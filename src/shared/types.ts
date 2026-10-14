@@ -306,6 +306,8 @@ export interface AppSettings {
     spellcheck: boolean
     showWordCount: boolean
     typewriterSounds: boolean
+    /** Words a day. 0 hides the goal. */
+    dailyGoal: number
   }
   providers: Record<ProviderId, ProviderSettings>
   routes: ModelRoutes

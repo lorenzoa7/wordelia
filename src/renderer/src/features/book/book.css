@@ -239,3 +239,31 @@
   background: var(--desk-2);
   color: var(--ink);
 }
+
+.today {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink-3);
+}
+.today-bar {
+  position: relative;
+  width: 54px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--desk-3);
+  overflow: hidden;
+}
+.today-bar span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 2px;
+  background: var(--ribbon);
+  transition: width var(--dur-slow) var(--ease-out);
+}
+.today.is-done {
+  color: var(--pen);
+}
+.today.is-done .today-bar span {
+  background: var(--pen);
+}

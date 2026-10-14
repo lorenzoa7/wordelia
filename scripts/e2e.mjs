@@ -12,7 +12,8 @@ const scenarios = [
   ['dark', '--dark'],
   ['library'],
   ['newbook'],
-  ['resize']
+  ['resize'],
+  ['today']
 ]
 
 function run(args) {

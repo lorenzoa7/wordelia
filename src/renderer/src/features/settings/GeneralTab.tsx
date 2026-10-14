@@ -41,6 +41,14 @@ export function GeneralTab(): React.JSX.Element | null {
           ariaLabel="Page zoom"
         />
       </Field>
+      <Field label="Daily goal (words)" inline>
+        <Select
+          value={String(settings.editor.dailyGoal ?? 0)}
+          onValueChange={(v) => void update({ editor: { ...settings.editor, dailyGoal: Number(v) } })}
+          options={[0, 250, 500, 750, 1000, 1500, 2000].map((n) => ({ value: String(n), label: n ? `${n} words` : 'Off' }))}
+          ariaLabel="Daily goal"
+        />
+      </Field>
       <Field label="Spell check" inline>
         <Switch checked={settings.editor.spellcheck} onCheckedChange={(v) => void update({ editor: { ...settings.editor, spellcheck: v } })} />
       </Field>

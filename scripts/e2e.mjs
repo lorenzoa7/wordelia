@@ -10,7 +10,8 @@ const scenarios = [
   ['history'],
   ['settings'],
   ['dark', '--dark'],
-  ['library']
+  ['library'],
+  ['newbook']
 ]
 
 function run(args) {

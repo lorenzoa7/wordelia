@@ -8,6 +8,7 @@ import clsx from 'clsx'
 import { parseMarkdown } from '@shared/markdown/parse'
 import { serializeMarkdown } from '@shared/markdown/serialize'
 import { countWords } from '@shared/book'
+import { chapterWord } from '@shared/export/model'
 import type { DocNode } from '@shared/types'
 import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
@@ -22,8 +23,6 @@ import { FindBar } from './FindBar'
 import { useEditorStats } from './stats'
 import { typewriterSound } from './typewriter-sound'
 import './editor.css'
-
-const NUMBER_WORDS = ['One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen', 'Twenty']
 
 export function PageEditor(): React.JSX.Element | null {
   const manifest = useBook((s) => s.manifest)
@@ -76,6 +75,10 @@ export function PageEditor(): React.JSX.Element | null {
     {
       extensions,
       content: chapter ? (parseMarkdown(chapter.body) as object) : '',
+      // Prose, not Markdown: "- " or "* " at the start of a line must stay text (dialogue!).
+      // Only the book's own typing rules run.
+      enableInputRules: ['smartTyping', 'sceneBreak'],
+      enablePasteRules: false,
       editorProps: {
         attributes: {
           class: 'manuscript',
@@ -247,6 +250,7 @@ export function PageEditor(): React.JSX.Element | null {
 }
 
 function ChapterHead({ index, title, id, onEnter }: { index: number; title: string; id: string; onEnter: () => void }): React.JSX.Element {
+  const language = useBook((s) => s.manifest?.language ?? 'en')
   const [value, setValue] = useState(title)
   useEffect(() => setValue(title), [title, id])
   const commit = (): void => {
@@ -255,7 +259,7 @@ function ChapterHead({ index, title, id, onEnter }: { index: number; title: stri
   }
   return (
     <header className="chapter-head">
-      <div className="chapter-label caps">Chapter {NUMBER_WORDS[index] ?? index + 1}</div>
+      <div className="chapter-label caps">{chapterWord(language, index + 1)}</div>
       <div className="chapter-number">{index + 1}</div>
       <input
         className="chapter-title"

@@ -21,6 +21,7 @@ import {
   uniqueName
 } from '@shared/book'
 import { writingRulesTemplate } from '@shared/ai/defaults'
+import { chapterWord } from '@shared/export/model'
 import type { BookManifest, BookSnapshot, Chapter, Entry, SyncState, Thread } from '@shared/types'
 import { atomicWrite, readJson, readTextOr, safeJoin } from '../fsutil'
 
@@ -66,7 +67,8 @@ export async function createBook(opts: {
 
   const manifest = newManifest({ title: opts.title, author: opts.author, language: opts.language })
   if (!opts.empty) {
-    const first: Chapter = { id: newId('ch'), file: 'Chapter One.md', title: 'Chapter One', body: '', meta: {} }
+    const title = chapterWord(opts.language, 1)
+    const first: Chapter = { id: newId('ch'), file: fileNameFromTitle(title), title, body: '', meta: {} }
     manifest.chapters.push({ id: first.id, file: first.file })
     await atomicWrite(join(root, MANUSCRIPT_DIR, first.file), chapterToFile(first))
   }

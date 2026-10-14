@@ -20,6 +20,7 @@ import {
 import type { BookManifest, BookSnapshot, CategoryDef, Chapter, Entry, SyncState, Thread } from '@shared/types'
 import { invoke, on } from '@/lib/api'
 import { saver } from './saver'
+import { chapterWord } from '@shared/export/model'
 import { runFlushers } from '@/lib/flush'
 
 export type BookView = 'write' | 'plan'
@@ -248,7 +249,7 @@ export const useBook = create<BookState>((set, get) => {
     async addChapter(afterId, title, body = '') {
       const { chapters, root } = get()
       if (!root) throw new Error('No book is open')
-      const t = title ?? `Chapter ${chapters.length + 1}`
+      const t = title ?? chapterWord(get().manifest?.language ?? 'en', chapters.length + 1)
       const file = uniqueName(fileNameFromTitle(t), chapters.map((c) => c.file))
       const ch: Chapter = { id: newId('ch'), file, title: t, body, meta: {} }
       const idx = afterId ? chapters.findIndex((c) => c.id === afterId) + 1 : chapters.length

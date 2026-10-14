@@ -81,6 +81,14 @@ function selectEntries(input: ChatPromptInput): Entry[] {
   for (const e of entriesMentionedIn(probe, book.entries)) ids.add(e.id)
   const current = book.chapters.find((c) => c.id === currentChapterId)
   if (current) for (const e of entriesMentionedIn(current.body, book.entries)) ids.add(e.id)
+  // The plot notes say where the story goes: always send them (up to a budget).
+  let plotTokens = 0
+  for (const e of book.entries) {
+    if (!/^(plot|enredo|trama)$/i.test(e.category)) continue
+    plotTokens += estimateTokens(e.body)
+    if (plotTokens > 12000) break
+    ids.add(e.id)
+  }
   return book.entries.filter((e) => ids.has(e.id))
 }
 

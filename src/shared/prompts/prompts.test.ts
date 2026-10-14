@@ -53,6 +53,12 @@ describe('chat system prompt', () => {
     expect(system('c1')).toContain('<planning_entry file="planning/Characters/Elias.md"')
   })
 
+  it('always includes the plot notes', () => {
+    entries.push({ id: 'e3', category: 'Plot', file: 'Plot/Final.md', name: 'Final', aliases: [], summary: '', image: null, body: 'O farol cai no último capítulo.', meta: {} })
+    expect(system('c3')).toContain('O farol cai no último capítulo.')
+    entries.pop()
+  })
+
   it('uses summaries when the book does not fit', () => {
     const s = system('c1', 12, { c3: 'Resumo do capítulo três.' })
     expect(s).toContain('Resumo do capítulo três.')

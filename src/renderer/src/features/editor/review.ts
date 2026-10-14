@@ -84,8 +84,24 @@ export function proposedPlain(markdown: string): string {
     .join('\n\n')
 }
 
+/** An empty block after the reviewed text. The review bar sits in it, so it never covers text. */
+function spacer(state: EditorState, r: ReviewData): Decoration {
+  const $to = state.doc.resolve(Math.min(r.to, state.doc.content.size))
+  const pos = $to.depth >= 1 ? $to.after(1) : r.to
+  return Decoration.widget(
+    pos,
+    () => {
+      const el = document.createElement('div')
+      el.className = 'review-spacer'
+      el.setAttribute('contenteditable', 'false')
+      return el
+    },
+    { side: 1, key: 'review-spacer', ignoreSelection: true }
+  )
+}
+
 function decorations(state: EditorState, r: ReviewData): DecorationSet {
-  const decos: Decoration[] = []
+  const decos: Decoration[] = [spacer(state, r)]
   if (r.phase !== 'ready') {
     decos.push(Decoration.inline(r.from, r.to, { class: r.phase === 'error' ? 'ai-error' : 'ai-pending' }))
     return DecorationSet.create(state.doc, decos)

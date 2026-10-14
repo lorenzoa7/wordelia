@@ -27,9 +27,20 @@ export interface ImportedBook {
   warnings: string[]
 }
 
+export interface FontFaceSpec {
+  family: string
+  style: string
+  weight: string
+  unicodeRange: string
+  /** Absolute URL of a font file of the app (http in dev, file in production) */
+  url: string
+}
+
 export interface PdfExportRequest {
+  /** Print HTML. The main process puts the embedded fonts where it finds the comment FONT_FACES. */
   html: string
   defaultName: string
+  fonts: FontFaceSpec[]
 }
 
 export interface DocxExportRequest {
@@ -85,6 +96,7 @@ export interface IpcInvokeMap {
   'window:setTheme': [[theme: 'light' | 'dark'], void]
   'window:openExternal': [[url: string], void]
   'window:showItem': [[path: string], void]
+  'window:setSpellLanguage': [[tag: string], void]
 }
 
 /** Events from main to renderer: channel -> payload */
@@ -130,7 +142,8 @@ export const INVOKE_CHANNELS: InvokeChannel[] = [
   'app:version',
   'window:setTheme',
   'window:openExternal',
-  'window:showItem'
+  'window:showItem',
+  'window:setSpellLanguage'
 ]
 
 export const EVENT_CHANNELS: EventChannel[] = ['book:externalChange', 'ai:event']

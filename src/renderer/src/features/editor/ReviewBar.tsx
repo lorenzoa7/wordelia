@@ -22,14 +22,16 @@ export function ReviewBar({ editor }: { editor: Editor }): React.JSX.Element {
     const place = (): void => {
       const desk = editor.view.dom.closest('.desk') as HTMLElement | null
       if (!desk) return
-      const end = editor.view.coordsAtPos(Math.min(review.to, editor.state.doc.content.size))
-      const start = editor.view.coordsAtPos(review.from)
       const box = desk.getBoundingClientRect()
       const page = editor.view.dom.getBoundingClientRect()
-      setPos({
-        top: end.bottom - box.top + desk.scrollTop + 12,
-        left: Math.min(Math.max(page.left - box.left + 24, start.left - box.left), box.width - 420)
-      })
+      const gap = editor.view.dom.querySelector('.review-spacer')
+      if (gap) {
+        const r = gap.getBoundingClientRect()
+        setPos({ top: r.top - box.top + desk.scrollTop + 6, left: page.left - box.left })
+        return
+      }
+      const end = editor.view.coordsAtPos(Math.min(review.to, editor.state.doc.content.size))
+      setPos({ top: end.bottom - box.top + desk.scrollTop + 12, left: page.left - box.left })
     }
     place()
     const id = requestAnimationFrame(place)

@@ -230,6 +230,9 @@
   z-index: 81;
   animation: dialog-in var(--dur-slow) var(--ease-out);
 }
+.dialog:focus-visible {
+  outline: none;
+}
 .dialog-head {
   display: flex;
   align-items: flex-start;
@@ -335,8 +338,15 @@
 .select:hover {
   border-color: var(--ink-4);
 }
+.select > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .select-caret {
   color: var(--ink-3);
+  flex-shrink: 0;
 }
 .select-content {
   min-width: var(--radix-select-trigger-width);

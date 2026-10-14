@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, Menu, shell } from 'electron'
 import { join } from 'node:path'
 import { cancelAll } from './ai'
 import { handleAssetProtocol, registerAssetScheme } from './assets'
@@ -6,6 +6,8 @@ import { unwatchAll } from './book/watcher'
 import { registerIpc } from './ipc'
 import { getSettings } from './settings'
 import { themeOverlay } from './window'
+import { loadWindowState, trackWindowState } from './window-state'
+import { installContextMenu } from './context-menu'
 
 // Tests use a separate data folder, so they never touch the user's library.
 if (process.env['WORDELIA_USER_DATA']) app.setPath('userData', process.env['WORDELIA_USER_DATA'])
@@ -17,9 +19,11 @@ async function createWindow(): Promise<void> {
   const dark =
     settings.theme === 'dark' ||
     (settings.theme === 'system' && (await import('electron')).nativeTheme.shouldUseDarkColors)
+  const saved = loadWindowState()
   const win = new BrowserWindow({
-    width: 1440,
-    height: 920,
+    width: saved?.bounds.width ?? 1440,
+    height: saved?.bounds.height ?? 920,
+    ...(saved ? { x: saved.bounds.x, y: saved.bounds.y } : {}),
     minWidth: 980,
     minHeight: 640,
     show: false,
@@ -36,7 +40,19 @@ async function createWindow(): Promise<void> {
     }
   })
 
-  win.once('ready-to-show', () => win.show())
+  win.once('ready-to-show', () => {
+    if (saved?.maximized) win.maximize()
+    win.show()
+  })
+  trackWindowState(win)
+  installContextMenu(win)
+
+  // Developer tools in development only.
+  if (!app.isPackaged) {
+    win.webContents.on('before-input-event', (_e, input) => {
+      if (input.type === 'keyDown' && input.control && input.shift && input.key.toLowerCase() === 'i') win.webContents.toggleDevTools()
+    })
+  }
 
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//.test(url)) void shell.openExternal(url)
@@ -55,6 +71,8 @@ async function createWindow(): Promise<void> {
 }
 
 app.whenReady().then(async () => {
+  // No menu bar: the app has its own title bar. Clipboard shortcuts still work in the page.
+  if (process.platform !== 'darwin') Menu.setApplicationMenu(null)
   handleAssetProtocol()
   registerIpc()
   await createWindow()

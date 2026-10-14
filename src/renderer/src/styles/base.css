@@ -138,3 +138,10 @@ textarea:focus-visible,
     transition-duration: 1ms !important;
   }
 }
+
+/* Green "accept" buttons need dark text on the light green of the dark theme. */
+:root[data-theme='dark'] .review-accept,
+:root[data-theme='dark'] .proposal-btn.is-accept,
+:root[data-theme='dark'] .hunk-actions button.is-accept {
+  color: #10261b;
+}

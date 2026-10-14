@@ -15,10 +15,10 @@ export function StatusBar(): React.JSX.Element {
       <span>
         {selectionWords > 0 ? (
           <>
-            <b>{selectionWords.toLocaleString()}</b> selected ·{' '}
+            <b>{selectionWords.toLocaleString('en-US')}</b> selected ·{' '}
           </>
         ) : null}
-        <b>{chapterWords.toLocaleString()}</b> words in chapter · {formatCount(bookWords)} in book · {minutes} min read
+        <b>{chapterWords.toLocaleString('en-US')}</b> words in chapter · {formatCount(bookWords)} in book · {minutes} min read
       </span>
       <span className={`save-state is-${save}`} title={save === 'error' ? saver.error : undefined}>
         {save === 'saved' && (

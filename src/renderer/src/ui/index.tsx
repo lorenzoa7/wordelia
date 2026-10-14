@@ -190,7 +190,16 @@ export function Dialog({
     <RDialog.Root open={open} onOpenChange={onOpenChange}>
       <RDialog.Portal>
         <RDialog.Overlay className="dialog-overlay" />
-        <RDialog.Content className={clsx('dialog grain', className)} style={{ width }}>
+        <RDialog.Content
+          className={clsx('dialog grain', className)}
+          style={{ width }}
+          onOpenAutoFocus={(e) => {
+            // Do not put a focus ring on the close button. Fields with autoFocus still get focus.
+            e.preventDefault()
+            ;(e.currentTarget as HTMLElement).focus()
+          }}
+          tabIndex={-1}
+        >
           <header className="dialog-head">
             <div>
               <RDialog.Title className="dialog-title">{title}</RDialog.Title>

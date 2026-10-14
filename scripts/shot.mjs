@@ -12,6 +12,7 @@ const scenario = process.argv[2] ?? 'home'
 const dark = process.argv.includes('--dark')
 const outDir = resolve('test-results/shots')
 await mkdir(outDir, { recursive: true })
+await mkdir(resolve('test-results/exports'), { recursive: true })
 
 const work = await mkdtemp(join(tmpdir(), 'wordelia-shot-'))
 const userData = join(work, 'userdata')
@@ -32,7 +33,7 @@ await cp(resolve('e2e/fixtures/sample-book'), book, { recursive: true })
 
 const app = await electron.launch({
   args: [resolve('out/main/index.js')],
-  env: { ...process.env, WORDELIA_E2E: '1', WORDELIA_MOCK_AI: '1', WORDELIA_USER_DATA: userData }
+  env: { ...process.env, WORDELIA_E2E: '1', WORDELIA_MOCK_AI: '1', WORDELIA_USER_DATA: userData, WORDELIA_EXPORT_DIR: resolve('test-results/exports'), WORDELIA_BOOKS_DIR: join(work, 'books') }
 })
 const page = await app.firstWindow()
 page.on('console', (m) => {

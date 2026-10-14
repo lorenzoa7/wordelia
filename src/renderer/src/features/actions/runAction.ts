@@ -11,6 +11,7 @@ import { toast, useUi } from '@/stores/ui'
 import { getActiveEditor } from '@/features/editor/registry'
 import { proposedPlain, reviewKey, textWithMap } from '@/features/editor/review'
 import { create } from 'zustand'
+import { normalizeRange } from './range'
 
 interface ActionRunState {
   running: boolean
@@ -112,45 +113,6 @@ export async function runAction(action: AiAction, range?: { from: number; to: nu
     return
   }
   editor.commands.updateReview(id, rewrite, 'ready')
-}
-
-/**
- * A selection that ends at the very start of a paragraph (or starts at the very end of one)
- * includes an empty piece of that paragraph. Leave that piece out, so a one-paragraph rewrite
- * does not join two paragraphs.
- */
-export function normalizeRange(doc: import('@tiptap/pm/model').Node, from: number, to: number): { from: number; to: number } {
-  let a = from
-  let b = to
-  const $b = doc.resolve(b)
-  if (b > a && $b.parent.isTextblock && $b.parentOffset === 0) {
-    // Move back to the end of the previous textblock.
-    let pos = $b.before() // position before this block
-    while (pos > a) {
-      const $p = doc.resolve(pos)
-      const before = $p.nodeBefore
-      if (!before) break
-      if (before.isTextblock) {
-        b = pos - 1
-        break
-      }
-      pos -= before.nodeSize
-    }
-  }
-  const $a = doc.resolve(a)
-  if (b > a && $a.parent.isTextblock && $a.parentOffset === $a.parent.content.size) {
-    let pos = $a.after()
-    while (pos < b) {
-      const after = doc.resolve(pos).nodeAfter
-      if (!after) break
-      if (after.isTextblock) {
-        a = pos + 1
-        break
-      }
-      pos += after.nodeSize
-    }
-  }
-  return { from: a, to: Math.max(a, b) }
 }
 
 export async function retryAction(): Promise<void> {

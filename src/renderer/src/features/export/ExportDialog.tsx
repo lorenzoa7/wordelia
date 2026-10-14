@@ -11,7 +11,7 @@ import { BOOK_FONTS, fontStack } from '@/lib/fonts'
 import { useBook } from '@/stores/book'
 import { toast } from '@/stores/ui'
 import { flushEditor } from '@/features/editor/registry'
-import { embeddedFontCss } from './fontCss'
+import { fontFaces } from './fontCss'
 import './export.css'
 
 type Format = 'pdf' | 'docx' | 'md' | 'txt'
@@ -50,8 +50,8 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
       const name = manifest.title || 'Book'
       let path: string | null = null
       if (format === 'pdf') {
-        const css = BOOK_FONTS.find((f) => f.family === s.typography.fontFamily)?.bundled ? await embeddedFontCss(s.typography.fontFamily) : ''
-        path = await invoke('export:pdf', { html: buildPrintHtml(model, css), defaultName: name })
+        const fonts = BOOK_FONTS.find((f) => f.family === s.typography.fontFamily)?.bundled ? fontFaces(s.typography.fontFamily) : []
+        path = await invoke('export:pdf', { html: buildPrintHtml(model, '/* FONT_FACES */'), defaultName: name, fonts })
       } else if (format === 'docx') {
         path = await invoke('export:docx', { book: model, defaultName: name })
       } else {

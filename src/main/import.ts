@@ -105,7 +105,11 @@ export async function readImport(path: string): Promise<ImportedBook> {
       return { title: name, author: '', chapters: [{ title: 'Chapter One', html: res.value }], warnings }
     }
     const frontLines = stripTags(front.replace(/<\/p>/g, '\n')).split('\n').map((l) => l.trim()).filter(Boolean)
-    return { title: frontLines[0] ?? name, author: frontLines[1] ?? '', chapters, warnings }
+    const title = frontLines[0] ?? name
+    // The author is the first short line after the title that is not boilerplate.
+    const boiler = /^(ficha catalogr|agradecimentos|sum[aá]rio|dedicat|copyright|©|acknowledg|contents|table of contents|dedication)/i
+    const author = frontLines.find((l) => l !== title && l.length <= 60 && !boiler.test(l)) ?? ''
+    return { title, author, chapters, warnings }
   }
   const src = await readFile(path, 'utf8')
   if (ext === '.md' || ext === '.markdown') return { title: name, author: '', chapters: splitMarkdown(src), warnings }

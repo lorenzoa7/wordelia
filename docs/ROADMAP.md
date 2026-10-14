@@ -1,6 +1,6 @@
 # Wordelia — Roadmap and status
 
-This file is the source of truth for progress. Update it after each task. Mark a task `[x]` only after you verify it (tests pass, or you saw it work in the app).
+This file is the source of truth for progress. Update it after each task. Mark a task `[x]` only after you verify it (tests pass, or you saw it work in the app). `[~]` means built but not yet verified.
 
 ## Current focus
 
@@ -26,7 +26,7 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] Library screen: recent books, new book, open folder
 - [x] Chapters: add, rename, reorder, delete
 - [x] Autosave with debounce, save state in the status bar
-- [x] File watcher: reload external changes
+- [~] File watcher: reload external changes — built; live test pending
 
 ## M2 — Editor
 
@@ -41,9 +41,9 @@ This file is the source of truth for progress. Update it after each task. Mark a
 ## M3 — AI providers
 
 - [x] Transport interface and stream events
-- [x] Claude Code transport (CLI)
-- [x] Codex transport (CLI)
-- [x] Anthropic API and OpenAI API transports
+- [~] Claude Code transport (CLI) — built; live test pending
+- [~] Codex transport (CLI) — built; live test pending
+- [~] Anthropic API and OpenAI API transports — built; live test pending
 - [x] Provider status detection and model lists
 - [x] Settings UI: providers, model routes, suggested routes
 

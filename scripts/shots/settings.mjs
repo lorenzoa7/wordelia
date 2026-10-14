@@ -1,0 +1,18 @@
+export default async function ({ page, shot, openBook }) {
+  await openBook()
+  await page.keyboard.press('Control+,')
+  await page.waitForTimeout(700)
+  await shot('appearance')
+  await page.locator('.settings-tab', { hasText: 'This book' }).click()
+  await page.waitForTimeout(400)
+  await shot('book')
+  await page.locator('.settings-tab', { hasText: 'AI' }).click()
+  await page.waitForTimeout(600)
+  await shot('ai')
+  await page.locator('.settings-panes').evaluate((el) => el.scrollTo({ top: 2000 }))
+  await page.waitForTimeout(300)
+  await shot('ai-routes')
+  await page.locator('.settings-tab', { hasText: 'Actions' }).click()
+  await page.waitForTimeout(400)
+  await shot('actions')
+}

@@ -147,6 +147,7 @@ export const useBook = create<BookState>((set, get) => {
 
     open(snap) {
       offExternal?.()
+      void invoke('window:setSpellLanguage', snap.manifest.language)
       offExternal = on('book:externalChange', (e) => {
         if (e.root === get().root) handleExternal(e.rel, e.content)
       })
@@ -195,6 +196,7 @@ export const useBook = create<BookState>((set, get) => {
       const next = { ...m, ...patch, updatedAt: now() }
       set({ manifest: next })
       persistManifest(next)
+      if (patch.language && patch.language !== m.language) void invoke('window:setSpellLanguage', patch.language)
     },
 
     setChapterBody(id, body) {

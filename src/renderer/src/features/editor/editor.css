@@ -585,3 +585,15 @@
   padding-top: 20vh;
   color: var(--ink-3);
 }
+
+/* Room for the review bar, under the reviewed text */
+.review-spacer {
+  height: 46px;
+  text-indent: 0;
+  animation: spacer-open var(--dur-med) var(--ease-out) both;
+}
+@keyframes spacer-open {
+  from {
+    height: 0;
+  }
+}

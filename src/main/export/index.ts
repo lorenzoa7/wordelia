@@ -1,11 +1,15 @@
 // Export: PDF (Chromium print), DOCX and text files.
 
-import { BrowserWindow, dialog } from 'electron'
+import { BrowserWindow, dialog, net } from 'electron'
 import { writeFile } from 'node:fs/promises'
-import type { DocxExportRequest, PdfExportRequest, TextExportRequest } from '@shared/ipc'
+import { join } from 'node:path'
+import type { DocxExportRequest, FontFaceSpec, PdfExportRequest, TextExportRequest } from '@shared/ipc'
 import { buildDocx } from './docx'
 
 async function askPath(win: BrowserWindow | undefined, defaultName: string, ext: string, label: string): Promise<string | null> {
+  // End-to-end tests write exports to a folder without a dialog.
+  const testDir = process.env['WORDELIA_EXPORT_DIR']
+  if (testDir) return join(testDir, `${defaultName}.${ext}`)
   const opts = { title: `Export ${label}`, defaultPath: `${defaultName}.${ext}`, filters: [{ name: label, extensions: [ext] }] }
   const res = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts)
   return res.canceled || !res.filePath ? null : res.filePath
@@ -37,10 +41,31 @@ export async function renderPdf(html: string): Promise<Buffer> {
   }
 }
 
+/** Read the app's own font files and turn them into @font-face rules with data URLs. */
+export async function fontFaceCss(fonts: FontFaceSpec[]): Promise<string> {
+  const rules: string[] = []
+  for (const f of fonts) {
+    if (!/^(https?:\/\/localhost|file:)/.test(f.url)) continue
+    try {
+      const res = await net.fetch(f.url)
+      if (!res.ok) continue
+      const data = Buffer.from(await res.arrayBuffer()).toString('base64')
+      rules.push(
+        `@font-face { font-family: '${f.family.replace(/'/g, '')}'; font-style: ${f.style}; font-weight: ${f.weight}; src: url(data:font/woff2;base64,${data}) format('woff2');${f.unicodeRange ? ` unicode-range: ${f.unicodeRange};` : ''} }`
+      )
+    } catch {
+      /* skip a font that does not load */
+    }
+  }
+  return rules.join('\n')
+}
+
 export async function exportPdf(win: BrowserWindow | undefined, req: PdfExportRequest): Promise<string | null> {
   const path = await askPath(win, req.defaultName, 'pdf', 'PDF')
   if (!path) return null
-  await writeFile(path, await renderPdf(req.html))
+  const css = await fontFaceCss(req.fonts ?? [])
+  const html = req.html.replace('/* FONT_FACES */', css)
+  await writeFile(path, await renderPdf(html))
   return path
 }
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'motion/react'
 import { DotsThree, FileArrowUp, FolderOpen, Plus, Trash, WarningCircle } from '@phosphor-icons/react'
 import { formatCount } from '@shared/book'
@@ -8,7 +8,7 @@ import { Logo } from '@/app/Logo'
 import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
 import { toast, useUi } from '@/stores/ui'
-import { invoke } from '@/lib/api'
+import { invoke, isE2E } from '@/lib/api'
 import { NewBookDialog } from './NewBookDialog'
 import { ImportDialog } from './ImportDialog'
 import './library.css'
@@ -37,6 +37,12 @@ export function LibraryView(): React.JSX.Element {
   const newOpen = useUi((s) => s.newBookOpen)
   const setNewOpen = useUi((s) => s.setNewBookOpen)
   const [importPath, setImportPath] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isE2E()) return
+    const hooks = (window as unknown as { __wordelia?: Record<string, unknown> }).__wordelia
+    if (hooks) hooks.importFile = (p: string) => setImportPath(p)
+  }, [])
 
   const openFolder = async (): Promise<void> => {
     const dir = await invoke('book:pickFolder', { title: 'Open a book folder' })

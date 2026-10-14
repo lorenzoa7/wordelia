@@ -15,6 +15,7 @@ import { listLibrary, removeFromLibrary, touchLibrary } from './library'
 import { getSecret, getSettings, setSecret, setSettings } from './settings'
 import { assetUrl, registerBookRoot } from './assets'
 import { themeOverlay } from './window'
+import { setSpellLanguage } from './context-menu'
 
 type Handler<C extends InvokeChannel> = (e: IpcMainInvokeEvent, ...args: InvokeArgs<C>) => Promise<InvokeResult<C>> | InvokeResult<C>
 
@@ -144,7 +145,8 @@ export function registerIpc(): void {
   handle('import:read', (_e, path) => readImport(path))
 
   handle('app:defaultBooksDir', async () => {
-    const dir = join(app.getPath('documents'), 'Wordelia')
+    // Tests set WORDELIA_BOOKS_DIR, so they never write to the user's Documents folder.
+    const dir = process.env['WORDELIA_BOOKS_DIR'] || join(app.getPath('documents'), 'Wordelia')
     await mkdir(dir, { recursive: true })
     return dir
   })
@@ -159,6 +161,10 @@ export function registerIpc(): void {
     if (/^https?:\/\//.test(url)) void shell.openExternal(url)
   })
   handle('window:showItem', (_e, path) => shell.showItemInFolder(path))
+  handle('window:setSpellLanguage', (e, tag) => {
+    const w = win(e)
+    if (w) setSpellLanguage(w, tag)
+  })
 }
 
 async function afterOpen(e: IpcMainInvokeEvent, root: string): Promise<void> {

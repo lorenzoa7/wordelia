@@ -20,5 +20,6 @@ export default async function ({ app, page, openBook, book }) {
   const chapter = await readFile(join(book, 'manuscript', 'A Tempestade.md'), 'utf8')
   const elias = await readFile(join(book, 'planning', 'Characters', 'Elias.md'), 'utf8')
   console.log('chapter saved:', chapter.includes('MARCADOR-FINAL-123'))
+  if (!chapter.includes('MARCADOR-FINAL-123') || !elias.includes('NOTA-456')) throw new Error('Text was not saved on close')
   console.log('note saved:', elias.includes('NOTA-456'))
 }

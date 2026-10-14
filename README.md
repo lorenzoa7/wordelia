@@ -17,6 +17,8 @@ Wordelia is a desktop writing app for novelists. It looks like a simple word pro
 - **Connected threads.** Keep one thread per character or per part of the plot. Each thread keeps a short digest. All threads read the digests of the others, so they do not contradict each other.
 - **Plan the story.** Characters, places, world and plot, as notes with images and aliases. Each note shows where its names appear in the manuscript.
 - **Sync the planning.** Press *Sync with manuscript*. The AI reads the chapters that changed and proposes new characters and new facts.
+- **Never lose a word.** Wordelia saves as you type, keeps versions of each chapter (when you open it, every few minutes, and before every AI change), and lets you compare and restore them. Deleted chapters go to a trash folder in the book.
+- **Small comforts.** A daily word goal, focus mode, typewriter scrolling, and optional typewriter sounds.
 - **Import and export.** Import DOCX (from Google Docs or Word), Markdown or text. Export a print-ready PDF (book or standard manuscript format), a DOCX with real Word styles (Google Docs opens it without loss), Markdown or text.
 - **Your files, your AI.** A book is a folder of Markdown files on your computer. Put it in Google Drive, OneDrive or git. Connect the AI that you already pay for.
 

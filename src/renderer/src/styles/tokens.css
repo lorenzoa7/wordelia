@@ -1,0 +1,142 @@
+/*
+ * Wordelia design tokens.
+ * Concept: a writing desk. Warm paper, black ink, a red typewriter ribbon,
+ * and a green editor's pen for AI suggestions.
+ */
+
+:root {
+  /* Type */
+  --font-ui: 'Courier Prime', 'Courier New', ui-monospace, monospace;
+  --font-prose: 'Literata', 'Iowan Old Style', Georgia, serif;
+  --font-book: var(--font-prose); /* Overridden by book typography at runtime */
+
+  --text-2xs: 10.5px;
+  --text-xs: 11.5px;
+  --text-sm: 12.5px;
+  --text-md: 13.5px;
+  --text-lg: 15px;
+  --text-xl: 18px;
+  --text-2xl: 24px;
+  --text-3xl: 34px;
+
+  --tracking-caps: 0.14em;
+  --tracking-tight: -0.01em;
+
+  /* Space (4 px grid) */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-10: 40px;
+  --s-12: 48px;
+  --s-16: 64px;
+
+  /* Shape */
+  --radius-xs: 3px;
+  --radius-sm: 6px;
+  --radius-md: 9px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+
+  /* Layout */
+  --titlebar-h: 44px;
+  --sidebar-w: 256px;
+  --chat-w: 400px;
+  --page-w: 760px;
+  --window-controls-w: 140px;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 120ms;
+  --dur-med: 220ms;
+  --dur-slow: 420ms;
+
+  /* Light theme: "Paper" */
+  --desk: #ece5d8;
+  --desk-2: #e5ddce;
+  --desk-3: #dcd3c2;
+  --paper: #fbf8f2;
+  --paper-2: #f6f1e7;
+  --paper-edge: #e3dacb;
+
+  --ink: #26221d;
+  --ink-2: #4a443b;
+  --ink-3: #847b6e;
+  --ink-4: #ada393;
+  --ink-5: #cfc6b6;
+
+  --rule: #dcd3c3;
+  --rule-soft: #e7e0d3;
+
+  --ribbon: #a83a2b;
+  --ribbon-2: #8f2f22;
+  --ribbon-soft: #f3e0d9;
+  --ribbon-wash: rgba(168, 58, 43, 0.12);
+
+  --pen: #2f6a52; /* AI insertions: an editor's green pen */
+  --pen-soft: #dfeadf;
+  --pen-wash: rgba(47, 106, 82, 0.12);
+
+  --strike: #a83a2b;
+  --strike-soft: #f5e3dc;
+
+  --focus: #a83a2b;
+  --selection: rgba(168, 58, 43, 0.16);
+
+  --shadow-page: 0 1px 1px rgba(64, 48, 28, 0.04), 0 2px 6px rgba(64, 48, 28, 0.05),
+    0 18px 40px -18px rgba(64, 48, 28, 0.22);
+  --shadow-pop: 0 1px 2px rgba(40, 30, 18, 0.06), 0 8px 24px -6px rgba(40, 30, 18, 0.2),
+    0 0 0 1px rgba(40, 30, 18, 0.06);
+  --shadow-inset: inset 0 1px 2px rgba(40, 30, 18, 0.06);
+
+  --grain-opacity: 0.35;
+
+  color-scheme: light;
+}
+
+/* Dark theme: "Lamplight" */
+:root[data-theme='dark'] {
+  --desk: #191714;
+  --desk-2: #1f1c18;
+  --desk-3: #2a2621;
+  --paper: #23201b;
+  --paper-2: #2a261f;
+  --paper-edge: #322d26;
+
+  --ink: #ebe4d6;
+  --ink-2: #c9c0ae;
+  --ink-3: #908776;
+  --ink-4: #6b6355;
+  --ink-5: #4a443a;
+
+  --rule: #36312a;
+  --rule-soft: #2d2923;
+
+  --ribbon: #e07a5f;
+  --ribbon-2: #ec8d72;
+  --ribbon-soft: #3d2620;
+  --ribbon-wash: rgba(224, 122, 95, 0.16);
+
+  --pen: #8cc3a4;
+  --pen-soft: #22352b;
+  --pen-wash: rgba(140, 195, 164, 0.14);
+
+  --strike: #e58d76;
+  --strike-soft: #3a231d;
+
+  --focus: #e07a5f;
+  --selection: rgba(224, 122, 95, 0.24);
+
+  --shadow-page: 0 1px 1px rgba(0, 0, 0, 0.2), 0 18px 40px -18px rgba(0, 0, 0, 0.6);
+  --shadow-pop: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 28px -6px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 245, 230, 0.06);
+  --shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+
+  --grain-opacity: 0.18;
+
+  color-scheme: dark;
+}

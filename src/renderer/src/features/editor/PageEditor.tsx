@@ -19,6 +19,7 @@ import { SelectionMenu } from './SelectionMenu'
 import { ReviewBar } from './ReviewBar'
 import { FindBar } from './FindBar'
 import { useEditorStats } from './stats'
+import { typewriterSound } from './typewriter-sound'
 import './editor.css'
 
 const NUMBER_WORDS = ['One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen', 'Twenty']
@@ -167,6 +168,23 @@ export function PageEditor(): React.JSX.Element | null {
       editor.off('selectionUpdate', onSel)
     }
   }, [editor, ui?.typewriterScroll])
+
+  // Optional typewriter sounds.
+  const sounds = useApp((s) => s.settings?.editor.typewriterSounds ?? false)
+  useEffect(() => {
+    if (!editor || !sounds) return
+    const dom = editor.view.dom
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'Enter') typewriterSound('bell')
+      else if (e.ctrlKey || e.metaKey || e.altKey) return
+      else if (e.key === 'Enter') typewriterSound('enter')
+      else if (e.key === 'Backspace' || e.key === 'Delete') typewriterSound('back')
+      else if (e.key === ' ') typewriterSound('space')
+      else if (e.key.length === 1) typewriterSound('key')
+    }
+    dom.addEventListener('keydown', onKey)
+    return () => dom.removeEventListener('keydown', onKey)
+  }, [editor, sounds])
 
   // Show the toolbar again when the mouse moves.
   useEffect(() => {

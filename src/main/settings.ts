@@ -14,7 +14,7 @@ export function defaultSettings(): AppSettings {
     version: 1,
     theme: 'light',
     ui: { sidebarOpen: true, chatOpen: true, focusMode: false, typewriterScroll: false, zoom: 1 },
-    editor: { spellcheck: true, showWordCount: true },
+    editor: { spellcheck: true, showWordCount: true, typewriterSounds: false },
     providers: {
       'claude-code': { enabled: true },
       codex: { enabled: true },

@@ -3,6 +3,7 @@ import { Moon, Sun, Desktop } from '@phosphor-icons/react'
 import type { ThemeSetting } from '@shared/types'
 import { Field, Select, Switch } from '@/ui'
 import { useApp } from '@/stores/app'
+import { typewriterSound } from '@/features/editor/typewriter-sound'
 
 const THEMES: Array<{ id: ThemeSetting; label: string; icon: React.ReactNode }> = [
   { id: 'light', label: 'Paper', icon: <Sun size={16} /> },
@@ -45,6 +46,15 @@ export function GeneralTab(): React.JSX.Element | null {
       </Field>
       <Field label="Focus mode (dim other paragraphs)" inline>
         <Switch checked={settings.ui.focusMode} onCheckedChange={(v) => setUi({ focusMode: v })} />
+      </Field>
+      <Field label="Typewriter sounds" inline>
+        <Switch
+          checked={settings.editor.typewriterSounds}
+          onCheckedChange={(v) => {
+            void update({ editor: { ...settings.editor, typewriterSounds: v } })
+            if (v) typewriterSound('bell')
+          }}
+        />
       </Field>
       <Field label="Typewriter scrolling" inline>
         <Switch checked={settings.ui.typewriterScroll} onCheckedChange={(v) => setUi({ typewriterScroll: v })} />

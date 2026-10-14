@@ -304,6 +304,7 @@ export interface AppSettings {
   editor: {
     spellcheck: boolean
     showWordCount: boolean
+    typewriterSounds: boolean
   }
   providers: Record<ProviderId, ProviderSettings>
   routes: ModelRoutes

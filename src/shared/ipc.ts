@@ -92,6 +92,7 @@ export interface IpcInvokeMap {
 
   'app:defaultBooksDir': [[], string]
   'app:version': [[], string]
+  'app:flushDone': [[], void]
 
   'window:setTheme': [[theme: 'light' | 'dark'], void]
   'window:openExternal': [[url: string], void]
@@ -103,6 +104,8 @@ export interface IpcInvokeMap {
 export interface IpcEventMap {
   'book:externalChange': { root: string; rel: string; content: string | null }
   'ai:event': { requestId: string; event: StreamEvent }
+  /** The window wants to close: save everything, then call app:flushDone */
+  'app:flushRequest': Record<string, never>
 }
 
 export type InvokeChannel = keyof IpcInvokeMap
@@ -140,13 +143,14 @@ export const INVOKE_CHANNELS: InvokeChannel[] = [
   'import:read',
   'app:defaultBooksDir',
   'app:version',
+  'app:flushDone',
   'window:setTheme',
   'window:openExternal',
   'window:showItem',
   'window:setSpellLanguage'
 ]
 
-export const EVENT_CHANNELS: EventChannel[] = ['book:externalChange', 'ai:event']
+export const EVENT_CHANNELS: EventChannel[] = ['book:externalChange', 'ai:event', 'app:flushRequest']
 
 export interface WordeliaBridge {
   platform: string

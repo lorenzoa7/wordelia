@@ -13,6 +13,7 @@ import { useBook } from '@/stores/book'
 import { fontStack } from '@/lib/fonts'
 import { editorExtensions } from './extensions'
 import { setActiveEditor } from './registry'
+import { registerFlusher } from '@/lib/flush'
 import { Toolbar } from './Toolbar'
 import { SelectionMenu } from './SelectionMenu'
 import { ReviewBar } from './ReviewBar'
@@ -141,7 +142,9 @@ export function PageEditor(): React.JSX.Element | null {
   useEffect(() => {
     if (!editor) return
     setActiveEditor({ editor, chapterId: currentId.current ?? '', flush })
+    const unregister = registerFlusher(flush)
     return () => {
+      unregister()
       flush()
       setActiveEditor(null)
     }

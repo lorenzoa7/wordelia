@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { cancelAll } from './ai'
 import { handleAssetProtocol, registerAssetScheme } from './assets'
 import { unwatchAll } from './book/watcher'
-import { registerIpc } from './ipc'
+import { onFlushDone, registerIpc } from './ipc'
 import { getSettings } from './settings'
 import { themeOverlay } from './window'
 import { loadWindowState, trackWindowState } from './window-state'
@@ -45,6 +45,22 @@ async function createWindow(): Promise<void> {
     win.show()
   })
   trackWindowState(win)
+
+  // Before the window closes, let the renderer save the last keystrokes.
+  let allowClose = false
+  win.on('close', (e) => {
+    if (allowClose) return
+    e.preventDefault()
+    const done = (): void => {
+      if (allowClose) return
+      allowClose = true
+      clearTimeout(timer)
+      if (!win.isDestroyed()) win.close()
+    }
+    const timer = setTimeout(done, 4000)
+    onFlushDone(win.webContents.id, done)
+    win.webContents.send('app:flushRequest', {})
+  })
   installContextMenu(win)
 
   // Developer tools in development only.

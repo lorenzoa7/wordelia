@@ -20,6 +20,7 @@ import {
 import type { BookManifest, BookSnapshot, CategoryDef, Chapter, Entry, SyncState, Thread } from '@shared/types'
 import { invoke, on } from '@/lib/api'
 import { saver } from './saver'
+import { runFlushers } from '@/lib/flush'
 
 export type BookView = 'write' | 'plan'
 
@@ -168,6 +169,7 @@ export const useBook = create<BookState>((set, get) => {
     },
 
     async close() {
+      runFlushers()
       await saver.flush()
       const root = get().root
       if (root) await invoke('book:close', root)

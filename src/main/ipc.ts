@@ -23,6 +23,13 @@ function handle<C extends InvokeChannel>(channel: C, fn: Handler<C>): void {
   ipcMain.handle(channel, (e, ...args) => fn(e, ...(args as InvokeArgs<C>)))
 }
 
+const flushWaiters = new Map<number, () => void>()
+
+/** Call `fn` when the renderer of `webContentsId` reports that it saved everything. */
+export function onFlushDone(webContentsId: number, fn: () => void): void {
+  flushWaiters.set(webContentsId, fn)
+}
+
 const win = (e: IpcMainInvokeEvent): BrowserWindow | undefined => BrowserWindow.fromWebContents(e.sender) ?? undefined
 
 export function registerIpc(): void {
@@ -151,6 +158,11 @@ export function registerIpc(): void {
     return dir
   })
   handle('app:version', () => app.getVersion())
+  handle('app:flushDone', (e) => {
+    const fn = flushWaiters.get(e.sender.id)
+    flushWaiters.delete(e.sender.id)
+    fn?.()
+  })
 
   handle('window:setTheme', (e, theme) => {
     const w = win(e)

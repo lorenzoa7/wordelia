@@ -66,6 +66,6 @@ try {
   console.error(err)
   await shot('error')
 } finally {
-  await app.close()
+  await app.close().catch(() => {})
   await rm(work, { recursive: true, force: true }).catch(() => {})
 }

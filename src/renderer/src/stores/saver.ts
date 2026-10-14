@@ -106,7 +106,3 @@ export const saver = {
     return lastError
   }
 }
-
-window.addEventListener('beforeunload', () => {
-  void saver.flush()
-})

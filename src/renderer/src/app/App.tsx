@@ -4,7 +4,9 @@ import { TooltipProvider } from '@/ui'
 import { PromptHost } from '@/ui/prompt'
 import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
-import { invoke, isE2E } from '@/lib/api'
+import { invoke, isE2E, on } from '@/lib/api'
+import { runFlushers } from '@/lib/flush'
+import { saver } from '@/stores/saver'
 import { LibraryView } from '@/features/library/LibraryView'
 import { BookView } from '@/features/book/BookView'
 import { SettingsDialog } from '@/features/settings/SettingsDialog'
@@ -45,6 +47,16 @@ export function App(): React.JSX.Element {
   }, [])
 
   useGlobalShortcuts()
+
+  // Save everything before the window closes.
+  useEffect(
+    () =>
+      on('app:flushRequest', () => {
+        runFlushers()
+        void saver.flush().finally(() => void invoke('app:flushDone'))
+      }),
+    []
+  )
 
   return (
     <TooltipProvider>

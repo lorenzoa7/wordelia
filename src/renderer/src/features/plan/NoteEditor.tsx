@@ -7,6 +7,7 @@ import type { DocNode } from '@shared/types'
 import { schemaExtensions } from '@/features/editor/extensions'
 import { SmartTyping, quotesFor } from '@/features/editor/smart-typing'
 import { useBook } from '@/stores/book'
+import { registerFlusher } from '@/lib/flush'
 
 /** A rich-text editor for notes (planning entries, writing rules). Markdown in, Markdown out. */
 export function NoteEditor({
@@ -52,13 +53,19 @@ export function NoteEditor({
     [extensions, docKey]
   )
 
-  // Save pending text when the note closes.
+  // Save pending text when the note closes, or when the book or the window closes.
   useEffect(() => {
-    return () => {
+    const flush = (): void => {
       if (timer.current && editor && !editor.isDestroyed) {
         clearTimeout(timer.current)
+        timer.current = undefined
         onChangeRef.current(serializeMarkdown(editor.getJSON() as DocNode))
       }
+    }
+    const unregister = registerFlusher(flush)
+    return () => {
+      unregister()
+      flush()
     }
   }, [editor])
 

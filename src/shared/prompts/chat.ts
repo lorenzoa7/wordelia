@@ -84,35 +84,40 @@ function selectEntries(input: ChatPromptInput): Entry[] {
   return book.entries.filter((e) => ids.has(e.id))
 }
 
-function manuscriptBlock(input: ChatPromptInput): string {
+/**
+ * The manuscript in two parts, for prompt caching:
+ * - `stable`: the chapters that are not open, in order. They change rarely.
+ * - `current`: the outline and the open chapter, which change while the author writes.
+ */
+function manuscriptParts(input: ChatPromptInput): { stable: string; current: string } {
   const { book, currentChapterId, mentions, summaries, manuscriptBudget } = input
   const chapters = book.chapters
   const total = chapters.reduce((n, c) => n + estimateTokens(c.body), 0)
-  const parts: string[] = [outlineBlock(chapters, currentChapterId)]
-  if (total <= manuscriptBudget) {
-    chapters.forEach((c, i) => parts.push(chapterBlock(c, i, c.id === currentChapterId)))
-    return parts.join('\n\n')
-  }
-  // The book is too long: full text for the current chapter, its neighbors and mentioned chapters.
+  const fits = total <= manuscriptBudget
+  // When the book is too long: full text for the open chapter, its neighbors and mentioned chapters.
   const full = new Set<string>()
   const idx = chapters.findIndex((c) => c.id === currentChapterId)
-  if (idx >= 0) {
-    full.add(chapters[idx].id)
+  if (!fits) {
     if (idx > 0) full.add(chapters[idx - 1].id)
-    if (idx + 1 < chapters.length) full.add(chapters[idx + 1].id)
+    if (idx >= 0 && idx + 1 < chapters.length) full.add(chapters[idx + 1].id)
+    for (const m of mentions) if (m.kind === 'chapter') full.add(m.id)
   }
-  for (const m of mentions) if (m.kind === 'chapter') full.add(m.id)
-  let used = 0
+  const current = idx >= 0 ? chapters[idx] : null
+  let used = current ? estimateTokens(current.body) : 0
+  const stable: string[] = []
   chapters.forEach((c, i) => {
-    if (full.has(c.id) && used + estimateTokens(c.body) <= manuscriptBudget) {
-      used += estimateTokens(c.body)
-      parts.push(chapterBlock(c, i, c.id === currentChapterId))
+    if (c.id === currentChapterId) return
+    if (fits || (full.has(c.id) && used + estimateTokens(c.body) <= manuscriptBudget)) {
+      if (!fits) used += estimateTokens(c.body)
+      stable.push(chapterBlock(c, i, false))
     } else {
       const summary = summaries[c.id] ?? c.body.trim().slice(0, 700) + (c.body.length > 700 ? ' […]' : '')
-      parts.push(`<chapter_summary file="manuscript/${c.file}" number="${i + 1}" title="${c.title.replace(/"/g, "'")}">\n${summary}\n</chapter_summary>`)
+      stable.push(`<chapter_summary file="manuscript/${c.file}" number="${i + 1}" title="${c.title.replace(/"/g, "'")}">\n${summary}\n</chapter_summary>`)
     }
   })
-  return parts.join('\n\n')
+  const now = [outlineBlock(chapters, currentChapterId)]
+  if (current) now.push(chapterBlock(current, idx, true))
+  return { stable: stable.join('\n\n'), current: now.join('\n\n') }
 }
 
 export function buildChatSystem(input: ChatPromptInput): string {
@@ -120,15 +125,19 @@ export function buildChatSystem(input: ChatPromptInput): string {
   const m = book.manifest
   const entries = selectEntries(input)
   const others = threadsBlock(book.threads, thread.id)
+  const manuscript = manuscriptParts(input)
+  // Stable sections first, so providers can cache them between messages.
   const sections = [
     ROLE,
+    PROTOCOL,
     `# Writing rules of the book\n${writingRulesBlock(book.writingRules)}`,
     `# The book\n${bookBlock(m)}`,
-    `# Planning\nThe planning is the story bible. Language of the book: ${languageName(m.language)}.\n${planningIndex(book.entries)}${entries.length ? '\n\n' + entries.map(entryBlock).join('\n\n') : ''}`,
-    `# Manuscript\n${manuscriptBlock(input)}`,
+    `# Planning\nThe planning is the story bible. Language of the book: ${languageName(m.language)}.\n${planningIndex(book.entries)}`,
+    manuscript.stable ? `# Manuscript: the other chapters\n${manuscript.stable}` : '',
+    `# Manuscript: outline and the open chapter\n${manuscript.current}`,
+    entries.length ? `# Planning entries that matter now\n${entries.map(entryBlock).join('\n\n')}` : '',
     others ? `# Other conversations about this book\nThese are digests of the author's other chat threads. Stay consistent with their facts and decisions.\n${others}` : '',
-    `# This conversation\nTitle: ${thread.title}${thread.brief ? `\nPurpose: ${thread.brief}` : ''}${thread.digest ? `\nDigest of the earlier messages:\n${thread.digest}` : ''}`,
-    PROTOCOL
+    `# This conversation\nTitle: ${thread.title}${thread.brief ? `\nPurpose: ${thread.brief}` : ''}${thread.digest ? `\nDigest of the earlier messages:\n${thread.digest}` : ''}`
   ]
   return sections.filter(Boolean).join('\n\n')
 }

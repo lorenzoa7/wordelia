@@ -1,0 +1,14 @@
+node_modules/
+out/
+dist/
+release/
+coverage/
+*.log
+.DS_Store
+.vite/
+test-results/
+playwright-report/
+.env
+.env.*
+/tmp/
+/scratch/

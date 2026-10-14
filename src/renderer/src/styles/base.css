@@ -51,6 +51,12 @@ button {
   outline-offset: 2px;
   border-radius: var(--radius-xs);
 }
+/* Text fields show focus with their own border. */
+input:focus-visible,
+textarea:focus-visible,
+[contenteditable]:focus-visible {
+  outline: none;
+}
 
 /* Thin, warm scrollbars */
 ::-webkit-scrollbar {

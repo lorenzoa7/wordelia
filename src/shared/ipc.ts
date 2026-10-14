@@ -50,7 +50,7 @@ export interface IpcInvokeMap {
   'library:remove': [[root: string], void]
   'library:touch': [[item: LibraryItem], void]
 
-  'book:create': [[opts: { parentDir: string; title: string; author: string; language: string }], BookSnapshot]
+  'book:create': [[opts: { parentDir: string; title: string; author: string; language: string; empty?: boolean }], BookSnapshot]
   'book:open': [[root: string], BookSnapshot]
   'book:close': [[root: string], void]
   'book:pickFolder': [[opts: { title: string; create?: boolean }], string | null]
@@ -78,6 +78,9 @@ export interface IpcInvokeMap {
 
   'import:pick': [[], string | null]
   'import:read': [[path: string], ImportedBook]
+
+  'app:defaultBooksDir': [[], string]
+  'app:version': [[], string]
 
   'window:setTheme': [[theme: 'light' | 'dark'], void]
   'window:openExternal': [[url: string], void]
@@ -123,6 +126,8 @@ export const INVOKE_CHANNELS: InvokeChannel[] = [
   'export:text',
   'import:pick',
   'import:read',
+  'app:defaultBooksDir',
+  'app:version',
   'window:setTheme',
   'window:openExternal',
   'window:showItem'

@@ -78,8 +78,16 @@ function icon() {
 
 await mkdir('resources/brand', { recursive: true })
 await mkdir('build', { recursive: true })
+await mkdir('src/renderer/src/assets', { recursive: true })
 await writeFile('resources/brand/wordmark.svg', wordmark(INK))
 await writeFile('resources/brand/wordmark-light.svg', wordmark('#E9E2D4'))
+// UI version: colors come from CSS classes, so the logo follows the theme.
+await writeFile(
+  'src/renderer/src/assets/wordmark.svg',
+  wordmark('currentColor')
+    .replace('<path ', '<path class="wm-ink" ')
+    .replace(`fill="${RIBBON}"`, 'class="wm-caret"')
+)
 const iconSvg = icon()
 await writeFile('resources/brand/icon.svg', iconSvg)
 

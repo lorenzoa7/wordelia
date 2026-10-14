@@ -37,7 +37,7 @@ export const DEFAULT_ACTIONS: AiAction[] = [
   {
     id: 'grammar',
     name: 'Fix grammar only',
-    icon: 'SpellCheck',
+    icon: 'Checks',
     builtIn: true,
     route: null,
     contextChars: 600,

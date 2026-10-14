@@ -1,6 +1,6 @@
 // IPC handlers. The contract is in src/shared/ipc.ts.
 
-import { BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
 import { copyFile, mkdir, rename, rm } from 'node:fs/promises'
 import { basename, extname, join } from 'node:path'
 import { ASSETS_DIR, countMarkdownWords, fileNameFromTitle, uniqueName } from '@shared/book'
@@ -142,6 +142,13 @@ export function registerIpc(): void {
     return res.canceled ? null : (res.filePaths[0] ?? null)
   })
   handle('import:read', (_e, path) => readImport(path))
+
+  handle('app:defaultBooksDir', async () => {
+    const dir = join(app.getPath('documents'), 'Wordelia')
+    await mkdir(dir, { recursive: true })
+    return dir
+  })
+  handle('app:version', () => app.getVersion())
 
   handle('window:setTheme', (e, theme) => {
     const w = win(e)

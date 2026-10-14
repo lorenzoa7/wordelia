@@ -56,6 +56,8 @@ export async function createBook(opts: {
   title: string
   author: string
   language: string
+  /** No first chapter (for imports) */
+  empty?: boolean
 }): Promise<BookSnapshot> {
   const existing = await readdir(opts.parentDir).catch(() => [] as string[])
   const folder = uniqueName(fileNameFromTitle(opts.title, ''), existing)
@@ -63,11 +65,13 @@ export async function createBook(opts: {
   await mkdir(root, { recursive: true })
 
   const manifest = newManifest({ title: opts.title, author: opts.author, language: opts.language })
-  const first: Chapter = { id: newId('ch'), file: 'Chapter One.md', title: 'Chapter One', body: '', meta: {} }
-  manifest.chapters.push({ id: first.id, file: first.file })
-
+  if (!opts.empty) {
+    const first: Chapter = { id: newId('ch'), file: 'Chapter One.md', title: 'Chapter One', body: '', meta: {} }
+    manifest.chapters.push({ id: first.id, file: first.file })
+    await atomicWrite(join(root, MANUSCRIPT_DIR, first.file), chapterToFile(first))
+  }
+  await mkdir(join(root, MANUSCRIPT_DIR), { recursive: true })
   await atomicWrite(join(root, MANIFEST_FILE), JSON.stringify(manifest, null, 2) + '\n')
-  await atomicWrite(join(root, MANUSCRIPT_DIR, first.file), chapterToFile(first))
   for (const c of manifest.planning.categories) await mkdir(join(root, PLANNING_DIR, c.folder), { recursive: true })
   await mkdir(join(root, THREADS_DIR), { recursive: true })
   await atomicWrite(join(root, WRITING_RULES_FILE), writingRulesTemplate(languageName(opts.language)))

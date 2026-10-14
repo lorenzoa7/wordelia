@@ -1,9 +1,42 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 
-function App(): React.JSX.Element {
-  return <h1 style={{ fontFamily: 'monospace', padding: 48 }}>wordelia</h1>
-}
+import '@fontsource/courier-prime/400.css'
+import '@fontsource/courier-prime/400-italic.css'
+import '@fontsource/courier-prime/700.css'
+import '@fontsource/literata/400.css'
+import '@fontsource/literata/400-italic.css'
+import '@fontsource/literata/600.css'
+import '@fontsource/literata/700.css'
+import '@fontsource/literata/700-italic.css'
+import '@fontsource/eb-garamond/400.css'
+import '@fontsource/eb-garamond/400-italic.css'
+import '@fontsource/eb-garamond/700.css'
+import '@fontsource/crimson-pro/400.css'
+import '@fontsource/crimson-pro/400-italic.css'
+import '@fontsource/crimson-pro/700.css'
+import '@fontsource/libre-baskerville/400.css'
+import '@fontsource/libre-baskerville/400-italic.css'
+import '@fontsource/libre-baskerville/700.css'
+import '@fontsource/baskervville/400.css'
+import '@fontsource/baskervville/400-italic.css'
+import '@fontsource/lora/400.css'
+import '@fontsource/lora/400-italic.css'
+import '@fontsource/lora/700.css'
+import '@fontsource/merriweather/400.css'
+import '@fontsource/merriweather/400-italic.css'
+import '@fontsource/merriweather/700.css'
+import '@fontsource/source-serif-4/400.css'
+import '@fontsource/source-serif-4/400-italic.css'
+import '@fontsource/source-serif-4/700.css'
+import '@fontsource/cormorant-garamond/400.css'
+import '@fontsource/cormorant-garamond/400-italic.css'
+import '@fontsource/cormorant-garamond/700.css'
+
+import './styles/tokens.css'
+import './styles/base.css'
+import './ui/ui.css'
+import { App } from './app/App'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

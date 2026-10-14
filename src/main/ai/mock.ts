@@ -39,6 +39,7 @@ function reply(req: CompletionRequest): string {
     const sel = between(last, '<selection>\n', '\n</selection>') ?? between(last, '<selection>', '</selection>') ?? last
     return `<rewrite>\n${polish(sel.trim())}\n</rewrite>`
   }
+  if (req.purpose === 'background' && /short title/i.test(req.system)) return 'The opening paragraph'
   if (req.purpose === 'background') {
     return '- The writer and the assistant discussed the current chapter.\n- Decision: keep the tone dark and quiet.'
   }

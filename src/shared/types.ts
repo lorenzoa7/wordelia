@@ -300,6 +300,7 @@ export interface AppSettings {
     focusMode: boolean
     typewriterScroll: boolean
     zoom: number
+    chatWidth: number
   }
   editor: {
     spellcheck: boolean

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
@@ -16,12 +16,37 @@ import { startAutoSnapshots } from '@/features/history/snapshots'
 import './book.css'
 
 const SIDEBAR_W = 256
-const CHAT_W = 400
+const CHAT_MIN = 320
+const CHAT_MAX = 680
 
 export function BookView(): React.JSX.Element {
   const view = useBook((s) => s.view)
   const sidebarOpen = useApp((s) => s.settings?.ui.sidebarOpen ?? true)
   const chatOpen = useApp((s) => s.settings?.ui.chatOpen ?? true)
+  const savedWidth = useApp((s) => s.settings?.ui.chatWidth ?? 400)
+  const [chatW, setChatW] = useState(savedWidth)
+  const [resizing, setResizing] = useState(false)
+  useEffect(() => setChatW(savedWidth), [savedWidth])
+
+  const startResize = (e: React.PointerEvent): void => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startW = chatW
+    let w = startW
+    setResizing(true)
+    const move = (ev: PointerEvent): void => {
+      w = Math.min(CHAT_MAX, Math.max(CHAT_MIN, startW + (startX - ev.clientX)))
+      setChatW(w)
+    }
+    const up = (): void => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      setResizing(false)
+      useApp.getState().setUi({ chatWidth: Math.round(w) })
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
   const exportOpen = useUi((s) => s.exportOpen)
   const setExportOpen = useUi((s) => s.setExportOpen)
   const historyChapterId = useUi((s) => s.historyChapterId)
@@ -79,12 +104,22 @@ export function BookView(): React.JSX.Element {
       </div>
 
       <motion.div
-        className="book-chat"
+        className={`book-chat${resizing ? ' is-resizing' : ''}`}
         initial={false}
-        animate={{ width: chatOpen ? CHAT_W : 0, opacity: chatOpen ? 1 : 0 }}
-        transition={{ type: 'spring', stiffness: 380, damping: 40 }}
+        animate={{ width: chatOpen ? chatW : 0, opacity: chatOpen ? 1 : 0 }}
+        transition={resizing ? { duration: 0 } : { type: 'spring', stiffness: 380, damping: 40 }}
       >
-        <div className="book-chat-inner" style={{ width: CHAT_W }}>
+        {chatOpen && (
+          <div
+            className="chat-resizer"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize the chat"
+            onPointerDown={startResize}
+            onDoubleClick={() => useApp.getState().setUi({ chatWidth: 400 })}
+          />
+        )}
+        <div className="book-chat-inner" style={{ width: chatW }}>
           <ChatPanel />
         </div>
       </motion.div>

@@ -5,6 +5,7 @@ import MarkdownIt from 'markdown-it'
 import type StateInline from 'markdown-it/lib/rules_inline/state_inline.mjs'
 import type Token from 'markdown-it/lib/token.mjs'
 import type { DocMark, DocNode } from '../types'
+import { setInlineVerifier } from './serialize'
 
 const md = new MarkdownIt({ html: true, linkify: false, typographer: false, breaks: false })
 md.disable(['code', 'fence', 'table', 'lheading', 'html_block'])
@@ -82,6 +83,8 @@ function popMark(ctx: InlineCtx, type: string): void {
   }
 }
 
+const HTML_MARKS: Record<string, string> = { u: 'underline', strong: 'bold', b: 'bold', em: 'italic', i: 'italic', s: 'strike', del: 'strike' }
+
 function inlineToNodes(tokens: Token[]): DocNode[] {
   const out: DocNode[] = []
   const ctx: InlineCtx = { marks: [] }
@@ -140,9 +143,11 @@ function inlineToNodes(tokens: Token[]): DocNode[] {
         break
       case 'html_inline': {
         const tag = t.content.trim().toLowerCase()
-        if (tag === '<u>') pushMark(ctx, { type: 'underline' })
-        else if (tag === '</u>') popMark(ctx, 'underline')
-        else if (tag === '<br>' || tag === '<br/>' || tag === '<br />') out.push({ type: 'hardBreak' })
+        const tm = /^<(\/?)(u|strong|b|em|i|s|del)>$/.exec(tag)
+        if (tm) {
+          if (tm[1]) popMark(ctx, HTML_MARKS[tm[2]])
+          else pushMark(ctx, { type: HTML_MARKS[tm[2]] })
+        } else if (tag === '<br>' || tag === '<br/>' || tag === '<br />') out.push({ type: 'hardBreak' })
         else addText(out, t.content, ctx.marks)
         break
       }
@@ -276,5 +281,13 @@ export function parseMarkdown(src: string): DocNode {
   if (!doc.content || doc.content.length === 0) doc.content = [{ type: 'paragraph' }]
   return doc
 }
+
+/** Parse one line of inline Markdown into text nodes (used to check the serializer). */
+export function parseInlineNodes(src: string): DocNode[] {
+  const tokens = md.parseInline(src, {})[0]?.children ?? []
+  return inlineToNodes(tokens)
+}
+
+setInlineVerifier(parseInlineNodes)
 
 export { SCENE_BREAK_SOURCES }

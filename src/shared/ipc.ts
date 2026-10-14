@@ -100,7 +100,7 @@ export interface IpcInvokeMap {
 
   'app:defaultBooksDir': [[], string]
   'app:version': [[], string]
-  'app:flushDone': [[], void]
+  'app:flushDone': [[ok: boolean, error: string], void]
 
   'window:setTheme': [[theme: 'light' | 'dark'], void]
   'window:openExternal': [[url: string], void]

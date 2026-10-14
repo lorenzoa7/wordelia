@@ -17,18 +17,32 @@ export function toRel(root: string, full: string): string {
 
 let tmpCounter = 0
 
-/** Write a file atomically: write a temp file, then rename it over the target. */
+const BUSY = new Set(['EPERM', 'EBUSY', 'EACCES'])
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
+
+/**
+ * Write a file atomically: write a temp file, then rename it over the target.
+ * On Windows a sync client or an antivirus can hold the target for a moment, so the rename
+ * retries. If it still fails, the content is written in place (not atomic, but not lost).
+ */
 export async function atomicWrite(path: string, content: string | Uint8Array): Promise<void> {
   await mkdir(dirname(path), { recursive: true })
   const tmp = `${path}.${process.pid}.${Date.now()}.${tmpCounter++}.tmp`
-  await writeFile(tmp, content)
   try {
-    await rename(tmp, path)
-  } catch (err) {
-    // On Windows, rename can fail when another program (a sync client) holds the file.
+    await writeFile(tmp, content)
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        await rename(tmp, path)
+        return
+      } catch (err) {
+        if (!BUSY.has((err as NodeJS.ErrnoException).code ?? '')) throw err
+        await sleep(40 * (attempt + 1))
+      }
+    }
+    // Last resort for a busy target. This throws if the file is still locked.
     await writeFile(path, content)
-    await rm(tmp, { force: true })
-    if ((err as NodeJS.ErrnoException).code !== 'EPERM' && (err as NodeJS.ErrnoException).code !== 'EBUSY') throw err
+  } finally {
+    await rm(tmp, { force: true }).catch(() => {})
   }
 }
 

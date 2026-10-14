@@ -93,7 +93,10 @@ export const useBook = create<BookState>((set, get) => {
   const handleExternal = (rel: string, content: string | null): void => {
     const st = get()
     const root = st.root
-    if (!root || saver.isPending(root, rel)) return
+    if (!root) return
+    // Typing that is still in an editor wins over the change from outside: save it first.
+    runFlushers()
+    if (saver.isPending(root, rel)) return
     if (rel === MANIFEST_FILE && content) {
       try {
         const m = normalizeManifest(JSON.parse(content))
@@ -214,19 +217,31 @@ export const useBook = create<BookState>((set, get) => {
     },
 
     async renameChapter(id, title) {
-      const { chapters, root, manifest } = get()
+      runFlushers()
+      const { chapters, root } = get()
       const ch = chapters.find((c) => c.id === id)
-      if (!ch || !root || !manifest) return
+      if (!ch || !root) return
       const clean = title.trim() || 'Untitled'
       const others = chapters.filter((c) => c.id !== id).map((c) => c.file)
       const file = uniqueName(fileNameFromTitle(clean), others)
-      const next = { ...ch, title: clean, file }
-      if (file !== ch.file) {
+      const oldRel = chapterRel(ch)
+      // Point the store at the new file first, so every later write goes there.
+      set({ chapters: get().chapters.map((c) => (c.id === id ? { ...c, title: clean, file } : c)) })
+      const next = get().chapters.find((c) => c.id === id)!
+      if (file.toLowerCase() === ch.file.toLowerCase()) {
+        // Same file, or only the case changes: rename in place.
+        if (file !== ch.file) {
+          saver.cancel(root, oldRel)
+          await invoke('book:renameFile', root, oldRel, chapterRel(next))
+        }
+        saver.write(root, chapterRel(next), chapterToFile(next), true)
+      } else {
+        // Write the new file, then remove the old one.
+        saver.cancel(root, oldRel)
+        saver.write(root, chapterRel(next), chapterToFile(next), true)
         await saver.flush()
-        await invoke('book:renameFile', root, chapterRel(ch), chapterRel(next))
+        await invoke('book:deleteFile', root, oldRel)
       }
-      set({ chapters: get().chapters.map((c) => (c.id === id ? next : c)) })
-      saver.write(root, chapterRel(next), chapterToFile(next), true)
       get().updateManifest({ chapters: get().chapters.map((c) => ({ id: c.id, file: c.file })) })
     },
 
@@ -245,20 +260,23 @@ export const useBook = create<BookState>((set, get) => {
     },
 
     async deleteChapter(id) {
+      runFlushers()
+      await saver.flush()
       const { chapters, root, activeChapterId } = get()
       const ch = chapters.find((c) => c.id === id)
       if (!ch || !root) return
-      await saver.flush()
-      // Move to a hidden trash folder instead of deleting: text is precious.
-      const stamp = new Date().toISOString().replace(/[:.]/g, '-')
-      await invoke('book:renameFile', root, chapterRel(ch), `.wordelia/trash/${stamp} ${ch.file}`)
+      // Leave the chapter first, so no editor writes it again.
       const next = chapters.filter((c) => c.id !== id)
       const idx = chapters.findIndex((c) => c.id === id)
       set({
         chapters: next,
         activeChapterId: activeChapterId === id ? (next[Math.max(0, idx - 1)]?.id ?? null) : activeChapterId
       })
-      get().updateManifest({ chapters: next.map((c) => ({ id: c.id, file: c.file })) })
+      saver.cancel(root, chapterRel(ch))
+      // Move to a hidden trash folder instead of deleting: text is precious.
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+      await invoke('book:renameFile', root, chapterRel(ch), `.wordelia/trash/${stamp} ${ch.file}`)
+      get().updateManifest({ chapters: get().chapters.map((c) => ({ id: c.id, file: c.file })) })
     },
 
     moveChapter(id, toIndex) {
@@ -321,6 +339,7 @@ export const useBook = create<BookState>((set, get) => {
     },
 
     async renameEntry(id, name) {
+      runFlushers()
       const { entries, root } = get()
       const e = entries.find((x) => x.id === id)
       if (!e || !root) return
@@ -328,20 +347,31 @@ export const useBook = create<BookState>((set, get) => {
       const fileName = uniqueName(fileNameFromTitle(name.trim() || 'Untitled'), others)
       const file = `${e.category}/${fileName}`
       if (file === e.file) return
-      await saver.flush()
-      await invoke('book:renameFile', root, entryRel(e), `${PLANNING_DIR}/${file}`)
-      const next = { ...e, file, name: fileName.replace(/\.md$/, '') }
-      set({ entries: get().entries.map((x) => (x.id === id ? next : x)) })
+      const oldRel = entryRel(e)
+      set({ entries: get().entries.map((x) => (x.id === id ? { ...x, file, name: fileName.replace(/\.md$/, '') } : x)) })
+      const next = get().entries.find((x) => x.id === id)!
+      saver.cancel(root, oldRel)
+      if (file.toLowerCase() === e.file.toLowerCase()) {
+        await invoke('book:renameFile', root, oldRel, entryRel(next))
+        saver.write(root, entryRel(next), entryToFile(next), true)
+      } else {
+        saver.write(root, entryRel(next), entryToFile(next), true)
+        await saver.flush()
+        await invoke('book:deleteFile', root, oldRel)
+      }
     },
 
     async deleteEntry(id) {
+      runFlushers()
+      await saver.flush()
       const { entries, root, activeEntryId } = get()
       const e = entries.find((x) => x.id === id)
       if (!e || !root) return
-      await saver.flush()
+      // Close the entry first, so no editor writes it again.
+      set({ entries: entries.filter((x) => x.id !== id), activeEntryId: activeEntryId === id ? null : activeEntryId })
+      saver.cancel(root, entryRel(e))
       const stamp = new Date().toISOString().replace(/[:.]/g, '-')
       await invoke('book:renameFile', root, entryRel(e), `.wordelia/trash/${stamp} ${e.name}.md`)
-      set({ entries: entries.filter((x) => x.id !== id), activeEntryId: activeEntryId === id ? null : activeEntryId })
     },
 
     addCategory(name) {

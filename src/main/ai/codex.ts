@@ -9,7 +9,7 @@ import { join } from 'node:path'
 import type { CompletionRequest, CompletionResult, ModelInfo, ProviderStatus, StreamEvent } from '@shared/types'
 import { getSettings } from '../settings'
 import { cleanEnv, codexCandidates, resolveBin, type ResolvedBin } from './resolve-bin'
-import { classifyError, flattenConversation, runCli, type ProviderTransport } from './transport'
+import { classifyError, flattenConversation, killTree, runCli, type ProviderTransport } from './transport'
 
 async function bin(): Promise<ResolvedBin | null> {
   const s = await getSettings()
@@ -128,7 +128,7 @@ class AppServer {
   }
 
   kill(): void {
-    this.child.kill()
+    killTree(this.child)
   }
 }
 
@@ -186,8 +186,12 @@ export const codex: ProviderTransport = {
     const b = await bin()
     if (!b) return { ok: false, text: '', error: 'Codex is not installed.', errorKind: 'not-installed' }
     const cwd = await workDir()
+    const cancelled: CompletionResult = { ok: false, text: '', error: 'Cancelled.', errorKind: 'cancelled' }
+    if (signal.aborted) return cancelled
     const viaServer = await completeWithAppServer(b, cwd, req, onEvent, signal)
     if (viaServer) return viaServer
+    // The app-server is missing in this version. Do not start a second run after a cancel.
+    if (signal.aborted) return cancelled
     return completeWithExec(b, cwd, req, onEvent, signal)
   }
 }
@@ -215,6 +219,7 @@ async function completeWithAppServer(
       await server.init()
     } catch {
       server.kill()
+      if (signal.aborted) return { ok: false, text: '', error: 'Cancelled.', errorKind: 'cancelled' }
       return null // app-server is missing in this version: use exec
     }
     const done = new Promise<{ ok: boolean; error?: string }>((resolve) => {

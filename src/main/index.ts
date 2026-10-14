@@ -1,5 +1,7 @@
-import { app, BrowserWindow, Menu, shell } from 'electron'
+import { app, BrowserWindow, dialog, Menu, shell } from 'electron'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { isAppUrl, setAppUrl } from './security'
 import { cancelAll } from './ai'
 import { handleAssetProtocol, registerAssetScheme } from './assets'
 import { unwatchAll } from './book/watcher'
@@ -51,14 +53,30 @@ async function createWindow(): Promise<void> {
   win.on('close', (e) => {
     if (allowClose) return
     e.preventDefault()
-    const done = (): void => {
+    const close = (): void => {
       if (allowClose) return
       allowClose = true
       clearTimeout(timer)
       if (!win.isDestroyed()) win.close()
     }
-    const timer = setTimeout(done, 4000)
-    onFlushDone(win.webContents.id, done)
+    const timer = setTimeout(close, 6000)
+    onFlushDone(win.webContents.id, (ok, error) => {
+      clearTimeout(timer)
+      if (ok) return close()
+      // Some text is not on disk yet: ask before closing.
+      const choice = dialog.showMessageBoxSync(win, {
+        type: 'warning',
+        title: 'Wordelia',
+        message: 'Some changes could not be saved.',
+        detail: `${error || 'A file could not be written.'}
+
+If a sync app (OneDrive, Google Drive, Dropbox) holds the file, wait a moment and try again.`,
+        buttons: ['Keep the window open', 'Close anyway'],
+        defaultId: 0,
+        cancelId: 0
+      })
+      if (choice === 1) close()
+    })
     win.webContents.send('app:flushRequest', {})
   })
   installContextMenu(win)
@@ -74,15 +92,21 @@ async function createWindow(): Promise<void> {
     if (/^https?:\/\//.test(url)) void shell.openExternal(url)
     return { action: 'deny' }
   })
-  // Never navigate away from the app.
+  // Never navigate away from the app: not by a link, and not by a file dropped on the window.
   win.webContents.on('will-navigate', (e, url) => {
-    if (!url.startsWith('http://localhost') && !url.startsWith('file://')) e.preventDefault()
+    if (!isAppUrl(url)) e.preventDefault()
+  })
+  win.webContents.on('will-frame-navigate', (e) => {
+    if (!isAppUrl(e.url)) e.preventDefault()
   })
 
   if (process.env['ELECTRON_RENDERER_URL']) {
+    setAppUrl(process.env['ELECTRON_RENDERER_URL'])
     await win.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
-    await win.loadFile(join(__dirname, '../renderer/index.html'))
+    const file = join(__dirname, '../renderer/index.html')
+    setAppUrl(pathToFileURL(file).toString())
+    await win.loadFile(file)
   }
 }
 

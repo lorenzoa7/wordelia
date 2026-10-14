@@ -64,6 +64,7 @@ export const claudeCode: ProviderTransport = {
   async complete(req: CompletionRequest, onEvent: (e: StreamEvent) => void, signal: AbortSignal): Promise<CompletionResult> {
     const b = await bin()
     if (!b) return { ok: false, text: '', error: 'Claude Code is not installed.', errorKind: 'not-installed' }
+    if (signal.aborted) return { ok: false, text: '', error: 'Cancelled.', errorKind: 'cancelled' }
     const cwd = await workDir()
     const sysFile = join(cwd, `system-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`)
     await writeFile(sysFile, req.system, 'utf8')

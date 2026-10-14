@@ -1,4 +1,5 @@
 // Debounced, ordered file writes for the open book.
+// A failed write stays in the queue and retries, so a busy file (a sync client) never loses text.
 
 import { invoke } from '@/lib/api'
 
@@ -6,39 +7,66 @@ type Listener = (state: SaveState) => void
 export type SaveState = 'saved' | 'saving' | 'error'
 
 const DELAY = 500
+const MAX_RETRY_DELAY = 30000
+
+interface Job {
+  root: string
+  content: string
+}
 
 const timers = new Map<string, ReturnType<typeof setTimeout>>()
-const pending = new Map<string, { root: string; content: string }>()
-const inflight = new Map<string, Promise<void>>()
+const pending = new Map<string, Job>()
+const inflight = new Map<string, Promise<boolean>>()
+const failed = new Map<string, number>() // key -> next retry delay
 const listeners = new Set<Listener>()
 let state: SaveState = 'saved'
 let lastError = ''
 
 function emit(next: SaveState): void {
+  if (next === state) return
   state = next
   for (const l of listeners) l(state)
 }
 
 function refresh(): void {
-  if (state === 'error') return
-  emit(pending.size || inflight.size ? 'saving' : 'saved')
+  if (failed.size) emit('error')
+  else emit(pending.size || inflight.size ? 'saving' : 'saved')
 }
 
-async function write(key: string): Promise<void> {
+function schedule(key: string, delay: number): void {
+  const t = timers.get(key)
+  if (t) clearTimeout(t)
+  timers.set(
+    key,
+    setTimeout(() => {
+      timers.delete(key)
+      void write(key)
+    }, delay)
+  )
+}
+
+/** Write the pending job of a file. Resolves true when it is on disk. */
+function write(key: string): Promise<boolean> {
   const job = pending.get(key)
-  if (!job) return
+  if (!job) return inflight.get(key) ?? Promise.resolve(true)
   pending.delete(key)
   const rel = key.slice(key.indexOf('|') + 1)
-  const prev = inflight.get(key) ?? Promise.resolve()
+  const prev = inflight.get(key) ?? Promise.resolve(true)
   const run = prev
     .then(() => invoke('book:writeFile', job.root, rel, job.content))
     .then(
       () => {
-        if (state === 'error') state = 'saving'
+        failed.delete(key)
+        return true
       },
       (err: unknown) => {
         lastError = err instanceof Error ? err.message : String(err)
-        emit('error')
+        // Keep the text: a newer job for the same file wins, else retry this one.
+        if (!pending.has(key)) pending.set(key, job)
+        const delay = Math.min((failed.get(key) ?? 1000) * 2, MAX_RETRY_DELAY)
+        failed.set(key, delay)
+        schedule(key, delay)
+        return false
       }
     )
     .finally(() => {
@@ -47,7 +75,7 @@ async function write(key: string): Promise<void> {
     })
   inflight.set(key, run)
   refresh()
-  await run
+  return run
 }
 
 export const saver = {
@@ -55,19 +83,13 @@ export const saver = {
   write(root: string, rel: string, content: string, immediate = false): void {
     const key = `${root}|${rel}`
     pending.set(key, { root, content })
-    const t = timers.get(key)
-    if (t) clearTimeout(t)
     if (immediate) {
+      const t = timers.get(key)
+      if (t) clearTimeout(t)
       timers.delete(key)
       void write(key)
     } else {
-      timers.set(
-        key,
-        setTimeout(() => {
-          timers.delete(key)
-          void write(key)
-        }, DELAY)
-      )
+      schedule(key, DELAY)
     }
     refresh()
   },
@@ -84,16 +106,18 @@ export const saver = {
     if (t) clearTimeout(t)
     timers.delete(key)
     pending.delete(key)
+    failed.delete(key)
     refresh()
   },
 
-  async flush(): Promise<void> {
+  /** Write everything now. Resolves false if some text could not be saved. */
+  async flush(): Promise<boolean> {
     for (const [key, t] of timers) {
       clearTimeout(t)
       timers.delete(key)
     }
-    await Promise.all([...pending.keys()].map(write))
-    await Promise.all([...inflight.values()])
+    const results = await Promise.all([...new Set([...pending.keys(), ...inflight.keys()])].map(write))
+    return results.every(Boolean) && failed.size === 0
   },
 
   subscribe(l: Listener): () => void {

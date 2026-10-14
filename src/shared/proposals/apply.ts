@@ -5,6 +5,18 @@ export interface MatchResult {
   end: number
   /** How the match was found */
   mode: 'exact' | 'normalized'
+  /** How many times the text appears. More than 1 means the target is ambiguous. */
+  count: number
+}
+
+function countOf(haystack: string, needle: string): number {
+  let n = 0
+  let at = haystack.indexOf(needle)
+  while (at >= 0) {
+    n++
+    at = haystack.indexOf(needle, at + 1)
+  }
+  return n
 }
 
 /** Characters that the AI often changes by mistake: quotes, dashes, spaces. */
@@ -59,7 +71,7 @@ function normalizeWithMap(src: string): { text: string; map: number[] } {
 export function findText(haystack: string, needle: string): MatchResult | null {
   if (!needle) return null
   const exact = haystack.indexOf(needle)
-  if (exact >= 0) return { start: exact, end: exact + needle.length, mode: 'exact' }
+  if (exact >= 0) return { start: exact, end: exact + needle.length, mode: 'exact', count: countOf(haystack, needle) }
   const h = normalizeWithMap(haystack)
   const n = normalizeWithMap(needle).text.trim()
   if (!n) return null
@@ -68,7 +80,7 @@ export function findText(haystack: string, needle: string): MatchResult | null {
   const start = h.map[at]
   const lastIdx = at + n.length - 1
   const end = h.map[lastIdx] + 1
-  return { start, end, mode: 'normalized' }
+  return { start, end, mode: 'normalized', count: countOf(h.text, n) }
 }
 
 export function applyHunk(markdown: string, find: string, replace: string): { ok: true; text: string } | { ok: false; reason: string } {
@@ -79,5 +91,6 @@ export function applyHunk(markdown: string, find: string, replace: string): { ok
   }
   const m = findText(markdown, find)
   if (!m) return { ok: false, reason: 'The text to change was not found. It may have changed since the AI read it.' }
+  if (m.count > 1) return { ok: false, reason: 'The text to change appears more than once, so the right place is not clear. Ask the AI for a longer passage.' }
   return { ok: true, text: markdown.slice(0, m.start) + replace + markdown.slice(m.end) }
 }

@@ -2,7 +2,7 @@
 
 import { app, BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
 import { copyFile, mkdir, rename, rm } from 'node:fs/promises'
-import { basename, extname, join } from 'node:path'
+import { basename, extname, join, resolve } from 'node:path'
 import { ASSETS_DIR, countMarkdownWords, fileNameFromTitle, markdownToPlain, uniqueName } from '@shared/book'
 import type { InvokeArgs, InvokeChannel, InvokeResult } from '@shared/ipc'
 import { cancel, complete, providerModels, providerStatus } from './ai'
@@ -18,12 +18,25 @@ import { getSecret, getSettings, setSecret, setSettings } from './settings'
 import { assetUrl, registerBookRoot } from './assets'
 import { themeOverlay } from './window'
 import { setSpellLanguage } from './context-menu'
+import { allowExported, allowPicked, allowRoot, assertPicked, assertRoot, isExported, isPicked, trustedSender } from './security'
 
 type Handler<C extends InvokeChannel> = (e: IpcMainInvokeEvent, ...args: InvokeArgs<C>) => Promise<InvokeResult<C>> | InvokeResult<C>
 
 function handle<C extends InvokeChannel>(channel: C, fn: Handler<C>): void {
-  ipcMain.handle(channel, (e, ...args) => fn(e, ...(args as InvokeArgs<C>)))
+  ipcMain.handle(channel, (e, ...args) => {
+    if (!trustedSender(e)) throw new Error('Untrusted sender')
+    return fn(e, ...(args as InvokeArgs<C>))
+  })
 }
+
+const E2E = process.env['WORDELIA_E2E'] === '1'
+
+function defaultBooksDir(): string {
+  // Tests set WORDELIA_BOOKS_DIR, so they never write to the user's Documents folder.
+  return process.env['WORDELIA_BOOKS_DIR'] || join(app.getPath('documents'), 'Wordelia')
+}
+
+const samePath = (a: string, b: string): boolean => resolve(a).toLowerCase() === resolve(b).toLowerCase()
 
 /** The first sentence or two of the book, for the library card. */
 function excerptOf(bodies: string[]): string {
@@ -35,10 +48,10 @@ function excerptOf(bodies: string[]): string {
   return cut.slice(0, cut.lastIndexOf(' ')) + '…'
 }
 
-const flushWaiters = new Map<number, () => void>()
+const flushWaiters = new Map<number, (ok: boolean, error: string) => void>()
 
-/** Call `fn` when the renderer of `webContentsId` reports that it saved everything. */
-export function onFlushDone(webContentsId: number, fn: () => void): void {
+/** Call `fn` when the renderer of `webContentsId` reports that it saved everything (or could not). */
+export function onFlushDone(webContentsId: number, fn: (ok: boolean, error: string) => void): void {
   flushWaiters.set(webContentsId, fn)
 }
 
@@ -50,6 +63,9 @@ export function registerIpc(): void {
   handle('library:touch', (_e, item) => touchLibrary(item))
 
   handle('book:create', async (e, opts) => {
+    if (!E2E && !isPicked(opts.parentDir) && !samePath(opts.parentDir, defaultBooksDir())) {
+      throw new Error('Choose the folder for the book first.')
+    }
     const snap = await createBook(opts)
     await afterOpen(e, snap.root)
     await touchLibrary({
@@ -65,6 +81,9 @@ export function registerIpc(): void {
   })
 
   handle('book:open', async (e, root) => {
+    // A book from the library, or a folder that the user chose.
+    const known = (await listLibrary()).some((i) => samePath(i.root, root))
+    if (!E2E && !known && !isPicked(root)) throw new Error('Open the folder with the Open folder button.')
     const snap = await openBook(root)
     await afterOpen(e, root)
     await touchLibrary({
@@ -88,24 +107,32 @@ export function registerIpc(): void {
     const res = w
       ? await dialog.showOpenDialog(w, { title: opts.title, properties: props })
       : await dialog.showOpenDialog({ title: opts.title, properties: props })
-    return res.canceled ? null : (res.filePaths[0] ?? null)
+    const dir = res.canceled ? null : (res.filePaths[0] ?? null)
+    if (dir) allowPicked(dir)
+    return dir
   })
 
   handle('book:writeFile', async (_e, root, rel, content) => {
+    assertRoot(root)
     const full = safeJoin(root, rel)
     noteOwnWrite(full, content)
     await atomicWrite(full, content)
   })
 
-  handle('book:readFile', (_e, root, rel) => readTextOr(safeJoin(root, rel), null))
+  handle('book:readFile', (_e, root, rel) => {
+    assertRoot(root)
+    return readTextOr(safeJoin(root, rel), null)
+  })
 
   handle('book:deleteFile', async (_e, root, rel) => {
+    assertRoot(root)
     const full = safeJoin(root, rel)
     noteOwnWrite(full, null)
     await rm(full, { force: true })
   })
 
   handle('book:renameFile', async (_e, root, from, to) => {
+    assertRoot(root)
     const a = safeJoin(root, from)
     const b = safeJoin(root, to)
     noteOwnWrite(a, null)
@@ -121,10 +148,14 @@ export function registerIpc(): void {
       filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'avif'] }]
     }
     const res = w ? await dialog.showOpenDialog(w, opts) : await dialog.showOpenDialog(opts)
-    return res.canceled ? null : (res.filePaths[0] ?? null)
+    const file = res.canceled ? null : (res.filePaths[0] ?? null)
+    if (file) allowPicked(file)
+    return file
   })
 
   handle('book:importAsset', async (_e, root, sourcePath) => {
+    assertRoot(root)
+    assertPicked(sourcePath)
     const ext = extname(sourcePath).toLowerCase()
     const name = uniqueName(fileNameFromTitle(basename(sourcePath, ext), ext), [])
     const rel = `${ASSETS_DIR}/${Date.now().toString(36)}-${name}`
@@ -134,15 +165,28 @@ export function registerIpc(): void {
   })
 
   handle('book:reveal', (_e, root, rel) => {
+    assertRoot(root)
     if (rel) shell.showItemInFolder(safeJoin(root, rel))
     else void shell.openPath(root)
   })
 
-  handle('book:assetUrl', (_e, root, rel) => assetUrl(root, rel))
+  handle('book:assetUrl', (_e, root, rel) => {
+    assertRoot(root)
+    return assetUrl(root, rel)
+  })
 
-  handle('history:save', (_e, root, chapterId, label, body) => saveSnapshot(root, chapterId, label, body))
-  handle('history:list', (_e, root, chapterId) => listSnapshots(root, chapterId))
-  handle('history:read', (_e, root, chapterId, id) => readSnapshot(root, chapterId, id))
+  handle('history:save', (_e, root, chapterId, label, body) => {
+    assertRoot(root)
+    return saveSnapshot(root, chapterId, label, body)
+  })
+  handle('history:list', (_e, root, chapterId) => {
+    assertRoot(root)
+    return listSnapshots(root, chapterId)
+  })
+  handle('history:read', (_e, root, chapterId, id) => {
+    assertRoot(root)
+    return readSnapshot(root, chapterId, id)
+  })
 
   handle('settings:get', () => getSettings())
   handle('settings:set', (_e, patch) => setSettings(patch))
@@ -155,9 +199,13 @@ export function registerIpc(): void {
   handle('ai:hasKey', async (_e, provider) => Boolean(await getSecret(provider)))
   handle('ai:openLogin', (_e, provider) => openLogin(provider))
 
-  handle('export:pdf', (e, req) => exportPdf(win(e), req))
-  handle('export:docx', (e, req) => exportDocx(win(e), req))
-  handle('export:text', (e, req) => exportText(win(e), req))
+  const remember = (path: string | null): string | null => {
+    if (path) allowExported(path)
+    return path
+  }
+  handle('export:pdf', async (e, req) => remember(await exportPdf(win(e), req)))
+  handle('export:docx', async (e, req) => remember(await exportDocx(win(e), req)))
+  handle('export:text', async (e, req) => remember(await exportText(win(e), req)))
 
   handle('import:pick', async (e) => {
     const w = win(e)
@@ -167,21 +215,25 @@ export function registerIpc(): void {
       filters: [{ name: 'Documents', extensions: ['docx', 'md', 'markdown', 'txt'] }]
     }
     const res = w ? await dialog.showOpenDialog(w, opts) : await dialog.showOpenDialog(opts)
-    return res.canceled ? null : (res.filePaths[0] ?? null)
+    const file = res.canceled ? null : (res.filePaths[0] ?? null)
+    if (file) allowPicked(file)
+    return file
   })
-  handle('import:read', (_e, path) => readImport(path))
+  handle('import:read', (_e, path) => {
+    assertPicked(path)
+    return readImport(path)
+  })
 
   handle('app:defaultBooksDir', async () => {
-    // Tests set WORDELIA_BOOKS_DIR, so they never write to the user's Documents folder.
-    const dir = process.env['WORDELIA_BOOKS_DIR'] || join(app.getPath('documents'), 'Wordelia')
+    const dir = defaultBooksDir()
     await mkdir(dir, { recursive: true })
     return dir
   })
   handle('app:version', () => app.getVersion())
-  handle('app:flushDone', (e) => {
+  handle('app:flushDone', (e, ok, error) => {
     const fn = flushWaiters.get(e.sender.id)
     flushWaiters.delete(e.sender.id)
-    fn?.()
+    fn?.(ok, error)
   })
 
   handle('window:setTheme', (e, theme) => {
@@ -192,7 +244,9 @@ export function registerIpc(): void {
   handle('window:openExternal', (_e, url) => {
     if (/^https?:\/\//.test(url)) void shell.openExternal(url)
   })
-  handle('window:showItem', (_e, path) => shell.showItemInFolder(path))
+  handle('window:showItem', (_e, path) => {
+    if (isExported(path)) shell.showItemInFolder(path)
+  })
   handle('window:setSpellLanguage', (e, tag) => {
     const w = win(e)
     if (w) setSpellLanguage(w, tag)
@@ -200,6 +254,7 @@ export function registerIpc(): void {
 }
 
 async function afterOpen(e: IpcMainInvokeEvent, root: string): Promise<void> {
+  allowRoot(root)
   registerBookRoot(root)
   watchBook(root, (change) => {
     if (!e.sender.isDestroyed()) e.sender.send('book:externalChange', change)

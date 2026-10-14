@@ -149,4 +149,61 @@ describe('frontmatter', () => {
     expect(readFrontmatter('Só texto').data).toEqual({})
     expect(readFrontmatter('---\n: : bad\n---\nx').body).toBe('x')
   })
+
+  it('writes back frontmatter that is not valid YAML, unchanged', () => {
+    const src = '---\ntags: a\ntags: b\n---\nCorpo.\n'
+    const fm = readFrontmatter(src)
+    expect(fm.body).toBe('Corpo.\n')
+    expect(writeFrontmatter({ ...fm.data, id: 'x' }, fm.body)).toBe(src)
+  })
+})
+
+describe('review findings', () => {
+  const rt = (d: DocNode): DocNode => parseMarkdown(serializeMarkdown(d))
+
+  it('keeps a hard break at the end of a paragraph', () => {
+    const d = doc(para(p('Verso um'), { type: 'hardBreak' }), para(p('Outro')))
+    expect(rt(d)).toEqual(d)
+  })
+
+  it('keeps paragraphs that are only a number with a dot or parenthesis', () => {
+    for (const text of ['1984.', '2)', '1.', '12. Doze']) {
+      const d = doc(para(p(text)))
+      expect(rt(d)).toEqual(d)
+    }
+  })
+
+  it('keeps emphasis next to punctuation and other emphasis', () => {
+    const cases: DocNode[] = [
+      doc(para(p('a', [{ type: 'bold' }]), p('b', [{ type: 'bold' }, { type: 'italic' }]), p('c', [{ type: 'italic' }]))),
+      doc(para(p('"Hi!"', [{ type: 'italic' }]), p('he said'))),
+      doc(para(p('said'), p('"Hi"', [{ type: 'italic' }]))),
+      doc(para(p('palavra', [{ type: 'bold' }]), p('-composta')))
+    ]
+    for (const d of cases) expect(rt(d)).toEqual(d)
+  })
+
+  it('drops marks on whitespace-only runs', () => {
+    const d = doc(para(p('a'), p('  ', [{ type: 'italic' }]), p('b', [{ type: 'bold' }])))
+    expect(rt(d)).toEqual(doc(para(p('a  '), p('b', [{ type: 'bold' }]))))
+  })
+
+  it('writes wiki links without escapes', () => {
+    const d = doc(para(p('Veja [[Heitor Ferrari]] e [[Teresa|ela]].')))
+    expect(serializeMarkdown(d)).toBe('Veja [[Heitor Ferrari]] e [[Teresa|ela]].\n')
+    expect(rt(d)).toEqual(d)
+  })
+
+  it('keeps list items with two paragraphs and two lists in a row', () => {
+    const li = (...c: DocNode[]): DocNode => ({ type: 'listItem', content: c })
+    const d1 = doc({ type: 'bulletList', content: [li(para(p('um')), para(p('dois'))), li(para(p('três')))] })
+    expect(rt(d1)).toEqual(d1)
+    const d2 = doc({ type: 'bulletList', content: [li(para(p('a')))] }, { type: 'bulletList', content: [li(para(p('b')))] })
+    expect(rt(d2)).toEqual(d2)
+  })
+
+  it('does not turn "!" before a link into an image', () => {
+    const d = doc(para(p('Wow!'), p('here', [{ type: 'link', attrs: { href: 'https://x.y' } }])))
+    expect(rt(d)).toEqual(d)
+  })
 })

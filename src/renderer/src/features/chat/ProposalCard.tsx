@@ -11,7 +11,7 @@ import type { ChatMessage, HunkState, Thread } from '@shared/types'
 import { Spinner, Tooltip } from '@/ui'
 import { useBook } from '@/stores/book'
 import { toast } from '@/stores/ui'
-import { applyCreate, applyEditHunk, resolveTarget, restoreSnapshot, snapshotOf, type Snapshot } from './applyProposal'
+import { applyCreate, applyEditHunk, markAfter, resolveTarget, restoreSnapshot, snapshotOf, type Snapshot } from './applyProposal'
 
 type EditSeg = Extract<Segment, { kind: 'edit' }>
 type CreateSeg = Extract<Segment, { kind: 'create' }>
@@ -120,7 +120,10 @@ function EditCard({ segment, message, thread, streaming }: Props & { segment: Ed
       action: {
         label: 'Undo',
         run: () => {
-          restoreSnapshot(snap)
+          if (!restoreSnapshot(snap)) {
+            toast('The text changed after the AI change, so Undo could stop your new words. Use Ctrl+Z or the version history.', { kind: 'error' })
+            return
+          }
           for (const i of accepted) setHunkState(thread, message.id, keys[i], 'pending')
         }
       }
@@ -128,7 +131,10 @@ function EditCard({ segment, message, thread, streaming }: Props & { segment: Ed
   }
   const accept = (i: number): void => {
     const snap = snapshotOf(segment.file)
-    if (apply(i)) offerUndo(snap, [i], `Change applied to "${target.label}".`)
+    if (apply(i)) {
+      markAfter(snap)
+      offerUndo(snap, [i], `Change applied to "${target.label}".`)
+    }
   }
   const reject = (i: number): void => {
     if (thread && message) setHunkState(thread, message.id, keys[i], 'rejected')
@@ -143,6 +149,7 @@ function EditCard({ segment, message, thread, streaming }: Props & { segment: Ed
       if (apply(i)) accepted.push(i)
     }
     setBusy(false)
+    markAfter(snap)
     if (accepted.length) offerUndo(snap, accepted, `${accepted.length} change${accepted.length > 1 ? 's' : ''} applied to "${target.label}".`)
   }
 

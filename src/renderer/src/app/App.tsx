@@ -49,12 +49,28 @@ export function App(): React.JSX.Element {
 
   useGlobalShortcuts()
 
+  // A file dropped outside an editor must not open in the window.
+  useEffect(() => {
+    const stop = (e: DragEvent): void => {
+      if (e.dataTransfer?.types.includes('Files')) e.preventDefault()
+    }
+    window.addEventListener('dragover', stop)
+    window.addEventListener('drop', stop)
+    return () => {
+      window.removeEventListener('dragover', stop)
+      window.removeEventListener('drop', stop)
+    }
+  }, [])
+
   // Save everything before the window closes.
   useEffect(
     () =>
       on('app:flushRequest', () => {
         runFlushers()
-        void saver.flush().finally(() => void invoke('app:flushDone'))
+        void saver.flush().then(
+          (ok) => invoke('app:flushDone', ok, saver.error),
+          () => invoke('app:flushDone', false, saver.error)
+        )
       }),
     []
   )

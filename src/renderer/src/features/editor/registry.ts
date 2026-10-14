@@ -45,6 +45,7 @@ export function applyToChapter(chapterId: string, find: string, replace: string)
     const plainFind = markdownToPlain(find).trim()
     const m = findText(text, plainFind)
     if (!m) return { ok: false, reason: 'The text to change was not found in the chapter. It may have changed.' }
+    if (m.count > 1) return { ok: false, reason: 'The text to change appears more than once in the chapter. Ask the AI for a longer passage.' }
     const from = map[m.start]
     const to = map[m.end - 1] + 1
     const slice = sliceFromMarkdown(state.schema, replace)

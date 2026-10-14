@@ -62,7 +62,12 @@ describe('applyHunk', () => {
   })
 
   it('matches across Markdown escapes', () => {
-    expect(findText('2 \\* 3 = 6', '2 * 3 = 6')).toEqual({ start: 0, end: 10, mode: 'normalized' })
+    expect(findText('2 \\* 3 = 6', '2 * 3 = 6')).toEqual({ start: 0, end: 10, mode: 'normalized', count: 1 })
+  })
+
+  it('refuses text that appears more than once', () => {
+    const r = applyHunk('— disse ele.\n\nMais.\n\n— disse ele.', '— disse ele.', '— murmurou ele.')
+    expect(r.ok).toBe(false)
   })
 
   it('fails when the text is missing', () => {

@@ -20,6 +20,8 @@ function norm(p: string): string {
 
 export function resolveTarget(file: string): Target {
   const rel = norm(file)
+  // "planning/../manuscript/x.md" must not pass as a planning file.
+  if (rel.split('/').some((seg) => seg === '..' || seg === '.' || seg === '')) return { kind: 'unknown', rel, label: rel }
   const book = useBook.getState()
   if (rel.startsWith(`${MANUSCRIPT_DIR}/`)) {
     const name = rel.slice(MANUSCRIPT_DIR.length + 1)
@@ -79,7 +81,22 @@ export async function applyCreate(file: string, content: string): Promise<ApplyR
 /* Undo for accepted proposals                                          */
 /* ------------------------------------------------------------------ */
 
-export type Snapshot = { kind: 'chapter'; id: string; body: string } | { kind: 'entry'; id: string; body: string; summary: string }
+export type Snapshot = ({ kind: 'chapter'; id: string; body: string } | { kind: 'entry'; id: string; body: string; summary: string }) & {
+  /** The text right after the change. Undo is safe only while the text is still this. */
+  after?: string
+}
+
+function currentText(s: Pick<Snapshot, 'kind' | 'id'>): string | undefined {
+  const book = useBook.getState()
+  return s.kind === 'chapter' ? book.chapters.find((c) => c.id === s.id)?.body : book.entries.find((e) => e.id === s.id)?.body
+}
+
+/** Remember the text after the change. Call it right after the change. */
+export function markAfter(s: Snapshot | null): void {
+  if (!s) return
+  flushEditor()
+  s.after = currentText(s)
+}
 
 /** The text of a file before a change, so the change can be undone from a toast. */
 export function snapshotOf(file: string): Snapshot | null {
@@ -94,8 +111,11 @@ export function snapshotOf(file: string): Snapshot | null {
   return null
 }
 
-export function restoreSnapshot(s: Snapshot): void {
+/** Undo a change. Returns false (and changes nothing) when the text changed after the AI change. */
+export function restoreSnapshot(s: Snapshot): boolean {
   flushEditor()
+  if (s.after !== undefined && currentText(s) !== s.after) return false
   if (s.kind === 'chapter') useBook.getState().restoreChapter(s.id, s.body)
   else useBook.getState().restoreEntry(s.id, s.body, s.summary)
+  return true
 }

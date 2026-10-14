@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process'
+import { spawn, type ChildProcess } from 'node:child_process'
 import type { ChatTurn, CompletionRequest, CompletionResult, ModelInfo, ProviderId, ProviderStatus, StreamEvent } from '@shared/types'
 import { cleanEnv, type ResolvedBin } from './resolve-bin'
 
@@ -7,6 +7,19 @@ export interface ProviderTransport {
   status(): Promise<ProviderStatus>
   listModels(): Promise<ModelInfo[]>
   complete(req: CompletionRequest, onEvent: (e: StreamEvent) => void, signal: AbortSignal): Promise<CompletionResult>
+}
+
+/**
+ * Stop a child process and its children. On Windows, kill() stops only the first process:
+ * a CLI wrapper (codex.js) would leave the real program running.
+ */
+export function killTree(child: ChildProcess): void {
+  if (child.exitCode !== null || child.killed) return
+  if (process.platform === 'win32' && child.pid) {
+    spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' }).on('error', () => child.kill())
+  } else {
+    child.kill()
+  }
 }
 
 export interface RunResult {
@@ -46,10 +59,11 @@ export function runCli(
     }
     const onAbort = (): void => {
       aborted = true
-      child.kill()
+      killTree(child)
     }
     opts.signal?.addEventListener('abort', onAbort)
-    const timer = opts.timeoutMs ? setTimeout(() => child.kill(), opts.timeoutMs) : undefined
+    if (opts.signal?.aborted) onAbort()
+    const timer = opts.timeoutMs ? setTimeout(() => killTree(child), opts.timeoutMs) : undefined
 
     child.stdout.setEncoding('utf8')
     child.stdout.on('data', (chunk: string) => {

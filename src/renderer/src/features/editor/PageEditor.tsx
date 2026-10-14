@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
 import { EditorState } from '@tiptap/pm/state'
+import type { Node as PMNode } from '@tiptap/pm/model'
 import { motion } from 'motion/react'
 import { Plus } from '@phosphor-icons/react'
 import clsx from 'clsx'
@@ -42,7 +43,8 @@ export function PageEditor(): React.JSX.Element | null {
   const stateCache = useRef(new Map<string, { state: EditorState; body: string }>())
   const currentId = useRef<string | null>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
-  const dirty = useRef(false)
+  /** The newest document that is not saved yet. It belongs to the chapter `currentId`. */
+  const dirtyDoc = useRef<PMNode | null>(null)
 
   const extensions = useMemo(
     () =>
@@ -59,11 +61,12 @@ export function PageEditor(): React.JSX.Element | null {
 
   const flush = useCallback((): void => {
     clearTimeout(saveTimer.current)
-    const ed = editorRef.current
+    const doc = dirtyDoc.current
     const id = currentId.current
-    if (!ed || !id || !dirty.current) return
-    dirty.current = false
-    const body = serializeMarkdown(ed.getJSON() as DocNode)
+    if (!doc || !id) return
+    dirtyDoc.current = null
+    // The saved document, not the editor: the editor may be gone (new typing rules).
+    const body = serializeMarkdown(doc.toJSON() as DocNode)
     useBook.getState().setChapterBody(id, body)
     const cached = stateCache.current.get(id)
     if (cached) cached.body = body
@@ -83,7 +86,7 @@ export function PageEditor(): React.JSX.Element | null {
       },
       onUpdate: ({ transaction }) => {
         if (!transaction.docChanged) return
-        dirty.current = true
+        dirtyDoc.current = transaction.doc
         clearTimeout(saveTimer.current)
         saveTimer.current = setTimeout(flush, 350)
         setTyping(true)
@@ -93,16 +96,16 @@ export function PageEditor(): React.JSX.Element | null {
     },
     [extensions]
   )
-  const editorRef = useRef(editor)
-  editorRef.current = editor
 
   // A new editor (new typing rules) cannot use states made for the old one.
+  // This runs after the cleanup below saved the typing of the old editor.
   const lastEditor = useRef(editor)
-  if (lastEditor.current !== editor) {
+  useEffect(() => {
+    if (lastEditor.current === editor) return
     lastEditor.current = editor
     stateCache.current.clear()
     currentId.current = null
-  }
+  }, [editor])
 
   // Switch chapters: save the old state, load the new one.
   useEffect(() => {
@@ -137,7 +140,7 @@ export function PageEditor(): React.JSX.Element | null {
     const doc = editor.schema.nodeFromJSON(parseMarkdown(ch.body))
     editor.view.updateState(EditorState.create({ doc, plugins: editor.state.plugins, schema: editor.schema }))
     stateCache.current.delete(chapterId)
-    dirty.current = false
+    dirtyDoc.current = null
   }, [editor, chapterId, externalRev])
 
   useEffect(() => {

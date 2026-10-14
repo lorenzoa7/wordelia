@@ -32,6 +32,12 @@ export function NoteEditor({
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
+  /** The last Markdown this editor sent or loaded. A different `value` comes from outside. */
+  const lastSent = useRef(value)
+  const send = (md: string): void => {
+    lastSent.current = md
+    onChangeRef.current(md)
+  }
 
   const extensions = useMemo(
     () => [
@@ -50,7 +56,10 @@ export function NoteEditor({
       editorProps: { attributes: { class: 'note-text prose', spellcheck: 'true', lang: language } },
       onUpdate: ({ editor: e }) => {
         clearTimeout(timer.current)
-        timer.current = setTimeout(() => onChangeRef.current(serializeMarkdown(e.getJSON() as DocNode)), 350)
+        timer.current = setTimeout(() => {
+          timer.current = undefined
+          send(serializeMarkdown(e.getJSON() as DocNode))
+        }, 350)
       }
     },
     [extensions, docKey]
@@ -62,7 +71,7 @@ export function NoteEditor({
       if (timer.current && editor && !editor.isDestroyed) {
         clearTimeout(timer.current)
         timer.current = undefined
-        onChangeRef.current(serializeMarkdown(editor.getJSON() as DocNode))
+        send(serializeMarkdown(editor.getJSON() as DocNode))
       }
     }
     const unregister = registerFlusher(flush)
@@ -72,12 +81,22 @@ export function NoteEditor({
     }
   }, [editor])
 
+  // A new note: its text is the starting point.
   useEffect(() => {
-    if (!editor || rev === 0) return
-    editor.commands.setContent(parseMarkdown(value) as object, { emitUpdate: false })
-    // Only external changes reload the note.
+    lastSent.current = value
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rev])
+  }, [docKey])
+
+  // The text changed outside this editor (an accepted AI change, another app): reload,
+  // unless the writer is typing right now.
+  useEffect(() => {
+    if (!editor || editor.isDestroyed || timer.current) return
+    if (value === lastSent.current && rev === 0) return
+    if (value !== lastSent.current) {
+      lastSent.current = value
+      editor.commands.setContent(parseMarkdown(value) as object, { emitUpdate: false })
+    }
+  }, [value, rev, editor])
 
   return <EditorContent editor={editor} />
 }

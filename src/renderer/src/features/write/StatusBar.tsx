@@ -40,7 +40,7 @@ export function StatusBar(): React.JSX.Element {
       <button className="status-btn" onClick={() => useUi.getState().openHistory(useBook.getState().activeChapterId)} title="Version history">
         <ClockCounterClockwise size={12} /> History
       </button>
-      <span className={`save-state is-${save}`} title={save === 'error' ? saver.error : undefined}>
+      <span className={`save-state is-${save}`} title={save === 'error' ? saver.error : undefined} role="status" aria-live="polite">
         {save === 'saved' && (
           <>
             <CheckCircle size={12} /> Saved

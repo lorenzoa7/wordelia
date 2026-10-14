@@ -114,7 +114,7 @@ function ProviderCard({ id }: { id: ProviderId }): React.JSX.Element {
       {status?.account && ok && <p className="provider-detail">Account: {status.account}</p>}
       {isApi && (
         <div className="provider-key">
-          <TextInput type="password" placeholder={ok ? 'A key is saved. Paste a new one to replace it.' : 'Paste your API key'} value={key} onChange={(e) => setKey(e.target.value)} />
+          <TextInput type="password" aria-label="API key" spellCheck={false} placeholder={ok ? 'A key is saved. Paste a new one to replace it.' : 'Paste your API key'} value={key} onChange={(e) => setKey(e.target.value)} />
           <Button size="sm" onClick={() => void saveKey()} disabled={!key.trim()}>
             Save key
           </Button>
@@ -132,6 +132,8 @@ function ProviderCard({ id }: { id: ProviderId }): React.JSX.Element {
         <div className="provider-extra">
           {showPath ? (
             <TextInput
+              spellCheck={false}
+              aria-label="Program path"
               placeholder={`Full path to the ${id === 'codex' ? 'codex' : 'claude'} program (leave empty to find it automatically)`}
               defaultValue={settings.providers[id]?.binPath ?? ''}
               onBlur={(e) => void update({ providers: { ...settings.providers, [id]: { ...settings.providers[id], binPath: e.target.value.trim() || undefined } } }).then(() => check(id))}
@@ -145,7 +147,7 @@ function ProviderCard({ id }: { id: ProviderId }): React.JSX.Element {
       )}
       {ok && enabled && (
         <div className="provider-foot">
-          <span className="muted">{models?.length ?? 0} models available</span>
+          <span className="muted">{models?.length ?? 0} {(models?.length ?? 0) === 1 ? 'model' : 'models'} available</span>
           <button className="link-btn" onClick={() => void useSuggested()}>
             <Sparkle size={12} /> Use for all tasks
           </button>

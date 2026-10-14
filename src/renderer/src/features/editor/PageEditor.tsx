@@ -82,6 +82,8 @@ export function PageEditor(): React.JSX.Element | null {
       enablePasteRules: false,
       editorProps: {
         transformPastedHTML: cleanPastedHtml,
+        scrollMargin: { top: 130, bottom: 90, left: 0, right: 0 },
+        scrollThreshold: { top: 130, bottom: 90, left: 0, right: 0 },
         attributes: {
           class: 'manuscript',
           spellcheck: String(spellcheck),

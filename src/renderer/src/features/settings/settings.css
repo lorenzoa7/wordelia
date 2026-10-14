@@ -48,7 +48,7 @@
   overflow-y: auto;
   padding: 0 var(--s-6) var(--s-8) var(--s-4);
 }
-.settings-pane {
+.settings-pane:focus {
   outline: none;
 }
 .settings-h {

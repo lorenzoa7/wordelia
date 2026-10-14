@@ -15,9 +15,9 @@ import './history.css'
 function when(iso: string): string {
   if (!iso) return ''
   const d = new Date(iso)
-  const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
   if (d.toDateString() === new Date().toDateString()) return `Today, ${time}`
-  return `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}, ${time}`
+  return `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${time}`
 }
 
 export function HistoryDialog({ chapterId, onClose }: { chapterId: string | null; onClose: () => void }): React.JSX.Element {
@@ -54,7 +54,7 @@ export function HistoryDialog({ chapterId, onClose }: { chapterId: string | null
     if (!chapter || body == null) return
     snapshot(chapter.id, 'Before restore')
     useBook.getState().restoreChapter(chapter.id, body)
-    toast(`"${chapter.title}" is back to the version of ${when(items?.find((i) => i.id === selected)?.at ?? '')}.`)
+    toast(`“${chapter.title}” is back to the version of ${when(items?.find((i) => i.id === selected)?.at ?? '')}.`)
     onClose()
   }
 
@@ -87,7 +87,7 @@ export function HistoryDialog({ chapterId, onClose }: { chapterId: string | null
           <ol className="history-list">
             {items.map((it) => (
               <li key={it.id}>
-                <button className={clsx('history-item', it.id === selected && 'is-active')} onClick={() => setSelected(it.id)}>
+                <button aria-current={it.id === selected ? 'true' : undefined} className={clsx('history-item', it.id === selected && 'is-active')} onClick={() => setSelected(it.id)}>
                   <span className="history-when">{when(it.at)}</span>
                   <span className="history-label">
                     {it.label} · {it.words.toLocaleString('en-US')} words

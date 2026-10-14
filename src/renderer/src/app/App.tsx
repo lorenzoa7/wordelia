@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, MotionConfig, motion } from 'motion/react'
 import { TooltipProvider } from '@/ui'
 import { PromptHost } from '@/ui/prompt'
 import { useApp } from '@/stores/app'
@@ -21,6 +21,7 @@ import './app.css'
 export function App(): React.JSX.Element {
   const ready = useApp((s) => s.settings !== null)
   const root = useBook((s) => s.root)
+  const onboarded = useApp((s) => s.settings?.onboarded ?? true)
   const [booting, setBooting] = useState(true)
 
   useEffect(() => {
@@ -76,10 +77,11 @@ export function App(): React.JSX.Element {
   )
 
   return (
+    <MotionConfig reducedMotion="user">
     <TooltipProvider>
       <div className="app">
         <TitleBar />
-        <main className="app-main">
+        <main className="app-main" inert={!onboarded}>
           {ready && !booting && (
             <AnimatePresence mode="wait" initial={false}>
               {root ? (
@@ -114,5 +116,6 @@ export function App(): React.JSX.Element {
         <Toasts />
       </div>
     </TooltipProvider>
+    </MotionConfig>
   )
 }

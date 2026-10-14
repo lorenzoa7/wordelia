@@ -28,7 +28,11 @@ export function Welcome(): React.JSX.Element | null {
 
   return (
     <div className="welcome-backdrop">
-      <motion.div className="welcome grain" initial={{ opacity: 0, y: 16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}>
+      <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Welcome to Wordelia"
+        className="welcome grain" initial={{ opacity: 0, y: 16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}>
         <AnimatePresence mode="wait">
           {step === 0 ? (
             <motion.div key="hello" className="welcome-step" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}>
@@ -49,7 +53,7 @@ export function Welcome(): React.JSX.Element | null {
                 <Button variant="ghost" onClick={finish}>
                   Skip
                 </Button>
-                <Button variant="ribbon" onClick={() => setStep(1)}>
+                <Button variant="ribbon" autoFocus onClick={() => setStep(1)}>
                   Connect an AI <ArrowRight size={14} />
                 </Button>
               </div>
@@ -117,8 +121,10 @@ function CliRow({ id }: { id: ProviderId }): React.JSX.Element {
 
   const ok = status?.installed && status.loggedIn !== false
   const copy = (text: string): void => {
-    void navigator.clipboard.writeText(text)
-    toast('Copied.')
+    navigator.clipboard.writeText(text).then(
+      () => toast('Copied. Paste it in a terminal.'),
+      () => toast(`Run in a terminal: ${text}`)
+    )
   }
 
   return (

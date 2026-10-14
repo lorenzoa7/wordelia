@@ -69,7 +69,7 @@ export function ImportDialog({ path, onClose }: { path: string | null; onClose: 
       for (const c of prepared.chapters) await useBook.getState().addChapter(null, c.title, c.markdown)
       useBook.getState().selectChapter(useBook.getState().chapters[0]?.id ?? '')
       onClose()
-      toast(`Imported ${prepared.chapters.length} chapters.`)
+      toast(`Imported ${prepared.chapters.length} ${prepared.chapters.length === 1 ? 'chapter' : 'chapters'}.`)
       if (buildPlanning) void startPlanningSync({ bootstrap: true })
     } catch (err) {
       toast(`Import failed: ${err instanceof Error ? err.message : String(err)}`, { kind: 'error' })
@@ -107,7 +107,7 @@ export function ImportDialog({ path, onClose }: { path: string | null; onClose: 
           <div className="import-summary">
             <BookOpen size={18} />
             <span>
-              {prepared.chapters.length} chapters · {formatCount(total)} words
+              {prepared.chapters.length} {prepared.chapters.length === 1 ? 'chapter' : 'chapters'} · {formatCount(total)} words
             </span>
           </div>
           <ol className="import-chapters">

@@ -170,7 +170,8 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
         return { id: c.id, title: c.title, index: i, n }
       })
       .filter((m) => m.n > 0)
-  }, [chapters, entry])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chapters, entry.name, entry.aliases.join('|')])
 
   const update = useBook.getState().updateEntry
   const pickImage = async (): Promise<void> => {
@@ -187,7 +188,7 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
   }
   const remove = async (): Promise<void> => {
     const ok = await askConfirm({
-      title: `Delete "${entry.name}"?`,
+      title: `Delete “${entry.name}”?`,
       message: "The file moves to the book's .wordelia/trash folder.",
       confirm: 'Delete',
       danger: true
@@ -236,7 +237,6 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
               className="entry-name"
               value={name}
               aria-label="Name"
-              spellCheck={false}
               onChange={(e) => setName(e.target.value)}
               onBlur={() => name.trim() && name !== entry.name && void useBook.getState().renameEntry(entry.id, name)}
               onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}

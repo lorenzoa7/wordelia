@@ -79,10 +79,14 @@ export function Composer({ thread }: { thread: Thread | null }): React.JSX.Eleme
   return (
     <div className="composer-wrap">
       {mentionQuery !== null && candidates.length > 0 && (
-        <div className="mention-pop" role="listbox">
+        <div className="mention-pop" role="listbox" id="mention-list" aria-label="Mention">
           {candidates.map((c, i) => (
             <button
               key={`${c.kind}-${c.id}`}
+              id={`mention-${i}`}
+              role="option"
+              aria-selected={i === highlight}
+              tabIndex={-1}
               className={clsx('mention-option', i === highlight && 'is-active')}
               onMouseDown={(e) => {
                 e.preventDefault()
@@ -122,6 +126,12 @@ export function Composer({ thread }: { thread: Thread | null }): React.JSX.Eleme
           ref={ref}
           className="composer-input"
           rows={1}
+          aria-label="Message to your editor"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={mentionQuery !== null && candidates.length > 0}
+          aria-controls="mention-list"
+          aria-activedescendant={mentionQuery !== null && candidates.length > 0 ? `mention-${highlight}` : undefined}
           placeholder={quotes.length ? 'Ask about the quote…' : 'Ask your editor. Type @ to mention a chapter, entry or thread.'}
           value={draft}
           spellCheck

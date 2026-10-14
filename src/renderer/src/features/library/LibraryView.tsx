@@ -13,13 +13,15 @@ import { NewBookDialog } from './NewBookDialog'
 import { ImportDialog } from './ImportDialog'
 import './library.css'
 
+const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
+
 function timeAgo(iso: string): string {
   const d = (Date.now() - new Date(iso).getTime()) / 1000
   if (d < 60) return 'just now'
-  if (d < 3600) return `${Math.floor(d / 60)} min ago`
-  if (d < 86400) return `${Math.floor(d / 3600)} h ago`
-  if (d < 86400 * 30) return `${Math.floor(d / 86400)} days ago`
-  return new Date(iso).toLocaleDateString()
+  if (d < 3600) return rtf.format(-Math.floor(d / 60), 'minute')
+  if (d < 86400) return rtf.format(-Math.floor(d / 3600), 'hour')
+  if (d < 86400 * 30) return rtf.format(-Math.floor(d / 86400), 'day')
+  return new Date(iso).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 export async function openBookAt(root: string): Promise<void> {

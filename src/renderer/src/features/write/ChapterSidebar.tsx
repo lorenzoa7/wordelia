@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Reorder } from 'motion/react'
-import { ArrowBendUpLeft, ClockCounterClockwise, DotsThree, PencilSimple, Plus, Trash } from '@phosphor-icons/react'
+import { ArrowBendUpLeft, ArrowDown, ArrowUp, ClockCounterClockwise, DotsThree, PencilSimple, Plus, Trash } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { countMarkdownWords, formatCount } from '@shared/book'
 import type { Chapter } from '@shared/types'
@@ -68,28 +68,65 @@ function ChapterItem({
   const words = countMarkdownWords(chapter.body)
   const [value, setValue] = useState(chapter.title)
 
+  const move = (delta: number): void => {
+    const st = useBook.getState()
+    const i = st.chapters.findIndex((c) => c.id === chapter.id)
+    const to = i + delta
+    if (i < 0 || to < 0 || to >= st.chapters.length) return
+    st.moveChapter(chapter.id, to)
+    setTimeout(() => document.querySelector<HTMLElement>(`[data-chapter="${chapter.id}"]`)?.focus(), 30)
+  }
+
   const remove = async (): Promise<void> => {
     const ok = await askConfirm({
-      title: `Delete "${chapter.title}"?`,
+      title: `Delete “${chapter.title}”?`,
       message: "The file moves to the book's .wordelia/trash folder. You can get it back from there.",
       confirm: 'Delete',
       danger: true
     })
     if (!ok) return
     await useBook.getState().deleteChapter(chapter.id)
-    toast(`"${chapter.title}" moved to the trash folder.`)
+    toast(`“${chapter.title}” moved to the trash folder.`)
   }
 
   return (
     <div
       className={clsx('chapter-item', active && 'is-active')}
+      role="button"
+      tabIndex={renaming ? -1 : 0}
+      data-chapter={chapter.id}
+      aria-current={active ? 'page' : undefined}
+      aria-label={`Chapter ${index + 1}: ${chapter.title}, ${words} words. F2 renames, Alt and arrow keys move it.`}
       onClick={() => !renaming && useBook.getState().selectChapter(chapter.id)}
       onDoubleClick={onRename}
+      onKeyDown={(e) => {
+        if (renaming || e.target !== e.currentTarget) return
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          useBook.getState().selectChapter(chapter.id)
+        } else if (e.key === 'F2') {
+          e.preventDefault()
+          setValue(chapter.title)
+          onRename()
+        } else if (e.altKey && e.key === 'ArrowUp') {
+          e.preventDefault()
+          move(-1)
+        } else if (e.altKey && e.key === 'ArrowDown') {
+          e.preventDefault()
+          move(1)
+        } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault()
+          const items = [...document.querySelectorAll<HTMLElement>('[data-chapter]')]
+          const i = items.indexOf(e.currentTarget)
+          items[i + (e.key === 'ArrowDown' ? 1 : -1)]?.focus()
+        }
+      }}
     >
       <span className="chapter-item-num">{String(index + 1).padStart(2, '0')}</span>
       {renaming ? (
         <input
           className="chapter-item-input"
+          aria-label="Chapter title"
           autoFocus
           value={value}
           onChange={(e) => setValue(e.target.value)}
@@ -125,6 +162,12 @@ function ChapterItem({
           </MenuItem>
           <MenuItem icon={<Plus size={15} />} onSelect={() => void useBook.getState().addChapter(chapter.id)}>
             New chapter after this
+          </MenuItem>
+          <MenuItem icon={<ArrowUp size={15} />} shortcut="Alt+↑" disabled={index === 0} onSelect={() => move(-1)}>
+            Move up
+          </MenuItem>
+          <MenuItem icon={<ArrowDown size={15} />} shortcut="Alt+↓" onSelect={() => move(1)}>
+            Move down
           </MenuItem>
           <MenuItem
             icon={<ArrowBendUpLeft size={15} />}

@@ -92,7 +92,8 @@ export function PlanSidebar(): React.JSX.Element {
                 <button
                   className="plan-caret"
                   onClick={() => setOpen((o) => ({ ...o, [c.folder]: !isOpen }))}
-                  aria-label={isOpen ? 'Collapse' : 'Expand'}
+                  aria-label={`${c.name}: show entries`}
+                  aria-expanded={isOpen}
                 >
                   <CaretRight size={10} className={clsx(isOpen && 'is-open')} />
                 </button>
@@ -115,6 +116,7 @@ export function PlanSidebar(): React.JSX.Element {
                   {list.map((e) => (
                     <button
                       key={e.id}
+                      aria-current={e.id === activeEntry ? 'page' : undefined}
                       className={clsx('plan-entry', e.id === activeEntry && 'is-active')}
                       onClick={() => useBook.getState().selectEntry(e.id)}
                     >

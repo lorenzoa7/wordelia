@@ -17,7 +17,7 @@ import {
   AlignCenterVerticalSimple
 } from '@phosphor-icons/react'
 import { BOOK_FONTS, FONT_SIZES, fontStack } from '@/lib/fonts'
-import { IconButton, Menu, MenuItem, MenuLabel, MenuSeparator, Tooltip } from '@/ui'
+import { IconButton, Menu, MenuItem, MenuLabel, MenuSeparator } from '@/ui'
 import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
 import { useUi } from '@/stores/ui'
@@ -62,7 +62,7 @@ export function Toolbar({ editor }: { editor: Editor }): React.JSX.Element {
 
   return (
     <div className="toolbar-wrap">
-      <div className="toolbar" role="toolbar" aria-label="Formatting">
+      <div className="toolbar" aria-label="Formatting">
         <IconButton label="Undo" shortcut="Ctrl+Z" disabled={!st.canUndo} onClick={() => run().undo().run()}>
           <ArrowArcLeft size={17} />
         </IconButton>
@@ -131,14 +131,10 @@ export function Toolbar({ editor }: { editor: Editor }): React.JSX.Element {
 
         <Menu
           trigger={
-            <span>
-              <Tooltip label="Alignment">
-                <button className="icon-btn toolbar-align" aria-label="Alignment">
-                  {ALIGN_ICONS[align as keyof typeof ALIGN_ICONS] ?? ALIGN_ICONS.left}
-                  <CaretDown size={9} />
-                </button>
-              </Tooltip>
-            </span>
+            <button className="icon-btn toolbar-align" aria-label="Alignment" title="Alignment">
+              {ALIGN_ICONS[align as keyof typeof ALIGN_ICONS] ?? ALIGN_ICONS.left}
+              <CaretDown size={9} />
+            </button>
           }
         >
           {(['left', 'center', 'right', 'justify'] as const).map((a) => (

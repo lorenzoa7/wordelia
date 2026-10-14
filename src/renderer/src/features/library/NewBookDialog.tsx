@@ -58,7 +58,7 @@ export function NewBookDialog({ open, onOpenChange }: { open: boolean; onOpenCha
             Cancel
           </Button>
           <Button variant="primary" onClick={() => void create()} disabled={!title.trim() || busy}>
-            Create book
+            {busy ? 'Creating…' : 'Create book'}
           </Button>
         </>
       }

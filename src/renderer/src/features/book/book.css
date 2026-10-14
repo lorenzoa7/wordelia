@@ -142,6 +142,9 @@
 .chapter-item.is-active .chapter-item-title {
   font-weight: 700;
 }
+.chapter-item-input:focus {
+  border-color: var(--ribbon);
+}
 .chapter-item-input {
   flex: 1;
   min-width: 0;
@@ -167,10 +170,12 @@
   height: 24px;
 }
 .chapter-item:hover .chapter-item-menu,
+.chapter-item:focus-within .chapter-item-menu,
 .chapter-item-menu:has([data-state='open']) {
   display: inline-flex;
 }
-.chapter-item:hover .chapter-item-words {
+.chapter-item:hover .chapter-item-words,
+.chapter-item:focus-within .chapter-item-words {
   display: none;
 }
 .sidebar-add {
@@ -185,7 +190,10 @@
   color: var(--ink-3);
   font-size: var(--text-xs);
   font-weight: 700;
-  transition: all var(--dur-fast) var(--ease-out);
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
 }
 .sidebar-add:hover {
   border-color: var(--ink-4);

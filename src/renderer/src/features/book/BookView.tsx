@@ -83,7 +83,7 @@ export function BookView(): React.JSX.Element {
         animate={{ width: sidebarOpen ? SIDEBAR_W : 0, opacity: sidebarOpen ? 1 : 0 }}
         transition={{ type: 'spring', stiffness: 380, damping: 40 }}
       >
-        <div className="book-sidebar-inner" style={{ width: SIDEBAR_W }}>
+        <div className="book-sidebar-inner" style={{ width: SIDEBAR_W }} inert={!sidebarOpen}>
           {view === 'write' ? <ChapterSidebar /> : <PlanSidebar />}
         </div>
       </motion.div>
@@ -113,13 +113,26 @@ export function BookView(): React.JSX.Element {
           <div
             className="chat-resizer"
             role="separator"
+            tabIndex={0}
             aria-orientation="vertical"
-            aria-label="Resize the chat"
+            aria-label="Chat width. Use the arrow keys to change it."
+            aria-valuemin={CHAT_MIN}
+            aria-valuemax={CHAT_MAX}
+            aria-valuenow={Math.round(chatW)}
             onPointerDown={startResize}
             onDoubleClick={() => useApp.getState().setUi({ chatWidth: 400 })}
+            onKeyDown={(e) => {
+              const step = e.shiftKey ? 60 : 20
+              const next = e.key === 'ArrowLeft' ? chatW + step : e.key === 'ArrowRight' ? chatW - step : null
+              if (next == null) return
+              e.preventDefault()
+              const w = Math.min(CHAT_MAX, Math.max(CHAT_MIN, next))
+              setChatW(w)
+              useApp.getState().setUi({ chatWidth: w })
+            }}
           />
         )}
-        <div className="book-chat-inner" style={{ width: chatW }}>
+        <div className="book-chat-inner" style={{ width: chatW }} inert={!chatOpen}>
           <ChatPanel />
         </div>
       </motion.div>

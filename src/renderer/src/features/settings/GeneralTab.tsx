@@ -21,7 +21,7 @@ export function GeneralTab(): React.JSX.Element | null {
       <h3 className="settings-h">Theme</h3>
       <div className="theme-picker">
         {THEMES.map((t) => (
-          <button key={t.id} className={clsx('theme-card', `theme-${t.id}`, settings.theme === t.id && 'is-active')} onClick={() => void update({ theme: t.id })}>
+          <button key={t.id} aria-pressed={settings.theme === t.id} className={clsx('theme-card', `theme-${t.id}`, settings.theme === t.id && 'is-active')} onClick={() => void update({ theme: t.id })}>
             <span className="theme-swatch">
               <span className="theme-page" />
             </span>

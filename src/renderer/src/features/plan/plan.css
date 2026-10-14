@@ -26,7 +26,10 @@
   color: var(--ink-2);
   font-size: var(--text-sm);
   font-weight: 700;
-  transition: all var(--dur-fast) var(--ease-out);
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
 }
 .sync-btn:hover {
   border-color: var(--ink-4);
@@ -137,10 +140,12 @@
   width: 24px;
   height: 24px;
 }
-.plan-item:hover .plan-item-add {
+.plan-item:hover .plan-item-add,
+.plan-item:focus-within .plan-item-add {
   display: inline-flex;
 }
-.plan-item:hover .plan-item-count {
+.plan-item:hover .plan-item-count,
+.plan-item:focus-within .plan-item-count {
   display: none;
 }
 .plan-entries {
@@ -423,6 +428,11 @@
 .entry-name:focus,
 .entry-summary:focus {
   background: var(--paper-2);
+}
+.entry-name:focus,
+.entry-summary:focus,
+.alias-input:focus {
+  box-shadow: inset 0 -2px 0 var(--ribbon);
 }
 .entry-aliases {
   display: flex;

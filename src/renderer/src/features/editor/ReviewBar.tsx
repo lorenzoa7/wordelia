@@ -53,6 +53,8 @@ export function ReviewBar({ editor }: { editor: Editor }): React.JSX.Element {
         <motion.div
           ref={ref}
           className="review-bar"
+          role="status"
+          aria-live="polite"
           style={{ top: pos.top, left: pos.left }}
           initial={{ opacity: 0, y: -6, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -87,7 +89,7 @@ export function ReviewBar({ editor }: { editor: Editor }): React.JSX.Element {
               <button className="review-btn" onClick={() => editor.chain().focus().rejectReview().run()}>
                 <X size={13} /> Reject <Kbd>Esc</Kbd>
               </button>
-              <button className="review-btn review-icon" title="Try again" onClick={() => void retryAction()}>
+              <button className="review-btn review-icon" title="Try again" aria-label="Try again" onClick={() => void retryAction()}>
                 <ArrowsClockwise size={14} />
               </button>
             </>

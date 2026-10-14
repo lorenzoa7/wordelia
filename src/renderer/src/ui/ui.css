@@ -270,10 +270,16 @@
   gap: 6px;
   margin-bottom: var(--s-4);
 }
-.field-inline {
+.field-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.field-inline .field-main {
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
+  gap: var(--s-4);
 }
 .field-inline .field-hint {
   display: none;
@@ -308,7 +314,7 @@
   color: var(--ink-4);
 }
 .input:focus {
-  border-color: var(--ink-4);
+  border-color: var(--ribbon);
   box-shadow: 0 0 0 3px var(--ribbon-wash);
 }
 .textarea {

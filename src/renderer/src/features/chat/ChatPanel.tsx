@@ -7,6 +7,7 @@ import type { Thread } from '@shared/types'
 import { Button, Dialog, Field, IconButton, Menu, MenuItem, MenuSeparator, TextArea, TextInput } from '@/ui'
 import { useBook } from '@/stores/book'
 import { useChat } from './chatStore'
+import { askConfirm } from '@/ui/prompt'
 import { newThread } from './send'
 import { MessageView, StreamingMessage } from './MessageView'
 import { Composer } from './Composer'
@@ -72,10 +73,18 @@ export function ChatPanel(): React.JSX.Element {
               <MenuItem
                 danger
                 icon={<Trash size={15} />}
-                onSelect={() => {
-                  void useBook.getState().deleteThread(thread.id)
-                  setActive(null)
-                }}
+                onSelect={() =>
+                  void askConfirm({
+                    title: `Delete “${thread.title}”?`,
+                    message: 'The messages of this thread will be deleted. Other threads keep their own digests.',
+                    confirm: 'Delete',
+                    danger: true
+                  }).then((ok) => {
+                    if (!ok) return
+                    void useBook.getState().deleteThread(thread.id)
+                    setActive(null)
+                  })
+                }
               >
                 Delete thread
               </MenuItem>
@@ -93,7 +102,7 @@ export function ChatPanel(): React.JSX.Element {
         {!thread || (thread.messages.length === 0 && !streaming) ? (
           <ChatEmpty />
         ) : (
-          <div className="chat-messages">
+          <div className="chat-messages" role="log" aria-live="polite" aria-relevant="additions">
             {thread.messages.map((m) => (
               <MessageView key={m.id} message={m} thread={thread} />
             ))}
@@ -138,7 +147,7 @@ function ThreadSwitcher({
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content className="thread-pop" align="start" sideOffset={6}>
-          <input className="thread-search" placeholder="Search threads" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+          <input className="thread-search" aria-label="Search threads" placeholder="Search threads" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
           <div className="thread-list">
             {sorted.length === 0 && <p className="thread-none">No threads yet.</p>}
             {sorted.map((t) => (
@@ -154,7 +163,7 @@ function ThreadSwitcher({
                   {t.pinned && <PushPin size={11} weight="fill" />}
                   {t.title}
                 </span>
-                <span className="thread-item-sub">{t.brief || firstLine(t.digest) || `${t.messages.length} messages`}</span>
+                <span className="thread-item-sub">{t.brief || firstLine(t.digest) || `${t.messages.length} ${t.messages.length === 1 ? 'message' : 'messages'}`}</span>
               </button>
             ))}
           </div>

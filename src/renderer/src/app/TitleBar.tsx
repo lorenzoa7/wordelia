@@ -98,6 +98,7 @@ export function TitleBar(): React.JSX.Element {
             <button
               key={v.id}
               className={clsx('view-tab', view === v.id && 'is-active')}
+              aria-current={view === v.id ? 'page' : undefined}
               onClick={() => setView(v.id)}
               title={`${v.label} (${v.key})`}
             >

@@ -54,6 +54,9 @@
   z-index: 60;
   animation: pop-in var(--dur-med) var(--ease-out);
 }
+.thread-search:focus {
+  border-color: var(--ribbon);
+}
 .thread-search {
   width: 100%;
   height: 32px;
@@ -487,7 +490,8 @@ button.proposal-file:hover span {
   opacity: 0;
   transition: opacity var(--dur-fast) var(--ease-out);
 }
-.hunk:hover .hunk-actions {
+.hunk:hover .hunk-actions,
+.hunk:focus-within .hunk-actions {
   opacity: 1;
 }
 .hunk-actions button {
@@ -596,7 +600,10 @@ button.proposal-file:hover span {
   font-size: var(--text-sm);
   text-align: left;
   line-height: 1.4;
-  transition: all var(--dur-fast) var(--ease-out);
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
 }
 .chat-suggestion:hover {
   border-color: var(--ribbon);
@@ -826,5 +833,21 @@ button.proposal-file:hover span {
 }
 .msg-actions button:hover {
   background: var(--desk-3);
+  color: var(--ink);
+}
+
+.proposal-more {
+  display: block;
+  width: 100%;
+  padding: 6px 12px;
+  border: 0;
+  border-top: 1px solid var(--rule-soft);
+  background: var(--paper-2);
+  color: var(--ink-3);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  text-align: left;
+}
+.proposal-more:hover {
   color: var(--ink);
 }

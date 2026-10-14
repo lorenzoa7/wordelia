@@ -85,8 +85,10 @@ function AssistantMessage({ message, thread }: { message: ChatMessage; thread: T
 
 function MessageActions({ text }: { text: string }): React.JSX.Element {
   const copy = (): void => {
-    void navigator.clipboard.writeText(text)
-    toast('Copied.')
+    navigator.clipboard.writeText(text).then(
+      () => toast('Copied.'),
+      () => toast('Could not copy.', { kind: 'error' })
+    )
   }
   const insert = (): void => {
     const a = getActiveEditor()
@@ -116,7 +118,7 @@ export function StreamingMessage({ text }: { text: string }): React.JSX.Element 
   return (
     <div className="msg msg-ai is-streaming">
       {segments.length === 0 && (
-        <div className="msg-thinking">
+        <div className="msg-thinking" role="status" aria-label="The editor is thinking">
           <span />
           <span />
           <span />

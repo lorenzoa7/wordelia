@@ -27,9 +27,12 @@ interface UiState {
   openHistory(chapterId: string | null): void
   toast(message: string, opts?: { kind?: Toast['kind']; action?: Toast['action']; ms?: number }): void
   dismissToast(id: number): void
+  pauseToast(id: number): void
+  resumeToast(id: number): void
 }
 
 let nextToast = 1
+const toastTimers = new Map<number, { remaining: number; started: number; timer: ReturnType<typeof setTimeout> | undefined }>()
 
 export const useUi = create<UiState>((set, get) => ({
   settingsOpen: false,
@@ -60,9 +63,26 @@ export const useUi = create<UiState>((set, get) => ({
   toast(message, opts = {}) {
     const id = nextToast++
     set({ toasts: [...get().toasts, { id, message, kind: opts.kind ?? 'info', action: opts.action }] })
-    setTimeout(() => get().dismissToast(id), opts.ms ?? (opts.kind === 'error' ? 7000 : 3500))
+    const ms = opts.ms ?? (opts.action ? 9000 : opts.kind === 'error' ? 7000 : 3500)
+    toastTimers.set(id, { remaining: ms, started: Date.now(), timer: setTimeout(() => get().dismissToast(id), ms) })
+  },
+  pauseToast(id) {
+    const t = toastTimers.get(id)
+    if (!t || t.timer === undefined) return
+    clearTimeout(t.timer)
+    t.remaining -= Date.now() - t.started
+    t.timer = undefined
+  },
+  resumeToast(id) {
+    const t = toastTimers.get(id)
+    if (!t || t.timer !== undefined) return
+    t.started = Date.now()
+    t.timer = setTimeout(() => get().dismissToast(id), Math.max(1500, t.remaining))
   },
   dismissToast(id) {
+    const t = toastTimers.get(id)
+    if (t?.timer) clearTimeout(t.timer)
+    toastTimers.delete(id)
     set({ toasts: get().toasts.filter((t) => t.id !== id) })
   }
 }))

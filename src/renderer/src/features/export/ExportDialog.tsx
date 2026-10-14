@@ -96,7 +96,7 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
           <div className="export-left">
             <div className="format-grid">
               {FORMATS.map((f) => (
-                <button key={f.id} className={clsx('format-card', format === f.id && 'is-active')} onClick={() => setFormat(f.id)}>
+                <button key={f.id} aria-pressed={format === f.id} className={clsx('format-card', format === f.id && 'is-active')} onClick={() => setFormat(f.id)}>
                   {f.icon}
                   <span className="format-label">{f.label}</span>
                   <span className="format-hint">{f.hint}</span>
@@ -108,6 +108,7 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
                 <div className="preset-row">
                   <button
                     className={clsx('preset', s.preset === 'book' && 'is-active')}
+                    aria-pressed={s.preset === 'book'}
                     onClick={() => setSettings(presetSettings('book', s, manifest.typography.fontFamily))}
                   >
                     <BookOpen size={16} />
@@ -116,7 +117,7 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
                       <small>Pages like a printed novel</small>
                     </span>
                   </button>
-                  <button className={clsx('preset', s.preset === 'manuscript' && 'is-active')} onClick={() => setSettings(presetSettings('manuscript', s, manifest.typography.fontFamily))}>
+                  <button aria-pressed={s.preset === 'manuscript'} className={clsx('preset', s.preset === 'manuscript' && 'is-active')} onClick={() => setSettings(presetSettings('manuscript', s, manifest.typography.fontFamily))}>
                     <Files size={16} />
                     <span>
                       <b>Manuscript</b>

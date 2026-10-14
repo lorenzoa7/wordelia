@@ -133,7 +133,7 @@ function EditCard({ segment, message, thread, streaming }: Props & { segment: Ed
     const snap = snapshotOf(segment.file)
     if (apply(i)) {
       markAfter(snap)
-      offerUndo(snap, [i], `Change applied to "${target.label}".`)
+      offerUndo(snap, [i], `Change applied to “${target.label}”.`)
     }
   }
   const reject = (i: number): void => {
@@ -150,7 +150,7 @@ function EditCard({ segment, message, thread, streaming }: Props & { segment: Ed
     }
     setBusy(false)
     markAfter(snap)
-    if (accepted.length) offerUndo(snap, accepted, `${accepted.length} change${accepted.length > 1 ? 's' : ''} applied to "${target.label}".`)
+    if (accepted.length) offerUndo(snap, accepted, `${accepted.length} change${accepted.length > 1 ? 's' : ''} applied to “${target.label}”.`)
   }
 
   const Icon = target.kind === 'chapter' ? BookOpenText : Notebook
@@ -182,7 +182,7 @@ function EditCard({ segment, message, thread, streaming }: Props & { segment: Ed
           pending.length > 0 && (
             <>
               <button className="proposal-btn" onClick={() => keys.forEach((k, i) => pending.includes(k) && reject(i))}>
-                Reject
+                {segment.hunks.length > 1 ? 'Reject all' : 'Reject'}
               </button>
               <button className="proposal-btn is-accept" onClick={acceptAll} disabled={busy}>
                 <Check size={12} weight="bold" /> Accept{segment.hunks.length > 1 ? ' all' : ''}
@@ -252,7 +252,7 @@ function CreateCard({ segment, message, thread, streaming }: Props & { segment: 
     const res = await applyCreate(segment.file, segment.content)
     setHunkState(thread, message.id, key, res.ok ? 'accepted' : 'failed')
     if (!res.ok) toast(res.reason, { kind: 'error' })
-    else toast(`${exists ? 'Updated' : 'Created'} "${target.label}" in the planning.`)
+    else toast(`${exists ? 'Updated' : 'Created'} “${target.label}” in the planning.`)
   }
 
   return (
@@ -279,13 +279,16 @@ function CreateCard({ segment, message, thread, streaming }: Props & { segment: 
           <HunkBadge state={state} />
         )}
       </header>
-      <div className={clsx('proposal-body prose', !expanded && 'is-clamped')} onClick={() => setExpanded(true)}>
+      <div id={`create-${segment.index}`} className={clsx('proposal-body prose', !expanded && 'is-clamped')}>
         {typeof data.summary === 'string' && <p className="proposal-summary">{data.summary}</p>}
         {Array.isArray(data.aliases) && data.aliases.length > 0 && (
           <p className="proposal-aliases">Also: {(data.aliases as unknown[]).map(String).join(', ')}</p>
         )}
         <ReactMarkdown>{body}</ReactMarkdown>
       </div>
+      <button className="proposal-more" aria-expanded={expanded} aria-controls={`create-${segment.index}`} onClick={() => setExpanded(!expanded)}>
+        {expanded ? 'Show less' : 'Show all'}
+      </button>
     </motion.div>
   )
 }

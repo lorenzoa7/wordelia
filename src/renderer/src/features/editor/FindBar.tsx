@@ -57,13 +57,20 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
     else editor.commands.clearFind()
   }, [open, query, cs, ww, editor, activeId])
 
+  // Plain text of the other chapters, made once per chapter text.
+  const plain = useMemo(() => new Map(chapters.map((c) => [c.id, markdownToPlain(c.body)])), [chapters])
+  const [slowQuery, setSlowQuery] = useState(query)
+  useEffect(() => {
+    const t = setTimeout(() => setSlowQuery(query), 200)
+    return () => clearTimeout(t)
+  }, [query])
   const others = useMemo(() => {
-    if (!open || !query) return []
+    if (!open || !slowQuery) return []
     return chapters
       .filter((c) => c.id !== activeId)
-      .map((c) => ({ id: c.id, title: c.title, n: countIn(markdownToPlain(c.body), query, cs, ww) }))
+      .map((c) => ({ id: c.id, title: c.title, n: countIn(plain.get(c.id) ?? '', slowQuery, cs, ww) }))
       .filter((c) => c.n > 0)
-  }, [open, query, cs, ww, chapters, activeId])
+  }, [open, slowQuery, cs, ww, chapters, activeId, plain])
 
   const close = (): void => {
     setOpen(false)
@@ -81,13 +88,14 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
           transition={{ type: 'spring', stiffness: 500, damping: 36 }}
         >
           <div className="find-row">
-            <button className={clsx('find-toggle', showReplace && 'is-open')} onClick={() => setShowReplace(!showReplace)} aria-label="Show replace">
+            <button className={clsx('find-toggle', showReplace && 'is-open')} onClick={() => setShowReplace(!showReplace)} aria-label="Replace" aria-expanded={showReplace}>
               <CaretRight size={12} />
             </button>
             <input
               ref={input}
               autoFocus
               className="find-input"
+              aria-label="Find"
               placeholder="Find"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -100,11 +108,11 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
                 if (e.key === 'Escape') close()
               }}
             />
-            <span className="find-count">{query ? (st.count ? `${st.current + 1}/${st.count}` : 'No results') : ''}</span>
-            <button className={clsx('find-opt', cs && 'is-on')} onClick={() => setCs(!cs)} title="Match case">
+            <span className="find-count" aria-live="polite">{query ? (st.count ? `${st.current + 1}/${st.count}` : 'No results') : ''}</span>
+            <button className={clsx('find-opt', cs && 'is-on')} onClick={() => setCs(!cs)} title="Match case" aria-label="Match case" aria-pressed={cs}>
               Aa
             </button>
-            <button className={clsx('find-opt', ww && 'is-on')} onClick={() => setWw(!ww)} title="Whole word">
+            <button className={clsx('find-opt', ww && 'is-on')} onClick={() => setWw(!ww)} title="Whole word" aria-label="Whole word" aria-pressed={ww}>
               W
             </button>
             <button className="icon-btn" onClick={() => editor.commands.findPrev()} aria-label="Previous">
@@ -122,6 +130,7 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
               <span className="find-toggle-space" />
               <input
                 className="find-input"
+                aria-label="Replace with"
                 placeholder="Replace"
                 value={replace}
                 onChange={(e) => setReplace(e.target.value)}
@@ -137,7 +146,7 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
                 Replace
               </button>
               <button className="find-text-btn" disabled={!st.count} onClick={() => editor.commands.replaceAll(replace)}>
-                All
+                Replace all
               </button>
             </div>
           )}

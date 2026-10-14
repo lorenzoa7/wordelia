@@ -147,6 +147,7 @@ export function MenuItem({
       onSelect={onSelect}
       disabled={disabled}
       style={style}
+      {...(checked !== undefined ? { role: 'menuitemradio', 'aria-checked': checked } : {})}
     >
       <span className="menu-item-icon">{checked ? <Check size={14} weight="bold" /> : icon}</span>
       <span className="menu-item-label">{children}</span>
@@ -199,15 +200,12 @@ export function Dialog({
             ;(e.currentTarget as HTMLElement).focus()
           }}
           tabIndex={-1}
+          {...(description ? {} : { 'aria-describedby': undefined })}
         >
           <header className="dialog-head">
             <div>
               <RDialog.Title className="dialog-title">{title}</RDialog.Title>
-              {description ? (
-                <RDialog.Description className="dialog-desc">{description}</RDialog.Description>
-              ) : (
-                <RDialog.Description className="sr-only">{typeof title === 'string' ? title : 'Dialog'}</RDialog.Description>
-              )}
+              {description && <RDialog.Description className="dialog-desc">{description}</RDialog.Description>}
             </div>
             <RDialog.Close asChild>
               <button className="icon-btn" aria-label="Close">
@@ -239,11 +237,13 @@ export function Field({
   inline?: boolean
 }): React.JSX.Element {
   return (
-    <label className={clsx('field', inline && 'field-inline')}>
-      <span className="field-label">{label}</span>
-      <span className="field-control">{children}</span>
+    <div className={clsx('field', inline && 'field-inline')}>
+      <label className="field-main">
+        <span className="field-label">{label}</span>
+        <span className="field-control">{children}</span>
+      </label>
       {hint && <span className="field-hint">{hint}</span>}
-    </label>
+    </div>
   )
 }
 
@@ -251,7 +251,7 @@ export const TextInput = forwardRef<HTMLInputElement, React.InputHTMLAttributes<
   { className, ...rest },
   ref
 ) {
-  return <input ref={ref} className={clsx('input', className)} spellCheck={false} {...rest} />
+  return <input ref={ref} className={clsx('input', className)} {...rest} />
 })
 
 export const TextArea = forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HTMLTextAreaElement>>(function TextArea(

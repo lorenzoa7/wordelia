@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 import { ArrowCounterClockwise, Plus, Star, Trash } from '@phosphor-icons/react'
 import { DEFAULT_ACTIONS } from '@shared/ai/defaults'
@@ -35,7 +35,7 @@ export function ActionsTab(): React.JSX.Element | null {
     setSelected(a.id)
   }
   const remove = async (): Promise<void> => {
-    if (!(await askConfirm({ title: `Delete "${action.name}"?`, message: 'This action will be removed.', confirm: 'Delete', danger: true }))) return
+    if (!(await askConfirm({ title: `Delete “${action.name}”?`, message: 'This action will be removed.', confirm: 'Delete', danger: true }))) return
     const next = actions.filter((a) => a.id !== action.id)
     save(next)
     setSelected(next[0]?.id ?? null)
@@ -70,7 +70,7 @@ export function ActionsTab(): React.JSX.Element | null {
       <div className="actions-layout">
         <div className="actions-list">
           {actions.map((a, i) => (
-            <button key={a.id} className={clsx('action-item', a.id === action?.id && 'is-active')} onClick={() => setSelected(a.id)}>
+            <button key={a.id} aria-current={a.id === action?.id ? 'true' : undefined} className={clsx('action-item', a.id === action?.id && 'is-active')} onClick={() => setSelected(a.id)}>
               <ActionIcon name={a.icon} />
               <span>{a.name}</span>
               {a.id === settings.defaultActionId ? (
@@ -95,12 +95,12 @@ export function ActionsTab(): React.JSX.Element | null {
           <div className="action-form" key={action.id}>
             <div className="action-form-row">
               <Field label="Name">
-                <TextInput value={action.name} onChange={(e) => patch({ name: e.target.value })} />
+                <DraftInput key={`n-${action.id}`} value={action.name} onCommit={(v) => patch({ name: v })} />
               </Field>
               <Field label="Icon">
                 <div className="icon-picker">
                   {ACTION_ICON_NAMES.map((n) => (
-                    <button key={n} className={clsx('icon-choice', action.icon === n && 'is-active')} onClick={() => patch({ icon: n })} aria-label={n}>
+                    <button key={n} aria-pressed={action.icon === n} className={clsx('icon-choice', action.icon === n && 'is-active')} onClick={() => patch({ icon: n })} aria-label={n}>
                       <ActionIcon name={n} />
                     </button>
                   ))}
@@ -108,7 +108,7 @@ export function ActionsTab(): React.JSX.Element | null {
               </Field>
             </div>
             <Field label="Instructions" hint="What the AI must do with the selected text. Your writing rules are added automatically.">
-              <TextArea value={action.instructions} rows={9} onChange={(e) => patch({ instructions: e.target.value })} className="instructions" />
+              <DraftArea key={`i-${action.id}`} value={action.instructions} onCommit={(v) => patch({ instructions: v })} />
             </Field>
             <div className="action-form-row">
               <Field label="Context around the selection">
@@ -165,4 +165,31 @@ export function ActionsTab(): React.JSX.Element | null {
       </div>
     </div>
   )
+}
+
+/** Keep typing local; save after a pause and on blur, so the settings file is not written on every key. */
+function useDraft(value: string, onCommit: (v: string) => void): [string, (v: string) => void, () => void] {
+  const [draft, setDraft] = useState(value)
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const commit = (): void => {
+    clearTimeout(timer.current)
+    if (draft !== value) onCommit(draft)
+  }
+  const change = (v: string): void => {
+    setDraft(v)
+    clearTimeout(timer.current)
+    timer.current = setTimeout(() => onCommit(v), 600)
+  }
+  useEffect(() => () => clearTimeout(timer.current), [])
+  return [draft, change, commit]
+}
+
+function DraftInput({ value, onCommit }: { value: string; onCommit: (v: string) => void }): React.JSX.Element {
+  const [draft, change, commit] = useDraft(value, onCommit)
+  return <TextInput value={draft} aria-label="Action name" onChange={(e) => change(e.target.value)} onBlur={commit} />
+}
+
+function DraftArea({ value, onCommit }: { value: string; onCommit: (v: string) => void }): React.JSX.Element {
+  const [draft, change, commit] = useDraft(value, onCommit)
+  return <TextArea value={draft} rows={9} className="instructions" aria-label="Instructions" onChange={(e) => change(e.target.value)} onBlur={commit} />
 }

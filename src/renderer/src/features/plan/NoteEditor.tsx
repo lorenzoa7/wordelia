@@ -59,7 +59,7 @@ export function NoteEditor({
     {
       extensions,
       content: parseMarkdown(value) as object,
-      editorProps: { attributes: { class: 'note-text prose', spellcheck: 'true', lang: language } },
+      editorProps: { attributes: { class: 'note-text prose', spellcheck: 'true', lang: language, 'aria-label': quoteLabel ? `Notes about ${quoteLabel}` : 'Notes' } },
       onUpdate: ({ editor: e }) => {
         clearTimeout(timer.current)
         timer.current = setTimeout(() => {

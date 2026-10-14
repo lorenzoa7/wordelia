@@ -16,7 +16,8 @@ const scenarios = [
   ['today'],
   ['keyboard'],
   ['paste'],
-  ['reorder']
+  ['reorder'],
+  ['external']
 ]
 
 function run(args) {

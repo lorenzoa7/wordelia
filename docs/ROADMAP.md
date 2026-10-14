@@ -95,7 +95,7 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] Save on close: the window waits for the editors and the file queue
 - [x] Login launcher for Claude Code and Codex, first-run welcome
 - [x] Optional typewriter sounds
-- [x] E2E scenario suite (`npm run e2e`)
+- [x] E2E scenario suite (`npm run e2e`): library, editor, AI review, chat proposals, planning, export, save on close, history, settings, dark theme, new book typing, chat resize, daily goal, keyboard, paste, reorder, outside file changes
 - [x] Independent code review: 17 findings fixed (data safety, Markdown, security, cancellation)
 
 ## Later (not in version 1)

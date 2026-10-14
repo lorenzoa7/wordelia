@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import {
   ArrowsClockwise,
   CaretRight,
+  DownloadSimple,
   Folder,
   GlobeHemisphereWest,
   MapPin,
@@ -18,6 +19,7 @@ import { IconButton, Tooltip } from '@/ui'
 import { askText } from '@/ui/prompt'
 import { useBook } from '@/stores/book'
 import { changedChapters, startPlanningSync } from './sync'
+import { importNotes } from './importNotes'
 
 const CATEGORY_ICONS: Record<string, React.ComponentType<IconProps>> = {
   UserCircle,
@@ -100,6 +102,9 @@ export function PlanSidebar(): React.JSX.Element {
                   <span className="plan-item-count">{list.length || ''}</span>
                 </button>
                 <span className="plan-item-add">
+                  <IconButton label={`Import notes into ${c.name}`} onClick={() => void importNotes(c.folder)}>
+                    <DownloadSimple size={13} />
+                  </IconButton>
                   <IconButton label={`New in ${c.name}`} onClick={() => void addEntry(c.folder)}>
                     <Plus size={13} />
                   </IconButton>

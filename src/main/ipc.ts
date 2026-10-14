@@ -219,6 +219,23 @@ export function registerIpc(): void {
     if (file) allowPicked(file)
     return file
   })
+  handle('import:pickNotes', async (e) => {
+    const w = win(e)
+    const opts = {
+      title: 'Import notes into the planning',
+      properties: ['openFile' as const, 'multiSelections' as const],
+      filters: [{ name: 'Markdown notes', extensions: ['md', 'markdown', 'txt'] }]
+    }
+    const res = w ? await dialog.showOpenDialog(w, opts) : await dialog.showOpenDialog(opts)
+    if (res.canceled) return []
+    const out: Array<{ name: string; text: string }> = []
+    for (const p of res.filePaths.slice(0, 200)) {
+      const text = await readTextOr(p, null)
+      if (text != null) out.push({ name: basename(p, extname(p)), text })
+    }
+    return out
+  })
+
   handle('import:read', (_e, path) => {
     assertPicked(path)
     return readImport(path)

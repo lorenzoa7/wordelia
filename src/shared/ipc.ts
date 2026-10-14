@@ -97,6 +97,8 @@ export interface IpcInvokeMap {
 
   'import:pick': [[], string | null]
   'import:read': [[path: string], ImportedBook]
+  /** Choose Markdown notes (for the planning). Returns their names and text. */
+  'import:pickNotes': [[], Array<{ name: string; text: string }>]
 
   'app:defaultBooksDir': [[], string]
   'app:version': [[], string]
@@ -154,6 +156,7 @@ export const INVOKE_CHANNELS: InvokeChannel[] = [
   'export:text',
   'import:pick',
   'import:read',
+  'import:pickNotes',
   'app:defaultBooksDir',
   'app:version',
   'app:flushDone',

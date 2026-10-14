@@ -30,6 +30,10 @@ Wordelia is a desktop writing app for novelists. It looks like a simple word pro
 |---|---|
 | ![Export](docs/images/export.png) | ![Dark](docs/images/dark.png) |
 
+| Version history | A page of the exported PDF |
+|---|---|
+| ![History](docs/images/history.png) | ![PDF page](docs/images/pdf-page.png) |
+
 ## Connect an AI
 
 Wordelia is free. It uses an AI that you already have:
@@ -75,6 +79,7 @@ npm run dev
 | `npm test` | Run the unit tests (Vitest). |
 | `npm run typecheck` | Check the types of all processes. |
 | `npm run shot -- book` | Build, start the app with a scripted AI, and save screenshots to `test-results/shots/`. |
+| `npm run e2e` | Build and run all end-to-end scenarios (scripted AI, temporary data folders). |
 | `npm run dist` | Make the Windows installer in `release/`. |
 
 Read `CLAUDE.md` and `docs/` before you change the code: `docs/SPEC.md` (product), `docs/ARCHITECTURE.md` (design), `docs/ROADMAP.md` (status) and `GLOSSARY.md` (terms).

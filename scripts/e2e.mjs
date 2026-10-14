@@ -13,7 +13,8 @@ const scenarios = [
   ['library'],
   ['newbook'],
   ['resize'],
-  ['today']
+  ['today'],
+  ['keyboard']
 ]
 
 function run(args) {

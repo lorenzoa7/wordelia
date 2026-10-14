@@ -280,6 +280,7 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
             rev={rev}
             value={entry.body}
             onChange={(md) => update(entry.id, { body: md })}
+            quoteLabel={entry.name}
             placeholder="Notes: appearance, personality, history, secrets…"
           />
         </div>

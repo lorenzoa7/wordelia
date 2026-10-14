@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
+import { BubbleMenu } from '@tiptap/react/menus'
+import { ArrowBendUpLeft } from '@phosphor-icons/react'
+import { addQuote } from '@/features/chat/chatStore'
 import { Placeholder } from '@tiptap/extensions'
 import { parseMarkdown } from '@shared/markdown/parse'
 import { serializeMarkdown } from '@shared/markdown/serialize'
@@ -17,7 +20,8 @@ export function NoteEditor({
   value,
   onChange,
   placeholder,
-  rev = 0
+  rev = 0,
+  quoteLabel
 }: {
   /** Changes when another note opens */
   docKey: string
@@ -26,6 +30,8 @@ export function NoteEditor({
   placeholder?: string
   /** Changes when the file changed outside the editor */
   rev?: number
+  /** Label for quotes sent to the chat (the entry name). No label: no Reply button. */
+  quoteLabel?: string
 }): React.JSX.Element {
   const language = useBook((s) => s.manifest?.language ?? 'en')
   const dash = useBook((s) => s.manifest?.typography.dialogueDash ?? '—')
@@ -98,5 +104,31 @@ export function NoteEditor({
     }
   }, [value, rev, editor])
 
-  return <EditorContent editor={editor} />
+  return (
+    <>
+      <EditorContent editor={editor} />
+      {editor && quoteLabel && (
+        <BubbleMenu
+          editor={editor}
+          className="selection-menu"
+          options={{ placement: 'top', offset: 10 }}
+          shouldShow={({ editor: e, from, to }) => from !== to && e.isFocused && e.state.doc.textBetween(from, to, ' ').trim().length > 0}
+        >
+          <button
+            className="sel-btn"
+            onMouseDown={(ev) => ev.preventDefault()}
+            onClick={() => {
+              const { from, to } = editor.state.selection
+              const text = editor.state.doc.textBetween(from, to, '\n\n').trim()
+              if (text) addQuote({ text, source: { kind: 'entry', id: docKey, label: quoteLabel } })
+              editor.commands.setTextSelection(to)
+            }}
+          >
+            <ArrowBendUpLeft size={14} />
+            <span>Reply</span>
+          </button>
+        </BubbleMenu>
+      )}
+    </>
+  )
 }

@@ -4,9 +4,9 @@ This file is the source of truth for progress. Update it after each task. Mark a
 
 ## Current focus
 
-> **Milestone:** M5–M7 verification and polish
-> **Next task:** Verify export (PDF, DOCX) and import (DOCX) end to end; review-bar spacer; dark theme pass.
-> **Blocked:** live AI tests need the user to run `claude auth login` and `codex login` (both CLIs are logged out). The mock provider (`WORDELIA_MOCK_AI=1`) covers the UI flows.
+> **Milestone:** M8 — polish and live AI verification
+> **Next task:** Live tests with real models once the user logs in (`claude auth login`, `codex logout && codex login`): Polish quality, chat proposals, planning sync on the real book.
+> **Blocked:** both CLIs are logged out on this computer. The scripted provider (`WORDELIA_MOCK_AI=1`) covers the UI flows.
 
 ## M0 — Foundation
 
@@ -26,7 +26,7 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] Library screen: recent books, new book, open folder
 - [x] Chapters: add, rename, reorder, delete
 - [x] Autosave with debounce, save state in the status bar
-- [~] File watcher: reload external changes — built; live test pending
+- [x] File watcher: reload external changes
 
 ## M2 — Editor
 
@@ -35,14 +35,14 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] Smart typing: `--` to dialogue dash, smart quotes, ellipsis (settings)
 - [x] Find and replace
 - [x] Word counts (chapter, book)
-- [ ] Spell check with the book language
+- [x] Spell check with the book language
 - [x] Focus mode, typewriter scrolling
 
 ## M3 — AI providers
 
 - [x] Transport interface and stream events
 - [~] Claude Code transport (CLI) — built; live test pending
-- [~] Codex transport (CLI) — built; live test pending
+- [~] Codex transport (CLI) — app-server path verified up to the server reply (the account token had expired)
 - [~] Anthropic API and OpenAI API transports — built; live test pending
 - [x] Provider status detection and model lists
 - [x] Settings UI: providers, model routes, suggested routes
@@ -67,30 +67,40 @@ This file is the source of truth for progress. Update it after each task. Mark a
 
 - [x] Plan view: categories, entries, entry editor, cards
 - [x] Entry images and aliases
-- [ ] Wiki links `[[...]]`
+- [x] Wiki links `[[...]]`
 - [x] Planning in the AI context
 - [x] Sync with manuscript (proposals review)
-- [ ] Import: DOCX, Markdown, TXT; build planning from manuscript
+- [x] Import: DOCX, Markdown, TXT; build planning from manuscript
 
 ## M7 — Export
 
-- [ ] PDF: book and manuscript presets
-- [ ] DOCX with named styles
-- [ ] Markdown and plain text
-- [ ] Export dialog with preview
+- [x] PDF: book and manuscript presets
+- [x] DOCX with named styles
+- [x] Markdown and plain text
+- [x] Export dialog with preview
 
 ## M8 — Polish and release
 
 - [ ] Animations and micro-interactions review
-- [ ] Onboarding (first run) and empty states
-- [ ] Keyboard shortcuts sheet
+- [x] Onboarding (first run) and empty states
+- [x] Keyboard shortcuts sheet
 - [ ] Accessibility review (focus rings, contrast, labels)
-- [ ] Windows installer (electron-builder), app icon
-- [ ] README with screenshots
+- [x] Windows installer (electron-builder), app icon
+- [x] README with screenshots
+
+## Done beyond the plan
+
+- [x] Version history: automatic chapter snapshots, before AI changes, diff and restore
+- [x] Undo toast for accepted chat proposals (refuses when the text changed after)
+- [x] Save on close: the window waits for the editors and the file queue
+- [x] Login launcher for Claude Code and Codex, first-run welcome
+- [x] Optional typewriter sounds
+- [x] E2E scenario suite (`npm run e2e`)
+- [x] Independent code review: 17 findings fixed (data safety, Markdown, security, cancellation)
 
 ## Later (not in version 1)
 
-- Version history (local snapshots with git)
+- Sync to a git remote from the app
 - EPUB export
 - Typewriter sounds (optional)
 - Book-level overrides of actions

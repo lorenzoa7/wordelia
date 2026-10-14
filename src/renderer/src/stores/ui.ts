@@ -17,12 +17,14 @@ interface UiState {
   exportOpen: boolean
   newBookOpen: boolean
   findOpen: boolean
+  historyChapterId: string | null
   toasts: Toast[]
   openSettings(tab?: SettingsTab): void
   closeSettings(): void
   setExportOpen(v: boolean): void
   setNewBookOpen(v: boolean): void
   setFindOpen(v: boolean): void
+  openHistory(chapterId: string | null): void
   toast(message: string, opts?: { kind?: Toast['kind']; action?: Toast['action']; ms?: number }): void
   dismissToast(id: number): void
 }
@@ -35,6 +37,7 @@ export const useUi = create<UiState>((set, get) => ({
   exportOpen: false,
   newBookOpen: false,
   findOpen: false,
+  historyChapterId: null,
   toasts: [],
   openSettings(tab) {
     set({ settingsOpen: true, settingsTab: tab ?? get().settingsTab })
@@ -50,6 +53,9 @@ export const useUi = create<UiState>((set, get) => ({
   },
   setFindOpen(v) {
     set({ findOpen: v })
+  },
+  openHistory(chapterId) {
+    set({ historyChapterId: chapterId })
   },
   toast(message, opts = {}) {
     const id = nextToast++

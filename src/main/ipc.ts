@@ -8,6 +8,7 @@ import type { InvokeArgs, InvokeChannel, InvokeResult } from '@shared/ipc'
 import { cancel, complete, providerModels, providerStatus } from './ai'
 import { openLogin } from './ai/login'
 import { createBook, openBook } from './book/store'
+import { listSnapshots, readSnapshot, saveSnapshot } from './book/history'
 import { noteOwnWrite, unwatchBook, watchBook } from './book/watcher'
 import { exportDocx, exportPdf, exportText } from './export'
 import { atomicWrite, readTextOr, safeJoin } from './fsutil'
@@ -138,6 +139,10 @@ export function registerIpc(): void {
   })
 
   handle('book:assetUrl', (_e, root, rel) => assetUrl(root, rel))
+
+  handle('history:save', (_e, root, chapterId, label, body) => saveSnapshot(root, chapterId, label, body))
+  handle('history:list', (_e, root, chapterId) => listSnapshots(root, chapterId))
+  handle('history:read', (_e, root, chapterId, id) => readSnapshot(root, chapterId, id))
 
   handle('settings:get', () => getSettings())
   handle('settings:set', (_e, patch) => setSettings(patch))

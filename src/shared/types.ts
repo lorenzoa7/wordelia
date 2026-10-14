@@ -135,6 +135,13 @@ export interface BookSnapshot {
   syncState: SyncState
 }
 
+export interface HistoryItem {
+  id: string
+  at: string
+  label: string
+  words: number
+}
+
 export interface LibraryItem {
   root: string
   id: Id

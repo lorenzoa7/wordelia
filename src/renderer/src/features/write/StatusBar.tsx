@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { CheckCircle, CloudArrowUp, WarningCircle } from '@phosphor-icons/react'
+import { CheckCircle, ClockCounterClockwise, CloudArrowUp, WarningCircle } from '@phosphor-icons/react'
+import { useBook } from '@/stores/book'
+import { useUi } from '@/stores/ui'
 import { formatCount } from '@shared/book'
 import { saver, type SaveState } from '@/stores/saver'
 import { useStats } from '@/features/editor/stats'
@@ -20,6 +22,10 @@ export function StatusBar(): React.JSX.Element {
         ) : null}
         <b>{chapterWords.toLocaleString('en-US')}</b> words in chapter · {formatCount(bookWords)} in book · {minutes} min read
       </span>
+      <span className="status-right">
+      <button className="status-btn" onClick={() => useUi.getState().openHistory(useBook.getState().activeChapterId)} title="Version history">
+        <ClockCounterClockwise size={12} /> History
+      </button>
       <span className={`save-state is-${save}`} title={save === 'error' ? saver.error : undefined}>
         {save === 'saved' && (
           <>
@@ -36,6 +42,7 @@ export function StatusBar(): React.JSX.Element {
             <WarningCircle size={12} /> Not saved
           </>
         )}
+      </span>
       </span>
     </footer>
   )

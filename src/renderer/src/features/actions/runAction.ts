@@ -12,6 +12,7 @@ import { getActiveEditor } from '@/features/editor/registry'
 import { proposedPlain, reviewKey, textWithMap } from '@/features/editor/review'
 import { create } from 'zustand'
 import { normalizeRange } from './range'
+import { snapshot } from '@/features/history/snapshots'
 
 interface ActionRunState {
   running: boolean
@@ -112,6 +113,8 @@ export async function runAction(action: AiAction, range?: { from: number; to: nu
     editor.commands.rejectReview()
     return
   }
+  // Keep the text before the AI change in the version history.
+  snapshot(active.chapterId, `Before ${action.name}`)
   editor.commands.updateReview(id, rewrite, 'ready')
 }
 

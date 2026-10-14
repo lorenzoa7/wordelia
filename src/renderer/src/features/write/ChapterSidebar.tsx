@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { Reorder } from 'motion/react'
-import { DotsThree, PencilSimple, Plus, Trash, ArrowBendUpLeft } from '@phosphor-icons/react'
+import { ArrowBendUpLeft, ClockCounterClockwise, DotsThree, PencilSimple, Plus, Trash } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { countMarkdownWords, formatCount } from '@shared/book'
 import type { Chapter } from '@shared/types'
 import { IconButton, Menu, MenuItem, MenuSeparator } from '@/ui'
 import { askConfirm } from '@/ui/prompt'
 import { useBook } from '@/stores/book'
-import { toast } from '@/stores/ui'
+import { toast, useUi } from '@/stores/ui'
 import { useChat } from '@/features/chat/chatStore'
 import { useApp } from '@/stores/app'
 
@@ -135,6 +135,9 @@ function ChapterItem({
             }}
           >
             Mention in chat
+          </MenuItem>
+          <MenuItem icon={<ClockCounterClockwise size={15} />} onSelect={() => useUi.getState().openHistory(chapter.id)}>
+            Version history…
           </MenuItem>
           <MenuSeparator />
           <MenuItem danger icon={<Trash size={15} />} onSelect={() => void remove()}>

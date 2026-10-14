@@ -11,6 +11,8 @@ import { PlanView } from '@/features/plan/PlanView'
 import { PlanSidebar } from '@/features/plan/PlanSidebar'
 import { ExportDialog } from '@/features/export/ExportDialog'
 import { runAction } from '@/features/actions/runAction'
+import { HistoryDialog } from '@/features/history/HistoryDialog'
+import { startAutoSnapshots } from '@/features/history/snapshots'
 import './book.css'
 
 const SIDEBAR_W = 256
@@ -22,6 +24,9 @@ export function BookView(): React.JSX.Element {
   const chatOpen = useApp((s) => s.settings?.ui.chatOpen ?? true)
   const exportOpen = useUi((s) => s.exportOpen)
   const setExportOpen = useUi((s) => s.setExportOpen)
+  const historyChapterId = useUi((s) => s.historyChapterId)
+
+  useEffect(() => startAutoSnapshots(), [])
 
   // Action shortcuts: Ctrl+J for the default action, Alt+1…9 for the others.
   useEffect(() => {
@@ -84,6 +89,7 @@ export function BookView(): React.JSX.Element {
         </div>
       </motion.div>
       <ExportDialog open={exportOpen} onOpenChange={setExportOpen} />
+      <HistoryDialog chapterId={historyChapterId} onClose={() => useUi.getState().openHistory(null)} />
     </div>
   )
 }

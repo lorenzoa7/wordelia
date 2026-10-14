@@ -6,6 +6,7 @@ import type { Hunk } from '@shared/proposals/parse'
 import type { Chapter, Entry } from '@shared/types'
 import { useBook } from '@/stores/book'
 import { applyToChapter, flushEditor, type ApplyResult } from '@/features/editor/registry'
+import { snapshot } from '@/features/history/snapshots'
 
 export type Target =
   | { kind: 'chapter'; chapter: Chapter; label: string }
@@ -86,6 +87,7 @@ export function snapshotOf(file: string): Snapshot | null {
   const t = resolveTarget(file)
   if (t.kind === 'chapter') {
     const ch = useBook.getState().chapters.find((c) => c.id === t.chapter.id)
+    if (ch) snapshot(ch.id, 'Before AI chat change')
     return ch ? { kind: 'chapter', id: ch.id, body: ch.body } : null
   }
   if (t.kind === 'entry') return { kind: 'entry', id: t.entry.id, body: t.entry.body, summary: t.entry.summary }

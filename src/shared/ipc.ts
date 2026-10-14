@@ -3,6 +3,7 @@
 
 import type {
   AppSettings,
+  HistoryItem,
   BookSnapshot,
   CompletionRequest,
   CompletionResult,
@@ -74,6 +75,10 @@ export interface IpcInvokeMap {
   'book:reveal': [[root: string, rel?: string], void]
   'book:assetUrl': [[root: string, rel: string], string]
 
+  'history:save': [[root: string, chapterId: string, label: string, body: string], void]
+  'history:list': [[root: string, chapterId: string], HistoryItem[]]
+  'history:read': [[root: string, chapterId: string, id: string], string | null]
+
   'settings:get': [[], AppSettings]
   'settings:set': [[patch: Partial<AppSettings>], AppSettings]
 
@@ -132,6 +137,9 @@ export const INVOKE_CHANNELS: InvokeChannel[] = [
   'book:pickImage',
   'book:reveal',
   'book:assetUrl',
+  'history:save',
+  'history:list',
+  'history:read',
   'settings:get',
   'settings:set',
   'ai:status',

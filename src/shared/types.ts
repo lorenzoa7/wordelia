@@ -143,6 +143,8 @@ export interface LibraryItem {
   words: number
   chapters: number
   openedAt: string
+  /** The first words of the book, for the library card */
+  excerpt?: string
   missing?: boolean
 }
 

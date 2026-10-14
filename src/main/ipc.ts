@@ -3,7 +3,7 @@
 import { app, BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
 import { copyFile, mkdir, rename, rm } from 'node:fs/promises'
 import { basename, extname, join } from 'node:path'
-import { ASSETS_DIR, countMarkdownWords, fileNameFromTitle, uniqueName } from '@shared/book'
+import { ASSETS_DIR, countMarkdownWords, fileNameFromTitle, markdownToPlain, uniqueName } from '@shared/book'
 import type { InvokeArgs, InvokeChannel, InvokeResult } from '@shared/ipc'
 import { cancel, complete, providerModels, providerStatus } from './ai'
 import { openLogin } from './ai/login'
@@ -22,6 +22,16 @@ type Handler<C extends InvokeChannel> = (e: IpcMainInvokeEvent, ...args: InvokeA
 
 function handle<C extends InvokeChannel>(channel: C, fn: Handler<C>): void {
   ipcMain.handle(channel, (e, ...args) => fn(e, ...(args as InvokeArgs<C>)))
+}
+
+/** The first sentence or two of the book, for the library card. */
+function excerptOf(bodies: string[]): string {
+  const text = markdownToPlain(bodies.find((b) => b.trim()) ?? '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (text.length <= 180) return text
+  const cut = text.slice(0, 180)
+  return cut.slice(0, cut.lastIndexOf(' ')) + '…'
 }
 
 const flushWaiters = new Map<number, () => void>()
@@ -63,7 +73,8 @@ export function registerIpc(): void {
       author: snap.manifest.author,
       words: snap.chapters.reduce((n, c) => n + countMarkdownWords(c.body), 0),
       chapters: snap.chapters.length,
-      openedAt: new Date().toISOString()
+      openedAt: new Date().toISOString(),
+      excerpt: excerptOf(snap.chapters.map((c) => c.body))
     })
     return snap
   })

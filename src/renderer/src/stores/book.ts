@@ -53,6 +53,9 @@ interface BookState {
   deleteChapter(id: string): Promise<void>
   moveChapter(id: string, toIndex: number): void
   reorderChapters(ids: string[]): void
+  /** Put back an older text (undo); open editors reload */
+  restoreChapter(id: string, body: string): void
+  restoreEntry(id: string, body: string, summary: string): void
 
   createEntry(category: string, name: string, body?: string, extra?: Partial<Entry>): Promise<Entry>
   updateEntry(id: string, patch: Partial<Pick<Entry, 'body' | 'aliases' | 'summary' | 'image'>>): void
@@ -266,6 +269,16 @@ export const useBook = create<BookState>((set, get) => {
       chapters.splice(Math.max(0, Math.min(toIndex, chapters.length)), 0, ch)
       set({ chapters })
       get().updateManifest({ chapters: chapters.map((c) => ({ id: c.id, file: c.file })) })
+    },
+
+    restoreChapter(id, body) {
+      get().setChapterBody(id, body)
+      set({ externalRev: { ...get().externalRev, [id]: (get().externalRev[id] ?? 0) + 1 } })
+    },
+
+    restoreEntry(id, body, summary) {
+      get().updateEntry(id, { body, summary })
+      set({ externalRev: { ...get().externalRev, [id]: (get().externalRev[id] ?? 0) + 1 } })
     },
 
     reorderChapters(ids) {

@@ -121,6 +121,7 @@ function BookCard({ item, index, onRemoved }: { item: LibraryItem; index: number
         <span className="book-card-rule" />
         <span className="book-card-title">{item.title}</span>
         {item.author && <span className="book-card-author">{item.author}</span>}
+        {item.excerpt && <span className="book-card-excerpt">{item.excerpt}</span>}
         <span className="book-card-meta">
           {item.missing ? (
             <>

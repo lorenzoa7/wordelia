@@ -5,7 +5,7 @@ import { applyHunk } from '@shared/proposals/apply'
 import type { Hunk } from '@shared/proposals/parse'
 import type { Chapter, Entry } from '@shared/types'
 import { useBook } from '@/stores/book'
-import { applyToChapter, type ApplyResult } from '@/features/editor/registry'
+import { applyToChapter, flushEditor, type ApplyResult } from '@/features/editor/registry'
 
 export type Target =
   | { kind: 'chapter'; chapter: Chapter; label: string }
@@ -72,4 +72,28 @@ export async function applyCreate(file: string, content: string): Promise<ApplyR
   }
   await useBook.getState().writeRaw(t.rel, content.endsWith('\n') ? content : content + '\n')
   return { ok: true }
+}
+
+/* ------------------------------------------------------------------ */
+/* Undo for accepted proposals                                          */
+/* ------------------------------------------------------------------ */
+
+export type Snapshot = { kind: 'chapter'; id: string; body: string } | { kind: 'entry'; id: string; body: string; summary: string }
+
+/** The text of a file before a change, so the change can be undone from a toast. */
+export function snapshotOf(file: string): Snapshot | null {
+  flushEditor()
+  const t = resolveTarget(file)
+  if (t.kind === 'chapter') {
+    const ch = useBook.getState().chapters.find((c) => c.id === t.chapter.id)
+    return ch ? { kind: 'chapter', id: ch.id, body: ch.body } : null
+  }
+  if (t.kind === 'entry') return { kind: 'entry', id: t.entry.id, body: t.entry.body, summary: t.entry.summary }
+  return null
+}
+
+export function restoreSnapshot(s: Snapshot): void {
+  flushEditor()
+  if (s.kind === 'chapter') useBook.getState().restoreChapter(s.id, s.body)
+  else useBook.getState().restoreEntry(s.id, s.body, s.summary)
 }

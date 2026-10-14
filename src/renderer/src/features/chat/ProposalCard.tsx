@@ -11,7 +11,7 @@ import type { ChatMessage, HunkState, Thread } from '@shared/types'
 import { Spinner, Tooltip } from '@/ui'
 import { useBook } from '@/stores/book'
 import { toast } from '@/stores/ui'
-import { applyCreate, applyEditHunk, resolveTarget } from './applyProposal'
+import { applyCreate, applyEditHunk, resolveTarget, restoreSnapshot, snapshotOf, type Snapshot } from './applyProposal'
 
 type EditSeg = Extract<Segment, { kind: 'edit' }>
 type CreateSeg = Extract<Segment, { kind: 'create' }>
@@ -106,26 +106,44 @@ function EditCard({ segment, message, thread, streaming }: Props & { segment: Ed
     return { added, removed }
   }, [segment.hunks])
 
-  const accept = (i: number): boolean => {
+  const apply = (i: number): boolean => {
     if (!thread || !message) return false
     const res = applyEditHunk(segment.file, segment.hunks[i])
     setHunkState(thread, message.id, keys[i], res.ok ? 'accepted' : 'failed')
     if (!res.ok) toast(res.reason, { kind: 'error' })
     return res.ok
   }
+  const offerUndo = (snap: Snapshot | null, accepted: number[], label: string): void => {
+    if (!snap || !thread || !message) return
+    toast(label, {
+      ms: 8000,
+      action: {
+        label: 'Undo',
+        run: () => {
+          restoreSnapshot(snap)
+          for (const i of accepted) setHunkState(thread, message.id, keys[i], 'pending')
+        }
+      }
+    })
+  }
+  const accept = (i: number): void => {
+    const snap = snapshotOf(segment.file)
+    if (apply(i)) offerUndo(snap, [i], `Change applied to "${target.label}".`)
+  }
   const reject = (i: number): void => {
     if (thread && message) setHunkState(thread, message.id, keys[i], 'rejected')
   }
   const acceptAll = (): void => {
     setBusy(true)
-    let ok = 0
+    const snap = snapshotOf(segment.file)
+    const accepted: number[] = []
     // Apply from the last hunk to the first, so earlier text does not move.
     for (let i = segment.hunks.length - 1; i >= 0; i--) {
       if (states[keys[i]] && states[keys[i]] !== 'pending') continue
-      if (accept(i)) ok++
+      if (apply(i)) accepted.push(i)
     }
     setBusy(false)
-    if (ok) toast(`${ok} change${ok > 1 ? 's' : ''} applied to "${target.label}". Ctrl+Z undoes them.`)
+    if (accepted.length) offerUndo(snap, accepted, `${accepted.length} change${accepted.length > 1 ? 's' : ''} applied to "${target.label}".`)
   }
 
   const Icon = target.kind === 'chapter' ? BookOpenText : Notebook

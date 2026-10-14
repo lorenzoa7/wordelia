@@ -1,21 +1,14 @@
-export default async function ({ page, openBook }) {
-  await openBook()
-  page.on('console', (m) => console.log('[log]', m.text()))
-  const info = await page.evaluate(async () => {
-    const w = window.__wordelia
-    const ed = w.editor()
-    ed.commands.setTextSelection({ from: 60, to: 200 })
-    const origDispatch = ed.view.dispatch.bind(ed.view)
-    const metas = []
-    ed.view.dispatch = (tr) => {
-      metas.push(Object.keys(tr.meta || {}).join(',') + ' steps=' + tr.steps.length)
-      return origDispatch(tr)
-    }
-    const p = w.runAction('polish')
-    await new Promise((r) => setTimeout(r, 100))
-    const pending = !!document.querySelector('.ai-pending')
-    await p
-    return { metas, pending }
+export default async function ({ page }) {
+  const r = await page.evaluate(async () => {
+    const models = await window.wordelia.invoke('ai:models', 'codex')
+    const t0 = Date.now()
+    const res = await window.wordelia.invoke('ai:complete', 'dbg1', {
+      route: { provider: 'codex', model: '', effort: 'low' },
+      purpose: 'background',
+      system: 'You are terse.',
+      messages: [{ role: 'user', content: 'Reply with the single word OK.' }]
+    })
+    return { models: models.map((m) => m.id + (m.isDefault ? '*' : '')), ms: Date.now() - t0, res }
   })
-  console.log(JSON.stringify(info))
+  console.log(JSON.stringify(r, null, 1))
 }

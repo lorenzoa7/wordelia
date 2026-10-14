@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import clsx from 'clsx'
-import { ArrowsClockwise, CheckCircle, Info, Key, Sparkle, Terminal, WarningCircle } from '@phosphor-icons/react'
+import { ArrowsClockwise, CheckCircle, Info, Key, SignIn, Sparkle, Terminal, WarningCircle } from '@phosphor-icons/react'
 import { PROVIDER_LABELS, TASK_LABELS, suggestRoutes } from '@shared/ai/routes'
 import type { Effort, ModelChoice, ProviderId, TaskKind } from '@shared/types'
 import { Button, Select, Spinner, Switch, TextInput, Tooltip } from '@/ui'
@@ -118,6 +118,14 @@ function ProviderCard({ id }: { id: ProviderId }): React.JSX.Element {
           <Button size="sm" onClick={() => void saveKey()} disabled={!key.trim()}>
             Save key
           </Button>
+        </div>
+      )}
+      {!isApi && status?.installed && status.loggedIn === false && (
+        <div className="provider-login">
+          <Button size="sm" icon={<SignIn size={13} />} onClick={() => void invoke('ai:openLogin', id)}>
+            Log in…
+          </Button>
+          <span className="muted">Opens a terminal window. Come back here and press the check button when you are done.</span>
         </div>
       )}
       {!isApi && (

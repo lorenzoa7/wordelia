@@ -10,6 +10,7 @@ import { saver } from '@/stores/saver'
 import { LibraryView } from '@/features/library/LibraryView'
 import { BookView } from '@/features/book/BookView'
 import { SettingsDialog } from '@/features/settings/SettingsDialog'
+import { Welcome } from '@/features/onboarding/Welcome'
 import { getActiveEditor } from '@/features/editor/registry'
 import { runAction } from '@/features/actions/runAction'
 import { TitleBar } from './TitleBar'
@@ -91,6 +92,7 @@ export function App(): React.JSX.Element {
             </AnimatePresence>
           )}
         </main>
+        {ready && !booting && <Welcome />}
         {ready && <SettingsDialog />}
         <PromptHost />
         <Toasts />

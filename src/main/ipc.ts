@@ -6,6 +6,7 @@ import { basename, extname, join } from 'node:path'
 import { ASSETS_DIR, countMarkdownWords, fileNameFromTitle, uniqueName } from '@shared/book'
 import type { InvokeArgs, InvokeChannel, InvokeResult } from '@shared/ipc'
 import { cancel, complete, providerModels, providerStatus } from './ai'
+import { openLogin } from './ai/login'
 import { createBook, openBook } from './book/store'
 import { noteOwnWrite, unwatchBook, watchBook } from './book/watcher'
 import { exportDocx, exportPdf, exportText } from './export'
@@ -134,6 +135,7 @@ export function registerIpc(): void {
   handle('ai:cancel', (_e, requestId) => cancel(requestId))
   handle('ai:setKey', (_e, provider, key) => setSecret(provider, key))
   handle('ai:hasKey', async (_e, provider) => Boolean(await getSecret(provider)))
+  handle('ai:openLogin', (_e, provider) => openLogin(provider))
 
   handle('export:pdf', (e, req) => exportPdf(win(e), req))
   handle('export:docx', (e, req) => exportDocx(win(e), req))

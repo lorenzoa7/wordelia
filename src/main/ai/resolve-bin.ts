@@ -52,7 +52,9 @@ async function shimTarget(cmdPath: string): Promise<string | null> {
   let m: RegExpExecArray | null
   const found: string[] = []
   while ((m = re.exec(src))) found.push(join(dir, m[1]))
-  for (const f of found) if (await isFile(f)) return f
+  // npm shims also name node.exe (the interpreter). We want the program itself.
+  const targets = found.filter((f) => !/[\\/]node\.exe$/i.test(f))
+  for (const f of targets) if (await isFile(f)) return f
   return null
 }
 

@@ -1,8 +1,11 @@
 import { memo, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { At, BookOpenText, ChatsCircle, Notebook, Quotes, WarningCircle } from '@phosphor-icons/react'
-import { parseProposals } from '@shared/proposals/parse'
+import { At, BookOpenText, ChatsCircle, Copy, Notebook, Quotes, TextIndent, WarningCircle } from '@phosphor-icons/react'
+import { parseProposals, proposalSummary } from '@shared/proposals/parse'
+import { toast } from '@/stores/ui'
+import { getActiveEditor } from '@/features/editor/registry'
+import { sliceFromMarkdown } from '@/features/editor/review'
 import type { ChatMessage, Thread } from '@shared/types'
 import { ProposalCard } from './ProposalCard'
 
@@ -75,6 +78,35 @@ function AssistantMessage({ message, thread }: { message: ChatMessage; thread: T
           <WarningCircle size={14} /> {message.error}
         </div>
       )}
+      {message.content.trim() && <MessageActions text={proposalSummary(message.content).trim()} />}
+    </div>
+  )
+}
+
+function MessageActions({ text }: { text: string }): React.JSX.Element {
+  const copy = (): void => {
+    void navigator.clipboard.writeText(text)
+    toast('Copied.')
+  }
+  const insert = (): void => {
+    const a = getActiveEditor()
+    if (!a) {
+      toast('Open a chapter first.')
+      return
+    }
+    const { state } = a.editor
+    const slice = sliceFromMarkdown(state.schema, text)
+    a.editor.view.dispatch(state.tr.replaceSelection(slice).scrollIntoView())
+    a.editor.commands.focus()
+  }
+  return (
+    <div className="msg-actions">
+      <button onClick={copy} title="Copy the reply">
+        <Copy size={13} /> Copy
+      </button>
+      <button onClick={insert} title="Insert the reply at the cursor in the open chapter (Ctrl+Z undoes it)">
+        <TextIndent size={13} /> Insert into chapter
+      </button>
     </div>
   )
 }

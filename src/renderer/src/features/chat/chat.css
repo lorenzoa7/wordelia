@@ -800,3 +800,31 @@ button.proposal-file:hover span {
   color: var(--ink-4);
   font-size: var(--text-xs);
 }
+
+.msg-actions {
+  display: flex;
+  gap: 2px;
+  margin-top: 6px;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.msg-ai:hover .msg-actions,
+.msg-actions:focus-within {
+  opacity: 1;
+}
+.msg-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 7px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink-3);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+}
+.msg-actions button:hover {
+  background: var(--desk-3);
+  color: var(--ink);
+}

@@ -219,3 +219,30 @@ App data folder (`app.getPath('userData')`):
 
 - **PDF:** the main process opens a hidden window with print HTML and CSS paged media (`@page` size and margins, margin boxes for page numbers, `break-before: page` for chapters). `webContents.printToPDF` writes the file.
 - **DOCX:** `docx` builds a document with named styles: Normal, First Paragraph, Chapter Number, Chapter Title, Scene Break. Page size, margins and a page number field in the footer. The title page is a separate section without a page number.
+
+## 8. Saving
+
+- Editors keep up to 350 ms of typing in memory, then write Markdown to the book store.
+- The store writes files through `saver` (500 ms debounce for each file, ordered writes).
+- Editors register a flusher (`src/renderer/src/lib/flush.ts`). Closing a book runs all flushers, then `saver.flush()`.
+- Closing the window: the main process stops the close, sends `app:flushRequest`, and closes when the renderer answers `app:flushDone` (or after 4 s).
+- Deleted chapters and entries move to `.wordelia/trash/`. Nothing is deleted for good.
+- Accepted AI proposals show an **Undo** toast. It restores the text from before the change.
+
+## 9. Long books
+
+When the manuscript does not fit the token budget of the chat, the chat sends the open chapter and its neighbors in full, and summaries of the other chapters. The background model makes the summaries. They are cached by content hash in `.wordelia/cache/summaries.json`.
+
+## 10. Test hooks
+
+The app reads these environment variables. Users never set them.
+
+| Variable | Effect |
+|---|---|
+| `WORDELIA_E2E=1` | Exposes `window.__wordelia` (open a book, run an action, import a file). |
+| `WORDELIA_MOCK_AI=1` | All providers use the scripted provider in `src/main/ai/mock.ts`. |
+| `WORDELIA_USER_DATA` | App data folder (settings, library, secrets). |
+| `WORDELIA_BOOKS_DIR` | Default folder for new and imported books, instead of Documents. |
+| `WORDELIA_EXPORT_DIR` | Exports go here without a save dialog. |
+
+`scripts/shot.mjs <scenario> [--dark] [--fresh] [--real-ai]` builds nothing; run `npm run build` first, or use `npm run shot -- <scenario>`. Scenarios are in `scripts/shots/`.

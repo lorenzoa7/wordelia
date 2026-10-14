@@ -20,6 +20,7 @@ export function buildActionSystem(input: ActionPromptInput): string {
     'You are a line editor inside a writing app. You rewrite one passage of a novel for its author.',
     '',
     'Return only the rewritten passage, inside <rewrite></rewrite> tags. Write nothing before or after the tags.',
+    'You have no tools. Do not run commands or read files: everything you need is in this prompt.',
     '',
     '# Rules',
     '- Rewrite only the text in <selection>. The text in <before> and <after> is context: do not repeat it, but keep the passage consistent with it (names, facts, tense, voice) and make it join the context smoothly at both ends.',

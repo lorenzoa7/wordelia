@@ -23,6 +23,8 @@ export function buildSyncSystem(input: SyncPromptInput): string {
       ? 'The planning is new. Read the chapters and build the planning: one entry for each character, place, group, object or rule of the world that matters to the story.'
       : 'Read the chapters that changed. Compare them with the planning. Propose new entries for important characters, places, groups, objects or rules that are missing, and updates to entries when the chapters add facts (appearance, personality, relationships, events, secrets, changes of status).',
     '',
+    'You have no tools. Do not run commands or read files: everything you need is in this prompt.',
+    '',
     '# Rules',
     '- Use only facts that the text states or clearly implies. Do not invent. When a fact is uncertain, write it as a question in a "## Open questions" section.',
     '- Do not duplicate entries. Check names and aliases in the planning index first.',

@@ -565,3 +565,19 @@
   line-height: 1.6;
   font-size: var(--text-sm);
 }
+
+/* [[Wiki links]] */
+.wiki-link {
+  color: var(--ribbon);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.wiki-link.is-missing {
+  color: var(--ink-3);
+}
+.manuscript .wiki-link {
+  cursor: text;
+}

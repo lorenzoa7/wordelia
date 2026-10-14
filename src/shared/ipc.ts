@@ -66,6 +66,7 @@ export interface IpcInvokeMap {
   'book:close': [[root: string], void]
   'book:pickFolder': [[opts: { title: string; create?: boolean }], string | null]
   'book:writeFile': [[root: string, rel: string, content: string], void]
+  'book:readFile': [[root: string, rel: string], string | null]
   'book:deleteFile': [[root: string, rel: string], void]
   'book:renameFile': [[root: string, from: string, to: string], void]
   'book:importAsset': [[root: string, sourcePath: string], string]
@@ -124,6 +125,7 @@ export const INVOKE_CHANNELS: InvokeChannel[] = [
   'book:close',
   'book:pickFolder',
   'book:writeFile',
+  'book:readFile',
   'book:deleteFile',
   'book:renameFile',
   'book:importAsset',

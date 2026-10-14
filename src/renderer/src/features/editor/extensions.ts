@@ -12,6 +12,8 @@ import { ParagraphIndent, SceneBreak } from './nodes'
 import { SmartTyping, quotesFor } from './smart-typing'
 import { FindReplace } from './find'
 import { Review } from './review'
+import { WikiLinks } from './wiki-links'
+import { wikiLinkOptions } from '@/features/plan/links'
 
 /** Extensions that define the schema. Used by the editor and by HTML import. */
 export function schemaExtensions(): AnyExtension[] {
@@ -79,6 +81,7 @@ export function editorExtensions(cfg: EditorConfig): AnyExtension[] {
     }),
     FindReplace,
     FocusBlock,
-    Review
+    Review,
+    WikiLinks.configure(wikiLinkOptions(false))
   ]
 }

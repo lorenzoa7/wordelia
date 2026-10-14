@@ -8,6 +8,8 @@ import { schemaExtensions } from '@/features/editor/extensions'
 import { SmartTyping, quotesFor } from '@/features/editor/smart-typing'
 import { useBook } from '@/stores/book'
 import { registerFlusher } from '@/lib/flush'
+import { WikiLinks } from '@/features/editor/wiki-links'
+import { wikiLinkOptions } from './links'
 
 /** A rich-text editor for notes (planning entries, writing rules). Markdown in, Markdown out. */
 export function NoteEditor({
@@ -35,6 +37,7 @@ export function NoteEditor({
     () => [
       ...schemaExtensions(),
       SmartTyping.configure({ dash, quotes: true, ellipsis: true, ...quotesFor(language) }),
+      WikiLinks.configure(wikiLinkOptions(true)),
       Placeholder.configure({ placeholder: placeholder ?? 'Write here…' })
     ],
     [dash, language, placeholder]

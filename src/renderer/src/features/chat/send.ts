@@ -11,6 +11,7 @@ import { useBook } from '@/stores/book'
 import { toast, useUi } from '@/stores/ui'
 import { flushEditor } from '@/features/editor/registry'
 import { useChat } from './chatStore'
+import { summariesFor } from './summaries'
 
 const HISTORY_LIMIT = 24
 
@@ -67,6 +68,22 @@ export async function sendMessage(text: string): Promise<void> {
   fresh.saveThread(base, true)
   useChat.getState().clearComposer()
 
+  // Show the "thinking" dots at once, also while long books get their summaries.
+  useChat.setState((s) => ({
+    streaming: { ...s.streaming, [base.id]: { messageId: assistantId, text: '', requestId: '', cancel: () => {} } }
+  }))
+
+  // Long books: summaries of the chapters that do not fit.
+  const budget = budgetFor(route)
+  const keepFull = new Set<string>()
+  const idx = fresh.chapters.findIndex((c) => c.id === fresh.activeChapterId)
+  for (const i of [idx - 1, idx, idx + 1]) if (fresh.chapters[i]) keepFull.add(fresh.chapters[i].id)
+  for (const m of mentions) if (m.kind === 'chapter') keepFull.add(m.id)
+  const settingsNow = useApp.getState().settings
+  const summaries = fresh.root
+    ? await summariesFor(fresh.root, fresh.chapters, keepFull, budget, settingsNow?.routes.background ?? route)
+    : {}
+
   const system = buildChatSystem({
     book: { manifest: fresh.manifest!, writingRules: fresh.writingRules, chapters: fresh.chapters, entries: fresh.entries, threads: fresh.threads },
     thread: base,
@@ -75,8 +92,8 @@ export async function sendMessage(text: string): Promise<void> {
     mentions,
     quotes,
     message,
-    summaries: {},
-    manuscriptBudget: budgetFor(route)
+    summaries,
+    manuscriptBudget: budget
   })
 
   const history: ChatTurn[] = thread.messages.slice(-HISTORY_LIMIT).map((m) => ({

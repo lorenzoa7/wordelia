@@ -10,7 +10,7 @@ import { openLogin } from './ai/login'
 import { createBook, openBook } from './book/store'
 import { noteOwnWrite, unwatchBook, watchBook } from './book/watcher'
 import { exportDocx, exportPdf, exportText } from './export'
-import { atomicWrite, safeJoin } from './fsutil'
+import { atomicWrite, readTextOr, safeJoin } from './fsutil'
 import { readImport } from './import'
 import { listLibrary, removeFromLibrary, touchLibrary } from './library'
 import { getSecret, getSettings, setSecret, setSettings } from './settings'
@@ -84,6 +84,8 @@ export function registerIpc(): void {
     noteOwnWrite(full, content)
     await atomicWrite(full, content)
   })
+
+  handle('book:readFile', (_e, root, rel) => readTextOr(safeJoin(root, rel), null))
 
   handle('book:deleteFile', async (_e, root, rel) => {
     const full = safeJoin(root, rel)

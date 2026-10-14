@@ -22,6 +22,7 @@ import { ReviewBar } from './ReviewBar'
 import { FindBar } from './FindBar'
 import { useEditorStats } from './stats'
 import { typewriterSound } from './typewriter-sound'
+import { cleanPastedHtml } from './paste'
 import './editor.css'
 
 export function PageEditor(): React.JSX.Element | null {
@@ -80,6 +81,7 @@ export function PageEditor(): React.JSX.Element | null {
       enableInputRules: ['smartTyping', 'sceneBreak'],
       enablePasteRules: false,
       editorProps: {
+        transformPastedHTML: cleanPastedHtml,
         attributes: {
           class: 'manuscript',
           spellcheck: String(spellcheck),

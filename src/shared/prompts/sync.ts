@@ -40,7 +40,7 @@ export function buildSyncSystem(input: SyncPromptInput): string {
     `- Categories that exist: ${input.categories.join(', ')}.`,
     '',
     '# Output format',
-    'First, one or two sentences that say what you found. Then the proposals:',
+    `First, a few short sentences in ${lang} that say what you found. Then the proposals:`,
     '',
     '<create file="planning/Characters/Name.md">',
     '---',

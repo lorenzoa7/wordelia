@@ -41,7 +41,7 @@ This file is the source of truth for progress. Update it after each task. Mark a
 ## M3 — AI providers
 
 - [x] Transport interface and stream events
-- [x] Claude Code transport (CLI) — live test on 2026-10-15 with the real book (19.4k words): planning sync 195 s, Polish 7–16 s, chat 12–22 s
+- [x] Claude Code transport (CLI) — live test on 2026-10-15 with the real book (19.4k words). Opus 4.8 (CLI 2.1.198): first planning sync 195 s, Polish 7–16 s, chat 12–22 s. Opus 5.5 (CLI 2.1.295): Polish 4–7 s, chat 10–32 s, incremental sync 30 s
 - [~] Codex transport (CLI) — app-server path verified up to the server reply (the account token had expired)
 - [~] Anthropic API and OpenAI API transports — built; live test pending
 - [x] Provider status detection and model lists

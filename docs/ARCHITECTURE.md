@@ -256,8 +256,11 @@ These scenarios use the AI that is connected on this computer (`--real-ai`). The
 | `live-import` | `IMPORT_FILE`, `LIVE_OUT` | Imports a DOCX, waits for the planning sync, accepts all proposals with the "Accept all" bar, copies the book to `LIVE_OUT/book`. |
 | `live-polish` | `LIVE_BOOK`, `LIVE_OUT`, optional `LIVE_CASES` | Runs actions on paragraphs (`action:chapter:paragraph:count`) and writes `polish-report.json` with the text before and after. |
 | `live-chat` | `LIVE_BOOK`, `LIVE_OUT`, optional `LIVE_PROMPTS` | Sends chat messages in a new thread, accepts the proposals, and writes `chat-report.json`. |
+| `live-sync` | `LIVE_BOOK`, `LIVE_OUT`, optional `LIVE_CHAPTER`, `LIVE_TEXT` | Adds a paragraph to a chapter, presses Sync, accepts the proposals, and writes `sync-report.json`. |
 | `live-settings` | — | Screenshot of Settings → AI with the real provider status. |
-| `debug` | optional `WORDELIA_DEBUG_PROVIDER` | One small completion. Prints the status, the models and the result. |
+| `debug` | optional `WORDELIA_DEBUG_PROVIDER`, `WORDELIA_DEBUG_MODEL`, `WORDELIA_DEBUG_BIN` | One small completion. Prints the status, the models and the result. |
+
+Set `WORDELIA_CLAUDE_BIN` to run any scenario with another copy of the `claude` CLI, for example a newer one.
 
 ### AI text and the book typography
 

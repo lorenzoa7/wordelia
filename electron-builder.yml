@@ -32,3 +32,8 @@ linux:
   target: AppImage
   category: Office
 npmRebuild: false
+publish:
+  provider: github
+  owner: lorenzoa7
+  repo: wordelia
+  releaseType: release

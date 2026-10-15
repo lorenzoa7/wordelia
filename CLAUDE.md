@@ -18,8 +18,12 @@ npm run typecheck    # TypeScript, all processes
 npm test             # Vitest unit tests
 npm run shot         # build, start the app with Playwright, save screenshots to test-results/
 npm run build        # production build to out/
-npm run dist         # Windows installer to release/
+npm run dist         # Windows installer to release/ (local only, not in git)
 ```
+
+## Releases
+
+Installers go to GitHub Releases, never into git. To release: change `version` in `package.json`, add a section to `CHANGELOG.md`, commit, and push a tag `vX.Y.Z`. The workflow `.github/workflows/release.yml` builds and publishes the installer.
 
 ## Rules
 

@@ -8,6 +8,10 @@ Wordelia is a desktop writing app for novelists. It looks like a simple word pro
 
 ![Inline review of an AI rewrite](docs/images/inline-review.png)
 
+## Download
+
+Get the Windows installer from [Releases](https://github.com/lorenzoa7/wordelia/releases). The installer has no code signature yet, so Windows SmartScreen shows a warning: select **More info**, then **Run anyway**.
+
 ## What it does
 
 - **Write on a page.** Chapters are tabs in a sidebar. The page uses real book typography: first-line indents, justified text, scene breaks. Type `--` and get the dialogue dash.
@@ -80,6 +84,12 @@ npm run dev
 | `npm run typecheck` | Check the types of all processes. |
 | `npm run shot -- book` | Build, start the app with a scripted AI, and save screenshots to `test-results/shots/`. |
 | `npm run e2e` | Build and run all end-to-end scenarios (scripted AI, temporary data folders). |
-| `npm run dist` | Make the Windows installer in `release/`. |
+| `npm run dist` | Make the Windows installer in `release/` on your computer (this folder is not in git). |
+
+### Release a version
+
+1. Change `version` in `package.json` and add a section to `CHANGELOG.md`.
+2. Commit, then push a tag: `git tag v0.2.0` and `git push origin v0.2.0`.
+3. The **Release** workflow (`.github/workflows/release.yml`) runs the tests, builds the installer, and publishes it to GitHub Releases with the notes from `CHANGELOG.md`.
 
 Read `CLAUDE.md` and `docs/` before you change the code: `docs/SPEC.md` (product), `docs/ARCHITECTURE.md` (design), `docs/ROADMAP.md` (status) and `GLOSSARY.md` (terms).

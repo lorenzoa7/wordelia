@@ -11,6 +11,8 @@
 //
 // The parser works on partial text too, so the UI can show proposals while they stream.
 
+import type { HunkState } from '../types'
+
 export interface Hunk {
   find: string
   replace: string
@@ -94,13 +96,32 @@ function mergeText(segments: Segment[]): Segment[] {
   return out
 }
 
-/** Text of a reply without proposals: for digests and the thread history sent to the AI. */
-export function proposalSummary(text: string): string {
+const STATE_WORDS: Record<HunkState, string> = {
+  pending: 'not decided yet',
+  accepted: 'accepted by the author',
+  rejected: 'rejected by the author',
+  failed: 'could not be applied'
+}
+
+function short(text: string, max = 200): string {
+  const t = text.replace(/\s+/g, ' ').trim()
+  return t.length > max ? `${t.slice(0, max)}…` : t
+}
+
+/**
+ * The text of a reply with each proposal as one short line: for digests and the thread history sent to the AI.
+ * With `states`, each line says what the author did with the proposal, and edits show the new text,
+ * so the history and the digests know what is now in the book.
+ */
+export function proposalSummary(text: string, states?: Record<string, HunkState>): string {
   return parseProposals(text)
     .map((s) => {
       if (s.kind === 'text') return s.text
-      if (s.kind === 'edit') return `[Proposed ${s.hunks.length} change(s) to ${s.file}]`
-      return `[Proposed new file ${s.file}]`
+      if (!states) return s.kind === 'edit' ? `[Proposed ${s.hunks.length} change(s) to ${s.file}]` : `[Proposed new file ${s.file}]`
+      if (s.kind === 'create') return `[Proposed new file ${s.file}: ${STATE_WORDS[states[hunkKey(s.index, 0)] ?? 'pending']}]`
+      return s.hunks
+        .map((h, i) => `[Proposed change to ${s.file}, ${STATE_WORDS[states[hunkKey(s.index, i)] ?? 'pending']}: "${short(h.find, 80)}" → "${short(h.replace)}"]`)
+        .join('\n')
     })
     .join('')
 }

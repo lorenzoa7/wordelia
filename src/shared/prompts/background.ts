@@ -19,7 +19,7 @@ export function buildDigestSystem(book?: { title: string; chapters: string[] }):
 }
 
 export function buildDigestUser(previous: string, messages: ChatMessage[]): string {
-  const lines = messages.map((m) => `${m.role === 'user' ? 'Author' : 'Editor'}: ${proposalSummary(m.content).trim()}`)
+  const lines = messages.map((m) => `${m.role === 'user' ? 'Author' : 'Editor'}: ${proposalSummary(m.content, m.hunks ?? {}).trim()}`)
   return `<previous_digest>\n${previous.trim() || '(empty)'}\n</previous_digest>\n\n<new_messages>\n${lines.join('\n\n')}\n</new_messages>`
 }
 

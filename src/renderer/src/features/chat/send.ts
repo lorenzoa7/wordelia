@@ -98,7 +98,7 @@ export async function sendMessage(text: string): Promise<void> {
 
   const history: ChatTurn[] = thread.messages.slice(-HISTORY_LIMIT).map((m) => ({
     role: m.role,
-    content: m.role === 'assistant' ? proposalSummary(m.content) : renderUser(m)
+    content: m.role === 'assistant' ? proposalSummary(m.content, m.hunks ?? {}) : renderUser(m)
   }))
   history.push({ role: 'user', content: buildChatUserTurn(message || 'What do you think about this passage?', quotes, mentions, fresh.threads, fresh.chapters) })
 

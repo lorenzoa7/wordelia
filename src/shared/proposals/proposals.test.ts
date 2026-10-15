@@ -47,6 +47,13 @@ describe('parseProposals', () => {
       'A [Proposed 1 change(s) to x.md] B'
     )
   })
+
+  it('says what the author did with each proposal', () => {
+    const text = 'A <edit file="x.md"><find>a</find><replace>b</replace></edit> <create file="planning/P/N.md">x</create>'
+    expect(proposalSummary(text, { '0:0': 'accepted' })).toBe(
+      'A [Proposed change to x.md, accepted by the author: "a" → "b"] [Proposed new file planning/P/N.md: not decided yet]'
+    )
+  })
 })
 
 describe('applyHunk', () => {

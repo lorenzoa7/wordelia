@@ -110,7 +110,8 @@ export async function runAction(action: AiAction, range?: { from: number; to: nu
   }
   const rewrite = typesetForBook(extractRewrite(result.text).text)
   if (!rewrite || proposedPlain(rewrite) === current.original.trim()) {
-    toast('The AI found nothing to change.')
+    if (window.wordelia.isE2E) console.warn('[action reply]', JSON.stringify(result.text.slice(0, 3000)))
+    toast(rewrite ? 'The AI found nothing to change.' : 'The AI sent no rewrite. Try again.')
     editor.commands.rejectReview()
     return
   }

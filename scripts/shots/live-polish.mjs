@@ -47,9 +47,11 @@ export default async function ({ page, shot, work }) {
     )
     const t0 = Date.now()
     void page.evaluate((id) => window.__wordelia.runAction(id), action)
+    // Wait for the review, or for a toast that says why there is none.
     let ok = true
     try {
-      await page.waitForSelector('.review-accept', { timeout: 180000 })
+      await page.waitForFunction(() => document.querySelector('.review-accept') || window.__toasts.length > 0, null, { timeout: 180000 })
+      ok = Boolean(await page.$('.review-accept'))
     } catch {
       ok = false
     }

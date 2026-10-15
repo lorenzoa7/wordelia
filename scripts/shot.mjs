@@ -27,7 +27,9 @@ const settings = fresh ? { theme: dark ? 'dark' : 'light', onboarded: false } : 
     sync: { provider: 'claude-code', model: 'opus' },
     background: { provider: 'claude-code', model: 'haiku' }
   },
-  onboarded: !fresh
+  onboarded: !fresh,
+  // WORDELIA_CLAUDE_BIN: test with another copy of the claude CLI.
+  ...(process.env.WORDELIA_CLAUDE_BIN ? { providers: { 'claude-code': { enabled: true, binPath: process.env.WORDELIA_CLAUDE_BIN } } } : {})
 }
 await writeFile(join(userData, 'settings.json'), JSON.stringify(settings))
 const book = join(work, 'books', 'O Farol de Santa Ilha')

@@ -1,4 +1,4 @@
-// Open a terminal window where the user logs in to a CLI provider.
+// Open a terminal window where the user logs in to a CLI provider, or updates it.
 // Wordelia never sees the login; the CLI stores it.
 
 import { spawn } from 'node:child_process'
@@ -6,15 +6,17 @@ import type { ProviderId } from '@shared/types'
 import { getSettings } from '../settings'
 import { claudeCandidates, codexCandidates, resolveBin } from './resolve-bin'
 
-export async function openLogin(provider: ProviderId): Promise<boolean> {
+export async function openLogin(provider: ProviderId, task: 'login' | 'update' = 'login'): Promise<boolean> {
   if (provider !== 'claude-code' && provider !== 'codex') return false
+  // Only Claude Code updates itself. Codex is updated with the tool that installed it.
+  if (task === 'update' && provider !== 'claude-code') return false
   const s = await getSettings()
   const bin =
     provider === 'claude-code'
       ? await resolveBin('claude', s.providers['claude-code'].binPath, claudeCandidates())
       : await resolveBin('codex', s.providers.codex.binPath, codexCandidates())
   if (!bin) return false
-  const args = provider === 'claude-code' ? ['auth', 'login'] : ['login']
+  const args = task === 'update' ? ['update'] : provider === 'claude-code' ? ['auth', 'login'] : ['login']
   if (process.platform === 'win32') {
     // A new console window: cmd /k keeps it open so the user can read the result.
     // The outer quotes are removed by cmd /k; the inner quotes keep paths with spaces together.
@@ -22,7 +24,7 @@ export async function openLogin(provider: ProviderId): Promise<boolean> {
     const line = `"${quoted} ${args.join(' ')}"`
     const env: NodeJS.ProcessEnv = { ...process.env, ...bin.env }
     delete env['CLAUDECODE']
-    const child = spawn('cmd.exe', ['/c', 'start', '"Wordelia login"', 'cmd.exe', '/k', line], {
+    const child = spawn('cmd.exe', ['/c', 'start', task === 'update' ? '"Wordelia update"' : '"Wordelia login"', 'cmd.exe', '/k', line], {
       detached: true,
       stdio: 'ignore',
       windowsVerbatimArguments: true,

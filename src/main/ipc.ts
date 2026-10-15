@@ -198,6 +198,7 @@ export function registerIpc(): void {
   handle('ai:setKey', (_e, provider, key) => setSecret(provider, key))
   handle('ai:hasKey', async (_e, provider) => Boolean(await getSecret(provider)))
   handle('ai:openLogin', (_e, provider) => openLogin(provider))
+  handle('ai:openUpdate', (_e, provider) => openLogin(provider, 'update'))
 
   const remember = (path: string | null): string | null => {
     if (path) allowExported(path)

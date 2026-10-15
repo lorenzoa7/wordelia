@@ -2,6 +2,7 @@
 // Backspace right after a replacement undoes it (core undoInputRule).
 
 import { Extension, InputRule } from '@tiptap/core'
+import { quotesFor } from '@shared/text/quotes'
 
 export interface SmartTypingOptions {
   dash: string
@@ -14,13 +15,7 @@ export interface SmartTypingOptions {
   singleClose: string
 }
 
-export function quotesFor(language: string): Pick<SmartTypingOptions, 'doubleOpen' | 'doubleClose' | 'singleOpen' | 'singleClose'> {
-  const l = language.toLowerCase()
-  if (l.startsWith('de')) return { doubleOpen: '„', doubleClose: '“', singleOpen: '‚', singleClose: '‘' }
-  if (l.startsWith('fr')) return { doubleOpen: '« ', doubleClose: ' »', singleOpen: '‹', singleClose: '›' }
-  if (l === 'pt-pt' || l.startsWith('es') || l.startsWith('it')) return { doubleOpen: '«', doubleClose: '»', singleOpen: '“', singleClose: '”' }
-  return { doubleOpen: '“', doubleClose: '”', singleOpen: '‘', singleClose: '’' }
-}
+export { quotesFor }
 
 /** Is the character before the cursor a place where a quote opens? */
 const OPENS_AFTER = /[\s([{—―–-]$|^$/

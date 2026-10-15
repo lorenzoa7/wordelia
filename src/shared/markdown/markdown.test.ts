@@ -156,6 +156,18 @@ describe('frontmatter', () => {
     expect(fm.body).toBe('Corpo.\n')
     expect(writeFrontmatter({ ...fm.data, id: 'x' }, fm.body)).toBe(src)
   })
+
+  it('reads a value with a colon that YAML rejects, and writes valid YAML', () => {
+    const src = '---\naliases: [Trama, "Os padres"]\nsummary: Duas tramas: os padres e o fogo.\n---\n## Linha\n'
+    const fm = readFrontmatter(src)
+    expect(fm.data).toEqual({ aliases: ['Trama', 'Os padres'], summary: 'Duas tramas: os padres e o fogo.' })
+    expect(readFrontmatter(writeFrontmatter(fm.data, fm.body)).data).toEqual(fm.data)
+  })
+
+  it('reads block lists in the loose reader', () => {
+    const fm = readFrontmatter('---\nsummary: A: b\naliases:\n  - Um\n  - Dois\n---\nx')
+    expect(fm.data).toEqual({ summary: 'A: b', aliases: ['Um', 'Dois'] })
+  })
 })
 
 describe('review findings', () => {

@@ -4,9 +4,9 @@ This file is the source of truth for progress. Update it after each task. Mark a
 
 ## Current focus
 
-> **Milestone:** M8 — polish and live AI verification
-> **Next task:** Live tests with real models once the user logs in (`claude auth login`, `codex logout && codex login`): Polish quality, chat proposals, planning sync on the real book.
-> **Blocked:** both CLIs are logged out on this computer. The scripted provider (`WORDELIA_MOCK_AI=1`) covers the UI flows.
+> **Milestone:** M8 — polish and release
+> **Next task:** Collect feedback from the first real use of the app on "O Paraíso Perdido". Then fix what the author finds.
+> **Not verified:** Codex and the two API transports. The user has no Codex account, and no API keys are set. The scripted provider (`WORDELIA_MOCK_AI=1`) covers their UI flows.
 
 ## M0 — Foundation
 
@@ -41,7 +41,7 @@ This file is the source of truth for progress. Update it after each task. Mark a
 ## M3 — AI providers
 
 - [x] Transport interface and stream events
-- [~] Claude Code transport (CLI) — built; live test pending
+- [x] Claude Code transport (CLI) — live test on 2026-10-15 with the real book (19.4k words): planning sync 195 s, Polish 7–16 s, chat 12–22 s
 - [~] Codex transport (CLI) — app-server path verified up to the server reply (the account token had expired)
 - [~] Anthropic API and OpenAI API transports — built; live test pending
 - [x] Provider status detection and model lists
@@ -81,10 +81,10 @@ This file is the source of truth for progress. Update it after each task. Mark a
 
 ## M8 — Polish and release
 
-- [ ] Animations and micro-interactions review
+- [x] Animations and micro-interactions review (UI audit, reduced motion)
 - [x] Onboarding (first run) and empty states
 - [x] Keyboard shortcuts sheet
-- [ ] Accessibility review (focus rings, contrast, labels)
+- [x] Accessibility review (focus rings, contrast, labels) — UI audit, about 40 fixes
 - [x] Windows installer (electron-builder), app icon
 - [x] README with screenshots
 
@@ -97,6 +97,10 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] Optional typewriter sounds
 - [x] E2E scenario suite (`npm run e2e`): library, editor, AI review, chat proposals, planning, export, save on close, history, settings, dark theme, new book typing, chat resize, daily goal, keyboard, paste, reorder, outside file changes
 - [x] Independent code review: 17 findings fixed (data safety, Markdown, security, cancellation)
+- [x] Live test scripts with a real AI: `live-import`, `live-polish`, `live-chat`, `live-settings` (see `docs/ARCHITECTURE.md` §10)
+- [x] Fixes from the live tests: "Accept all" for replies with many proposals; book quotes and ellipsis on AI text; planning file names keep accents; planning headings in the book language; tolerant frontmatter for AI notes; safe file names; more careful "Fix grammar only"; book title in thread digests
+- [x] CLI update check: Settings → AI shows when a newer Claude Code or Codex is out, and runs `claude update`. Old CLIs cannot use the newest models (Claude Code 2.1.198 maps "opus" to Opus 4.8; Opus 5.5 needs 2.1.280 or later)
+- [x] A provider shows "Not connected" after a real call fails on login, also when its CLI says that it is logged in
 
 ## Later (not in version 1)
 

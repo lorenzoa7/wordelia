@@ -10,6 +10,7 @@ import type { CompletionRequest, CompletionResult, ModelInfo, ProviderStatus, St
 import { getSettings } from '../settings'
 import { cleanEnv, codexCandidates, resolveBin, type ResolvedBin } from './resolve-bin'
 import { classifyError, flattenConversation, killTree, runCli, type ProviderTransport } from './transport'
+import { latestVersion } from './updates'
 
 async function bin(): Promise<ResolvedBin | null> {
   const s = await getSettings()
@@ -142,7 +143,7 @@ export const codex: ProviderTransport = {
     if (!b) return { provider: 'codex', installed: false, loggedIn: false, detail: 'The codex CLI was not found.' }
     const ver = await runCli(b, ['--version'], { timeoutMs: 15000 })
     const version = ver.stdout.trim().split(/\s+/).pop() || undefined
-    const login = await runCli(b, ['login', 'status'], { timeoutMs: 15000 })
+    const [login, latest] = await Promise.all([runCli(b, ['login', 'status'], { timeoutMs: 15000 }), latestVersion('codex')])
     const out = (login.stdout + login.stderr).trim()
     const loggedIn = login.code === 0 && /logged in/i.test(out) ? true : login.code === 0 ? null : false
     return {
@@ -150,6 +151,7 @@ export const codex: ProviderTransport = {
       installed: true,
       loggedIn,
       version,
+      latestVersion: latest,
       account: loggedIn ? out.replace(/^logged in using /i, '') : undefined,
       detail: loggedIn === false ? 'Run "codex login" in a terminal to log in.' : b.path
     }

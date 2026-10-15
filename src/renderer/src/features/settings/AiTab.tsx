@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import clsx from 'clsx'
-import { ArrowsClockwise, CheckCircle, Info, Key, SignIn, Sparkle, Terminal, WarningCircle } from '@phosphor-icons/react'
+import { ArrowCircleUp, ArrowsClockwise, CheckCircle, Info, Key, SignIn, Sparkle, Terminal, WarningCircle } from '@phosphor-icons/react'
 import { PROVIDER_LABELS, TASK_LABELS, suggestRoutes } from '@shared/ai/routes'
+import { isOlderVersion } from '@shared/version'
 import type { Effort, ModelChoice, ProviderId, TaskKind } from '@shared/types'
 import { Button, Select, Spinner, Switch, TextInput, Tooltip } from '@/ui'
 import { invoke } from '@/lib/api'
@@ -112,6 +113,19 @@ function ProviderCard({ id }: { id: ProviderId }): React.JSX.Element {
       </p>
       {status?.detail && !ok && <p className="provider-detail">{status.detail}</p>}
       {status?.account && ok && <p className="provider-detail">Account: {status.account}</p>}
+      {!isApi && status?.installed && isOlderVersion(status.version, status.latestVersion) && (
+        <div className="provider-login">
+          {id === 'claude-code' && (
+            <Button size="sm" icon={<ArrowCircleUp size={13} />} onClick={() => void invoke('ai:openUpdate', id)}>
+              Update…
+            </Button>
+          )}
+          <span className="muted">
+            Version {status.latestVersion} is out. New models often need the newest version.
+            {id === 'claude-code' ? ' The button runs “claude update” in a terminal.' : ' Update Codex with the tool that installed it.'}
+          </span>
+        </div>
+      )}
       {isApi && (
         <div className="provider-key">
           <TextInput type="password" aria-label="API key" spellCheck={false} placeholder={ok ? 'A key is saved. Paste a new one to replace it.' : 'Paste your API key'} value={key} onChange={(e) => setKey(e.target.value)} />

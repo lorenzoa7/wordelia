@@ -344,6 +344,9 @@
   font-size: var(--text-xs);
   font-weight: 700;
 }
+.proposal-file svg {
+  flex-shrink: 0;
+}
 .proposal-file span {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -808,6 +811,22 @@ button.proposal-file:hover span {
   font-size: var(--text-xs);
 }
 
+.msg-bulk {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: var(--paper-2);
+}
+.msg-bulk-count {
+  flex: 1;
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  color: var(--ink-3);
+}
 .msg-actions {
   display: flex;
   gap: 2px;
@@ -830,6 +849,12 @@ button.proposal-file:hover span {
   color: var(--ink-3);
   font-size: var(--text-2xs);
   font-weight: 700;
+}
+.msg-model {
+  margin-left: auto;
+  align-self: center;
+  font-size: var(--text-2xs);
+  color: var(--ink-4);
 }
 .msg-actions button:hover {
   background: var(--desk-3);

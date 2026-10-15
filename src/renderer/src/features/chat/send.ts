@@ -172,7 +172,7 @@ async function afterReply(threadId: string): Promise<void> {
   const r = await runCompletion({
     route,
     purpose: 'background',
-    system: buildDigestSystem(),
+    system: buildDigestSystem({ title: useBook.getState().manifest?.title ?? '', chapters: useBook.getState().chapters.map((c) => c.title) }),
     messages: [{ role: 'user', content: buildDigestUser(t.digest, fresh) }],
     maxTokens: 800
   }).done

@@ -42,8 +42,9 @@ export const DEFAULT_ACTIONS: AiAction[] = [
     route: null,
     contextChars: 600,
     instructions: [
-      'Only fix spelling, grammar, punctuation, agreement and typos.',
-      'Do not change style, word choice or rhythm unless it is an error.',
+      'Only fix clear errors: spelling, grammar, punctuation, agreement and typos.',
+      'Do not change style, word choice or rhythm. Keep spoken and regional forms (for example "pra" or "tá" in Portuguese) and the voice of each character.',
+      'When you are not sure that something is an error, keep it as it is.',
       'Keep the dialogue punctuation conventions of the book.'
     ].join('\n')
   },

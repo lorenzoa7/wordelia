@@ -13,6 +13,7 @@ import { proposedPlain, reviewKey, textWithMap } from '@/features/editor/review'
 import { create } from 'zustand'
 import { normalizeRange } from './range'
 import { snapshot } from '@/features/history/snapshots'
+import { typesetForBook } from '@/lib/typeset'
 
 interface ActionRunState {
   running: boolean
@@ -107,7 +108,7 @@ export async function runAction(action: AiAction, range?: { from: number; to: nu
     editor.commands.rejectReview()
     return
   }
-  const rewrite = extractRewrite(result.text).text
+  const rewrite = typesetForBook(extractRewrite(result.text).text)
   if (!rewrite || proposedPlain(rewrite) === current.original.trim()) {
     toast('The AI found nothing to change.')
     editor.commands.rejectReview()

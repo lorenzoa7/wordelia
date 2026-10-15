@@ -1,7 +1,7 @@
 // Prompt for the planning sync: compare chapters with the planning and propose updates.
 
 import type { Chapter } from '../types'
-import { bookBlock, chapterBlock, entryBlock, languageName, planningIndex, type BookContext } from './context'
+import { bookBlock, chapterBlock, entryBlock, languageName, planningHeadings, planningIndex, type BookContext } from './context'
 
 export interface SyncPromptInput {
   book: BookContext
@@ -16,6 +16,9 @@ export interface SyncPromptInput {
 export function buildSyncSystem(input: SyncPromptInput): string {
   const m = input.book.manifest
   const lang = languageName(m.language)
+  const known = planningHeadings(m.language)
+  const h = known ?? planningHeadings('en')!
+  const translate = known ? '' : ` (translate the headings to ${lang})`
   return [
     'You maintain the planning (the story bible) of a novel. The planning holds what the author needs to keep the story consistent: characters, places, the world and its rules, and the plot.',
     '',
@@ -26,11 +29,13 @@ export function buildSyncSystem(input: SyncPromptInput): string {
     'You have no tools. Do not run commands or read files: everything you need is in this prompt.',
     '',
     '# Rules',
-    '- Use only facts that the text states or clearly implies. Do not invent. When a fact is uncertain, write it as a question in a "## Open questions" section.',
+    `- Use only facts that the text states or clearly implies. Do not invent. When a fact is uncertain, write it as a question in a "## ${h.questions}" section.`,
     '- Do not duplicate entries. Check names and aliases in the planning index first.',
     '- Skip minor figures that appear once and do not matter.',
-    `- Write entries in ${lang}, short and concrete. Bullets are good.`,
-    '- A new entry has frontmatter with aliases (other names used in the text) and a one-line summary. Useful sections for a character: ## Role, ## Appearance, ## Personality, ## Relationships, ## In the story (what happens to them, by chapter). For a place: ## Description, ## In the story.',
+    `- Write entries in ${lang}, short and concrete. Bullets are good. Section headings are in ${lang} too.`,
+    `- Name each file with the name exactly as the book writes it, with accents and capitals (for example planning/Places/São Tomé.md, not Sao Tome.md).`,
+    `- A new entry has frontmatter with aliases (other names used in the text) and a one-line summary. If the summary has a colon, put it in double quotes.`,
+    `- Useful sections for a character${translate}: ## ${h.role}, ## ${h.appearance}, ## ${h.personality}, ## ${h.relationships}, ## ${h.story} (what happens to them, by chapter). For a place: ## ${h.description}, ## ${h.story}. Use these headings exactly.`,
     '- For an update, edit the existing file. Use an exact <find> from the entry and a <replace>, or an empty <find></find> to append a new section or bullet at the end.',
     `- Categories that exist: ${input.categories.join(', ')}.`,
     '',
@@ -42,7 +47,7 @@ export function buildSyncSystem(input: SyncPromptInput): string {
     'aliases: [Other name]',
     'summary: One line.',
     '---',
-    '## Role',
+    `## ${h.role}`,
     '...',
     '</create>',
     '',

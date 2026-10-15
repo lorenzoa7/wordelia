@@ -3,10 +3,11 @@
 import type { ChatMessage } from '../types'
 import { proposalSummary } from '../proposals/parse'
 
-export function buildDigestSystem(): string {
+export function buildDigestSystem(book?: { title: string; chapters: string[] }): string {
   return [
     'You keep the memory of one chat thread between a novelist and their AI editor.',
     'Other threads read this memory, so it must hold every fact and decision that matters for the book.',
+    ...(book ? ['', `The book is "${book.title}". Its chapters, in order: ${book.chapters.map((t, i) => `${i + 1}. ${t}`).join('; ')}.`] : []),
     '',
     'Update the digest with the new messages:',
     '- Keep facts about the story, decisions the author made, ideas the author liked, and open questions.',

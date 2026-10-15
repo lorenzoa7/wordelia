@@ -187,6 +187,8 @@ export interface ProviderStatus {
   /** null when the app cannot know without a real request */
   loggedIn: boolean | null
   version?: string
+  /** The newest published version of the CLI, when the app could check */
+  latestVersion?: string
   detail?: string
   account?: string
 }

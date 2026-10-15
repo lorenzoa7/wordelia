@@ -68,6 +68,7 @@ Markdown text.
 
 Rules for new files:
 - Create files only in planning/, in one of the categories of the planning index (or a new category folder if none fits).
+- Name the file with the name exactly as the book writes it, with accents and capitals (for example planning/Places/São Tomé.md). Write the section headings in the language of the book.
 - Never create or delete manuscript chapters. The author does that.
 
 Write one short sentence before each proposal to say what it does and why. Never put proposals inside code blocks.`

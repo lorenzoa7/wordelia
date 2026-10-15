@@ -1,13 +1,16 @@
-import { memo, useMemo } from 'react'
+import { memo, useMemo, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { At, BookOpenText, ChatsCircle, Copy, Notebook, Quotes, TextIndent, WarningCircle } from '@phosphor-icons/react'
-import { parseProposals, proposalSummary } from '@shared/proposals/parse'
+import { At, BookOpenText, ChatsCircle, Check, Copy, Notebook, Quotes, TextIndent, WarningCircle } from '@phosphor-icons/react'
+import { parseProposals, proposalSummary, type Segment } from '@shared/proposals/parse'
 import { toast } from '@/stores/ui'
 import { getActiveEditor } from '@/features/editor/registry'
 import { sliceFromMarkdown } from '@/features/editor/review'
 import type { ChatMessage, Thread } from '@shared/types'
 import { ProposalCard } from './ProposalCard'
+import { acceptPending, pendingKeys, setHunkStates } from './applyProposal'
+import { Spinner } from '@/ui'
+import { typesetForBook } from '@/lib/typeset'
 
 const mdComponents = {
   a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
@@ -78,12 +81,51 @@ function AssistantMessage({ message, thread }: { message: ChatMessage; thread: T
           <WarningCircle size={14} /> {message.error}
         </div>
       )}
-      {message.content.trim() && <MessageActions text={proposalSummary(message.content).trim()} />}
+      <BulkBar segments={segments} message={message} thread={thread} />
+      {message.content.trim() && <MessageActions text={proposalSummary(message.content).trim()} model={message.model} />}
     </div>
   )
 }
 
-function MessageActions({ text }: { text: string }): React.JSX.Element {
+/** One decision for all the proposals of a reply, for example after a planning sync. */
+function BulkBar({ segments, message, thread }: { segments: Segment[]; message: ChatMessage; thread: Thread }): React.JSX.Element | null {
+  const [busy, setBusy] = useState(false)
+  const pending = pendingKeys(segments, message.hunks)
+  if (pending.length < 2) return null
+  const acceptAll = async (): Promise<void> => {
+    setBusy(true)
+    try {
+      const result = await acceptPending(segments, message.hunks)
+      setHunkStates(thread, message.id, result)
+      const states = Object.values(result)
+      const ok = states.filter((s) => s === 'accepted').length
+      const failed = states.length - ok
+      const chapters = segments.some((s) => s.kind === 'edit' && s.file.replace(/\\/g, '/').startsWith('manuscript/'))
+      toast(
+        failed
+          ? `Applied ${ok} of ${states.length} proposals. ${failed} could not be applied: the text changed.`
+          : `Applied ${ok} proposals.${chapters ? ' The versions from before the change are in the chapter history.' : ''}`,
+        failed ? { kind: 'error' } : {}
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+  const rejectAll = (): void => setHunkStates(thread, message.id, Object.fromEntries(pending.map((k) => [k, 'rejected'])))
+  return (
+    <div className="msg-bulk">
+      <span className="msg-bulk-count">{pending.length} proposals to review</span>
+      <button className="proposal-btn" onClick={rejectAll} disabled={busy}>
+        Reject all
+      </button>
+      <button className="proposal-btn is-accept" onClick={() => void acceptAll()} disabled={busy}>
+        {busy ? <Spinner size={11} /> : <Check size={12} weight="bold" />} Accept all
+      </button>
+    </div>
+  )
+}
+
+function MessageActions({ text, model }: { text: string; model?: string }): React.JSX.Element {
   const copy = (): void => {
     navigator.clipboard.writeText(text).then(
       () => toast('Copied.'),
@@ -97,7 +139,7 @@ function MessageActions({ text }: { text: string }): React.JSX.Element {
       return
     }
     const { state } = a.editor
-    const slice = sliceFromMarkdown(state.schema, text)
+    const slice = sliceFromMarkdown(state.schema, typesetForBook(text))
     a.editor.view.dispatch(state.tr.replaceSelection(slice).scrollIntoView())
     a.editor.commands.focus()
   }
@@ -109,6 +151,7 @@ function MessageActions({ text }: { text: string }): React.JSX.Element {
       <button onClick={insert} title="Insert the reply at the cursor in the open chapter (Ctrl+Z undoes it)">
         <TextIndent size={13} /> Insert into chapter
       </button>
+      {model && <span className="msg-model">{model}</span>}
     </div>
   )
 }

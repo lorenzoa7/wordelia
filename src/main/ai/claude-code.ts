@@ -8,6 +8,7 @@ import type { CompletionRequest, CompletionResult, ModelInfo, ProviderStatus, St
 import { getSettings } from '../settings'
 import { claudeCandidates, resolveBin, type ResolvedBin } from './resolve-bin'
 import { classifyError, flattenConversation, runCli, type ProviderTransport } from './transport'
+import { latestVersion } from './updates'
 
 const MODELS: ModelInfo[] = [
   { id: 'opus', label: 'Opus', description: 'Most capable. Best for chat and planning.', tier: 'best', contextWindow: 200000 },
@@ -37,7 +38,7 @@ export const claudeCode: ProviderTransport = {
     if (!b) return { provider: 'claude-code', installed: false, loggedIn: false, detail: 'The claude CLI was not found.' }
     const ver = await runCli(b, ['--version'], { timeoutMs: 15000 })
     const version = ver.stdout.trim().split(/\s+/)[0] || undefined
-    const auth = await runCli(b, ['auth', 'status'], { timeoutMs: 15000 })
+    const [auth, latest] = await Promise.all([runCli(b, ['auth', 'status'], { timeoutMs: 15000 }), latestVersion('claude-code')])
     let loggedIn: boolean | null = null
     let account: string | undefined
     try {
@@ -52,6 +53,7 @@ export const claudeCode: ProviderTransport = {
       installed: true,
       loggedIn,
       version,
+      latestVersion: latest,
       account,
       detail: loggedIn === false ? 'Run "claude auth login" in a terminal to log in.' : b.path
     }

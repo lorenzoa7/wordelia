@@ -10,8 +10,9 @@ import { wordDiff, diffStats, type DiffOp } from '@shared/text/diff'
 import type { ChatMessage, HunkState, Thread } from '@shared/types'
 import { Spinner, Tooltip } from '@/ui'
 import { useBook } from '@/stores/book'
+import { typesetForBook } from '@/lib/typeset'
 import { toast } from '@/stores/ui'
-import { applyCreate, applyEditHunk, markAfter, resolveTarget, restoreSnapshot, snapshotOf, type Snapshot } from './applyProposal'
+import { applyCreate, applyEditHunk, markAfter, resolveTarget, restoreSnapshot, setHunkStates, snapshotOf, type Snapshot } from './applyProposal'
 
 type EditSeg = Extract<Segment, { kind: 'edit' }>
 type CreateSeg = Extract<Segment, { kind: 'create' }>
@@ -24,9 +25,7 @@ interface Props {
 }
 
 function setHunkState(thread: Thread, messageId: string, key: string, state: HunkState): void {
-  const latest = useBook.getState().threads.find((t) => t.id === thread.id) ?? thread
-  const messages = latest.messages.map((m) => (m.id === messageId ? { ...m, hunks: { ...(m.hunks ?? {}), [key]: state } } : m))
-  useBook.getState().saveThread({ ...latest, messages })
+  setHunkStates(thread, messageId, { [key]: state })
 }
 
 export function ProposalCard(props: Props): React.JSX.Element {
@@ -87,10 +86,15 @@ function HunkView({ hunk, split }: { hunk: Hunk; split: boolean }): React.JSX.El
   )
 }
 
-function EditCard({ segment, message, thread, streaming }: Props & { segment: EditSeg }): React.JSX.Element {
+function EditCard({ segment: raw, message, thread, streaming }: Props & { segment: EditSeg }): React.JSX.Element {
   const [split, setSplit] = useState(false)
   const [busy, setBusy] = useState(false)
-  const target = resolveTarget(segment.file)
+  const target = resolveTarget(raw.file)
+  // Show chapter text with the quotes of the book, as it will be applied.
+  const segment = useMemo(
+    () => (target.kind === 'chapter' ? { ...raw, hunks: raw.hunks.map((h) => ({ ...h, replace: typesetForBook(h.replace) })) } : raw),
+    [raw, target.kind]
+  )
   const states = message?.hunks ?? {}
   const keys = segment.hunks.map((_, i) => hunkKey(segment.index, i))
   const pending = keys.filter((k) => !states[k] || states[k] === 'pending')
@@ -245,7 +249,8 @@ function CreateCard({ segment, message, thread, streaming }: Props & { segment: 
   const target = resolveTarget(segment.file)
   const { data, body } = readFrontmatter(segment.content)
   const category = segment.file.replace(/^planning\//, '').split('/').slice(0, -1).join('/')
-  const exists = target.kind === 'entry'
+  // After the user creates the entry, it exists: the card still shows where it went.
+  const exists = target.kind === 'entry' && state === 'pending'
 
   const create = async (): Promise<void> => {
     if (!thread || !message) return

@@ -23,6 +23,30 @@ export const LANGUAGE_NAMES: Record<string, string> = {
   it: 'Italian'
 }
 
+export interface PlanningHeadings {
+  role: string
+  appearance: string
+  personality: string
+  relationships: string
+  story: string
+  description: string
+  questions: string
+}
+
+const HEADINGS: Record<string, PlanningHeadings> = {
+  en: { role: 'Role', appearance: 'Appearance', personality: 'Personality', relationships: 'Relationships', story: 'In the story', description: 'Description', questions: 'Open questions' },
+  pt: { role: 'Papel', appearance: 'Aparência', personality: 'Personalidade', relationships: 'Relações', story: 'Na história', description: 'Descrição', questions: 'Perguntas em aberto' },
+  es: { role: 'Papel', appearance: 'Apariencia', personality: 'Personalidad', relationships: 'Relaciones', story: 'En la historia', description: 'Descripción', questions: 'Preguntas abiertas' },
+  fr: { role: 'Rôle', appearance: 'Apparence', personality: 'Personnalité', relationships: 'Relations', story: 'Dans l’histoire', description: 'Description', questions: 'Questions ouvertes' },
+  de: { role: 'Rolle', appearance: 'Aussehen', personality: 'Persönlichkeit', relationships: 'Beziehungen', story: 'In der Geschichte', description: 'Beschreibung', questions: 'Offene Fragen' },
+  it: { role: 'Ruolo', appearance: 'Aspetto', personality: 'Personalità', relationships: 'Relazioni', story: 'Nella storia', description: 'Descrizione', questions: 'Domande aperte' }
+}
+
+/** Section headings for planning entries in the language of the book (null when the app does not know them). */
+export function planningHeadings(language: string): PlanningHeadings | null {
+  return HEADINGS[language.slice(0, 2).toLowerCase()] ?? null
+}
+
 export function languageName(tag: string): string {
   return LANGUAGE_NAMES[tag] ?? tag
 }

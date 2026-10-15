@@ -2,6 +2,7 @@
 
 import type { CompletionRequest, CompletionResult, StreamEvent } from '@shared/types'
 import { invoke, on } from './api'
+import { useApp } from '@/stores/app'
 
 let counter = 0
 
@@ -19,7 +20,16 @@ export function runCompletion(req: CompletionRequest, onEvent?: (e: StreamEvent,
     if (event.type === 'text') text += event.delta
     onEvent?.(event, text)
   })
-  const done = invoke('ai:complete', id, req).finally(off)
+  const done = invoke('ai:complete', id, req)
+    .then((result) => {
+      // A CLI can say "logged in" while its token is dead. A real call is the truth.
+      if (result.errorKind === 'not-logged-in') {
+        const p = req.route.provider
+        useApp.setState((s) => ({ status: { ...s.status, [p]: { ...s.status[p], provider: p, installed: true, loggedIn: false, detail: result.error } } }))
+      }
+      return result
+    })
+    .finally(off)
   return { id, done, cancel: () => void invoke('ai:cancel', id) }
 }
 

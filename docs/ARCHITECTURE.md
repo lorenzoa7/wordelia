@@ -246,3 +246,23 @@ The app reads these environment variables. Users never set them.
 | `WORDELIA_EXPORT_DIR` | Exports go here without a save dialog. |
 
 `scripts/shot.mjs <scenario> [--dark] [--fresh] [--real-ai]` builds nothing; run `npm run build` first, or use `npm run shot -- <scenario>`. Scenarios are in `scripts/shots/`.
+
+### Live tests with a real AI
+
+These scenarios use the AI that is connected on this computer (`--real-ai`). They cost tokens of the user's plan. Each one works on a copy of the book.
+
+| Scenario | Environment | What it does |
+|---|---|---|
+| `live-import` | `IMPORT_FILE`, `LIVE_OUT` | Imports a DOCX, waits for the planning sync, accepts all proposals with the "Accept all" bar, copies the book to `LIVE_OUT/book`. |
+| `live-polish` | `LIVE_BOOK`, `LIVE_OUT`, optional `LIVE_CASES` | Runs actions on paragraphs (`action:chapter:paragraph:count`) and writes `polish-report.json` with the text before and after. |
+| `live-chat` | `LIVE_BOOK`, `LIVE_OUT`, optional `LIVE_PROMPTS` | Sends chat messages in a new thread, accepts the proposals, and writes `chat-report.json`. |
+| `live-settings` | — | Screenshot of Settings → AI with the real provider status. |
+| `debug` | optional `WORDELIA_DEBUG_PROVIDER` | One small completion. Prints the status, the models and the result. |
+
+### AI text and the book typography
+
+The AI often writes straight quotes and three dots. `typesetForBook` (`src/renderer/src/lib/typeset.ts`) changes them to the quotes and the ellipsis of the book, when the book settings ask for smart quotes and smart ellipsis. It runs on action rewrites, on chat edits to chapters (the diff card shows the same text that is applied), and on "Insert into chapter". Attribute blocks such as `{font="X"}` and HTML tags keep their straight quotes.
+
+### Frontmatter from the AI
+
+The AI can write YAML that is not valid, for example `summary: Two plots: one…`. When YAML parsing fails, `readFrontmatter` reads simple `key: value` lines and lists. The file is then written back as valid YAML. When a line does not fit, or a key repeats, the raw frontmatter is kept unchanged, as before.

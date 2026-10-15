@@ -90,6 +90,7 @@ export interface IpcInvokeMap {
   'ai:hasKey': [[provider: ProviderId], boolean]
   /** Open a terminal window that runs the login command of a CLI provider */
   'ai:openLogin': [[provider: ProviderId], boolean]
+  'ai:openUpdate': [[provider: ProviderId], boolean]
 
   'export:pdf': [[req: PdfExportRequest], string | null]
   'export:docx': [[req: DocxExportRequest], string | null]
@@ -151,6 +152,7 @@ export const INVOKE_CHANNELS: InvokeChannel[] = [
   'ai:setKey',
   'ai:hasKey',
   'ai:openLogin',
+  'ai:openUpdate',
   'export:pdf',
   'export:docx',
   'export:text',

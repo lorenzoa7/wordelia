@@ -97,7 +97,7 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] Optional typewriter sounds
 - [x] E2E scenario suite (`npm run e2e`): library, editor, AI review, chat proposals, planning, export, save on close, history, settings, dark theme, new book typing, chat resize, daily goal, keyboard, paste, reorder, outside file changes
 - [x] Independent code review: 17 findings fixed (data safety, Markdown, security, cancellation)
-- [x] Live test scripts with a real AI: `live-import`, `live-polish`, `live-chat`, `live-settings` (see `docs/ARCHITECTURE.md` §10)
+- [x] Live test scripts with a real AI: `live-import`, `live-polish`, `live-chat`, `live-sync`, `live-settings` (see `docs/ARCHITECTURE.md` §10)
 - [x] Fixes from the live tests: "Accept all" for replies with many proposals; book quotes and ellipsis on AI text; planning file names keep accents; planning headings in the book language; tolerant frontmatter for AI notes; safe file names; more careful "Fix grammar only"; book title in thread digests
 - [x] CLI update check: Settings → AI shows when a newer Claude Code or Codex is out, and runs `claude update`. Old CLIs cannot use the newest models (Claude Code 2.1.198 maps "opus" to Opus 4.8; Opus 5.5 needs 2.1.280 or later)
 - [x] A provider shows "Not connected" after a real call fails on login, also when its CLI says that it is logged in

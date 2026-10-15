@@ -2,6 +2,7 @@
 
 import Anthropic from '@anthropic-ai/sdk'
 import type { CompletionRequest, CompletionResult, ModelInfo, ProviderStatus, StreamEvent } from '@shared/types'
+import { EFFORT_ORDER } from '@shared/ai/effort'
 import { getSecret } from '../settings'
 import { classifyError, type ProviderTransport } from './transport'
 
@@ -44,11 +45,18 @@ export const anthropicApi: ProviderTransport = {
     try {
       for await (const m of c.models.list({ limit: 100 })) {
         if (!m.id.startsWith('claude-')) continue
+        // capabilities.effort says which levels the model accepts (Haiku 4.5 has none).
+        const caps = (m as unknown as { capabilities?: { effort?: Record<string, { supported?: boolean } | boolean> } }).capabilities
+        const effortCaps = caps?.effort
+        const efforts = effortCaps
+          ? EFFORT_ORDER.filter((e) => typeof effortCaps[e] === 'object' && (effortCaps[e] as { supported?: boolean }).supported)
+          : undefined
         out.push({
           id: m.id,
           label: m.display_name ?? m.id,
           tier: tierOf(m.id),
-          contextWindow: (m as unknown as { max_input_tokens?: number }).max_input_tokens
+          contextWindow: (m as unknown as { max_input_tokens?: number }).max_input_tokens,
+          ...(efforts ? { efforts: (effortCaps as { supported?: boolean }).supported === false ? [] : efforts } : {})
         })
       }
     } catch {
@@ -69,7 +77,7 @@ export const anthropicApi: ProviderTransport = {
         max_tokens: req.maxTokens ?? 32000,
         system: [{ type: 'text' as const, text: req.system, cache_control: { type: 'ephemeral' as const } }],
         messages: req.messages.map((m) => ({ role: m.role, content: m.content })),
-        ...(req.route.effort ? { output_config: { effort: req.route.effort } } : {})
+        ...(req.route.effort ? { output_config: { effort: req.route.effort === 'minimal' ? ('low' as const) : req.route.effort } } : {})
       }
       onEvent({ type: 'start', model })
       const onText = (delta: string): void => {

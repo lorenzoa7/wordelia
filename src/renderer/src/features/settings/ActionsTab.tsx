@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 import { ArrowCounterClockwise, Plus, Star, Trash } from '@phosphor-icons/react'
 import { DEFAULT_ACTIONS } from '@shared/ai/defaults'
-import { PROVIDER_LABELS } from '@shared/ai/routes'
+import { PROVIDER_LABELS, routeLabel } from '@shared/ai/routes'
 import { newId } from '@shared/book'
-import type { AiAction, ProviderId } from '@shared/types'
+import type { AiAction, Effort, ProviderId } from '@shared/types'
+import { EFFORT_LABELS, effortChoices, nearestEffort } from '@shared/ai/effort'
 import { Button, Field, IconButton, Select, TextArea, TextInput, Tooltip } from '@/ui'
 import { askConfirm } from '@/ui/prompt'
 import { useApp } from '@/stores/app'
@@ -47,6 +48,12 @@ export function ActionsTab(): React.JSX.Element | null {
 
   const providers = (Object.keys(PROVIDER_LABELS) as ProviderId[]).filter((p) => (models[p] ?? []).length > 0)
   const routeValue = action?.route ? `${action.route.provider}|${action.route.model}` : 'default'
+  // The model that runs this action, and the efforts it accepts.
+  const base = action?.route ?? settings.routes.action ?? settings.routes.chat
+  const baseModel = base ? (models[base.provider] ?? []).find((m) => m.id === base.model) : undefined
+  const efforts = base && action ? effortChoices(baseModel, action.effort) : null
+  const effortNow = action?.effort ? nearestEffort(action.effort, baseModel) : base?.effort
+  const effective = base ? { provider: base.provider, model: base.model, ...(effortNow ? { effort: effortNow } : {}) } : null
 
   return (
     <div className="actions-tab">
@@ -111,21 +118,6 @@ export function ActionsTab(): React.JSX.Element | null {
               <DraftArea key={`i-${action.id}`} value={action.instructions} onCommit={(v) => patch({ instructions: v })} />
             </Field>
             <div className="action-form-row">
-              <Field label="Context around the selection">
-                <Select
-                  value={String(action.contextChars)}
-                  onValueChange={(v) => patch({ contextChars: Number(v) })}
-                  options={[
-                    { value: '300', label: 'A little (300 characters)' },
-                    { value: '1500', label: 'Some (1,500)' },
-                    { value: '3000', label: 'A lot (3,000)' },
-                    { value: '8000', label: 'Most of the chapter (8,000)' }
-                  ].concat(
-                    [300, 1500, 3000, 8000].includes(action.contextChars) ? [] : [{ value: String(action.contextChars), label: `${action.contextChars}` }]
-                  )}
-                  ariaLabel="Context"
-                />
-              </Field>
               <Field label="Model">
                 <Select
                   value={routeValue}
@@ -137,7 +129,7 @@ export function ActionsTab(): React.JSX.Element | null {
                     }
                   }}
                   options={[
-                    { value: 'default', label: 'Actions default' },
+                    { value: 'default', label: 'Same as Actions' },
                     ...providers.flatMap((p) =>
                       (models[p] ?? []).slice(0, 8).map((m) => ({ value: `${p}|${m.id}`, label: `${PROVIDER_LABELS[p].short} · ${m.label}` }))
                     )
@@ -145,7 +137,45 @@ export function ActionsTab(): React.JSX.Element | null {
                   ariaLabel="Model"
                 />
               </Field>
+              <Field label="Effort">
+                {efforts ? (
+                  <Select
+                    value={action.effort ?? 'route'}
+                    onValueChange={(v) => patch({ effort: v === 'route' ? undefined : (v as Effort) })}
+                    options={[{ value: 'route', label: 'Same as the model' }, ...efforts.map((e) => ({ value: e, label: EFFORT_LABELS[e] }))]}
+                    ariaLabel="Effort"
+                  />
+                ) : (
+                  <span className="muted">This model has no effort setting.</span>
+                )}
+              </Field>
             </div>
+            <p className="action-runs-on">
+              Runs on <strong>{effective ? routeLabel(effective, models[effective.provider]) : 'no model yet'}</strong>
+              {effective && !effective.effort && efforts
+                ? effective.provider === 'claude-code' || effective.provider === 'codex'
+                  ? ' (the CLI chooses the effort)'
+                  : ' (the model chooses the effort)'
+                : ''}
+              . More effort is slower and uses more of your plan.
+            </p>
+            <Field label="Context around the selection">
+              <Select
+                value={String(action.contextChars)}
+                onValueChange={(v) => patch({ contextChars: Number(v) })}
+                options={[
+                  { value: '300', label: 'A little (300 characters)' },
+                  { value: '1500', label: 'Some (1,500)' },
+                  { value: '3000', label: 'A lot (3,000)' },
+                  { value: '8000', label: 'Most of the chapter (8,000)' }
+                ].concat(
+                  [300, 1500, 3000, 8000].includes(action.contextChars)
+                    ? []
+                    : [{ value: String(action.contextChars), label: `${action.contextChars.toLocaleString('en')} characters` }]
+                )}
+                ariaLabel="Context"
+              />
+            </Field>
             <div className="action-form-foot">
               <Button
                 size="sm"

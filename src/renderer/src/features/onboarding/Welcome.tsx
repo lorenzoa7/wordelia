@@ -144,15 +144,16 @@ function CliRow({ id }: { id: ProviderId }): React.JSX.Element {
           </span>
         )}
         {status?.installed && status.loggedIn === false && (
-          <span className="welcome-hint">Installed, but not logged in.</span>
+          <span className="welcome-hint">{status.detail?.includes('expired') ? 'The login on this computer has expired.' : 'Installed, but not logged in.'}</span>
         )}
+        {ok && <span className="welcome-hint">Found on this computer{status?.account ? `, logged in as ${status.account}` : ''}.</span>}
       </div>
       <div className="welcome-row-state">
         {checking && !status ? (
           <Spinner />
         ) : ok ? (
           <span className="state-ok">
-            <CheckCircle size={15} weight="fill" /> Ready
+            <CheckCircle size={15} weight="fill" /> Connected
           </span>
         ) : status?.installed ? (
           <Button

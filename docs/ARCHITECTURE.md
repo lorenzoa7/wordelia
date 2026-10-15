@@ -160,8 +160,30 @@ interface ProviderTransport {
 `CompletionRequest` is `{ system, messages, model, effort?, maxTokens? }`. The AI is a pure text model. It does not get tools. It proposes changes with the proposal protocol (5.3), and the app applies them after the user accepts.
 
 - **Claude Code:** the app runs the `claude` CLI of the user in print mode with streaming JSON output, no tools, no settings sources, and the prompt on stdin. See `docs/decisions/0002-ai-through-user-clis.md`.
-- **Codex:** the app runs the `codex` CLI of the user (`codex exec --json`, read-only sandbox, prompt on stdin).
+- **Codex:** the app runs the `codex` CLI of the user (`codex app-server`, JSON-RPC, read-only sandbox; `codex exec --json` as a fallback).
 - **Anthropic API / OpenAI API:** HTTPS streaming with the key of the user.
+
+#### Models and effort
+
+The model lists come from the providers, so new models appear without an app update:
+
+| Provider | Models | Effort levels |
+|---|---|---|
+| Claude Code | The aliases in `claude --help` ("fable", "opus", "sonnet"), plus "opus", "sonnet" and "haiku". The CLI maps each alias to the newest model of its family. A newer CLI brings newer models. | From the `--effort` line of `claude --help`. An old CLI without `--effort` gets none. |
+| Codex | `model/list` of `codex app-server`. | `supportedReasoningEfforts` and `defaultReasoningEffort` of each model. |
+| Anthropic API | `models.list`. | `capabilities.effort` of each model (Haiku 4.5 has none). |
+| OpenAI API | `models.list`. | Low, medium and high for reasoning models. |
+
+`src/main/ai/claude-models.ts` reads the help text again when the `claude` program changes (path, size, time). It also keeps the model that answered for each alias (`claude-models.json` in the app data folder), so the settings can show "Opus — Claude Opus 5.5".
+
+Each task route (`ModelChoice`) has an explicit effort. Settings version 2 gave old Claude Code routes the suggested effort of their task (`TASK_EFFORT` in `src/shared/ai/effort.ts`: chat high, actions medium, sync high, background low). An action can override the effort of its route (`AiAction.effort`). When the model does not support an effort, the app uses the nearest lower level (`nearestEffort`).
+
+#### Provider status
+
+- **Claude Code:** `claude --version` and `claude auth status`.
+- **Codex:** `codex login status` only reads the saved file. A login can look fine and still fail. So the app also asks `codex app-server` for `account/read` with `refreshToken: true`. When the account is null, the login has expired.
+- A failed request with a login error marks the provider "Not connected" in the app, also when the status check said that it was logged in.
+- The app compares the CLI version with the newest version on npm (`src/main/ai/updates.ts`) and shows an update hint.
 
 ### 5.2 Prompt building (renderer)
 

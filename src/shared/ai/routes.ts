@@ -1,6 +1,7 @@
 // Suggested model routes for a provider, from its model list.
 
 import type { ModelChoice, ModelInfo, ModelRoutes, ProviderId, TaskKind } from '../types'
+import { EFFORT_LABELS, TASK_EFFORT, nearestEffort } from './effort'
 
 export const TASK_LABELS: Record<TaskKind, { name: string; hint: string }> = {
   chat: { name: 'Chat', hint: 'Conversations, feedback and proposed edits.' },
@@ -22,38 +23,44 @@ function newest(models: ModelInfo[], re: RegExp): ModelInfo | undefined {
 }
 
 export function suggestRoutes(provider: ProviderId, models: ModelInfo[]): ModelRoutes {
-  const pick = (m: ModelInfo | undefined, effort?: ModelChoice['effort']): ModelChoice | null =>
-    m ? { provider, model: m.id, ...(effort ? { effort } : {}) } : null
+  // Each task gets an explicit effort, so the user can see it. The model may not support the suggested one.
+  const pick = (task: TaskKind, m: ModelInfo | undefined, fallbackId?: string): ModelChoice | null => {
+    const id = m?.id ?? fallbackId
+    if (id === undefined) return null
+    const effort = nearestEffort(TASK_EFFORT[task], m)
+    return { provider, model: id, ...(effort ? { effort } : {}) }
+  }
+  const byId = (id: string): ModelInfo | undefined => models.find((m) => m.id === id)
   switch (provider) {
     case 'claude-code':
+      // Aliases: the claude CLI maps each one to the newest model of its family.
       return {
-        chat: { provider, model: 'opus' },
-        action: { provider, model: 'sonnet' },
-        sync: { provider, model: 'opus' },
-        background: { provider, model: 'haiku' }
+        chat: pick('chat', byId('opus'), 'opus'),
+        action: pick('action', byId('sonnet'), 'sonnet'),
+        sync: pick('sync', byId('opus'), 'opus'),
+        background: pick('background', byId('haiku'), 'haiku')
       }
     case 'anthropic': {
       const opus = newest(models, /^claude-opus/) ?? newest(models, /^claude-fable/)
       const sonnet = newest(models, /^claude-sonnet/) ?? opus
       const haiku = newest(models, /^claude-haiku/) ?? sonnet
-      return { chat: pick(opus), action: pick(sonnet), sync: pick(opus), background: pick(haiku, 'low') }
+      return { chat: pick('chat', opus), action: pick('action', sonnet), sync: pick('sync', opus), background: pick('background', haiku) }
     }
     case 'codex': {
       const def = models.find((m) => m.isDefault) ?? models[0]
       const fast = models.find((m) => m.tier === 'fast') ?? def
       // An empty model id means "the CLI default".
-      const base: ModelChoice = def ? { provider, model: def.id } : { provider, model: '' }
       return {
-        chat: { ...base, effort: 'medium' },
-        action: { ...base, effort: 'low' },
-        sync: { ...base, effort: 'medium' },
-        background: fast ? { provider, model: fast.id, effort: 'low' } : { ...base, effort: 'low' }
+        chat: pick('chat', def, ''),
+        action: pick('action', def, ''),
+        sync: pick('sync', def, ''),
+        background: pick('background', fast, '')
       }
     }
     case 'openai': {
       const best = models.find((m) => m.tier !== 'fast') ?? models[0]
       const fast = models.find((m) => m.tier === 'fast') ?? best
-      return { chat: pick(best, 'medium'), action: pick(best, 'low'), sync: pick(best, 'medium'), background: pick(fast, 'low') }
+      return { chat: pick('chat', best), action: pick('action', best), sync: pick('sync', best), background: pick('background', fast) }
     }
   }
 }
@@ -61,5 +68,5 @@ export function suggestRoutes(provider: ProviderId, models: ModelInfo[]): ModelR
 export function routeLabel(route: ModelChoice | null, models?: ModelInfo[]): string {
   if (!route) return 'Not set'
   const model = models?.find((m) => m.id === route.model)?.label ?? (route.model || 'Default model')
-  return `${PROVIDER_LABELS[route.provider].short} · ${model}${route.effort ? ` · ${route.effort}` : ''}`
+  return `${PROVIDER_LABELS[route.provider].short} · ${model}${route.effort ? ` · ${EFFORT_LABELS[route.effort]}` : ''}`
 }

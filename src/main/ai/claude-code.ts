@@ -9,12 +9,8 @@ import { getSettings } from '../settings'
 import { claudeCandidates, resolveBin, type ResolvedBin } from './resolve-bin'
 import { classifyError, flattenConversation, runCli, type ProviderTransport } from './transport'
 import { latestVersion } from './updates'
+import { claudeModels, rememberResolved } from './claude-models'
 
-const MODELS: ModelInfo[] = [
-  { id: 'opus', label: 'Opus', description: 'Most capable. Best for chat and planning.', tier: 'best', contextWindow: 200000 },
-  { id: 'sonnet', label: 'Sonnet', description: 'Fast and strong. Best for actions.', tier: 'balanced', contextWindow: 200000 },
-  { id: 'haiku', label: 'Haiku', description: 'Fastest. Good for summaries.', tier: 'fast', contextWindow: 200000 }
-]
 
 /** Flags that newer CLI versions accept. We drop a flag if an old CLI rejects it. */
 const OPTIONAL_FLAGS = ['--safe-mode', '--disable-slash-commands', '--no-session-persistence', '--include-partial-messages']
@@ -60,7 +56,8 @@ export const claudeCode: ProviderTransport = {
   },
 
   async listModels(): Promise<ModelInfo[]> {
-    return MODELS
+    const b = await bin()
+    return b ? claudeModels(b) : []
   },
 
   async complete(req: CompletionRequest, onEvent: (e: StreamEvent) => void, signal: AbortSignal): Promise<CompletionResult> {
@@ -101,6 +98,7 @@ export const claudeCode: ProviderTransport = {
           args = dropFlag(args, res.retryWithout)
           continue
         }
+        if (res.result.ok) await rememberResolved(b, req.route.model || 'sonnet', res.result.model).catch(() => {})
         return res.result
       }
       return { ok: false, text: '', error: 'The claude CLI rejected its arguments.', errorKind: 'other' }

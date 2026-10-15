@@ -160,7 +160,8 @@ export interface LibraryItem {
 /* ------------------------------------------------------------------ */
 
 export type ProviderId = 'claude-code' | 'codex' | 'anthropic' | 'openai'
-export type Effort = 'low' | 'medium' | 'high'
+/** How long the model thinks before it answers. Each model supports some of these. */
+export type Effort = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 export type TaskKind = 'chat' | 'action' | 'sync' | 'background'
 
 export interface ModelChoice {
@@ -179,6 +180,12 @@ export interface ModelInfo {
   /** Tokens */
   contextWindow?: number
   tier?: 'best' | 'balanced' | 'fast'
+  /** Effort levels that the model accepts. Empty: the model has no effort setting. Unknown: undefined. */
+  efforts?: Effort[]
+  /** The effort that the model uses when the app sends none */
+  defaultEffort?: Effort
+  /** For an alias such as "opus": the model that answered last time, for example "Claude Opus 5.5" */
+  resolvedLabel?: string
 }
 
 export interface ProviderStatus {
@@ -229,6 +236,8 @@ export interface AiAction {
   instructions: string
   /** null: use the `action` model route */
   route: ModelChoice | null
+  /** Effort for this action. Undefined: the effort of the route. */
+  effort?: Effort
   /** Characters of context before and after the selection */
   contextChars: number
   icon: string
@@ -294,7 +303,8 @@ export interface ProviderSettings {
 }
 
 export interface AppSettings {
-  version: 1
+  /** 2: Claude Code routes have an explicit effort */
+  version: 2
   theme: ThemeSetting
   ui: {
     sidebarOpen: boolean

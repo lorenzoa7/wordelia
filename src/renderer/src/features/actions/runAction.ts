@@ -14,6 +14,7 @@ import { create } from 'zustand'
 import { normalizeRange } from './range'
 import { snapshot } from '@/features/history/snapshots'
 import { typesetForBook } from '@/lib/typeset'
+import { nearestEffort } from '@shared/ai/effort'
 
 interface ActionRunState {
   running: boolean
@@ -41,7 +42,11 @@ export async function runAction(action: AiAction, range?: { from: number; to: nu
   if (reviewKey.getState(editor.state)) cancelAction()
 
   const settings = useApp.getState().settings
-  const route = action.route ?? settings?.routes.action ?? settings?.routes.chat ?? null
+  const base = action.route ?? settings?.routes.action ?? settings?.routes.chat ?? null
+  // The action can set its own effort over the effort of its model setting.
+  const baseModel = base ? useApp.getState().models[base.provider]?.find((m) => m.id === base.model) : undefined
+  const effort = action.effort ? nearestEffort(action.effort, baseModel) : base?.effort
+  const route = base ? { provider: base.provider, model: base.model, ...(effort ? { effort } : {}) } : null
   if (!route) {
     toast('Connect an AI first.', { action: { label: 'Open settings', run: () => useUi.getState().openSettings('ai') } })
     return

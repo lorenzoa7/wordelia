@@ -3,7 +3,8 @@
 import { app, safeStorage } from 'electron'
 import { join } from 'node:path'
 import { DEFAULT_ACTIONS, DEFAULT_ACTION_ID } from '@shared/ai/defaults'
-import type { AppSettings, ProviderId } from '@shared/types'
+import type { AppSettings, ModelRoutes, ProviderId, TaskKind } from '@shared/types'
+import { TASK_EFFORT } from '@shared/ai/effort'
 import { atomicWrite, readJson } from './fsutil'
 
 const settingsFile = (): string => join(app.getPath('userData'), 'settings.json')
@@ -11,7 +12,7 @@ const secretsFile = (): string => join(app.getPath('userData'), 'secrets.json')
 
 export function defaultSettings(): AppSettings {
   return {
-    version: 1,
+    version: 2,
     theme: 'light',
     ui: { sidebarOpen: true, chatOpen: true, focusMode: false, typewriterScroll: false, zoom: 1, chatWidth: 400 },
     editor: { spellcheck: true, showWordCount: true, typewriterSounds: false, dailyGoal: 500 },
@@ -40,10 +41,25 @@ export async function getSettings(): Promise<AppSettings> {
     ui: { ...d.ui, ...(raw.ui ?? {}) },
     editor: { ...d.editor, ...(raw.editor ?? {}) },
     providers: { ...d.providers, ...(raw.providers ?? {}) },
-    routes: { ...d.routes, ...(raw.routes ?? {}) },
-    actions: Array.isArray(raw.actions) && raw.actions.length ? raw.actions : d.actions
+    routes: migrateRoutes(raw.version, { ...d.routes, ...(raw.routes ?? {}) }),
+    actions: Array.isArray(raw.actions) && raw.actions.length ? raw.actions : d.actions,
+    version: 2
   }
   return cache
+}
+
+/**
+ * Version 1 sent no effort to Claude Code, so the CLI chose it and the user could not see it.
+ * Give those routes the suggested effort of their task.
+ */
+function migrateRoutes(version: number | undefined, routes: ModelRoutes): ModelRoutes {
+  if (version === 2) return routes
+  const out = { ...routes }
+  for (const task of Object.keys(out) as TaskKind[]) {
+    const r = out[task]
+    if (r?.provider === 'claude-code' && !r.effort) out[task] = { ...r, effort: TASK_EFFORT[task] }
+  }
+  return out
 }
 
 export async function setSettings(patch: Partial<AppSettings>): Promise<AppSettings> {

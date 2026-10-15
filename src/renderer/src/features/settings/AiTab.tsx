@@ -3,6 +3,7 @@ import clsx from 'clsx'
 import { ArrowCircleUp, ArrowsClockwise, CheckCircle, Info, Key, SignIn, Sparkle, Terminal, WarningCircle } from '@phosphor-icons/react'
 import { PROVIDER_LABELS, TASK_LABELS, suggestRoutes } from '@shared/ai/routes'
 import { isOlderVersion } from '@shared/version'
+import { EFFORT_LABELS, defaultEffortLabel, effortChoices, nearestEffort } from '@shared/ai/effort'
 import type { Effort, ModelChoice, ProviderId, TaskKind } from '@shared/types'
 import { Button, Select, Spinner, Switch, TextInput, Tooltip } from '@/ui'
 import { invoke } from '@/lib/api'
@@ -44,6 +45,10 @@ export function AiTab(): React.JSX.Element | null {
       <h3 className="settings-h">Models for each task</h3>
       <p className="settings-note">
         Pick a model for each kind of work. Fast models feel better for actions; the strongest models give the best chat and planning.
+      </p>
+      <p className="settings-note">
+        <strong>Effort</strong> is how long the model thinks before it answers. More effort gives better answers, but they take longer and use
+        more of your plan. Each action can have its own model and effort (Settings → Actions).
       </p>
       <RoutesTable />
     </div>
@@ -89,7 +94,7 @@ function ProviderCard({ id }: { id: ProviderId }): React.JSX.Element {
             <Spinner size={13} />
           ) : !status ? null : ok ? (
             <span className="state-ok">
-              <CheckCircle size={14} weight="fill" /> {status.version && !isApi ? `v${status.version}` : 'Ready'}
+              <CheckCircle size={14} weight="fill" /> Connected
             </span>
           ) : (
             <span className="state-bad">
@@ -112,7 +117,13 @@ function ProviderCard({ id }: { id: ProviderId }): React.JSX.Element {
         <Info size={13} /> <span>{HELP[id]}</span>
       </p>
       {status?.detail && !ok && <p className="provider-detail">{status.detail}</p>}
-      {status?.account && ok && <p className="provider-detail">Account: {status.account}</p>}
+      {ok && !isApi && (
+        <p className="provider-detail">
+          Found on this computer{status?.version ? ` (version ${status.version})` : ''}
+          {status?.account ? `, logged in as ${status.account}` : ''}. Wordelia uses this login; it does not store it.
+        </p>
+      )}
+      {ok && isApi && <p className="provider-detail">The key is saved in the key store of the system.</p>}
       {!isApi && status?.installed && isOlderVersion(status.version, status.latestVersion) && (
         <div className="provider-login">
           {id === 'claude-code' && (
@@ -191,7 +202,9 @@ function RoutesTable(): React.JSX.Element {
       {TASKS.map((task) => {
         const r = settings.routes[task]
         const providerModels = r ? (models[r.provider] ?? []) : []
-        const modelOptions = providerModels.map((m) => ({ value: m.id, label: m.label }))
+        const modelOptions = providerModels.map((m) => ({ value: m.id, label: m.resolvedLabel ? `${m.label} — ${m.resolvedLabel}` : m.label }))
+        const current = r ? providerModels.find((m) => m.id === r.model) : undefined
+        const efforts = r ? effortChoices(current, r.effort) : null
         if (r && r.model && !modelOptions.some((o) => o.value === r.model)) modelOptions.unshift({ value: r.model, label: r.model })
         if (r?.provider === 'codex') modelOptions.unshift({ value: '__default', label: 'CLI default' })
         return (
@@ -199,6 +212,7 @@ function RoutesTable(): React.JSX.Element {
             <div className="route-label">
               <strong>{TASK_LABELS[task].name}</strong>
               <span>{TASK_LABELS[task].hint}</span>
+              {current?.resolvedLabel && <span className="route-now">Last answer: {current.resolvedLabel}</span>}
             </div>
             <Select
               value={r?.provider ?? ''}
@@ -214,26 +228,30 @@ function RoutesTable(): React.JSX.Element {
             <Select
               value={r ? (r.model || '__default') : ''}
               placeholder="Model"
-              onValueChange={(v) => r && setRoute(task, { ...r, model: v === '__default' ? '' : v })}
+              onValueChange={(v) => {
+                if (!r) return
+                const model = v === '__default' ? '' : v
+                const next = providerModels.find((m) => m.id === model)
+                const effort = r.effort ? nearestEffort(r.effort, next) : undefined
+                setRoute(task, { provider: r.provider, model, ...(effort ? { effort } : {}) })
+              }}
               options={modelOptions}
               ariaLabel={`${TASK_LABELS[task].name} model`}
               className="route-model"
             />
-            {r && r.provider !== 'claude-code' ? (
+            {r && efforts ? (
               <Select
                 value={r.effort ?? 'default'}
-                onValueChange={(v) => setRoute(task, { ...r, effort: v === 'default' ? undefined : (v as Effort) })}
+                onValueChange={(v) => setRoute(task, { provider: r.provider, model: r.model, ...(v === 'default' ? {} : { effort: v as Effort }) })}
                 options={[
-                  { value: 'default', label: 'Default effort' },
-                  { value: 'low', label: 'Low effort' },
-                  { value: 'medium', label: 'Medium effort' },
-                  { value: 'high', label: 'High effort' }
+                  { value: 'default', label: defaultEffortLabel(current, r.provider === 'claude-code' || r.provider === 'codex') },
+                  ...efforts.map((e) => ({ value: e, label: EFFORT_LABELS[e] }))
                 ]}
-                ariaLabel="Effort"
+                ariaLabel={`${TASK_LABELS[task].name} effort`}
                 className="route-effort"
               />
             ) : (
-              <span className="route-effort" />
+              <span className="route-effort route-effort-none">{r ? 'No effort setting' : ''}</span>
             )}
           </div>
         )

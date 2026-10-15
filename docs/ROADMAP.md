@@ -101,6 +101,9 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] Fixes from the live tests: "Accept all" for replies with many proposals; book quotes and ellipsis on AI text; planning file names keep accents; planning headings in the book language; tolerant frontmatter for AI notes; safe file names; more careful "Fix grammar only"; book title in thread digests
 - [x] CLI update check: Settings → AI shows when a newer Claude Code or Codex is out, and runs `claude update`. Old CLIs cannot use the newest models (Claude Code 2.1.198 maps "opus" to Opus 4.8; Opus 5.5 needs 2.1.280 or later)
 - [x] A provider shows "Not connected" after a real call fails on login, also when its CLI says that it is logged in
+- [x] Effort for each task and each action, with the levels that each model supports (Claude Code: low to max; Codex: from its model list). The chat model menu also sets the effort
+- [x] Claude Code models come from the installed CLI (new aliases such as "fable" appear after `claude update`); the settings show which model answered last
+- [x] Codex login check through `account/read`: an expired login shows "Not connected" at start
 
 ## Later (not in version 1)
 

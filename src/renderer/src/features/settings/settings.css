@@ -276,7 +276,7 @@
   margin: 6px 0 0 20px;
   font-size: var(--text-xs);
   color: var(--ink-4);
-  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 .provider-key {
   display: flex;
@@ -312,7 +312,7 @@
 }
 .route-row {
   display: grid;
-  grid-template-columns: 1fr 116px 168px 132px;
+  grid-template-columns: 1fr 104px 176px 150px;
   align-items: center;
   gap: var(--s-2);
   padding: 10px 0;
@@ -329,6 +329,15 @@
   font-size: var(--text-xs);
   color: var(--ink-3);
   line-height: 1.4;
+}
+.route-label .route-now {
+  margin-top: 2px;
+  font-size: var(--text-2xs);
+  color: var(--pen);
+}
+.route-effort-none {
+  font-size: var(--text-2xs);
+  color: var(--ink-4);
 }
 .route-row .select {
   min-width: 0;
@@ -394,6 +403,15 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--s-4);
+}
+.action-runs-on {
+  margin: -6px 0 var(--s-4);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+.action-runs-on strong {
+  color: var(--ink);
 }
 .action-form-row .select {
   width: 100%;

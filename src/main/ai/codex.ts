@@ -11,6 +11,7 @@ import { getSettings } from '../settings'
 import { cleanEnv, codexCandidates, resolveBin, type ResolvedBin } from './resolve-bin'
 import { classifyError, flattenConversation, killTree, runCli, type ProviderTransport } from './transport'
 import { latestVersion } from './updates'
+import { parseEfforts } from '@shared/ai/effort'
 
 async function bin(): Promise<ResolvedBin | null> {
   const s = await getSettings()
@@ -135,6 +136,22 @@ class AppServer {
 
 let modelCache: { at: number; models: ModelInfo[] } | null = null
 
+/** The account of the Codex login, false when the login does not work, or null when the app cannot tell. */
+async function accountCheck(b: ResolvedBin): Promise<string | false | null> {
+  const server = new AppServer(b, await workDir())
+  try {
+    await server.init()
+    const res = await server.request('account/read', { refreshToken: true }, 15000)
+    const acc = res.account as { email?: string; planType?: string; type?: string } | null | undefined
+    if (acc) return [acc.email, acc.planType].filter(Boolean).join(' · ') || 'ChatGPT'
+    return res.requiresOpenaiAuth === true ? false : null
+  } catch {
+    return null
+  } finally {
+    server.kill()
+  }
+}
+
 export const codex: ProviderTransport = {
   id: 'codex',
 
@@ -145,16 +162,20 @@ export const codex: ProviderTransport = {
     const version = ver.stdout.trim().split(/\s+/).pop() || undefined
     const [login, latest] = await Promise.all([runCli(b, ['login', 'status'], { timeoutMs: 15000 }), latestVersion('codex')])
     const out = (login.stdout + login.stderr).trim()
-    const loggedIn = login.code === 0 && /logged in/i.test(out) ? true : login.code === 0 ? null : false
-    return {
-      provider: 'codex',
-      installed: true,
-      loggedIn,
-      version,
-      latestVersion: latest,
-      account: loggedIn ? out.replace(/^logged in using /i, '') : undefined,
-      detail: loggedIn === false ? 'Run "codex login" in a terminal to log in.' : b.path
+    let loggedIn: boolean | null = login.code === 0 && /logged in/i.test(out) ? true : login.code === 0 ? null : false
+    let account = loggedIn ? out.replace(/^logged in using /i, '') : undefined
+    let detail = loggedIn === false ? 'Run "codex login" in a terminal to log in.' : b.path
+    // "codex login status" only reads the saved file. Ask the server, which also refreshes the token:
+    // an old login can look fine and still fail on the first request.
+    if (loggedIn) {
+      const live = await accountCheck(b)
+      if (live === false) {
+        loggedIn = false
+        account = undefined
+        detail = 'The Codex login has expired. Run "codex logout", then "codex login", in a terminal.'
+      } else if (typeof live === 'string') account = live
     }
+    return { provider: 'codex', installed: true, loggedIn, version, latestVersion: latest, account, detail }
   },
 
   async listModels(): Promise<ModelInfo[]> {
@@ -165,16 +186,30 @@ export const codex: ProviderTransport = {
     try {
       await server.init()
       const res = await server.request('model/list', { limit: 50 })
-      const data = (res.data ?? []) as Array<{ id: string; displayName?: string; description?: string; hidden?: boolean; isDefault?: boolean }>
+      const data = (res.data ?? []) as Array<{
+        id: string
+        displayName?: string
+        description?: string
+        hidden?: boolean
+        isDefault?: boolean
+        supportedReasoningEfforts?: Array<{ reasoningEffort?: string }>
+        defaultReasoningEffort?: string
+      }>
       const models = data
         .filter((m) => !m.hidden)
-        .map<ModelInfo>((m) => ({
-          id: m.id,
-          label: m.displayName ?? m.id,
-          description: m.description,
-          isDefault: Boolean(m.isDefault),
-          tier: /mini|nano|fast|luna/i.test(m.id) ? 'fast' : m.isDefault ? 'best' : 'balanced'
-        }))
+        .map<ModelInfo>((m) => {
+          const efforts = m.supportedReasoningEfforts ? parseEfforts(m.supportedReasoningEfforts.map((e) => e.reasoningEffort ?? '').join(' ')) : undefined
+          const def = m.defaultReasoningEffort ? parseEfforts(m.defaultReasoningEffort)[0] : undefined
+          return {
+            id: m.id,
+            label: m.displayName ?? m.id,
+            description: m.description,
+            isDefault: Boolean(m.isDefault),
+            tier: /mini|nano|fast|luna/i.test(m.id) ? 'fast' : m.isDefault ? 'best' : 'balanced',
+            ...(efforts ? { efforts } : {}),
+            ...(def ? { defaultEffort: def } : {})
+          }
+        })
       modelCache = { at: Date.now(), models }
       return models
     } catch {

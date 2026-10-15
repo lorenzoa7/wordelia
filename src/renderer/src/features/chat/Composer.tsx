@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowUp, At, Quotes, Stop, X } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { routeLabel } from '@shared/ai/routes'
+import { EFFORT_LABELS, defaultEffortLabel, effortChoices, nearestEffort } from '@shared/ai/effort'
 import type { Mention, ModelChoice, Thread } from '@shared/types'
 import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
@@ -199,6 +200,8 @@ function ModelPicker({ thread }: { thread: Thread | null }): React.JSX.Element {
   const status = useApp((s) => s.status)
   const route = thread?.route ?? settings?.routes.chat ?? null
   const ready = (Object.keys(models) as Array<keyof typeof models>).filter((p) => status[p]?.installed && status[p]?.loggedIn !== false)
+  const current = route ? models[route.provider]?.find((m) => m.id === route.model) : undefined
+  const efforts = route ? effortChoices(current, route.effort) : null
 
   const choose = (choice: ModelChoice | null): void => {
     if (!thread) {
@@ -231,8 +234,12 @@ function ModelPicker({ thread }: { thread: Thread | null }): React.JSX.Element {
           {(models[p] ?? []).slice(0, 8).map((m) => (
             <MenuItem
               key={m.id}
+              shortcut={m.resolvedLabel}
               checked={route?.provider === p && route.model === m.id}
-              onSelect={() => choose({ provider: p, model: m.id, ...(route?.provider === p && route.effort ? { effort: route.effort } : {}) })}
+              onSelect={() => {
+                const effort = route?.effort ? nearestEffort(route.effort, m) : undefined
+                choose({ provider: p, model: m.id, ...(effort ? { effort } : {}) })
+              }}
             >
               {m.label}
             </MenuItem>
@@ -240,6 +247,20 @@ function ModelPicker({ thread }: { thread: Thread | null }): React.JSX.Element {
         </div>
       ))}
       {ready.length === 0 && <MenuItem disabled>No AI connected</MenuItem>}
+      {route && efforts && (
+        <>
+          <MenuSeparator />
+          <MenuLabel>Effort</MenuLabel>
+          <MenuItem checked={!route.effort} onSelect={() => choose({ provider: route.provider, model: route.model })}>
+            {defaultEffortLabel(current, route.provider === 'claude-code' || route.provider === 'codex')}
+          </MenuItem>
+          {efforts.map((e) => (
+            <MenuItem key={e} checked={route.effort === e} onSelect={() => choose({ provider: route.provider, model: route.model, effort: e })}>
+              {EFFORT_LABELS[e]}
+            </MenuItem>
+          ))}
+        </>
+      )}
     </Menu>
   )
 }

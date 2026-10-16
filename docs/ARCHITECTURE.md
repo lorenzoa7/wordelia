@@ -283,6 +283,7 @@ The app reads these environment variables. Users never set them.
 | `WORDELIA_USER_DATA` | App data folder (settings, library, secrets). |
 | `WORDELIA_BOOKS_DIR` | Default folder for new and imported books, instead of Documents. |
 | `WORDELIA_EXPORT_DIR` | Exports go here without a save dialog. |
+| `WORDELIA_UPDATE_TEST=1` | The updater checks and downloads, but never installs (`scripts/smoke-update.mjs`). |
 
 `scripts/shot.mjs <scenario> [--dark] [--fresh] [--real-ai]` builds nothing; run `npm run build` first, or use `npm run shot -- <scenario>`. Scenarios are in `scripts/shots/`.
 

@@ -48,7 +48,7 @@ export async function checkForUpdate(): Promise<UpdateState> {
 
 /** Close the window (it saves first); when the app quits, install the new version and start it. */
 export function installUpdate(): void {
-  if (state.state !== 'ready') return
+  if (state.state !== 'ready' || process.env.WORDELIA_UPDATE_TEST === '1') return
   installOnClose = true
   for (const w of BrowserWindow.getAllWindows()) w.close()
 }
@@ -68,7 +68,8 @@ export async function initUpdater(): Promise<void> {
   }
   autoUpdater.autoDownload = true
   // An update that the user did not install yet goes in when they quit the app.
-  autoUpdater.autoInstallOnAppQuit = true
+  // WORDELIA_UPDATE_TEST=1: check and download only (scripts/smoke-update.mjs), never install.
+  autoUpdater.autoInstallOnAppQuit = process.env.WORDELIA_UPDATE_TEST !== '1'
   autoUpdater.on('update-available', (info) => publish({ state: 'downloading', version: info.version, percent: 0 }))
   autoUpdater.on('download-progress', (p) => {
     if (state.state === 'downloading') publish({ ...state, percent: Math.round(p.percent) })

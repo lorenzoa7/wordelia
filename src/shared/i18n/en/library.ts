@@ -29,7 +29,7 @@ export const library = {
   creating: 'Creating…',
   createBook: 'Create book',
   title: 'Title',
-  titlePlaceholder: 'The Lost Paradise',
+  titlePlaceholder: 'The Lighthouse of Saint Isle',
   author: 'Author',
   authorPlaceholder: 'Your name',
   language: 'Language of the book',

@@ -11,7 +11,8 @@ import type {
   ModelInfo,
   ProviderId,
   ProviderStatus,
-  StreamEvent
+  StreamEvent,
+  UpdateState
 } from './types'
 
 export interface ImportedChapter {
@@ -104,6 +105,12 @@ export interface IpcInvokeMap {
   'app:defaultBooksDir': [[], string]
   'app:version': [[], string]
   'app:flushDone': [[ok: boolean, error: string], void]
+  /** The state of the app update now */
+  'app:updateState': [[], UpdateState]
+  /** Look for a new version now */
+  'app:checkUpdate': [[], UpdateState]
+  /** Save everything, close, install the downloaded version and start again */
+  'app:installUpdate': [[], void]
 
   'window:setTheme': [[theme: 'light' | 'dark'], void]
   'window:openExternal': [[url: string], void]
@@ -117,6 +124,7 @@ export interface IpcEventMap {
   'ai:event': { requestId: string; event: StreamEvent }
   /** The window wants to close: save everything, then call app:flushDone */
   'app:flushRequest': Record<string, never>
+  'app:update': UpdateState
 }
 
 export type InvokeChannel = keyof IpcInvokeMap
@@ -162,13 +170,16 @@ export const INVOKE_CHANNELS: InvokeChannel[] = [
   'app:defaultBooksDir',
   'app:version',
   'app:flushDone',
+  'app:updateState',
+  'app:checkUpdate',
+  'app:installUpdate',
   'window:setTheme',
   'window:openExternal',
   'window:showItem',
   'window:setSpellLanguage'
 ]
 
-export const EVENT_CHANNELS: EventChannel[] = ['book:externalChange', 'ai:event', 'app:flushRequest']
+export const EVENT_CHANNELS: EventChannel[] = ['book:externalChange', 'ai:event', 'app:flushRequest', 'app:update']
 
 export interface WordeliaBridge {
   platform: string

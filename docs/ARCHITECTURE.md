@@ -77,7 +77,7 @@ My Book/
     The Traveller.md     One file for each chapter. The manifest keeps the order.
   planning/
     Characters/
-      Heitor Ferrari.md  One file for each entry
+      Marta.md          One file for each entry
     Places/
     World/
     Plot/
@@ -134,9 +134,9 @@ The serializer writes the shortest correct Markdown. The parser accepts standard
 ```markdown
 ---
 id: en_8fh2k1
-aliases: [Heitor, Ferrari]
-summary: Smuggler of the Carpinteiros gang. Loyal, hot-headed.
-image: _assets/heitor.webp
+aliases: [Marta]
+summary: Elias's companion. Practical and curious.
+image: _assets/marta.webp
 ---
 ## Appearance
 ...
@@ -236,6 +236,15 @@ The interface is in English (the default), Portuguese (Brazil) and Spanish (`App
 Some texts are stored in English and translated only when the app shows them, so that a book looks the same in every language: the title "New thread" (it also tells the app to make a title), the title and the purpose of the planning sync thread, and the labels of chapter versions ("Opened", "Before Polish"). Built-in actions and default categories show translated names until the user renames them (`actionName`, `categoryName`).
 
 The language of a book is a different setting. It controls the AI output, the dialogue style, the chapter word ("Capítulo Um"), spell check, hyphenation (the page has `lang` = book language) and export. AI prompts stay in English.
+
+## 5.8 App updates
+
+`src/main/updater.ts` uses electron-updater with the GitHub provider (`publish` in `electron-builder.yml`: the public repository `lorenzoa7/wordelia`). The build writes `latest.yml` and puts `app-update.yml` in the app resources. The release workflow uploads the installer, its blockmap and `latest.yml` to the GitHub release.
+
+- The installed app looks for a new version 15 seconds after start and then every 6 hours, when `AppSettings.autoUpdate` is on. Settings → General → Updates also has a manual check.
+- The app downloads the new version in the background. Then the title bar shows "Update ready" and a toast offers "Restart now".
+- "Restart now" closes the window through the normal close path, so the renderer saves everything first. Then `quitForUpdate()` runs the installer without questions and starts the new version. When the user quits without a restart, the update installs on quit.
+- Updates are off in development, in test runs (`WORDELIA_E2E=1`) and on other platforms. The state reaches the renderer as the `app:update` event (`UpdateState`).
 
 ## 6. Settings and secrets
 

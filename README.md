@@ -12,6 +12,8 @@ Wordelia is a desktop app for novelists. You write on a simple page. An AI edito
 
 Get the Windows installer from [Releases](https://github.com/lorenzoa7/wordelia/releases). The installer has no code signature yet. Windows SmartScreen shows a warning: select **More info**, then **Run anyway**.
 
+You install Wordelia one time. After that, Wordelia updates itself: it downloads new versions in the background and installs them when you restart.
+
 ## What it does
 
 ### ✍️ Write

@@ -5,7 +5,7 @@ This file is the source of truth for progress. Update it after each task. Mark a
 ## Current focus
 
 > **Milestone:** M8 — polish and release (version 0.2.0)
-> **Next task:** Collect feedback from the first real use of the app on "O Paraíso Perdido". Then fix what the author finds.
+> **Next task:** Collect feedback from the first real use of the app on the novel of the author. Then fix what the author finds.
 > **Not verified:** Codex and the two API transports. The user has no Codex account, and no API keys are set. The scripted provider (`WORDELIA_MOCK_AI=1`) covers their UI flows.
 
 ## M0 — Foundation
@@ -113,6 +113,11 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] Selections without spaces at the ends (a rewrite no longer joins two words); CRLF files read as LF
 - [x] README in simple English with English screenshots (sample book `e2e/fixtures/sample-book-en`, `--en` flag of `scripts/shot.mjs`); logo on a paper card
 - [x] Releases from tags: `.github/workflows/release.yml`
+
+## Version 0.3
+
+- [x] App updates from GitHub Releases (electron-updater): background download, "Update ready" in the title bar, restart saves first; Settings → General → Updates
+- [x] Public repository; examples use the sample book, not the novel of the author
 
 ## Later (not in version 1)
 

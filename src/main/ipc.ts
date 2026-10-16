@@ -20,6 +20,7 @@ import { assetUrl, registerBookRoot } from './assets'
 import { themeOverlay } from './window'
 import { setSpellLanguage } from './context-menu'
 import { allowExported, allowPicked, allowRoot, assertPicked, assertRoot, isExported, isPicked, trustedSender } from './security'
+import { checkForUpdate, installUpdate, updateState } from './updater'
 
 type Handler<C extends InvokeChannel> = (e: IpcMainInvokeEvent, ...args: InvokeArgs<C>) => Promise<InvokeResult<C>> | InvokeResult<C>
 
@@ -252,6 +253,9 @@ export function registerIpc(): void {
     return dir
   })
   handle('app:version', () => app.getVersion())
+  handle('app:updateState', () => updateState())
+  handle('app:checkUpdate', () => checkForUpdate())
+  handle('app:installUpdate', () => installUpdate())
   handle('app:flushDone', (e, ok, error) => {
     const fn = flushWaiters.get(e.sender.id)
     flushWaiters.delete(e.sender.id)

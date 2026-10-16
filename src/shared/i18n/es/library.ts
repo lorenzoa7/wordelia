@@ -28,7 +28,7 @@ export const library: typeof en = {
   creating: 'Creando…',
   createBook: 'Crear libro',
   title: 'Título',
-  titlePlaceholder: 'El paraíso perdido',
+  titlePlaceholder: 'El faro de Santa Isla',
   author: 'Autor',
   authorPlaceholder: 'Tu nombre',
   language: 'Idioma del libro',

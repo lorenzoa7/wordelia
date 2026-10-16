@@ -1,6 +1,12 @@
 import type { app as en } from '../en/app'
 
 export const app: typeof en = {
+  update: {
+    ready: (v) => `O Wordelia ${v} está pronto. Reinicie para usar.`,
+    restartNow: 'Reiniciar agora',
+    badge: 'Atualização pronta',
+    badgeHint: (v) => `Reiniciar e instalar o Wordelia ${v}. Seu trabalho é salvo antes.`
+  },
   showSidebar: 'Mostrar barra lateral',
   hideSidebar: 'Ocultar barra lateral',
   library: 'Biblioteca',

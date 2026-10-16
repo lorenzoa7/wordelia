@@ -451,3 +451,26 @@
   margin-top: 10px;
   font-size: var(--text-xs);
 }
+
+/* Updates */
+.update-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin: var(--s-2) 0 var(--s-4);
+}
+.update-version {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.update-line {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+.update-line.is-error {
+  color: var(--ribbon);
+}

@@ -1,6 +1,12 @@
 // Texts of one part of the app. See src/shared/i18n/README.md.
 
 export const app = {
+  update: {
+    ready: (v: string): string => `Wordelia ${v} is ready. Restart to use it.`,
+    restartNow: 'Restart now',
+    badge: 'Update ready',
+    badgeHint: (v: string): string => `Restart and install Wordelia ${v}. Your work is saved first.`
+  },
   showSidebar: 'Show sidebar',
   hideSidebar: 'Hide sidebar',
   library: 'Library',

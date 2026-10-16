@@ -6,6 +6,9 @@ import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
 import { invoke, isE2E, on } from '@/lib/api'
 import { runFlushers } from '@/lib/flush'
+import { installUpdate, watchUpdates } from '@/lib/update'
+import { getT } from '@/lib/i18n'
+import { toast } from '@/stores/ui'
 import { saver } from '@/stores/saver'
 import { LibraryView } from '@/features/library/LibraryView'
 import { BookView } from '@/features/book/BookView'
@@ -29,6 +32,14 @@ export function App(): React.JSX.Element {
   useEffect(() => {
     document.documentElement.lang = language
   }, [language])
+
+  // New versions download in the background; say so when one is ready.
+  useEffect(() => {
+    watchUpdates((version) => {
+      const t = getT().app.update
+      toast(t.ready(version), { ms: 20000, action: { label: t.restartNow, run: installUpdate } })
+    })
+  }, [])
 
   useEffect(() => {
     void useApp

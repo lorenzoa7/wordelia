@@ -2,6 +2,15 @@
 
 Each version has its Windows installer in GitHub Releases. The release workflow copies the section of the version from this file to the release notes.
 
+## 0.3.0 (2026-10-16)
+
+### New
+- Wordelia updates itself. It downloads new versions from GitHub in the background. When a version is ready, the title bar shows "Update ready". Select it to save, restart and install. Settings → General → Updates has the switch and a "Check for updates" button.
+- Install 0.3.0 by hand one time. The versions after it come by themselves.
+
+### Changed
+- The source code is public on GitHub.
+
 ## 0.2.0 (2026-10-15)
 
 ### New

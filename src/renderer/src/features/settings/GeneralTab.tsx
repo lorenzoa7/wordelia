@@ -1,7 +1,10 @@
 import clsx from 'clsx'
 import { Moon, Sun, Desktop } from '@phosphor-icons/react'
 import type { Locale, ThemeSetting } from '@shared/types'
-import { Field, Select, Switch } from '@/ui'
+import { useEffect, useState } from 'react'
+import { Button, Field, Select, Switch } from '@/ui'
+import { invoke } from '@/lib/api'
+import { checkForUpdate, installUpdate, useUpdate } from '@/lib/update'
 import { useApp } from '@/stores/app'
 import { LOCALES, useT } from '@/lib/i18n'
 import { typewriterSound } from '@/features/editor/typewriter-sound'
@@ -81,6 +84,8 @@ export function GeneralTab(): React.JSX.Element | null {
         <Switch checked={settings.ui.typewriterScroll} onCheckedChange={(v) => setUi({ typewriterScroll: v })} />
       </Field>
 
+      <UpdatesSection />
+
       <h3 className="settings-h">{g.keyboard}</h3>
       <dl className="shortcuts">
         {[
@@ -105,5 +110,50 @@ export function GeneralTab(): React.JSX.Element | null {
         ))}
       </dl>
     </div>
+  )
+}
+
+function UpdatesSection(): React.JSX.Element | null {
+  const t = useT()
+  const g = t.settings.general
+  const settings = useApp((s) => s.settings)
+  const update = useApp((s) => s.updateSettings)
+  const u = useUpdate()
+  const [version, setVersion] = useState('')
+  useEffect(() => {
+    void invoke('app:version').then(setVersion)
+  }, [])
+  if (!settings) return null
+  const st = g.updateStates
+  const line =
+    u.state === 'downloading'
+      ? st.downloading(u.version, u.percent)
+      : u.state === 'ready'
+        ? st.ready(u.version)
+        : u.state === 'error'
+          ? st.error(u.message)
+          : st[u.state]
+  return (
+    <>
+      <h3 className="settings-h">{g.updates}</h3>
+      <Field label={g.autoUpdate} hint={g.autoUpdateHint} inline>
+        <Switch checked={settings.autoUpdate} onCheckedChange={(v) => void update({ autoUpdate: v })} />
+      </Field>
+      <div className="update-row">
+        <span className="update-version">{version ? g.version(version) : ''}</span>
+        <span className={clsx('update-line', u.state === 'error' && 'is-error')} role="status" aria-live="polite">
+          {line}
+        </span>
+        {u.state === 'ready' ? (
+          <Button size="sm" variant="primary" onClick={installUpdate}>
+            {g.restartToUpdate}
+          </Button>
+        ) : (
+          <Button size="sm" onClick={() => void checkForUpdate()} disabled={u.state === 'off' || u.state === 'checking' || u.state === 'downloading'}>
+            {g.checkNow}
+          </Button>
+        )}
+      </div>
+    </>
   )
 }

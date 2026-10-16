@@ -1,7 +1,7 @@
 {
   "name": "wordelia",
   "productName": "Wordelia",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A quiet writing desk with an AI editor beside you.",
   "main": "./out/main/index.js",
   "author": "Lorenzo Aceti",
@@ -75,6 +75,7 @@
     "@anthropic-ai/sdk": "^0.133.0",
     "chokidar": "^4.0.3",
     "docx": "^9.11.0",
+    "electron-updater": "^6.8.9",
     "mammoth": "^1.13.0",
     "markdown-it": "^14.3.2",
     "openai": "^7.32.0",

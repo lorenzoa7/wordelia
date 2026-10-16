@@ -14,6 +14,7 @@ export function defaultSettings(): AppSettings {
   return {
     version: 3,
     language: 'en',
+    autoUpdate: true,
     theme: 'light',
     ui: { sidebarOpen: true, chatOpen: true, focusMode: false, typewriterScroll: false, zoom: 1, chatWidth: 400 },
     editor: { spellcheck: true, showWordCount: true, typewriterSounds: false, dailyGoal: 500 },

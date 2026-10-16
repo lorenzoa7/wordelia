@@ -19,7 +19,7 @@ export const chat: typeof en = {
   thread: 'Conversa',
   editorDescription: 'O propósito ajuda a IA a manter o foco. As outras conversas veem o propósito e o resumo desta conversa.',
   title: 'Título',
-  purposeHint: 'Exemplo: o arco de Heitor na parte dois. A culpa dele e a lealdade aos Carpinteiros.',
+  purposeHint: 'Exemplo: o arco de Marta na parte dois. As dúvidas dela e a lealdade a Elias.',
   digest: 'Resumo (mantido pela IA)',
 
   emptyTitle: 'Seu editor está aqui.',

@@ -11,6 +11,21 @@ export const settings: typeof en = {
     actions: 'Ações'
   },
   general: {
+    updates: 'Atualizações',
+    version: (v) => `Versão ${v}`,
+    autoUpdate: 'Baixar atualizações automaticamente',
+    autoUpdateHint: 'O Wordelia baixa as versões novas do GitHub em segundo plano. Elas são instaladas quando você reinicia.',
+    checkNow: 'Procurar atualizações',
+    restartToUpdate: 'Reiniciar e atualizar',
+    updateStates: {
+      idle: '',
+      off: 'As atualizações funcionam só no app instalado.',
+      checking: 'Procurando uma versão nova…',
+      none: 'Você tem a versão mais nova.',
+      downloading: (v, p) => `Baixando a versão ${v}… ${p}%`,
+      ready: (v) => `A versão ${v} está pronta. Reinicie para instalar.`,
+      error: (m) => `Não foi possível procurar atualizações: ${m}`
+    },
     language: 'Idioma',
     interfaceLanguage: 'Idioma da interface',
     languageHint: 'Este é o idioma do aplicativo. Defina o idioma de cada livro em “Este livro”.',
@@ -60,7 +75,7 @@ export const settings: typeof en = {
     },
     textOnPage: 'Texto na página',
     previewDialogue: (dash) => `${dash} Você sentiu isso? ${dash} perguntou o velho, e as velas se curvaram para a porta.`,
-    previewNarration: 'Miguel não respondeu. Lá fora, o vento guardava os próprios segredos.',
+    previewNarration: 'Elias não respondeu. Lá fora, o vento guardava os próprios segredos.',
     font: 'Fonte',
     size: 'Tamanho (pt)',
     sizeAria: 'Tamanho',

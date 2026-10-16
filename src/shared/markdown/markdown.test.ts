@@ -73,8 +73,8 @@ describe('parseMarkdown', () => {
   })
 
   it('treats a lone image paragraph as a block image', () => {
-    const d = parseMarkdown('![Heitor](_assets/heitor.webp)')
-    expect(d.content?.[0]).toEqual({ type: 'image', attrs: { src: '_assets/heitor.webp', alt: 'Heitor', title: null } })
+    const d = parseMarkdown('![Marta](_assets/marta.webp)')
+    expect(d.content?.[0]).toEqual({ type: 'image', attrs: { src: '_assets/marta.webp', alt: 'Marta', title: null } })
   })
 
   it('gives an empty paragraph for empty input', () => {
@@ -138,9 +138,9 @@ describe('round trip', () => {
 
 describe('frontmatter', () => {
   it('reads and writes YAML frontmatter', () => {
-    const src = '---\nid: ch_1\ntitle: O Viajante\n---\nCorpo.\n'
+    const src = '---\nid: ch_1\ntitle: O Visitante\n---\nCorpo.\n'
     const fm = readFrontmatter(src)
-    expect(fm.data).toEqual({ id: 'ch_1', title: 'O Viajante' })
+    expect(fm.data).toEqual({ id: 'ch_1', title: 'O Visitante' })
     expect(fm.body).toBe('Corpo.\n')
     expect(writeFrontmatter(fm.data, fm.body)).toBe(src)
   })
@@ -201,8 +201,8 @@ describe('review findings', () => {
   })
 
   it('writes wiki links without escapes', () => {
-    const d = doc(para(p('Veja [[Heitor Ferrari]] e [[Teresa|ela]].')))
-    expect(serializeMarkdown(d)).toBe('Veja [[Heitor Ferrari]] e [[Teresa|ela]].\n')
+    const d = doc(para(p('Veja [[Elias Rocha]] e [[Teresa|ela]].')))
+    expect(serializeMarkdown(d)).toBe('Veja [[Elias Rocha]] e [[Teresa|ela]].\n')
     expect(rt(d)).toEqual(d)
   })
 

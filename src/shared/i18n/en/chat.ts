@@ -21,7 +21,7 @@ export const chat = {
   thread: 'Thread',
   editorDescription: "The purpose helps the AI focus. Other threads see this thread's purpose and digest.",
   title: 'Title',
-  purposeHint: "Example: Heitor's arc in part two. His guilt and his loyalty to the Carpinteiros.",
+  purposeHint: "Example: Marta's arc in part two. Her doubts and her loyalty to Elias.",
   digest: 'Digest (kept by the AI)',
 
   // Empty chat

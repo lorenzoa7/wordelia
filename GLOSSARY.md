@@ -30,7 +30,7 @@ This file is the ubiquitous language of Wordelia. Use these words in code, docs 
 | **Provider** | A connection to an AI service: Claude Code, Codex, Anthropic API or OpenAI API. | `Provider` |
 | **Model route** | The model that the app uses for one task: chat, action, sync or background. | `ModelRoute` |
 | **Thread** | One chat conversation with the AI. A book has many threads. | `Thread` |
-| **Brief** | The purpose of a thread, written by the user. Example: "Heitor's arc". | `thread.brief` |
+| **Brief** | The purpose of a thread, written by the user. Example: "Marta's arc". | `thread.brief` |
 | **Digest** | A short summary of a thread that the AI keeps up to date. All other threads read it. | `thread.digest` |
 | **Action** | A configurable AI operation on selected text, for example **Polish**. | `Action` |
 | **Writing rules** | The rules of the author that apply to all AI work on this book. | `writingRules` |

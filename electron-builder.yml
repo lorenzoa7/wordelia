@@ -32,3 +32,10 @@ linux:
   target: AppImage
   category: Office
 npmRebuild: false
+# Where the app looks for updates (electron-updater). The build writes latest.yml for it;
+# the release workflow uploads the installer, its blockmap and latest.yml with gh.
+publish:
+  provider: github
+  owner: lorenzoa7
+  repo: wordelia
+  releaseType: release

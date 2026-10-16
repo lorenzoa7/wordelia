@@ -110,7 +110,7 @@ export interface Entry {
   id: Id
   /** Folder of the category */
   category: string
-  /** Path inside `planning/`, for example `Characters/Heitor.md` */
+  /** Path inside `planning/`, for example `Characters/Marta.md` */
   file: string
   /** File name without extension */
   name: string
@@ -335,4 +335,17 @@ export interface AppSettings {
   actions: AiAction[]
   defaultActionId: Id
   onboarded: boolean
+  /** Download new versions in the background and install them on restart */
+  autoUpdate: boolean
 }
+
+/** The state of the app update, from the main process */
+export type UpdateState =
+  | { state: 'idle' }
+  /** Updates do not work here: a development build, a test run, or the updates are off */
+  | { state: 'off' }
+  | { state: 'checking' }
+  | { state: 'none'; checkedAt: string }
+  | { state: 'downloading'; version: string; percent: number }
+  | { state: 'ready'; version: string }
+  | { state: 'error'; message: string }

@@ -13,6 +13,21 @@ export const settings = {
   },
   /** The Appearance tab */
   general: {
+    updates: 'Updates',
+    version: (v: string): string => `Version ${v}`,
+    autoUpdate: 'Download updates automatically',
+    autoUpdateHint: 'Wordelia downloads new versions from GitHub in the background. They install when you restart.',
+    checkNow: 'Check for updates',
+    restartToUpdate: 'Restart and update',
+    updateStates: {
+      idle: '',
+      off: 'Updates work only in the installed app.',
+      checking: 'Looking for a new version…',
+      none: 'You have the newest version.',
+      downloading: (v: string, p: number): string => `Downloading version ${v}… ${p}%`,
+      ready: (v: string): string => `Version ${v} is ready. Restart to install it.`,
+      error: (m: string): string => `Could not check for updates: ${m}`
+    },
     language: 'Language',
     interfaceLanguage: 'Interface language',
     languageHint: 'This is the language of the app. Set the language of each book in “This book”.',
@@ -66,7 +81,7 @@ export const settings = {
     textOnPage: 'Text on the page',
     /** Sample text in the typography preview */
     previewDialogue: (dash: string): string => `${dash} Did you feel that? ${dash} asked the old man, and the candles bent toward the door.`,
-    previewNarration: 'Miguel did not answer. Outside, the wind kept its own counsel.',
+    previewNarration: 'Elias did not answer. Outside, the wind kept its own counsel.',
     font: 'Font',
     size: 'Size (pt)',
     sizeAria: 'Size',

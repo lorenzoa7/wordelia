@@ -65,15 +65,15 @@ function reply(req: CompletionRequest): string {
   }
   if (req.purpose === 'sync') {
     return [
-      'I found one new character in the changed chapters.',
+      'Encontrei um personagem novo nos capítulos que mudaram.',
       '',
-      '<create file="planning/Characters/O Viajante.md">',
+      '<create file="planning/Characters/O Visitante.md">',
       '---',
-      'aliases: [Viajante]',
-      'summary: A mysterious old man who visits Father Miguel.',
+      'aliases: [o homem do bote azul]',
+      'summary: Um estranho encontrado num bote azul. Fala de ruas que não existem na ilha.',
       '---',
-      '## Role',
-      'A stranger who knows the way to the Lost Paradise.',
+      '## Papel',
+      'Um mistério que chega com a tempestade.',
       '</create>'
     ].join('\n')
   }

@@ -1,5 +1,6 @@
 import { motion } from 'motion/react'
 import {
+  ArrowCircleUp,
   BookOpenText,
   CaretDown,
   ChatCircleText,
@@ -19,6 +20,7 @@ import { useBook, type BookView } from '@/stores/book'
 import { useUi } from '@/stores/ui'
 import { invoke } from '@/lib/api'
 import { useT } from '@/lib/i18n'
+import { installUpdate, useUpdate } from '@/lib/update'
 import { Logo } from './Logo'
 import { ProviderBadge } from './ProviderBadge'
 
@@ -113,6 +115,7 @@ export function TitleBar(): React.JSX.Element {
       )}
 
       <div className="titlebar-right no-drag">
+        <UpdateBadge />
         <ProviderBadge />
         {root && (
           <IconButton
@@ -129,5 +132,18 @@ export function TitleBar(): React.JSX.Element {
         </IconButton>
       </div>
     </header>
+  )
+}
+
+/** A ready update: one click saves, restarts and installs it. */
+function UpdateBadge(): React.JSX.Element | null {
+  const t = useT()
+  const u = useUpdate()
+  if (u.state !== 'ready') return null
+  return (
+    <button className="update-badge" onClick={installUpdate} title={t.app.update.badgeHint(u.version)}>
+      <ArrowCircleUp size={14} weight="bold" />
+      {t.app.update.badge}
+    </button>
   )
 }

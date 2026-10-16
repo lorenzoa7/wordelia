@@ -11,6 +11,7 @@ import { themeOverlay } from './window'
 import { loadWindowState, trackWindowState } from './window-state'
 import { installContextMenu } from './context-menu'
 import { mainT } from './i18n'
+import { initUpdater, quitForUpdate } from './updater'
 
 // Tests use a separate data folder, so they never touch the user's library.
 if (process.env['WORDELIA_USER_DATA']) app.setPath('userData', process.env['WORDELIA_USER_DATA'])
@@ -117,6 +118,7 @@ app.whenReady().then(async () => {
   handleAssetProtocol()
   registerIpc()
   await createWindow()
+  void initUpdater()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) void createWindow()
   })
@@ -128,5 +130,7 @@ app.on('before-quit', () => {
 })
 
 app.on('window-all-closed', () => {
+  // After "Restart and update" the updater quits the app and starts the new version.
+  if (quitForUpdate()) return
   if (process.platform !== 'darwin') app.quit()
 })

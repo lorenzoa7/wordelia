@@ -36,6 +36,7 @@ jobs:
       - name: Build the installer
         run: npx electron-builder --win --publish never
 
+      # latest.yml tells the installed apps about the new version (electron-updater).
       - name: Publish the installer with the notes from CHANGELOG.md
         if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
@@ -46,8 +47,8 @@ jobs:
           awk -v v="${TAG#v}" '$0 ~ "^## " v "( |$)" {on=1; next} /^## / {on=0} on' CHANGELOG.md > notes.md
           if [ ! -s notes.md ]; then echo "Wordelia ${TAG#v}" > notes.md; fi
           if gh release view "$TAG" > /dev/null 2>&1; then
-            gh release upload "$TAG" release/*.exe --clobber
+            gh release upload "$TAG" release/*.exe release/*.exe.blockmap release/latest.yml --clobber
             gh release edit "$TAG" --title "Wordelia ${TAG#v}" --notes-file notes.md
           else
-            gh release create "$TAG" release/*.exe --verify-tag --title "Wordelia ${TAG#v}" --notes-file notes.md
+            gh release create "$TAG" release/*.exe release/*.exe.blockmap release/latest.yml --verify-tag --title "Wordelia ${TAG#v}" --notes-file notes.md
           fi

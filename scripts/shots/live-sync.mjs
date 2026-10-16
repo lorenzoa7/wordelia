@@ -1,6 +1,7 @@
 // Live test with a real AI: add new facts to a chapter, press Sync, and accept the proposals.
 // Usage: LIVE_BOOK=<book folder with a planning> LIVE_OUT=<folder> node scripts/shot.mjs live-sync --real-ai
 // LIVE_TEXT: the paragraph to add at the end of LIVE_CHAPTER (default: chapter index 3).
+// LIVE_ENTRY: the entry to print after the sync (default: Elias).
 import { cp, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
@@ -16,7 +17,7 @@ export default async function ({ page, shot, work }) {
   const chapter = Number(process.env.LIVE_CHAPTER ?? 3)
   const text =
     process.env.LIVE_TEXT ??
-    'Naquela noite, Heitor contou a Kuarashi que tinha uma filha, Clara, de sete anos, que morava com a avó em São Luís. Clara tinha os olhos claros do pai e uma cicatriz no queixo. Heitor mandava dinheiro todo mês, mas não a via havia três anos.'
+    'Naquela noite, Elias contou a Marta que tinha uma filha, Clara, de sete anos, que morava com a avó no continente. Clara tinha os olhos claros do pai e uma cicatriz no queixo.'
   await page.locator('.chapter-item').nth(chapter).click()
   await page.waitForTimeout(900)
   await page.evaluate((t) => {
@@ -60,11 +61,11 @@ export default async function ({ page, shot, work }) {
   await page.waitForTimeout(2500)
   await shot('accepted')
   const states = await page.locator('.msg-ai').last().locator('.hunk-badge').allInnerTexts()
-  const after = await page.evaluate(() => {
+  const after = await page.evaluate((name) => {
     const st = window.__wordelia.book.getState()
-    const heitor = st.entries.find((e) => e.name.startsWith('Heitor'))
-    return { entries: st.entries.map((e) => `${e.category}/${e.name}`), heitor: heitor?.body }
-  })
+    const entry = st.entries.find((e) => e.name.startsWith(name))
+    return { entries: st.entries.map((e) => `${e.category}/${e.name}`), entry: entry?.body }
+  }, process.env.LIVE_ENTRY ?? 'Elias')
   const report = { seconds, model: reply.model, error: reply.error, reply: reply.content, states, entriesBefore: before.entries, ...after }
   await writeFile(join(out, 'sync-report.json'), JSON.stringify(report, null, 1))
   console.log(JSON.stringify({ ...report, reply: reply.content.slice(0, 4000) }, null, 1))

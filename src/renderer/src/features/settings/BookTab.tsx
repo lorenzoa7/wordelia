@@ -1,129 +1,151 @@
 import type { SceneBreakStyle, Typography } from '@shared/types'
 import { Field, Select, Switch, TextInput } from '@/ui'
 import { useBook } from '@/stores/book'
+import { useT } from '@/lib/i18n'
 import { BOOK_FONTS, fontStack } from '@/lib/fonts'
 import { LANGUAGES } from '@/features/library/NewBookDialog'
 
-const SCENE_BREAKS: Array<{ value: SceneBreakStyle; label: string }> = [
+const SCENE_BREAKS: Array<{ value: SceneBreakStyle; label: string | null }> = [
   { value: 'asterisks', label: '*  *  *' },
   { value: 'asterism', label: '⁂' },
   { value: 'fleuron', label: '❦' },
   { value: 'hash', label: '#' },
-  { value: 'blank', label: 'Blank line' }
+  // A text label, in the interface language
+  { value: 'blank', label: null }
 ]
 
 export function BookTab(): React.JSX.Element | null {
   const m = useBook((s) => s.manifest)
   const update = useBook((s) => s.updateManifest)
+  const tr = useT().settings.book
   if (!m) return null
   const t = m.typography
   const setT = (patch: Partial<Typography>): void => update({ typography: { ...t, ...patch } })
 
   return (
     <div>
-      <h3 className="settings-h">Book</h3>
+      <h3 className="settings-h">{tr.book}</h3>
       <div className="settings-grid">
-        <Field label="Title">
+        <Field label={tr.title}>
           <TextInput value={m.title} onChange={(e) => update({ title: e.target.value })} />
         </Field>
-        <Field label="Author">
+        <Field label={tr.author}>
           <TextInput value={m.author} onChange={(e) => update({ author: e.target.value })} />
         </Field>
-        <Field label="Subtitle">
+        <Field label={tr.subtitle}>
           <TextInput value={m.subtitle} onChange={(e) => update({ subtitle: e.target.value })} />
         </Field>
-        <Field label="Genre">
-          <TextInput value={m.genre} placeholder="Dark fantasy, mystery…" onChange={(e) => update({ genre: e.target.value })} />
+        <Field label={tr.genre}>
+          <TextInput value={m.genre} placeholder={tr.genrePlaceholder} onChange={(e) => update({ genre: e.target.value })} />
         </Field>
       </div>
-      <Field label="Language" hint="The AI writes book text in this language.">
-        <Select value={m.language} onValueChange={(v) => update({ language: v })} options={LANGUAGES} ariaLabel="Language" />
+      <Field label={tr.language} hint={tr.languageHint}>
+        <Select
+          value={m.language}
+          onValueChange={(v) => update({ language: v })}
+          options={LANGUAGES.map((l) => ({ value: l.value, label: tr.languages[l.value] ?? l.label }))}
+          ariaLabel={tr.language}
+        />
       </Field>
 
-      <h3 className="settings-h">Text on the page</h3>
+      <h3 className="settings-h">{tr.textOnPage}</h3>
       <div className="typo-preview" style={{ fontFamily: fontStack(t.fontFamily), lineHeight: t.lineHeight, textAlign: t.align }}>
-        <p style={{ textIndent: t.indentFirstParagraph ? `${t.firstLineIndent}em` : 0 }}>
-          {t.dialogueDash} Did you feel that? {t.dialogueDash} asked the old man, and the candles bent toward the door.
-        </p>
-        <p style={{ textIndent: `${t.firstLineIndent}em` }}>Miguel did not answer. Outside, the wind kept its own counsel.</p>
+        <p style={{ textIndent: t.indentFirstParagraph ? `${t.firstLineIndent}em` : 0 }}>{t.dialogueStyle === 'quotes' ? tr.previewQuoted : tr.previewDialogue(t.dialogueDash)}</p>
+        <p style={{ textIndent: `${t.firstLineIndent}em` }}>{tr.previewNarration}</p>
       </div>
       <div className="settings-grid">
-        <Field label="Font">
+        <Field label={tr.font}>
           <Select
             value={t.fontFamily}
             onValueChange={(v) => setT({ fontFamily: v })}
             options={BOOK_FONTS.map((f) => ({ value: f.family, label: f.label, style: { fontFamily: fontStack(f.family) } }))}
-            ariaLabel="Font"
+            ariaLabel={tr.font}
           />
         </Field>
-        <Field label="Size (pt)">
+        <Field label={tr.size}>
           <Select
             value={String(t.fontSize)}
             onValueChange={(v) => setT({ fontSize: Number(v) })}
             options={[10, 11, 12, 13, 14, 16].map((n) => ({ value: String(n), label: String(n) }))}
-            ariaLabel="Size"
+            ariaLabel={tr.sizeAria}
           />
         </Field>
-        <Field label="Line spacing">
+        <Field label={tr.lineSpacing}>
           <Select
             value={String(t.lineHeight)}
             onValueChange={(v) => setT({ lineHeight: Number(v) })}
             options={[1.15, 1.3, 1.45, 1.6, 1.8, 2].map((n) => ({ value: String(n), label: String(n) }))}
-            ariaLabel="Line spacing"
+            ariaLabel={tr.lineSpacing}
           />
         </Field>
-        <Field label="First-line indent (em)">
+        <Field label={tr.indent}>
           <Select
             value={String(t.firstLineIndent)}
             onValueChange={(v) => setT({ firstLineIndent: Number(v) })}
             options={[0, 1, 1.5, 2, 2.5].map((n) => ({ value: String(n), label: String(n) }))}
-            ariaLabel="Indent"
+            ariaLabel={tr.indentAria}
           />
         </Field>
-        <Field label="Alignment">
+        <Field label={tr.alignment}>
           <Select
             value={t.align}
             onValueChange={(v) => setT({ align: v as Typography['align'] })}
             options={[
-              { value: 'justify', label: 'Justified' },
-              { value: 'left', label: 'Left' }
+              { value: 'justify', label: tr.justified },
+              { value: 'left', label: tr.left }
             ]}
-            ariaLabel="Alignment"
+            ariaLabel={tr.alignment}
           />
         </Field>
-        <Field label="Space between paragraphs">
+        <Field label={tr.paragraphSpace}>
           <Select
             value={String(t.paragraphSpacing)}
             onValueChange={(v) => setT({ paragraphSpacing: Number(v) })}
-            options={[0, 0.4, 0.8, 1].map((n) => ({ value: String(n), label: n === 0 ? 'None (book style)' : `${n} em` }))}
-            ariaLabel="Paragraph spacing"
+            options={[0, 0.4, 0.8, 1].map((n) => ({ value: String(n), label: n === 0 ? tr.noSpace : `${n} em` }))}
+            ariaLabel={tr.paragraphSpaceAria}
           />
         </Field>
       </div>
-      <Field label="Indent the first paragraph of a chapter or scene" inline>
+      <Field label={tr.indentFirst} inline>
         <Switch checked={t.indentFirstParagraph} onCheckedChange={(v) => setT({ indentFirstParagraph: v })} />
       </Field>
 
-      <h3 className="settings-h">Typing</h3>
-      <Field label="Dialogue dash (type --)" inline>
+      <h3 className="settings-h">{tr.typing}</h3>
+      <Field label={tr.dialogueStyle} hint={tr.dialogueStyleHint}>
+        <Select
+          value={t.dialogueStyle}
+          onValueChange={(v) => setT({ dialogueStyle: v as Typography['dialogueStyle'] })}
+          options={[
+            { value: 'dash', label: tr.dialogueStyleDash },
+            { value: 'quotes', label: tr.dialogueStyleQuotes }
+          ]}
+          ariaLabel={tr.dialogueStyle}
+        />
+      </Field>
+      <Field label={tr.dialogueDash} inline>
         <Select
           value={t.dialogueDash}
           onValueChange={(v) => setT({ dialogueDash: v as Typography['dialogueDash'] })}
           options={[
-            { value: '—', label: '— em dash (U+2014)' },
-            { value: '―', label: '― horizontal bar (U+2015)' }
+            { value: '—', label: tr.emDash },
+            { value: '―', label: tr.horizontalBar }
           ]}
-          ariaLabel="Dialogue dash"
+          ariaLabel={tr.dialogueDashAria}
         />
       </Field>
-      <Field label="Smart quotes" inline>
+      <Field label={tr.smartQuotes} inline>
         <Switch checked={t.smartQuotes} onCheckedChange={(v) => setT({ smartQuotes: v })} />
       </Field>
-      <Field label="Three dots become an ellipsis (…)" inline>
+      <Field label={tr.smartEllipsis} inline>
         <Switch checked={t.smartEllipsis} onCheckedChange={(v) => setT({ smartEllipsis: v })} />
       </Field>
-      <Field label="Scene break in exports" inline>
-        <Select value={t.sceneBreak} onValueChange={(v) => setT({ sceneBreak: v as SceneBreakStyle })} options={SCENE_BREAKS} ariaLabel="Scene break" />
+      <Field label={tr.sceneBreak} inline>
+        <Select
+          value={t.sceneBreak}
+          onValueChange={(v) => setT({ sceneBreak: v as SceneBreakStyle })}
+          options={SCENE_BREAKS.map((b) => ({ value: b.value, label: b.label ?? tr.blankLine }))}
+          ariaLabel={tr.sceneBreakAria}
+        />
       </Field>
     </div>
   )

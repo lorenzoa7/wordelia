@@ -1,6 +1,7 @@
 // Find planning entries by name for [[wiki links]].
 
 import type { Entry } from '@shared/types'
+import { getT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
 import { toast } from '@/stores/ui'
 
@@ -16,9 +17,10 @@ export function openWikiLink(name: string): void {
     useBook.getState().selectEntry(e.id)
     return
   }
-  toast(`No planning entry is called "${name}".`, {
+  const t = getT()
+  toast(t.plan.links.noEntry(name), {
     action: {
-      label: 'Create it',
+      label: t.plan.links.createIt,
       run: () => {
         const cats = useBook.getState().manifest?.planning.categories ?? []
         const folder = cats.find((c) => c.folder === 'Notes')?.folder ?? cats[0]?.folder ?? 'Notes'

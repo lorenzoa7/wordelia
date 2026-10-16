@@ -4,6 +4,8 @@ import { useEditorState, type Editor } from '@tiptap/react'
 import { ArrowsClockwise, Check, Stop, X } from '@phosphor-icons/react'
 import { diffStats } from '@shared/text/diff'
 import { Kbd, Spinner } from '@/ui'
+import { useApp } from '@/stores/app'
+import { actionName, useT } from '@/lib/i18n'
 import { cancelAction, retryAction, useActionRun } from '@/features/actions/runAction'
 import { reviewKey } from './review'
 
@@ -11,6 +13,9 @@ import { reviewKey } from './review'
 export function ReviewBar({ editor }: { editor: Editor }): React.JSX.Element {
   const review = useEditorState({ editor, selector: ({ editor: e }) => reviewKey.getState(e.state) ?? null })
   const words = useActionRun((s) => s.words)
+  const actionId = useActionRun((s) => s.actionId)
+  const action = useApp((s) => s.settings?.actions.find((a) => a.id === actionId))
+  const t = useT()
   const ref = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
 
@@ -46,6 +51,8 @@ export function ReviewBar({ editor }: { editor: Editor }): React.JSX.Element {
   }, [review?.phase])
 
   const stats = review?.phase === 'ready' ? diffStats(review.ops) : null
+  // The label is the name of the action. Show it in the interface language when it is a built-in name.
+  const label = review && action && action.name === review.label ? actionName(t, action) : review?.label
 
   return (
     <AnimatePresence>
@@ -66,17 +73,17 @@ export function ReviewBar({ editor }: { editor: Editor }): React.JSX.Element {
             <>
               <Spinner />
               <span className="review-label">
-                {review.label}
-                <span className="muted">{words ? ` · ${words} words` : '…'}</span>
+                {label}
+                <span className="muted">{words ? ` · ${t.editor.review.words(words)}` : '…'}</span>
               </span>
               <button className="review-btn" onClick={cancelAction}>
-                <Stop size={13} weight="fill" /> Stop <Kbd>Esc</Kbd>
+                <Stop size={13} weight="fill" /> {t.editor.review.stop} <Kbd>Esc</Kbd>
               </button>
             </>
           ) : (
             <>
               <span className="review-label">
-                {review.label}
+                {label}
                 {stats && (
                   <span className="review-stats">
                     <span className="plus">+{stats.added}</span> <span className="minus">−{stats.removed}</span>
@@ -84,12 +91,12 @@ export function ReviewBar({ editor }: { editor: Editor }): React.JSX.Element {
                 )}
               </span>
               <button className="review-btn review-accept" onClick={() => editor.chain().focus().acceptReview().run()}>
-                <Check size={14} weight="bold" /> Accept <Kbd>Enter</Kbd>
+                <Check size={14} weight="bold" /> {t.common.accept} <Kbd>Enter</Kbd>
               </button>
               <button className="review-btn" onClick={() => editor.chain().focus().rejectReview().run()}>
-                <X size={13} /> Reject <Kbd>Esc</Kbd>
+                <X size={13} /> {t.common.reject} <Kbd>Esc</Kbd>
               </button>
-              <button className="review-btn review-icon" title="Try again" aria-label="Try again" onClick={() => void retryAction()}>
+              <button className="review-btn review-icon" title={t.common.retry} aria-label={t.common.retry} onClick={() => void retryAction()}>
                 <ArrowsClockwise size={14} />
               </button>
             </>

@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { CompletionRequest, CompletionResult, ModelInfo, ProviderStatus, StreamEvent } from '@shared/types'
+import { mainT } from '../i18n'
 import { getSettings } from '../settings'
 import { cleanEnv, codexCandidates, resolveBin, type ResolvedBin } from './resolve-bin'
 import { classifyError, flattenConversation, killTree, runCli, type ProviderTransport } from './transport'
@@ -157,14 +158,16 @@ export const codex: ProviderTransport = {
 
   async status(): Promise<ProviderStatus> {
     const b = await bin()
-    if (!b) return { provider: 'codex', installed: false, loggedIn: false, detail: 'The codex CLI was not found.' }
+    const t = (await mainT()).main.ai
+    if (!b) return { provider: 'codex', installed: false, loggedIn: false, detail: t.codexNotFound }
     const ver = await runCli(b, ['--version'], { timeoutMs: 15000 })
     const version = ver.stdout.trim().split(/\s+/).pop() || undefined
     const [login, latest] = await Promise.all([runCli(b, ['login', 'status'], { timeoutMs: 15000 }), latestVersion('codex')])
     const out = (login.stdout + login.stderr).trim()
     let loggedIn: boolean | null = login.code === 0 && /logged in/i.test(out) ? true : login.code === 0 ? null : false
     let account = loggedIn ? out.replace(/^logged in using /i, '') : undefined
-    let detail = loggedIn === false ? 'Run "codex login" in a terminal to log in.' : b.path
+    let detail = loggedIn === false ? t.codexLogin : b.path
+    let reason: ProviderStatus['reason']
     // "codex login status" only reads the saved file. Ask the server, which also refreshes the token:
     // an old login can look fine and still fail on the first request.
     if (loggedIn) {
@@ -172,10 +175,11 @@ export const codex: ProviderTransport = {
       if (live === false) {
         loggedIn = false
         account = undefined
-        detail = 'The Codex login has expired. Run "codex logout", then "codex login", in a terminal.'
+        detail = t.codexExpired
+        reason = 'expired'
       } else if (typeof live === 'string') account = live
     }
-    return { provider: 'codex', installed: true, loggedIn, version, latestVersion: latest, account, detail }
+    return { provider: 'codex', installed: true, loggedIn, version, latestVersion: latest, account, detail, ...(reason ? { reason } : {}) }
   },
 
   async listModels(): Promise<ModelInfo[]> {
@@ -221,9 +225,10 @@ export const codex: ProviderTransport = {
 
   async complete(req: CompletionRequest, onEvent: (e: StreamEvent) => void, signal: AbortSignal): Promise<CompletionResult> {
     const b = await bin()
-    if (!b) return { ok: false, text: '', error: 'Codex is not installed.', errorKind: 'not-installed' }
+    const t = (await mainT()).main.ai
+    if (!b) return { ok: false, text: '', error: t.codexNotInstalled, errorKind: 'not-installed' }
     const cwd = await workDir()
-    const cancelled: CompletionResult = { ok: false, text: '', error: 'Cancelled.', errorKind: 'cancelled' }
+    const cancelled: CompletionResult = { ok: false, text: '', error: t.cancelled, errorKind: 'cancelled' }
     if (signal.aborted) return cancelled
     const viaServer = await completeWithAppServer(b, cwd, req, onEvent, signal)
     if (viaServer) return viaServer
@@ -240,6 +245,7 @@ async function completeWithAppServer(
   onEvent: (e: StreamEvent) => void,
   signal: AbortSignal
 ): Promise<CompletionResult | null> {
+  const t = (await mainT()).main.ai
   const server = new AppServer(b, cwd)
   let text = ''
   let model: string | undefined
@@ -256,7 +262,7 @@ async function completeWithAppServer(
       await server.init()
     } catch {
       server.kill()
-      if (signal.aborted) return { ok: false, text: '', error: 'Cancelled.', errorKind: 'cancelled' }
+      if (signal.aborted) return { ok: false, text: '', error: t.cancelled, errorKind: 'cancelled' }
       return null // app-server is missing in this version: use exec
     }
     const done = new Promise<{ ok: boolean; error?: string }>((resolve) => {
@@ -278,19 +284,19 @@ async function completeWithAppServer(
           }
         } else if (method === 'error') {
           const err = (params.error as Json | undefined)?.message
-          if (params.willRetry) onEvent({ type: 'status', message: 'Retrying…' })
-          else resolve({ ok: false, error: String(err ?? 'Codex error') })
+          if (params.willRetry) onEvent({ type: 'status', message: t.retrying })
+          else resolve({ ok: false, error: String(err ?? t.codexError) })
         } else if (method === 'turn/completed') {
           const turn = params.turn as Json | undefined
           const status = turn?.status
           if (status === 'completed') resolve({ ok: true })
           else {
             const err = (turn?.error as Json | undefined)?.message
-            resolve({ ok: false, error: String(err ?? `Turn ${String(status)}`) })
+            resolve({ ok: false, error: String(err ?? t.codexTurn(String(status))) })
           }
         }
       }
-      void server.closed.then(() => resolve({ ok: false, error: server.stderr.trim() || 'codex app-server stopped' }))
+      void server.closed.then(() => resolve({ ok: false, error: server.stderr.trim() || t.codexStopped }))
     })
 
     const threadParams: Json = {
@@ -315,11 +321,11 @@ async function completeWithAppServer(
     turnId = String((turn.turn as Json | undefined)?.id ?? '')
 
     const outcome = await done
-    if (signal.aborted) return { ok: false, text, model, error: 'Cancelled.', errorKind: 'cancelled' }
+    if (signal.aborted) return { ok: false, text, model, error: t.cancelled, errorKind: 'cancelled' }
     if (outcome.ok) return { ok: true, text, model, usage }
     return { ok: false, text, model, error: outcome.error, errorKind: classifyError(outcome.error ?? '') }
   } catch (err) {
-    if (signal.aborted) return { ok: false, text, model, error: 'Cancelled.', errorKind: 'cancelled' }
+    if (signal.aborted) return { ok: false, text, model, error: t.cancelled, errorKind: 'cancelled' }
     const msg = err instanceof Error ? err.message : String(err)
     return { ok: false, text, model, error: msg, errorKind: classifyError(msg) }
   } finally {
@@ -335,6 +341,7 @@ async function completeWithExec(
   onEvent: (e: StreamEvent) => void,
   signal: AbortSignal
 ): Promise<CompletionResult> {
+  const t = (await mainT()).main.ai
   const args = ['exec', '--json', '--skip-git-repo-check', '--ephemeral', '-s', 'read-only', '-C', cwd]
   if (req.route.model) args.push('-m', req.route.model)
   if (req.route.effort) args.push('-c', `model_reasoning_effort="${req.route.effort}"`)
@@ -365,12 +372,12 @@ async function completeWithExec(
         if (u) usage = { inputTokens: Number(u.input_tokens ?? 0), outputTokens: Number(u.output_tokens ?? 0) }
       } else if (ev.type === 'error' || ev.type === 'turn.failed') {
         const e = (ev.error as Json | undefined)?.message ?? ev.message
-        error = String(e ?? 'Codex error')
+        error = String(e ?? t.codexError)
       }
     }
   })
-  if (res.aborted) return { ok: false, text, error: 'Cancelled.', errorKind: 'cancelled' }
+  if (res.aborted) return { ok: false, text, error: t.cancelled, errorKind: 'cancelled' }
   if (res.code === 0 && !error) return { ok: true, text, usage }
-  const msg = error || res.stderr.trim() || `codex exited with code ${res.code}`
+  const msg = error || res.stderr.trim() || t.codexExited(res.code)
   return { ok: false, text, error: msg, errorKind: classifyError(msg) }
 }

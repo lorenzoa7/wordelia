@@ -1,19 +1,20 @@
 import { useEffect, useState } from 'react'
+import { messagesFor, type Messages } from '@shared/i18n'
 import { Button, Dialog, Field, Select, TextInput } from '@/ui'
 import { invoke } from '@/lib/api'
+import { getT, useT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
 import { toast } from '@/stores/ui'
 
-export const LANGUAGES = [
-  { value: 'pt-BR', label: 'Português (Brasil)' },
-  { value: 'pt-PT', label: 'Português (Portugal)' },
-  { value: 'en-US', label: 'English (US)' },
-  { value: 'en-GB', label: 'English (UK)' },
-  { value: 'es', label: 'Español' },
-  { value: 'fr', label: 'Français' },
-  { value: 'de', label: 'Deutsch' },
-  { value: 'it', label: 'Italiano' }
-]
+const BOOK_LANGUAGE_CODES = ['pt-BR', 'pt-PT', 'en-US', 'en-GB', 'es', 'fr', 'de', 'it']
+
+/** The book languages with their names in the interface language. */
+export function languageOptions(t: Messages): Array<{ value: string; label: string }> {
+  return BOOK_LANGUAGE_CODES.map((value) => ({ value, label: t.library.languages[value] ?? value }))
+}
+
+/** The book languages with their English names. Prefer `languageOptions(t)`. */
+export const LANGUAGES = languageOptions(messagesFor('en'))
 
 export function guessLanguage(): string {
   const nav = navigator.language || 'en-US'
@@ -21,6 +22,7 @@ export function guessLanguage(): string {
 }
 
 export function NewBookDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }): React.JSX.Element {
+  const t = useT()
   const [title, setTitle] = useState('')
   const [author, setAuthor] = useState('')
   const [language, setLanguage] = useState(guessLanguage())
@@ -40,7 +42,7 @@ export function NewBookDialog({ open, onOpenChange }: { open: boolean; onOpenCha
       onOpenChange(false)
       setTitle('')
     } catch (err) {
-      toast(`Could not create the book: ${err instanceof Error ? err.message : String(err)}`, { kind: 'error' })
+      toast(getT().library.couldNotCreate(err instanceof Error ? err.message : String(err)), { kind: 'error' })
     } finally {
       setBusy(false)
     }
@@ -50,15 +52,15 @@ export function NewBookDialog({ open, onOpenChange }: { open: boolean; onOpenCha
     <Dialog
       open={open}
       onOpenChange={onOpenChange}
-      title="A new book"
-      description="Wordelia keeps each book in its own folder of plain files."
+      title={t.library.newTitle}
+      description={t.library.newDescription}
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t.common.cancel}
           </Button>
           <Button variant="primary" onClick={() => void create()} disabled={!title.trim() || busy}>
-            {busy ? 'Creating…' : 'Create book'}
+            {busy ? t.library.creating : t.library.createBook}
           </Button>
         </>
       }
@@ -69,16 +71,16 @@ export function NewBookDialog({ open, onOpenChange }: { open: boolean; onOpenCha
           void create()
         }}
       >
-        <Field label="Title">
-          <TextInput autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="The Lost Paradise" />
+        <Field label={t.library.title}>
+          <TextInput autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t.library.titlePlaceholder} />
         </Field>
-        <Field label="Author">
-          <TextInput value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="Your name" />
+        <Field label={t.library.author}>
+          <TextInput value={author} onChange={(e) => setAuthor(e.target.value)} placeholder={t.library.authorPlaceholder} />
         </Field>
-        <Field label="Language of the book" hint="The AI writes book text in this language. Spell check uses it too.">
-          <Select value={language} onValueChange={setLanguage} options={LANGUAGES} ariaLabel="Language" />
+        <Field label={t.library.language} hint={t.library.languageHint}>
+          <Select value={language} onValueChange={setLanguage} options={languageOptions(t)} ariaLabel={t.library.languageAria} />
         </Field>
-        <Field label="Location">
+        <Field label={t.library.location}>
           <div className="location-row">
             <span className="location-path" title={parentDir}>
               {parentDir || '…'}
@@ -87,10 +89,10 @@ export function NewBookDialog({ open, onOpenChange }: { open: boolean; onOpenCha
               size="sm"
               type="button"
               onClick={() =>
-                void invoke('book:pickFolder', { title: 'Where to keep the book', create: true }).then((d) => d && setParentDir(d))
+                void invoke('book:pickFolder', { title: t.library.locationTitle, create: true }).then((d) => d && setParentDir(d))
               }
             >
-              Change…
+              {t.library.change}
             </Button>
           </div>
         </Field>

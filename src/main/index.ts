@@ -10,6 +10,7 @@ import { getSettings } from './settings'
 import { themeOverlay } from './window'
 import { loadWindowState, trackWindowState } from './window-state'
 import { installContextMenu } from './context-menu'
+import { mainT } from './i18n'
 
 // Tests use a separate data folder, so they never touch the user's library.
 if (process.env['WORDELIA_USER_DATA']) app.setPath('userData', process.env['WORDELIA_USER_DATA'])
@@ -60,18 +61,18 @@ async function createWindow(): Promise<void> {
       if (!win.isDestroyed()) win.close()
     }
     const timer = setTimeout(close, 6000)
-    onFlushDone(win.webContents.id, (ok, error) => {
+    onFlushDone(win.webContents.id, async (ok, error) => {
       clearTimeout(timer)
       if (ok) return close()
       // Some text is not on disk yet: ask before closing.
+      const t = (await mainT()).main.closeDialog
+      if (win.isDestroyed()) return
       const choice = dialog.showMessageBoxSync(win, {
         type: 'warning',
         title: 'Wordelia',
-        message: 'Some changes could not be saved.',
-        detail: `${error || 'A file could not be written.'}
-
-If a sync app (OneDrive, Google Drive, Dropbox) holds the file, wait a moment and try again.`,
-        buttons: ['Keep the window open', 'Close anyway'],
+        message: t.message,
+        detail: `${error || t.fileNotWritten}\n\n${t.syncAppHint}`,
+        buttons: [t.keepOpen, t.closeAnyway],
         defaultId: 0,
         cancelId: 0
       })

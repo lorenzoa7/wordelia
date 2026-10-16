@@ -96,3 +96,19 @@ describe('entriesMentionedIn', () => {
     expect(entriesMentionedIn('Martarola', entries)).toEqual([])
   })
 })
+
+describe('dialogue style', () => {
+  it('follows the book language and tells the AI', async () => {
+    const { newManifest, normalizeManifest } = await import('../book')
+    const { bookBlock } = await import('./context')
+    const en = newManifest({ title: 'T', author: 'A', language: 'en-US' })
+    const pt = newManifest({ title: 'T', author: 'A', language: 'pt-BR' })
+    expect(en.typography.dialogueStyle).toBe('quotes')
+    expect(pt.typography.dialogueStyle).toBe('dash')
+    expect(bookBlock(en)).toMatch(/quotation marks/)
+    expect(bookBlock(pt)).toMatch(/em dash/)
+    // An old book file without the setting gets the style of its language.
+    const old = normalizeManifest({ language: 'en-GB', typography: { fontSize: 11 } } as never)
+    expect(old.typography.dialogueStyle).toBe('quotes')
+  })
+})

@@ -1,5 +1,6 @@
 // Launch the built app with Playwright and save screenshots.
-// Usage: node scripts/shot.mjs [scenario] [--dark]
+// Usage: node scripts/shot.mjs [scenario] [--dark] [--fresh] [--real-ai] [--en]
+// --en uses the English sample book (for the README screenshots); the default is the Portuguese one.
 // Scenarios live in scripts/shots/<name>.mjs. The app runs with a fresh data folder
 // and a scripted AI (WORDELIA_MOCK_AI=1), so it never touches the user's books or AI.
 import { _electron as electron } from '@playwright/test'
@@ -12,6 +13,7 @@ const scenario = process.argv[2] ?? 'home'
 const dark = process.argv.includes('--dark')
 const realAi = process.argv.includes('--real-ai')
 const fresh = process.argv.includes('--fresh')
+const english = process.argv.includes('--en')
 const outDir = resolve('test-results/shots')
 await mkdir(outDir, { recursive: true })
 await mkdir(resolve('test-results/exports'), { recursive: true })
@@ -32,8 +34,8 @@ const settings = fresh ? { theme: dark ? 'dark' : 'light', onboarded: false } : 
   ...(process.env.WORDELIA_CLAUDE_BIN ? { providers: { 'claude-code': { enabled: true, binPath: process.env.WORDELIA_CLAUDE_BIN } } } : {})
 }
 await writeFile(join(userData, 'settings.json'), JSON.stringify(settings))
-const book = join(work, 'books', 'O Farol de Santa Ilha')
-await cp(resolve('e2e/fixtures/sample-book'), book, { recursive: true })
+const book = join(work, 'books', english ? 'The Lighthouse of Saint Isle' : 'O Farol de Santa Ilha')
+await cp(resolve(english ? 'e2e/fixtures/sample-book-en' : 'e2e/fixtures/sample-book'), book, { recursive: true })
 
 const app = await electron.launch({
   args: [resolve('out/main/index.js')],
@@ -54,7 +56,7 @@ await page.waitForTimeout(900)
 
 let n = 0
 const shot = async (name) => {
-  const file = resolve(outDir, `${scenario}${dark ? '-dark' : ''}-${String(++n).padStart(2, '0')}-${name}.png`)
+  const file = resolve(outDir, `${scenario}${english ? '-en' : ''}${dark ? '-dark' : ''}-${String(++n).padStart(2, '0')}-${name}.png`)
   await page.screenshot({ path: file })
   console.log('saved', file)
 }

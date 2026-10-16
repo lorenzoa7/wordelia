@@ -1,61 +1,74 @@
 import clsx from 'clsx'
 import { Moon, Sun, Desktop } from '@phosphor-icons/react'
-import type { ThemeSetting } from '@shared/types'
+import type { Locale, ThemeSetting } from '@shared/types'
 import { Field, Select, Switch } from '@/ui'
 import { useApp } from '@/stores/app'
+import { LOCALES, useT } from '@/lib/i18n'
 import { typewriterSound } from '@/features/editor/typewriter-sound'
 
-const THEMES: Array<{ id: ThemeSetting; label: string; icon: React.ReactNode }> = [
-  { id: 'light', label: 'Paper', icon: <Sun size={16} /> },
-  { id: 'dark', label: 'Lamplight', icon: <Moon size={16} /> },
-  { id: 'system', label: 'System', icon: <Desktop size={16} /> }
+const THEMES: Array<{ id: ThemeSetting; icon: React.ReactNode }> = [
+  { id: 'light', icon: <Sun size={16} /> },
+  { id: 'dark', icon: <Moon size={16} /> },
+  { id: 'system', icon: <Desktop size={16} /> }
 ]
 
 export function GeneralTab(): React.JSX.Element | null {
   const settings = useApp((s) => s.settings)
   const update = useApp((s) => s.updateSettings)
   const setUi = useApp((s) => s.setUi)
+  const t = useT()
   if (!settings) return null
+  const g = t.settings.general
   return (
     <div>
-      <h3 className="settings-h">Theme</h3>
+      <h3 className="settings-h">{g.language}</h3>
+      <Field label={g.interfaceLanguage} hint={g.languageHint}>
+        <Select
+          value={settings.language}
+          onValueChange={(v) => void update({ language: v as Locale })}
+          options={LOCALES.map((l) => ({ value: l.id, label: l.label }))}
+          ariaLabel={g.interfaceLanguage}
+        />
+      </Field>
+
+      <h3 className="settings-h">{g.theme}</h3>
       <div className="theme-picker">
-        {THEMES.map((t) => (
-          <button key={t.id} aria-pressed={settings.theme === t.id} className={clsx('theme-card', `theme-${t.id}`, settings.theme === t.id && 'is-active')} onClick={() => void update({ theme: t.id })}>
+        {THEMES.map((th) => (
+          <button key={th.id} aria-pressed={settings.theme === th.id} className={clsx('theme-card', `theme-${th.id}`, settings.theme === th.id && 'is-active')} onClick={() => void update({ theme: th.id })}>
             <span className="theme-swatch">
               <span className="theme-page" />
             </span>
             <span className="theme-label">
-              {t.icon} {t.label}
+              {th.icon} {g.themes[th.id]}
             </span>
           </button>
         ))}
       </div>
 
-      <h3 className="settings-h">Writing</h3>
-      <Field label="Page zoom" inline>
+      <h3 className="settings-h">{g.writing}</h3>
+      <Field label={g.pageZoom} inline>
         <Select
           value={String(settings.ui.zoom)}
           onValueChange={(v) => setUi({ zoom: Number(v) })}
           options={[0.9, 1, 1.1, 1.2, 1.35].map((z) => ({ value: String(z), label: `${Math.round(z * 100)}%` }))}
-          ariaLabel="Page zoom"
+          ariaLabel={g.pageZoom}
         />
       </Field>
-      <Field label="Daily goal (words)" inline>
+      <Field label={g.dailyGoal} inline>
         <Select
           value={String(settings.editor.dailyGoal ?? 0)}
           onValueChange={(v) => void update({ editor: { ...settings.editor, dailyGoal: Number(v) } })}
-          options={[0, 250, 500, 750, 1000, 1500, 2000].map((n) => ({ value: String(n), label: n ? `${n} words` : 'Off' }))}
-          ariaLabel="Daily goal"
+          options={[0, 250, 500, 750, 1000, 1500, 2000].map((n) => ({ value: String(n), label: n ? g.goalWords(n) : g.goalOff }))}
+          ariaLabel={g.dailyGoalAria}
         />
       </Field>
-      <Field label="Spell check" inline>
+      <Field label={g.spellcheck} inline>
         <Switch checked={settings.editor.spellcheck} onCheckedChange={(v) => void update({ editor: { ...settings.editor, spellcheck: v } })} />
       </Field>
-      <Field label="Focus mode (dim other paragraphs)" inline>
+      <Field label={g.focusMode} inline>
         <Switch checked={settings.ui.focusMode} onCheckedChange={(v) => setUi({ focusMode: v })} />
       </Field>
-      <Field label="Typewriter sounds" inline>
+      <Field label={g.typewriterSounds} inline>
         <Switch
           checked={settings.editor.typewriterSounds}
           onCheckedChange={(v) => {
@@ -64,24 +77,24 @@ export function GeneralTab(): React.JSX.Element | null {
           }}
         />
       </Field>
-      <Field label="Typewriter scrolling" inline>
+      <Field label={g.typewriterScrolling} inline>
         <Switch checked={settings.ui.typewriterScroll} onCheckedChange={(v) => setUi({ typewriterScroll: v })} />
       </Field>
 
-      <h3 className="settings-h">Keyboard</h3>
+      <h3 className="settings-h">{g.keyboard}</h3>
       <dl className="shortcuts">
         {[
-          ['Polish the selection', 'Ctrl+J'],
-          ['Other actions', 'Alt+1 … 9'],
-          ['Accept or reject an AI change', 'Enter / Esc'],
-          ['Dialogue dash', '--'],
-          ['Scene break', 'Ctrl+Shift+Enter'],
-          ['Find and replace', 'Ctrl+F / Ctrl+H'],
-          ['Show or hide the chat', 'Ctrl+L'],
-          ['Show or hide the sidebar', 'Ctrl+\\'],
-          ['Write / Plan', 'Ctrl+1 / Ctrl+2'],
-          ['Export', 'Ctrl+Shift+E'],
-          ['Settings', 'Ctrl+,']
+          [g.shortcuts.polish, 'Ctrl+J'],
+          [g.shortcuts.otherActions, 'Alt+1 … 9'],
+          [g.shortcuts.acceptReject, 'Enter / Esc'],
+          [g.shortcuts.dialogueDash, '--'],
+          [g.shortcuts.sceneBreak, 'Ctrl+Shift+Enter'],
+          [g.shortcuts.findReplace, 'Ctrl+F / Ctrl+H'],
+          [g.shortcuts.toggleChat, 'Ctrl+L'],
+          [g.shortcuts.toggleSidebar, 'Ctrl+\\'],
+          [g.shortcuts.writePlan, 'Ctrl+1 / Ctrl+2'],
+          [t.common.export, 'Ctrl+Shift+E'],
+          [t.common.settings, 'Ctrl+,']
         ].map(([label, key]) => (
           <div key={label} className="shortcut-row">
             <dt>{label}</dt>

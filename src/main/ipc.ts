@@ -12,6 +12,7 @@ import { listSnapshots, readSnapshot, saveSnapshot } from './book/history'
 import { noteOwnWrite, unwatchBook, watchBook } from './book/watcher'
 import { exportDocx, exportPdf, exportText } from './export'
 import { atomicWrite, readTextOr, safeJoin } from './fsutil'
+import { mainT } from './i18n'
 import { readImport } from './import'
 import { listLibrary, removeFromLibrary, touchLibrary } from './library'
 import { getSecret, getSettings, setSecret, setSettings } from './settings'
@@ -64,7 +65,7 @@ export function registerIpc(): void {
 
   handle('book:create', async (e, opts) => {
     if (!E2E && !isPicked(opts.parentDir) && !samePath(opts.parentDir, defaultBooksDir())) {
-      throw new Error('Choose the folder for the book first.')
+      throw new Error((await mainT()).main.dialogs.chooseFolderFirst)
     }
     const snap = await createBook(opts)
     await afterOpen(e, snap.root)
@@ -83,7 +84,7 @@ export function registerIpc(): void {
   handle('book:open', async (e, root) => {
     // A book from the library, or a folder that the user chose.
     const known = (await listLibrary()).some((i) => samePath(i.root, root))
-    if (!E2E && !known && !isPicked(root)) throw new Error('Open the folder with the Open folder button.')
+    if (!E2E && !known && !isPicked(root)) throw new Error((await mainT()).main.dialogs.useOpenFolder)
     const snap = await openBook(root)
     await afterOpen(e, root)
     await touchLibrary({
@@ -142,10 +143,11 @@ export function registerIpc(): void {
 
   handle('book:pickImage', async (e) => {
     const w = win(e)
+    const t = (await mainT()).main.dialogs
     const opts = {
-      title: 'Choose an image',
+      title: t.chooseImage,
       properties: ['openFile' as const],
-      filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'avif'] }]
+      filters: [{ name: t.images, extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'avif'] }]
     }
     const res = w ? await dialog.showOpenDialog(w, opts) : await dialog.showOpenDialog(opts)
     const file = res.canceled ? null : (res.filePaths[0] ?? null)
@@ -210,10 +212,11 @@ export function registerIpc(): void {
 
   handle('import:pick', async (e) => {
     const w = win(e)
+    const t = (await mainT()).main.dialogs
     const opts = {
-      title: 'Import a book',
+      title: t.importBook,
       properties: ['openFile' as const],
-      filters: [{ name: 'Documents', extensions: ['docx', 'md', 'markdown', 'txt'] }]
+      filters: [{ name: t.documents, extensions: ['docx', 'md', 'markdown', 'txt'] }]
     }
     const res = w ? await dialog.showOpenDialog(w, opts) : await dialog.showOpenDialog(opts)
     const file = res.canceled ? null : (res.filePaths[0] ?? null)
@@ -222,10 +225,11 @@ export function registerIpc(): void {
   })
   handle('import:pickNotes', async (e) => {
     const w = win(e)
+    const t = (await mainT()).main.dialogs
     const opts = {
-      title: 'Import notes into the planning',
+      title: t.importNotes,
       properties: ['openFile' as const, 'multiSelections' as const],
-      filters: [{ name: 'Markdown notes', extensions: ['md', 'markdown', 'txt'] }]
+      filters: [{ name: t.markdownNotes, extensions: ['md', 'markdown', 'txt'] }]
     }
     const res = w ? await dialog.showOpenDialog(w, opts) : await dialog.showOpenDialog(opts)
     if (res.canceled) return []

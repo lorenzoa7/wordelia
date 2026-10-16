@@ -4,6 +4,7 @@ import { BookOpenText, Lightning, PaintBrush, Robot } from '@phosphor-icons/reac
 import { useUi, type SettingsTab } from '@/stores/ui'
 import { useBook } from '@/stores/book'
 import { Dialog } from '@/ui'
+import { useT } from '@/lib/i18n'
 import { GeneralTab } from './GeneralTab'
 import { BookTab } from './BookTab'
 import { AiTab } from './AiTab'
@@ -15,28 +16,29 @@ export function SettingsDialog(): React.JSX.Element {
   const tab = useUi((s) => s.settingsTab)
   const close = useUi((s) => s.closeSettings)
   const hasBook = useBook((s) => s.root !== null)
+  const t = useT()
   const [current, setCurrent] = useState<SettingsTab>(tab)
   useEffect(() => {
     if (open) setCurrent(tab === 'book' && !hasBook ? 'general' : tab)
   }, [open, tab, hasBook])
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && close()} title="Settings" width={860} className="settings-dialog">
+    <Dialog open={open} onOpenChange={(v) => !v && close()} title={t.common.settings} width={860} className="settings-dialog">
       <Tabs.Root className="settings" value={current} onValueChange={(v) => setCurrent(v as SettingsTab)} orientation="vertical">
-        <Tabs.List className="settings-tabs" aria-label="Settings sections">
+        <Tabs.List className="settings-tabs" aria-label={t.settings.dialog.sections}>
           <Tabs.Trigger value="general" className="settings-tab">
-            <PaintBrush size={15} /> Appearance
+            <PaintBrush size={15} /> {t.settings.dialog.general}
           </Tabs.Trigger>
           {hasBook && (
             <Tabs.Trigger value="book" className="settings-tab">
-              <BookOpenText size={15} /> This book
+              <BookOpenText size={15} /> {t.settings.dialog.book}
             </Tabs.Trigger>
           )}
           <Tabs.Trigger value="ai" className="settings-tab">
-            <Robot size={15} /> AI
+            <Robot size={15} /> {t.settings.dialog.ai}
           </Tabs.Trigger>
           <Tabs.Trigger value="actions" className="settings-tab">
-            <Lightning size={15} /> Actions
+            <Lightning size={15} /> {t.settings.dialog.actions}
           </Tabs.Trigger>
         </Tabs.List>
         <div className="settings-panes">

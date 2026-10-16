@@ -11,6 +11,7 @@ import { schemaExtensions } from '@/features/editor/extensions'
 import { SmartTyping, quotesFor } from '@/features/editor/smart-typing'
 import { useBook } from '@/stores/book'
 import { registerFlusher } from '@/lib/flush'
+import { useT } from '@/lib/i18n'
 import { WikiLinks } from '@/features/editor/wiki-links'
 import { wikiLinkOptions } from './links'
 
@@ -33,6 +34,8 @@ export function NoteEditor({
   /** Label for quotes sent to the chat (the entry name). No label: no Reply button. */
   quoteLabel?: string
 }): React.JSX.Element {
+  const t = useT()
+  const hint = placeholder ?? t.plan.noteEditor.placeholder
   const language = useBook((s) => s.manifest?.language ?? 'en')
   const dash = useBook((s) => s.manifest?.typography.dialogueDash ?? '—')
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -50,16 +53,16 @@ export function NoteEditor({
       ...schemaExtensions(),
       SmartTyping.configure({ dash, quotes: true, ellipsis: true, ...quotesFor(language) }),
       WikiLinks.configure(wikiLinkOptions(true)),
-      Placeholder.configure({ placeholder: placeholder ?? 'Write here…' })
+      Placeholder.configure({ placeholder: hint })
     ],
-    [dash, language, placeholder]
+    [dash, language, hint]
   )
 
   const editor = useEditor(
     {
       extensions,
       content: parseMarkdown(value) as object,
-      editorProps: { attributes: { class: 'note-text prose', spellcheck: 'true', lang: language, 'aria-label': quoteLabel ? `Notes about ${quoteLabel}` : 'Notes' } },
+      editorProps: { attributes: { class: 'note-text prose', spellcheck: 'true', lang: language, 'aria-label': quoteLabel ? t.plan.noteEditor.notesAbout(quoteLabel) : t.plan.noteEditor.notes } },
       onUpdate: ({ editor: e }) => {
         clearTimeout(timer.current)
         timer.current = setTimeout(() => {
@@ -125,7 +128,7 @@ export function NoteEditor({
             }}
           >
             <ArrowBendUpLeft size={14} />
-            <span>Reply</span>
+            <span>{t.plan.noteEditor.reply}</span>
           </button>
         </BubbleMenu>
       )}

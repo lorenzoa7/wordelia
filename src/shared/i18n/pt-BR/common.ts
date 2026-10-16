@@ -26,6 +26,8 @@ export const common: typeof en = {
   next: 'Avançar',
   done: 'Pronto',
   continue: 'Continuar',
+  confirm: 'Confirmar',
+  ok: 'OK',
   settings: 'Configurações',
   loading: 'Carregando…',
   untitled: 'Sem título',

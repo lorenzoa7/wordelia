@@ -3,6 +3,7 @@
 import type { CompletionRequest, CompletionResult, StreamEvent } from '@shared/types'
 import { invoke, on } from './api'
 import { useApp } from '@/stores/app'
+import { getT } from './i18n'
 
 let counter = 0
 
@@ -25,7 +26,7 @@ export function runCompletion(req: CompletionRequest, onEvent?: (e: StreamEvent,
       // A CLI can say "logged in" while its token is dead. A real call is the truth.
       if (result.errorKind === 'not-logged-in') {
         const p = req.route.provider
-        useApp.setState((s) => ({ status: { ...s.status, [p]: { ...s.status[p], provider: p, installed: true, loggedIn: false, detail: result.error } } }))
+        useApp.setState((s) => ({ status: { ...s.status, [p]: { ...s.status[p], provider: p, installed: true, loggedIn: false, detail: result.error, ...(/expired|refresh/i.test(result.error ?? '') ? { reason: 'expired' as const } : {}) } } }))
       }
       return result
     })
@@ -34,18 +35,19 @@ export function runCompletion(req: CompletionRequest, onEvent?: (e: StreamEvent,
 }
 
 export function friendlyError(r: CompletionResult): string {
+  const t = getT().app.aiErrors
   switch (r.errorKind) {
     case 'not-installed':
-      return r.error ?? 'The AI provider is not installed.'
+      return r.error ?? t.notInstalled
     case 'not-logged-in':
-      return `${r.error ?? 'Not logged in.'} Open Settings → AI to connect.`
+      return t.connectHint(r.error ?? t.notLoggedIn)
     case 'rate-limit':
-      return 'The AI provider says the usage limit is reached. Try again later.'
+      return t.rateLimit
     case 'network':
-      return 'No connection to the AI provider.'
+      return t.network
     case 'cancelled':
-      return 'Stopped.'
+      return t.cancelled
     default:
-      return r.error ?? 'Something went wrong.'
+      return r.error ?? t.unknown
   }
 }

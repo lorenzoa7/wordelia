@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowRight, CheckCircle, Copy, Key, SignIn, Terminal, WarningCircle } from '@phosphor-icons/react'
+import { ArrowRight, CaretDown, CheckCircle, Copy, Globe, Key, SignIn, Terminal, WarningCircle } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { PROVIDER_LABELS } from '@shared/ai/routes'
 import type { ProviderId } from '@shared/types'
-import { Button, Spinner } from '@/ui'
+import { Button, Menu, MenuItem, Spinner } from '@/ui'
 import { Logo } from '@/app/Logo'
 import { invoke } from '@/lib/api'
+import { LOCALES, useT } from '@/lib/i18n'
 import { useApp } from '@/stores/app'
 import { toast, useUi } from '@/stores/ui'
 import './welcome.css'
@@ -20,6 +21,7 @@ const INSTALL: Record<string, { cmd: string; url: string }> = {
 
 /** First run: a short welcome, then connect an AI. */
 export function Welcome(): React.JSX.Element | null {
+  const t = useT()
   const onboarded = useApp((s) => s.settings?.onboarded ?? true)
   const update = useApp((s) => s.updateSettings)
   const [step, setStep] = useState(0)
@@ -31,37 +33,39 @@ export function Welcome(): React.JSX.Element | null {
       <motion.div
         role="dialog"
         aria-modal="true"
-        aria-label="Welcome to Wordelia"
+        aria-label={t.onboarding.dialog}
         className="welcome grain" initial={{ opacity: 0, y: 16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}>
+        <LanguagePicker />
         <AnimatePresence mode="wait">
           {step === 0 ? (
             <motion.div key="hello" className="welcome-step" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}>
               <Logo height={40} blink />
-              <h1 className="welcome-title">A quiet desk for your book.</h1>
+              <h1 className="welcome-title">{t.onboarding.title}</h1>
               <div className="welcome-points">
                 <p>
-                  <b>You write.</b> Wordelia gives you a calm page with real book typography.
+                  <b>{t.onboarding.youWrite}</b> {t.onboarding.youWriteText}
                 </p>
                 <p>
-                  <b>The AI edits.</b> Select a passage and press <kbd className="kbd">Ctrl+J</kbd>. The AI polishes it with your rules, and you see every change before you accept it.
+                  <b>{t.onboarding.aiEdits}</b> {t.onboarding.aiEditsBefore} <kbd className="kbd">Ctrl+J</kbd>
+                  {t.onboarding.aiEditsAfter}
                 </p>
                 <p>
-                  <b>The AI remembers.</b> It reads the whole book, the planning of your story, and your other conversations.
+                  <b>{t.onboarding.aiRemembers}</b> {t.onboarding.aiRemembersText}
                 </p>
               </div>
               <div className="welcome-actions">
                 <Button variant="ghost" onClick={finish}>
-                  Skip
+                  {t.onboarding.skip}
                 </Button>
                 <Button variant="ribbon" autoFocus onClick={() => setStep(1)}>
-                  Connect an AI <ArrowRight size={14} />
+                  {t.onboarding.connectAi} <ArrowRight size={14} />
                 </Button>
               </div>
             </motion.div>
           ) : (
             <motion.div key="connect" className="welcome-step" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}>
-              <h2 className="welcome-h2">Connect the AI you already pay for</h2>
-              <p className="welcome-sub">Wordelia is free. It runs your own Claude Code or Codex program, or uses an API key.</p>
+              <h2 className="welcome-h2">{t.onboarding.connectTitle}</h2>
+              <p className="welcome-sub">{t.onboarding.connectSub}</p>
               <div className="welcome-providers">
                 {CLI.map((p) => (
                   <CliRow key={p} id={p} />
@@ -73,13 +77,13 @@ export function Welcome(): React.JSX.Element | null {
                     useUi.getState().openSettings('ai')
                   }}
                 >
-                  <Key size={16} /> I have an API key (Anthropic or OpenAI)
+                  <Key size={16} /> {t.onboarding.apiKey}
                   <ArrowRight size={13} />
                 </button>
               </div>
               <div className="welcome-actions">
                 <Button variant="ghost" onClick={finish}>
-                  Later
+                  {t.onboarding.later}
                 </Button>
                 <Button
                   variant="primary"
@@ -88,7 +92,7 @@ export function Welcome(): React.JSX.Element | null {
                     void useApp.getState().autoRoute()
                   }}
                 >
-                  Start writing
+                  {t.onboarding.start}
                 </Button>
               </div>
             </motion.div>
@@ -100,6 +104,7 @@ export function Welcome(): React.JSX.Element | null {
 }
 
 function CliRow({ id }: { id: ProviderId }): React.JSX.Element {
+  const t = useT()
   const status = useApp((s) => s.status[id])
   const checking = useApp((s) => s.checking[id])
   const check = useApp((s) => s.checkProvider)
@@ -122,8 +127,8 @@ function CliRow({ id }: { id: ProviderId }): React.JSX.Element {
   const ok = status?.installed && status.loggedIn !== false
   const copy = (text: string): void => {
     navigator.clipboard.writeText(text).then(
-      () => toast('Copied. Paste it in a terminal.'),
-      () => toast(`Run in a terminal: ${text}`)
+      () => toast(t.onboarding.copied),
+      () => toast(t.onboarding.runInTerminal(text))
     )
   }
 
@@ -134,26 +139,26 @@ function CliRow({ id }: { id: ProviderId }): React.JSX.Element {
       </span>
       <div className="welcome-row-main">
         <strong>{PROVIDER_LABELS[id].name}</strong>
-        <span>{PROVIDER_LABELS[id].kind}</span>
+        <span>{t.common.providerKind[id]}</span>
         {status && !status.installed && (
           <span className="welcome-hint">
-            Not installed. In a terminal, run{' '}
+            {t.onboarding.notInstalled}{' '}
             <button className="cmd-chip" onClick={() => copy(INSTALL[id].cmd)}>
               {INSTALL[id].cmd} <Copy size={11} />
             </button>
           </span>
         )}
         {status?.installed && status.loggedIn === false && (
-          <span className="welcome-hint">{status.detail?.includes('expired') ? 'The login on this computer has expired.' : 'Installed, but not logged in.'}</span>
+          <span className="welcome-hint">{status.reason === 'expired' ? t.onboarding.expired : t.onboarding.notLoggedIn}</span>
         )}
-        {ok && <span className="welcome-hint">Found on this computer{status?.account ? `, logged in as ${status.account}` : ''}.</span>}
+        {ok && <span className="welcome-hint">{t.onboarding.found(status?.account)}</span>}
       </div>
       <div className="welcome-row-state">
         {checking && !status ? (
           <Spinner />
         ) : ok ? (
           <span className="state-ok">
-            <CheckCircle size={15} weight="fill" /> Connected
+            <CheckCircle size={15} weight="fill" /> {t.onboarding.connected}
           </span>
         ) : status?.installed ? (
           <Button
@@ -166,7 +171,7 @@ function CliRow({ id }: { id: ProviderId }): React.JSX.Element {
               })
             }
           >
-            {waiting ? 'Waiting…' : 'Log in'}
+            {waiting ? t.onboarding.waiting : t.onboarding.logIn}
           </Button>
         ) : (
           <span className="state-bad">
@@ -174,6 +179,33 @@ function CliRow({ id }: { id: ProviderId }): React.JSX.Element {
           </span>
         )}
       </div>
+    </div>
+  )
+}
+
+/** A small picker for the interface language, in the corner of the welcome card. */
+function LanguagePicker(): React.JSX.Element {
+  const t = useT()
+  const language = useApp((s) => s.settings?.language ?? 'en')
+  const current = LOCALES.find((l) => l.id === language) ?? LOCALES[0]
+  return (
+    <div className="welcome-lang">
+      <Menu
+        align="end"
+        trigger={
+          <button className="welcome-lang-btn" aria-label={`${t.onboarding.language}: ${current.label}`}>
+            <Globe size={13} />
+            <span>{current.label}</span>
+            <CaretDown size={10} />
+          </button>
+        }
+      >
+        {LOCALES.map((l) => (
+          <MenuItem key={l.id} checked={l.id === language} onSelect={() => void useApp.getState().updateSettings({ language: l.id })}>
+            <span lang={l.id}>{l.label}</span>
+          </MenuItem>
+        ))}
+      </Menu>
     </div>
   )
 }

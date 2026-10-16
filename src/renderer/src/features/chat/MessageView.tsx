@@ -11,6 +11,8 @@ import { ProposalCard } from './ProposalCard'
 import { acceptPending, pendingKeys, setHunkStates } from './applyProposal'
 import { Spinner } from '@/ui'
 import { typesetForBook } from '@/lib/typeset'
+import { useT } from '@/lib/i18n'
+import { mentionLabel } from './send'
 
 const mdComponents = {
   a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
@@ -29,6 +31,7 @@ function Markdown({ text }: { text: string }): React.JSX.Element {
 }
 
 export const MessageView = memo(function MessageView({ message, thread }: { message: ChatMessage; thread: Thread }): React.JSX.Element {
+  const t = useT()
   if (message.role === 'user') {
     return (
       <div className="msg msg-user">
@@ -44,7 +47,7 @@ export const MessageView = memo(function MessageView({ message, thread }: { mess
           <div className="msg-mentions">
             {message.mentions.map((m) => (
               <span key={m.id} className="mention-chip">
-                <MentionIcon kind={m.kind} /> {m.label}
+                <MentionIcon kind={m.kind} /> {mentionLabel(t, m)}
               </span>
             ))}
           </div>
@@ -89,6 +92,7 @@ function AssistantMessage({ message, thread }: { message: ChatMessage; thread: T
 
 /** One decision for all the proposals of a reply, for example after a planning sync. */
 function BulkBar({ segments, message, thread }: { segments: Segment[]; message: ChatMessage; thread: Thread }): React.JSX.Element | null {
+  const t = useT()
   const [busy, setBusy] = useState(false)
   const pending = pendingKeys(segments, message.hunks)
   if (pending.length < 2) return null
@@ -101,12 +105,7 @@ function BulkBar({ segments, message, thread }: { segments: Segment[]; message: 
       const ok = states.filter((s) => s === 'accepted').length
       const failed = states.length - ok
       const chapters = segments.some((s) => s.kind === 'edit' && s.file.replace(/\\/g, '/').startsWith('manuscript/'))
-      toast(
-        failed
-          ? `Applied ${ok} of ${states.length} proposals. ${failed} could not be applied: the text changed.`
-          : `Applied ${ok} proposals.${chapters ? ' The versions from before the change are in the chapter history.' : ''}`,
-        failed ? { kind: 'error' } : {}
-      )
+      toast(failed ? t.chat.bulkPartial(ok, states.length, failed) : t.chat.bulkApplied(ok, chapters), failed ? { kind: 'error' } : {})
     } finally {
       setBusy(false)
     }
@@ -114,28 +113,29 @@ function BulkBar({ segments, message, thread }: { segments: Segment[]; message: 
   const rejectAll = (): void => setHunkStates(thread, message.id, Object.fromEntries(pending.map((k) => [k, 'rejected'])))
   return (
     <div className="msg-bulk">
-      <span className="msg-bulk-count">{pending.length} proposals to review</span>
+      <span className="msg-bulk-count">{t.chat.toReview(pending.length)}</span>
       <button className="proposal-btn" onClick={rejectAll} disabled={busy}>
-        Reject all
+        {t.common.rejectAll}
       </button>
       <button className="proposal-btn is-accept" onClick={() => void acceptAll()} disabled={busy}>
-        {busy ? <Spinner size={11} /> : <Check size={12} weight="bold" />} Accept all
+        {busy ? <Spinner size={11} /> : <Check size={12} weight="bold" />} {t.common.acceptAll}
       </button>
     </div>
   )
 }
 
 function MessageActions({ text, model }: { text: string; model?: string }): React.JSX.Element {
+  const t = useT()
   const copy = (): void => {
     navigator.clipboard.writeText(text).then(
-      () => toast('Copied.'),
-      () => toast('Could not copy.', { kind: 'error' })
+      () => toast(t.common.copied),
+      () => toast(t.chat.copyFailed, { kind: 'error' })
     )
   }
   const insert = (): void => {
     const a = getActiveEditor()
     if (!a) {
-      toast('Open a chapter first.')
+      toast(t.chat.openChapterFirst)
       return
     }
     const { state } = a.editor
@@ -145,11 +145,11 @@ function MessageActions({ text, model }: { text: string; model?: string }): Reac
   }
   return (
     <div className="msg-actions">
-      <button onClick={copy} title="Copy the reply">
-        <Copy size={13} /> Copy
+      <button onClick={copy} title={t.chat.copyReply}>
+        <Copy size={13} /> {t.common.copy}
       </button>
-      <button onClick={insert} title="Insert the reply at the cursor in the open chapter (Ctrl+Z undoes it)">
-        <TextIndent size={13} /> Insert into chapter
+      <button onClick={insert} title={t.chat.insertHint}>
+        <TextIndent size={13} /> {t.chat.insert}
       </button>
       {model && <span className="msg-model">{model}</span>}
     </div>
@@ -157,11 +157,12 @@ function MessageActions({ text, model }: { text: string; model?: string }): Reac
 }
 
 export function StreamingMessage({ text }: { text: string }): React.JSX.Element {
+  const t = useT()
   const segments = useMemo(() => parseProposals(text), [text])
   return (
     <div className="msg msg-ai is-streaming">
       {segments.length === 0 && (
-        <div className="msg-thinking" role="status" aria-label="The editor is thinking">
+        <div className="msg-thinking" role="status" aria-label={t.chat.thinking}>
           <span />
           <span />
           <span />

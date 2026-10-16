@@ -22,6 +22,7 @@ import { invoke, on } from '@/lib/api'
 import { saver } from './saver'
 import { chapterWord } from '@shared/export/model'
 import { runFlushers } from '@/lib/flush'
+import { getT } from '@/lib/i18n'
 
 export type BookView = 'write' | 'plan'
 
@@ -222,7 +223,7 @@ export const useBook = create<BookState>((set, get) => {
       const { chapters, root } = get()
       const ch = chapters.find((c) => c.id === id)
       if (!ch || !root) return
-      const clean = title.trim() || 'Untitled'
+      const clean = title.trim() || getT().common.untitled
       const others = chapters.filter((c) => c.id !== id).map((c) => c.file)
       const file = uniqueName(fileNameFromTitle(clean), others)
       const oldRel = chapterRel(ch)
@@ -345,7 +346,7 @@ export const useBook = create<BookState>((set, get) => {
       const e = entries.find((x) => x.id === id)
       if (!e || !root) return
       const others = entries.filter((x) => x.category === e.category && x.id !== id).map((x) => x.file.slice(e.category.length + 1))
-      const fileName = uniqueName(fileNameFromTitle(name.trim() || 'Untitled'), others)
+      const fileName = uniqueName(fileNameFromTitle(name.trim() || getT().common.untitled), others)
       const file = `${e.category}/${fileName}`
       if (file === e.file) return
       const oldRel = entryRel(e)

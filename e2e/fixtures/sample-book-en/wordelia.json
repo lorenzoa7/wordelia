@@ -1,0 +1,68 @@
+{
+  "format": 1,
+  "id": "bk_sample_en",
+  "title": "The Lighthouse of Saint Isle",
+  "subtitle": "",
+  "author": "Ada Example",
+  "language": "en-US",
+  "genre": "Mystery",
+  "createdAt": "2026-10-01T10:00:00.000Z",
+  "updatedAt": "2026-10-01T10:00:00.000Z",
+  "chapters": [
+    {
+      "id": "ch_sample01",
+      "file": "The Storm.md"
+    },
+    {
+      "id": "ch_sample02",
+      "file": "The Visitor.md"
+    }
+  ],
+  "planning": {
+    "categories": [
+      {
+        "id": "characters",
+        "name": "Characters",
+        "folder": "Characters",
+        "icon": "UserCircle"
+      },
+      {
+        "id": "places",
+        "name": "Places",
+        "folder": "Places",
+        "icon": "MapPin"
+      },
+      {
+        "id": "world",
+        "name": "World",
+        "folder": "World",
+        "icon": "GlobeHemisphereWest"
+      },
+      {
+        "id": "plot",
+        "name": "Plot",
+        "folder": "Plot",
+        "icon": "Path"
+      },
+      {
+        "id": "notes",
+        "name": "Notes",
+        "folder": "Notes",
+        "icon": "Notebook"
+      }
+    ]
+  },
+  "typography": {
+    "fontFamily": "Literata",
+    "fontSize": 12,
+    "lineHeight": 1.6,
+    "paragraphSpacing": 0,
+    "firstLineIndent": 1.5,
+    "align": "justify",
+    "indentFirstParagraph": false,
+    "dialogueDash": "—",
+    "smartQuotes": true,
+    "smartEllipsis": true,
+    "sceneBreak": "asterisks"
+  }
+}

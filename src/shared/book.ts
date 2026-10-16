@@ -32,6 +32,7 @@ export const DEFAULT_TYPOGRAPHY: Typography = {
   align: 'justify',
   indentFirstParagraph: false,
   dialogueDash: '—',
+  dialogueStyle: 'dash',
   smartQuotes: true,
   smartEllipsis: true,
   sceneBreak: 'asterisks'
@@ -73,12 +74,17 @@ export function newManifest(opts: { title: string; author: string; language: str
     updatedAt: now,
     chapters: [],
     planning: { categories: DEFAULT_CATEGORIES.map((c) => ({ ...c })) },
-    typography: { ...DEFAULT_TYPOGRAPHY },
+    typography: { ...DEFAULT_TYPOGRAPHY, dialogueStyle: dialogueStyleFor(opts.language) },
     export: structuredClone(DEFAULT_EXPORT)
   }
 }
 
 /** Fill missing manifest fields with defaults, so old or hand-made files still open. */
+/** The usual dialogue style of a language: quotation marks in English, German and Dutch, a dash elsewhere. */
+export function dialogueStyleFor(language: string): 'dash' | 'quotes' {
+  return /^(en|de|nl)(-|$)/i.test(language) ? 'quotes' : 'dash'
+}
+
 export function normalizeManifest(raw: Partial<BookManifest> & Record<string, unknown>): BookManifest {
   const base = newManifest({ title: 'Untitled', author: '', language: 'en' })
   return {
@@ -90,7 +96,7 @@ export function normalizeManifest(raw: Partial<BookManifest> & Record<string, un
       categories:
         raw.planning?.categories && raw.planning.categories.length ? raw.planning.categories : base.planning.categories
     },
-    typography: { ...DEFAULT_TYPOGRAPHY, ...(raw.typography ?? {}) },
+    typography: { ...DEFAULT_TYPOGRAPHY, dialogueStyle: dialogueStyleFor(String(raw.language ?? 'en')), ...(raw.typography ?? {}) },
     export: {
       ...DEFAULT_EXPORT,
       ...(raw.export ?? {}),
@@ -130,8 +136,13 @@ export function uniqueName(name: string, taken: Iterable<string>): string {
   }
 }
 
+/** Files from Windows editors can have CRLF line ends. The app works with LF only. */
+function lf(src: string): string {
+  return src.replace(/\r\n?/g, '\n')
+}
+
 export function chapterFromFile(file: string, src: string, fallbackId: string): Chapter {
-  const { data, body } = readFrontmatter(src)
+  const { data, body } = readFrontmatter(lf(src))
   const { id, title, ...meta } = data
   return {
     id: typeof id === 'string' && id ? id : fallbackId,
@@ -147,7 +158,7 @@ export function chapterToFile(ch: Chapter): string {
 }
 
 export function entryFromFile(file: string, src: string, fallbackId: string): Entry {
-  const { data, body } = readFrontmatter(src)
+  const { data, body } = readFrontmatter(lf(src))
   const { id, aliases, summary, image, ...meta } = data
   const slash = file.lastIndexOf('/')
   const category = slash > 0 ? file.slice(0, slash) : ''

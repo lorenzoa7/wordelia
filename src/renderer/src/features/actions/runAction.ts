@@ -12,7 +12,8 @@ import { getActiveEditor } from '@/features/editor/registry'
 import { proposedPlain, reviewKey, textWithMap } from '@/features/editor/review'
 import { create } from 'zustand'
 import { normalizeRange } from './range'
-import { snapshot } from '@/features/history/snapshots'
+import { SNAPSHOT_EN, snapshot } from '@/features/history/snapshots'
+import { getT } from '@/lib/i18n'
 import { typesetForBook } from '@/lib/typeset'
 import { nearestEffort } from '@shared/ai/effort'
 
@@ -47,8 +48,9 @@ export async function runAction(action: AiAction, range?: { from: number; to: nu
   const baseModel = base ? useApp.getState().models[base.provider]?.find((m) => m.id === base.model) : undefined
   const effort = action.effort ? nearestEffort(action.effort, baseModel) : base?.effort
   const route = base ? { provider: base.provider, model: base.model, ...(effort ? { effort } : {}) } : null
+  const t = getT()
   if (!route) {
-    toast('Connect an AI first.', { action: { label: 'Open settings', run: () => useUi.getState().openSettings('ai') } })
+    toast(t.write.action.connectFirst, { action: { label: t.write.action.openSettings, run: () => useUi.getState().openSettings('ai') } })
     return
   }
 
@@ -116,12 +118,12 @@ export async function runAction(action: AiAction, range?: { from: number; to: nu
   const rewrite = typesetForBook(extractRewrite(result.text).text)
   if (!rewrite || proposedPlain(rewrite) === current.original.trim()) {
     if (window.wordelia.isE2E) console.warn('[action reply]', JSON.stringify(result.text.slice(0, 3000)))
-    toast(rewrite ? 'The AI found nothing to change.' : 'The AI sent no rewrite. Try again.')
+    toast(rewrite ? t.write.action.nothingToChange : t.write.action.noRewrite)
     editor.commands.rejectReview()
     return
   }
-  // Keep the text before the AI change in the version history.
-  snapshot(active.chapterId, `Before ${action.name}`)
+  // Keep the text before the AI change in the version history. The label stays in English; the history translates it.
+  snapshot(active.chapterId, SNAPSHOT_EN.before(action.name))
   editor.commands.updateReview(id, rewrite, 'ready')
 }
 

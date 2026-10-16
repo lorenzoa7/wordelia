@@ -4,9 +4,10 @@ import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
 import { Dialog as RDialog, DropdownMenu, Select as RSelect, Switch as RSwitch, Tooltip as RTooltip } from 'radix-ui'
 import { CaretDown, Check, X } from '@phosphor-icons/react'
 import clsx from 'clsx'
+import { useT } from '@/lib/i18n'
 
 /* ------------------------------------------------------------------ */
-/* Buttons                                                              */
+/* Buttons                                                            */
 /* ------------------------------------------------------------------ */
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -187,6 +188,7 @@ export function Dialog({
   width?: number
   className?: string
 }): React.JSX.Element {
+  const t = useT()
   return (
     <RDialog.Root open={open} onOpenChange={onOpenChange}>
       <RDialog.Portal>
@@ -208,7 +210,7 @@ export function Dialog({
               {description && <RDialog.Description className="dialog-desc">{description}</RDialog.Description>}
             </div>
             <RDialog.Close asChild>
-              <button className="icon-btn" aria-label="Close">
+              <button className="icon-btn" aria-label={t.common.close}>
                 <X size={16} />
               </button>
             </RDialog.Close>

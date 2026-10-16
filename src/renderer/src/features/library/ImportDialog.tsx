@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { BookOpen, FileText } from '@phosphor-icons/react'
-import { countMarkdownWords, formatCount } from '@shared/book'
+import { countMarkdownWords } from '@shared/book'
 import type { ImportedBook } from '@shared/ipc'
 import { Button, Dialog, Field, Select, Spinner, Switch, TextInput } from '@/ui'
 import { invoke } from '@/lib/api'
+import { getT, useT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
 import { toast } from '@/stores/ui'
-import { LANGUAGES, guessLanguage } from './NewBookDialog'
+import { guessLanguage, languageOptions } from './NewBookDialog'
 import { htmlToMarkdown } from './convert'
 import { startPlanningSync } from '@/features/plan/sync'
 
@@ -30,6 +31,7 @@ function detectLanguage(text: string): string | null {
 }
 
 export function ImportDialog({ path, onClose }: { path: string | null; onClose: () => void }): React.JSX.Element {
+  const t = useT()
   const [prepared, setPrepared] = useState<Prepared | null>(null)
   const [title, setTitle] = useState('')
   const [author, setAuthor] = useState('')
@@ -53,7 +55,7 @@ export function ImportDialog({ path, onClose }: { path: string | null; onClose: 
         if (lang) setLanguage(lang)
       })
       .catch((err: unknown) => {
-        toast(`Could not read the file: ${err instanceof Error ? err.message : String(err)}`, { kind: 'error' })
+        toast(getT().library.couldNotRead(err instanceof Error ? err.message : String(err)), { kind: 'error' })
         onClose()
       })
   }, [path, onClose])
@@ -63,16 +65,16 @@ export function ImportDialog({ path, onClose }: { path: string | null; onClose: 
     setBusy(true)
     try {
       const parentDir = await invoke('app:defaultBooksDir')
-      const snap = await invoke('book:create', { parentDir, title: title.trim() || 'Imported book', author: author.trim(), language, empty: true })
+      const snap = await invoke('book:create', { parentDir, title: title.trim() || t.library.importedBook, author: author.trim(), language, empty: true })
       const store = useBook.getState()
       store.open(snap)
       for (const c of prepared.chapters) await useBook.getState().addChapter(null, c.title, c.markdown)
       useBook.getState().selectChapter(useBook.getState().chapters[0]?.id ?? '')
       onClose()
-      toast(`Imported ${prepared.chapters.length} ${prepared.chapters.length === 1 ? 'chapter' : 'chapters'}.`)
+      toast(getT().library.imported(prepared.chapters.length))
       if (buildPlanning) void startPlanningSync({ bootstrap: true })
     } catch (err) {
-      toast(`Import failed: ${err instanceof Error ? err.message : String(err)}`, { kind: 'error' })
+      toast(getT().library.importFailed(err instanceof Error ? err.message : String(err)), { kind: 'error' })
     } finally {
       setBusy(false)
     }
@@ -84,61 +86,55 @@ export function ImportDialog({ path, onClose }: { path: string | null; onClose: 
     <Dialog
       open={path !== null}
       onOpenChange={(v) => !v && onClose()}
-      title="Import a book"
+      title={t.library.importTitle}
       description={path ? path.split(/[\\/]/).pop() : undefined}
       width={600}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
-            Cancel
+            {t.common.cancel}
           </Button>
           <Button variant="primary" onClick={() => void run()} disabled={!prepared || busy}>
-            {busy ? 'Importing…' : 'Import'}
+            {busy ? t.library.importing : t.common.import}
           </Button>
         </>
       }
     >
       {!prepared ? (
         <div className="import-loading">
-          <Spinner /> Reading the file…
+          <Spinner /> {t.library.reading}
         </div>
       ) : (
         <>
           <div className="import-summary">
             <BookOpen size={18} />
-            <span>
-              {prepared.chapters.length} {prepared.chapters.length === 1 ? 'chapter' : 'chapters'} · {formatCount(total)} words
-            </span>
+            <span>{t.library.importSummary(prepared.chapters.length, total)}</span>
           </div>
           <ol className="import-chapters">
             {prepared.chapters.map((c, i) => (
               <li key={i}>
                 <FileText size={14} />
                 <span className="import-ch-title">{c.title}</span>
-                <span className="import-ch-words">{formatCount(c.words)}</span>
+                <span className="import-ch-words">{t.library.count(c.words)}</span>
               </li>
             ))}
           </ol>
           <div className="import-fields">
-            <Field label="Title">
+            <Field label={t.library.title}>
               <TextInput value={title} onChange={(e) => setTitle(e.target.value)} />
             </Field>
-            <Field label="Author">
+            <Field label={t.library.author}>
               <TextInput value={author} onChange={(e) => setAuthor(e.target.value)} />
             </Field>
           </div>
-          <Field label="Language of the book">
-            <Select value={language} onValueChange={setLanguage} options={LANGUAGES} ariaLabel="Language" />
+          <Field label={t.library.language}>
+            <Select value={language} onValueChange={setLanguage} options={languageOptions(t)} ariaLabel={t.library.languageAria} />
           </Field>
-          <Field label="Build the planning with AI" inline>
-            <Switch checked={buildPlanning} onCheckedChange={setBuildPlanning} label="Build the planning with AI" />
+          <Field label={t.library.buildPlanning} inline>
+            <Switch checked={buildPlanning} onCheckedChange={setBuildPlanning} label={t.library.buildPlanning} />
           </Field>
-          <p className="import-note">
-            The AI reads the chapters and proposes characters, places and plot notes. You review each proposal before it is saved.
-          </p>
-          {prepared.book.warnings.length > 0 && (
-            <p className="import-note muted">{prepared.book.warnings.length} formatting notes from the converter were ignored.</p>
-          )}
+          <p className="import-note">{t.library.buildPlanningNote}</p>
+          {prepared.book.warnings.length > 0 && <p className="import-note muted">{t.library.warnings(prepared.book.warnings.length)}</p>}
         </>
       )}
     </Dialog>

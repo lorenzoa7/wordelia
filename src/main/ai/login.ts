@@ -3,6 +3,7 @@
 
 import { spawn } from 'node:child_process'
 import type { ProviderId } from '@shared/types'
+import { mainT } from '../i18n'
 import { getSettings } from '../settings'
 import { claudeCandidates, codexCandidates, resolveBin } from './resolve-bin'
 
@@ -24,7 +25,9 @@ export async function openLogin(provider: ProviderId, task: 'login' | 'update' =
     const line = `"${quoted} ${args.join(' ')}"`
     const env: NodeJS.ProcessEnv = { ...process.env, ...bin.env }
     delete env['CLAUDECODE']
-    const child = spawn('cmd.exe', ['/c', 'start', task === 'update' ? '"Wordelia update"' : '"Wordelia login"', 'cmd.exe', '/k', line], {
+    const t = (await mainT()).main.terminal
+    const title = `"${task === 'update' ? t.update : t.login}"`
+    const child = spawn('cmd.exe', ['/c', 'start', title, 'cmd.exe', '/k', line], {
       detached: true,
       stdio: 'ignore',
       windowsVerbatimArguments: true,

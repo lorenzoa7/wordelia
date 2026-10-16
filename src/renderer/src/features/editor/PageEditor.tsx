@@ -12,6 +12,7 @@ import { chapterWord } from '@shared/export/model'
 import type { DocNode } from '@shared/types'
 import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
+import { useT } from '@/lib/i18n'
 import { fontStack } from '@/lib/fonts'
 import { editorExtensions } from './extensions'
 import { setActiveEditor } from './registry'
@@ -34,6 +35,7 @@ export function PageEditor(): React.JSX.Element | null {
   const ui = useApp((s) => s.settings?.ui)
   const spellcheck = useApp((s) => s.settings?.editor.spellcheck ?? true)
   const typo = manifest?.typography
+  const t = useT()
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const [typing, setTyping] = useState(false)
@@ -53,10 +55,10 @@ export function PageEditor(): React.JSX.Element | null {
         smartQuotes: typo?.smartQuotes ?? true,
         smartEllipsis: typo?.smartEllipsis ?? true,
         language: manifest?.language ?? 'en',
-        placeholder: 'Begin here…'
+        placeholder: t.editor.page.placeholder
       }),
-    // Typing rules change rarely; the editor is rebuilt when they do.
-    [typo?.dialogueDash, typo?.smartQuotes, typo?.smartEllipsis, manifest?.language]
+    // Typing rules and the interface language change rarely; the editor is rebuilt when they do.
+    [typo?.dialogueDash, typo?.smartQuotes, typo?.smartEllipsis, manifest?.language, t.editor.page.placeholder]
   )
 
   const flush = useCallback((): void => {
@@ -88,7 +90,7 @@ export function PageEditor(): React.JSX.Element | null {
           class: 'manuscript',
           spellcheck: String(spellcheck),
           lang: manifest?.language ?? 'en',
-          'aria-label': 'Chapter text'
+          'aria-label': t.editor.page.chapterText
         }
       },
       onUpdate: ({ transaction }) => {
@@ -228,6 +230,8 @@ export function PageEditor(): React.JSX.Element | null {
         <motion.article
           key={chapter.id}
           className="page grain"
+          // Hyphenation and spell check follow the language of the book, not the language of the interface.
+          lang={manifest?.language ?? 'en'}
           style={pageStyle}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -255,6 +259,7 @@ export function PageEditor(): React.JSX.Element | null {
 
 function ChapterHead({ index, title, id, onEnter }: { index: number; title: string; id: string; onEnter: () => void }): React.JSX.Element {
   const language = useBook((s) => s.manifest?.language ?? 'en')
+  const t = useT()
   const [value, setValue] = useState(title)
   useEffect(() => setValue(title), [title, id])
   const commit = (): void => {
@@ -268,7 +273,7 @@ function ChapterHead({ index, title, id, onEnter }: { index: number; title: stri
       <input
         className="chapter-title"
         value={value}
-        aria-label="Chapter title"
+        aria-label={t.editor.page.chapterTitle}
         spellCheck={false}
         onChange={(e) => setValue(e.target.value)}
         onBlur={commit}
@@ -294,11 +299,12 @@ function ChapterHead({ index, title, id, onEnter }: { index: number; title: stri
 function PageEnd(): React.JSX.Element {
   const chapterId = useBook((s) => s.activeChapterId)
   const isLast = useBook((s) => s.chapters[s.chapters.length - 1]?.id === s.activeChapterId)
+  const t = useT()
   return (
     <div className="page-end">
       {isLast && (
         <button className="page-end-btn" onClick={() => void useBook.getState().addChapter(chapterId)}>
-          <Plus size={13} /> Start the next chapter
+          <Plus size={13} /> {t.editor.page.nextChapter}
         </button>
       )}
     </div>
@@ -306,11 +312,14 @@ function PageEnd(): React.JSX.Element {
 }
 
 function EmptyManuscript(): React.JSX.Element {
+  const t = useT()
+  // The first chapter title is book text: it follows the language of the book.
+  const language = useBook((s) => s.manifest?.language ?? 'en')
   return (
     <div className="empty-manuscript">
-      <p>This book has no chapters yet.</p>
-      <button className="btn btn-primary btn-md" onClick={() => void useBook.getState().addChapter(null, 'Chapter One')}>
-        <Plus size={14} /> Add the first chapter
+      <p>{t.editor.page.noChapters}</p>
+      <button className="btn btn-primary btn-md" onClick={() => void useBook.getState().addChapter(null, chapterWord(language, 1))}>
+        <Plus size={14} /> {t.editor.page.addFirstChapter}
       </button>
     </div>
   )

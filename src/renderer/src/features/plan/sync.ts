@@ -6,11 +6,15 @@ import { buildSyncSystem, buildSyncUser } from '@shared/prompts/sync'
 import { estimateTokens } from '@shared/prompts/context'
 import type { Chapter, ChatMessage, Thread } from '@shared/types'
 import { friendlyError, runCompletion } from '@/lib/ai'
+import { getT } from '@/lib/i18n'
 import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
 import { toast, useUi } from '@/stores/ui'
 import { flushEditor } from '@/features/editor/registry'
 import { useChat } from '@/features/chat/chatStore'
+import { messagesFor } from '@shared/i18n'
+
+const EN = messagesFor('en')
 
 export const SYNC_THREAD_ID = 'th_planning_sync'
 const BATCH_TOKENS = 60000
@@ -44,8 +48,9 @@ function syncThread(): Thread {
   const now = new Date().toISOString()
   return {
     id: SYNC_THREAD_ID,
-    title: 'Planning sync',
-    brief: 'Keeps the planning in step with the manuscript. Proposals come from the Sync button.',
+    // Stored in English; the chat shows them in the interface language (threadTitle, threadBrief).
+    title: EN.plan.sync.threadTitle,
+    brief: EN.plan.sync.threadBrief,
     digest: '',
     digestedCount: 0,
     createdAt: now,
@@ -60,10 +65,11 @@ let running = false
 
 export async function startPlanningSync(opts: { bootstrap?: boolean } = {}): Promise<void> {
   if (running) return
+  const t = getT()
   const settings = useApp.getState().settings
   const route = settings?.routes.sync ?? settings?.routes.chat ?? null
   if (!route) {
-    toast('Connect an AI first.', { action: { label: 'Open settings', run: () => useUi.getState().openSettings('ai') } })
+    toast(t.plan.sync.connectAiFirst, { action: { label: t.plan.sync.openSettings, run: () => useUi.getState().openSettings('ai') } })
     return
   }
   flushEditor()
@@ -71,7 +77,7 @@ export async function startPlanningSync(opts: { bootstrap?: boolean } = {}): Pro
   if (!book.manifest) return
   const todo = opts.bootstrap ? book.chapters.filter((c) => c.body.trim()) : changedChapters()
   if (!todo.length) {
-    toast('The planning is up to date with the manuscript.')
+    toast(t.plan.sync.upToDate)
     return
   }
 
@@ -90,7 +96,7 @@ export async function startPlanningSync(opts: { bootstrap?: boolean } = {}): Pro
       const userMsg: ChatMessage = {
         id: newId('m'),
         role: 'user',
-        content: `${bootstrap ? 'Build the planning from' : 'Sync the planning with'} ${group.length === 1 ? 'chapter' : `${group.length} chapters`}: ${label}${groups.length > 1 ? ` (part ${i + 1} of ${groups.length})` : ''}.`,
+        content: t.plan.sync.request(bootstrap, group.length, label, i + 1, groups.length),
         createdAt: new Date().toISOString()
       }
       let thread = { ...syncThread(), messages: [...syncThread().messages, userMsg], updatedAt: new Date().toISOString() }
@@ -141,7 +147,7 @@ export async function startPlanningSync(opts: { bootstrap?: boolean } = {}): Pro
       }
       st.setSyncState({ chapters: hashes, syncedAt: new Date().toISOString() })
     }
-    toast('Sync done. Review the proposals in the chat.')
+    toast(t.plan.sync.done)
   } finally {
     running = false
   }

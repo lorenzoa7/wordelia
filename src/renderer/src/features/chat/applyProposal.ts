@@ -8,6 +8,7 @@ import { useBook } from '@/stores/book'
 import { applyToChapter, flushEditor, type ApplyResult } from '@/features/editor/registry'
 import { snapshot } from '@/features/history/snapshots'
 import { typesetForBook } from '@/lib/typeset'
+import { getT } from '@/lib/i18n'
 
 export type Target =
   | { kind: 'chapter'; chapter: Chapter; label: string }
@@ -58,15 +59,16 @@ export function applyEditHunk(file: string, hunk: Hunk): ApplyResult {
         return { ok: true }
       }
     }
-    return inBody
+    // The reason in the interface language.
+    return { ok: false, reason: inBody.code === 'ambiguous' ? getT().chat.entryManyMatches : getT().chat.entryNotFound }
   }
-  return { ok: false, reason: `The file "${t.label}" does not exist.` }
+  return { ok: false, reason: getT().chat.fileMissing(t.label) }
 }
 
 export async function applyCreate(file: string, content: string): Promise<ApplyResult> {
   const t = resolveTarget(file)
   if (t.kind === 'chapter' || t.kind === 'unknown') {
-    return { ok: false, reason: 'The AI can create planning entries only.' }
+    return { ok: false, reason: getT().chat.createOnlyEntries }
   }
   if (t.kind === 'entry') {
     // The entry exists already: keep its id, replace its text.

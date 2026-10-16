@@ -7,6 +7,7 @@ import type { Entry } from '@shared/types'
 import { Button, IconButton, Tooltip } from '@/ui'
 import { askConfirm } from '@/ui/prompt'
 import { invoke } from '@/lib/api'
+import { categoryName, useT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
 import { useUi } from '@/stores/ui'
 import { useChat } from '@/features/chat/chatStore'
@@ -69,13 +70,14 @@ function Portrait({ entry, size }: { entry: Entry; size: 'card' | 'large' }): Re
 /* ------------------------------------------------------------------ */
 
 function CategoryGrid({ folder }: { folder: string | null }): React.JSX.Element {
+  const t = useT()
   const manifest = useBook((s) => s.manifest)
   const entries = useBook((s) => s.entries)
   const categories = manifest?.planning.categories ?? []
   const shown = folder ? categories.filter((c) => c.folder === folder) : categories
 
   const add = async (cat: string): Promise<void> => {
-    const e = await useBook.getState().createEntry(cat, 'New entry')
+    const e = await useBook.getState().createEntry(cat, t.plan.newEntryName)
     useBook.getState().selectEntry(e.id)
     setTimeout(() => document.querySelector<HTMLInputElement>('.entry-name')?.select(), 80)
   }
@@ -87,14 +89,12 @@ function CategoryGrid({ folder }: { folder: string | null }): React.JSX.Element 
       <div className="plan-inner">
         {!folder && (
           <header className="plan-hero">
-            <h1>The story bible</h1>
-            <p>
-              Characters, places, the world and the plot. The AI reads this planning in every chat and action, so the book stays consistent.
-            </p>
+            <h1>{t.plan.overview.title}</h1>
+            <p>{t.plan.overview.intro}</p>
             {total === 0 && (
               <div className="plan-hero-actions">
                 <Button variant="ribbon" onClick={() => void startPlanningSync({ bootstrap: true })}>
-                  Build the planning from the manuscript
+                  {t.plan.overview.buildFromManuscript}
                 </Button>
               </div>
             )}
@@ -106,7 +106,7 @@ function CategoryGrid({ folder }: { folder: string | null }): React.JSX.Element 
             <section key={c.id} className="plan-section">
               <h2 className="plan-section-title">
                 <CategoryIcon name={c.icon} size={16} />
-                <span>{c.name}</span>
+                <span>{categoryName(t, c)}</span>
                 <span className="plan-section-count">{list.length}</span>
               </h2>
               <div className="entry-grid">
@@ -121,12 +121,12 @@ function CategoryGrid({ folder }: { folder: string | null }): React.JSX.Element 
                   >
                     {c.folder === 'Characters' || e.image ? <Portrait entry={e} size="card" /> : null}
                     <span className="entry-card-name">{e.name}</span>
-                    <span className="entry-card-summary">{e.summary || firstSentence(e.body) || 'No notes yet.'}</span>
+                    <span className="entry-card-summary">{e.summary || firstSentence(e.body) || t.plan.overview.noNotesYet}</span>
                   </motion.button>
                 ))}
                 <button className="entry-card entry-card-new" onClick={() => void add(c.folder)}>
                   <Plus size={18} />
-                  <span>New</span>
+                  <span>{t.plan.overview.newCard}</span>
                 </button>
               </div>
             </section>
@@ -148,6 +148,7 @@ function firstSentence(md: string): string {
 /* ------------------------------------------------------------------ */
 
 function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
+  const t = useT()
   const root = useBook((s) => s.root)
   const chapters = useBook((s) => s.chapters)
   const rev = useBook((s) => s.externalRev[entry.id] ?? 0)
@@ -188,9 +189,9 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
   }
   const remove = async (): Promise<void> => {
     const ok = await askConfirm({
-      title: `Delete “${entry.name}”?`,
-      message: "The file moves to the book's .wordelia/trash folder.",
-      confirm: 'Delete',
+      title: t.plan.entry.deleteTitle(entry.name),
+      message: t.plan.entry.deleteMessage,
+      confirm: t.common.delete,
       danger: true
     })
     if (ok) await useBook.getState().deleteEntry(entry.id)
@@ -206,12 +207,12 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
       >
         <div className="entry-crumbs">
           <button onClick={() => useBook.getState().selectCategory(entry.category)}>
-            <CategoryIcon name={category?.icon ?? 'Folder'} size={13} /> {category?.name ?? entry.category}
+            <CategoryIcon name={category?.icon ?? 'Folder'} size={13} /> {category ? categoryName(t, category) : entry.category}
           </button>
           <span className="entry-tools">
-            <Tooltip label="Ask the chat about this entry">
+            <Tooltip label={t.plan.entry.askChat}>
               <IconButton
-                label="Mention in chat"
+                label={t.plan.entry.mentionInChat}
                 onClick={() => {
                   useChat.getState().addMention({ kind: 'entry', id: entry.id, label: entry.name })
                   useApp.getState().setUi({ chatOpen: true })
@@ -220,23 +221,23 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
                 <ArrowBendUpLeft size={15} />
               </IconButton>
             </Tooltip>
-            <IconButton label="Delete entry" onClick={() => void remove()}>
+            <IconButton label={t.plan.entry.deleteEntry} onClick={() => void remove()}>
               <Trash size={15} />
             </IconButton>
           </span>
         </div>
         <header className="entry-head">
-          <button className="entry-portrait" onClick={() => void pickImage()} title="Choose an image">
+          <button className="entry-portrait" onClick={() => void pickImage()} title={t.plan.entry.chooseImage}>
             <Portrait entry={entry} size="large" />
             <span className="entry-portrait-hint">
-              <ImageSquare size={14} /> {entry.image ? 'Change' : 'Add image'}
+              <ImageSquare size={14} /> {entry.image ? t.plan.entry.changeImage : t.plan.entry.addImage}
             </span>
           </button>
           <div className="entry-fields">
             <input
               className="entry-name"
               value={name}
-              aria-label="Name"
+              aria-label={t.plan.name}
               onChange={(e) => setName(e.target.value)}
               onBlur={() => name.trim() && name !== entry.name && void useBook.getState().renameEntry(entry.id, name)}
               onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
@@ -244,16 +245,16 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
             <input
               className="entry-summary"
               value={entry.summary}
-              placeholder="One line that describes this entry"
-              aria-label="Summary"
+              placeholder={t.plan.entry.summaryPlaceholder}
+              aria-label={t.plan.entry.summary}
               onChange={(e) => update(entry.id, { summary: e.target.value })}
             />
             <div className="entry-aliases">
-              <span className="caps">Also called</span>
+              <span className="caps">{t.plan.entry.alsoCalled}</span>
               {entry.aliases.map((a) => (
                 <span key={a} className="alias-chip">
                   {a}
-                  <button onClick={() => update(entry.id, { aliases: entry.aliases.filter((x) => x !== a) })} aria-label={`Remove ${a}`}>
+                  <button onClick={() => update(entry.id, { aliases: entry.aliases.filter((x) => x !== a) })} aria-label={t.plan.entry.removeAlias(a)}>
                     <X size={10} />
                   </button>
                 </span>
@@ -261,7 +262,7 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
               <input
                 className="alias-input"
                 value={aliasDraft}
-                placeholder="+ name"
+                placeholder={t.plan.entry.aliasPlaceholder}
                 onChange={(e) => setAliasDraft(e.target.value)}
                 onBlur={addAlias}
                 onKeyDown={(e) => {
@@ -281,12 +282,12 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
             value={entry.body}
             onChange={(md) => update(entry.id, { body: md })}
             quoteLabel={entry.name}
-            placeholder="Notes: appearance, personality, history, secrets…"
+            placeholder={t.plan.entry.notesPlaceholder}
           />
         </div>
         {mentions.length > 0 && (
           <footer className="entry-mentions">
-            <span className="caps">In the manuscript</span>
+            <span className="caps">{t.plan.entry.inManuscript}</span>
             <div>
               {mentions.map((m) => (
                 <button
@@ -313,19 +314,18 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
 /* ------------------------------------------------------------------ */
 
 function WritingRules(): React.JSX.Element {
+  const t = useT()
   const rules = useBook((s) => s.writingRules)
   const setRules = useBook((s) => s.setWritingRules)
   return (
     <div className="plan-scroll">
       <motion.article className="entry-page grain" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
         <header className="rules-head">
-          <h1>Writing rules</h1>
-          <p>
-            Your rules for this book: voice, point of view, tense, dialogue, words to avoid. Every AI action and chat follows them. Paste the rules from your old prompt here.
-          </p>
+          <h1>{t.plan.writingRules}</h1>
+          <p>{t.plan.rules.intro}</p>
         </header>
         <div className="entry-body">
-          <NoteEditor docKey="writing-rules" value={rules} onChange={setRules} placeholder="Write your rules…" />
+          <NoteEditor docKey="writing-rules" value={rules} onChange={setRules} placeholder={t.plan.rules.placeholder} />
         </div>
       </motion.article>
     </div>

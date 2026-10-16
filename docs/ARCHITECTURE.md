@@ -229,6 +229,14 @@ After each AI reply, a background job (Background route) updates the digest of t
 3. The AI returns `<create>` and `<edit>` proposals for planning files only.
 4. The user reviews them. Accepted proposals update the files and `ai/sync-state.json`.
 
+### 5.7 Interface languages
+
+The interface is in English (the default), Portuguese (Brazil) and Spanish (`AppSettings.language`). The texts are in `src/shared/i18n/<locale>/<namespace>.ts`. The translations have the type of the English texts, so a missing key is a type error. React code uses `useT()`, other renderer code `getT()`, and the main process `mainT()`. Rules and a terms table: `src/shared/i18n/README.md`.
+
+Some texts are stored in English and translated only when the app shows them, so that a book looks the same in every language: the title "New thread" (it also tells the app to make a title), the title and the purpose of the planning sync thread, and the labels of chapter versions ("Opened", "Before Polish"). Built-in actions and default categories show translated names until the user renames them (`actionName`, `categoryName`).
+
+The language of a book is a different setting. It controls the AI output, the dialogue style, the chapter word ("Capítulo Um"), spell check, hyphenation (the page has `lang` = book language) and export. AI prompts stay in English.
+
 ## 6. Settings and secrets
 
 App data folder (`app.getPath('userData')`):

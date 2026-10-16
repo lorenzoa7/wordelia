@@ -1,3 +1,30 @@
 import type { onboarding as en } from '../en/onboarding'
 
-export const onboarding: typeof en = {}
+export const onboarding: typeof en = {
+  dialog: 'Boas-vindas ao Wordelia',
+  language: 'Idioma',
+  title: 'Uma mesa tranquila para o seu livro.',
+  youWrite: 'Você escreve.',
+  youWriteText: 'O Wordelia oferece uma página calma, com tipografia de livro de verdade.',
+  aiEdits: 'A IA edita.',
+  aiEditsBefore: 'Selecione um trecho e pressione',
+  aiEditsAfter: '. A IA revisa o trecho com as suas regras, e você vê cada mudança antes de aceitar.',
+  aiRemembers: 'A IA lembra.',
+  aiRemembersText: 'Ela lê o livro inteiro, o planejamento da sua história e as suas outras conversas.',
+  skip: 'Pular',
+  connectAi: 'Conectar uma IA',
+  connectTitle: 'Conecte a IA pela qual você já paga',
+  connectSub: 'O Wordelia é gratuito. Ele usa o seu próprio programa Claude Code ou Codex, ou uma chave de API.',
+  apiKey: 'Tenho uma chave de API (Anthropic ou OpenAI)',
+  later: 'Depois',
+  start: 'Começar a escrever',
+  copied: 'Copiado. Cole em um terminal.',
+  runInTerminal: (cmd) => `Execute em um terminal: ${cmd}`,
+  notInstalled: 'Não instalado. Em um terminal, execute',
+  expired: 'O login neste computador expirou.',
+  notLoggedIn: 'Instalado, mas sem login.',
+  found: (account) => `Encontrado neste computador${account ? `, conectado como ${account}` : ''}.`,
+  connected: 'Conectado',
+  waiting: 'Aguardando…',
+  logIn: 'Entrar'
+}

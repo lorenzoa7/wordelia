@@ -84,6 +84,8 @@
 .export-grid {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
+  /* A label on two lines must not push its field below the others. */
+  align-items: end;
   gap: 0 var(--s-3);
 }
 .export-grid .select {

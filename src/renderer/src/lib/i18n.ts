@@ -17,4 +17,4 @@ export function getT(): Messages {
   return messagesFor(useApp.getState().settings?.language)
 }
 
-export { actionName, categoryName, effortName, routeText, LOCALES } from '@shared/i18n'
+export { actionName, categoryName, effortName, folderCategoryName, routeText, LOCALES } from '@shared/i18n'

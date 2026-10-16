@@ -83,14 +83,18 @@ export function findText(haystack: string, needle: string): MatchResult | null {
   return { start, end, mode: 'normalized', count: countOf(h.text, n) }
 }
 
-export function applyHunk(markdown: string, find: string, replace: string): { ok: true; text: string } | { ok: false; reason: string } {
+export function applyHunk(
+  markdown: string,
+  find: string,
+  replace: string
+): { ok: true; text: string } | { ok: false; reason: string; code: 'not-found' | 'ambiguous' } {
   // An empty find means "append".
   if (!find.trim()) {
     const sep = markdown.endsWith('\n\n') || markdown === '' ? '' : markdown.endsWith('\n') ? '\n' : '\n\n'
     return { ok: true, text: markdown + sep + replace + '\n' }
   }
   const m = findText(markdown, find)
-  if (!m) return { ok: false, reason: 'The text to change was not found. It may have changed since the AI read it.' }
-  if (m.count > 1) return { ok: false, reason: 'The text to change appears more than once, so the right place is not clear. Ask the AI for a longer passage.' }
+  if (!m) return { ok: false, code: 'not-found', reason: 'The text to change was not found. It may have changed since the AI read it.' }
+  if (m.count > 1) return { ok: false, code: 'ambiguous', reason: 'The text to change appears more than once, so the right place is not clear. Ask the AI for a longer passage.' }
   return { ok: true, text: markdown.slice(0, m.start) + replace + markdown.slice(m.end) }
 }

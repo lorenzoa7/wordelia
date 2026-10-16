@@ -2,6 +2,7 @@
 
 import OpenAI from 'openai'
 import type { CompletionRequest, CompletionResult, ModelInfo, ProviderStatus, StreamEvent } from '@shared/types'
+import { mainT } from '../i18n'
 import { getSecret } from '../settings'
 import { classifyError, type ProviderTransport } from './transport'
 
@@ -23,10 +24,11 @@ export const openaiApi: ProviderTransport = {
 
   async status(): Promise<ProviderStatus> {
     const c = await client()
-    if (!c) return { provider: 'openai', installed: true, loggedIn: false, detail: 'Add an API key.' }
+    const t = (await mainT()).main.ai
+    if (!c) return { provider: 'openai', installed: true, loggedIn: false, detail: t.addApiKey }
     try {
       await c.models.list()
-      return { provider: 'openai', installed: true, loggedIn: true, detail: 'API key works.' }
+      return { provider: 'openai', installed: true, loggedIn: true, detail: t.apiKeyWorks }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       return { provider: 'openai', installed: true, loggedIn: false, detail: msg.slice(0, 200) }
@@ -59,7 +61,8 @@ export const openaiApi: ProviderTransport = {
 
   async complete(req: CompletionRequest, onEvent: (e: StreamEvent) => void, signal: AbortSignal): Promise<CompletionResult> {
     const c = await client()
-    if (!c) return { ok: false, text: '', error: 'Add an OpenAI API key in Settings.', errorKind: 'not-logged-in' }
+    const t = (await mainT()).main.ai
+    if (!c) return { ok: false, text: '', error: t.openaiAddKey, errorKind: 'not-logged-in' }
     const model = req.route.model
     let text = ''
     try {
@@ -86,7 +89,7 @@ export const openaiApi: ProviderTransport = {
             onEvent({ type: 'usage', ...usage })
           }
         } else if (ev.type === 'response.failed') {
-          const msg = ev.response.error?.message ?? 'The request failed.'
+          const msg = ev.response.error?.message ?? t.requestFailed
           return { ok: false, text, model, error: msg, errorKind: classifyError(msg) }
         } else if (ev.type === 'error') {
           return { ok: false, text, model, error: ev.message, errorKind: classifyError(ev.message) }
@@ -94,7 +97,7 @@ export const openaiApi: ProviderTransport = {
       }
       return { ok: true, text, model, usage }
     } catch (err) {
-      if (signal.aborted) return { ok: false, text, model, error: 'Cancelled.', errorKind: 'cancelled' }
+      if (signal.aborted) return { ok: false, text, model, error: t.cancelled, errorKind: 'cancelled' }
       const msg = err instanceof Error ? err.message : String(err)
       return { ok: false, text, model, error: msg, errorKind: classifyError(msg) }
     }

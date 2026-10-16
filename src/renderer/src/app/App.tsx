@@ -22,7 +22,13 @@ export function App(): React.JSX.Element {
   const ready = useApp((s) => s.settings !== null)
   const root = useBook((s) => s.root)
   const onboarded = useApp((s) => s.settings?.onboarded ?? true)
+  const language = useApp((s) => s.settings?.language ?? 'en')
   const [booting, setBooting] = useState(true)
+
+  // The page language follows the interface language (screen readers, hyphenation of UI text).
+  useEffect(() => {
+    document.documentElement.lang = language
+  }, [language])
 
   useEffect(() => {
     void useApp

@@ -2,6 +2,7 @@
 
 import { entryFromFile } from '@shared/book'
 import { invoke } from '@/lib/api'
+import { categoryName, getT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
 import { toast } from '@/stores/ui'
 
@@ -26,5 +27,7 @@ export async function importNotes(category: string): Promise<void> {
     })
     n++
   }
-  toast(`Imported ${n} note${n === 1 ? '' : 's'} into ${category}.`)
+  const t = getT()
+  const def = useBook.getState().manifest?.planning.categories.find((c) => c.folder === category)
+  toast(t.plan.imported(n, def ? categoryName(t, def) : category))
 }

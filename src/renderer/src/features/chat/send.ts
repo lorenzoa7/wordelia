@@ -4,8 +4,10 @@ import { newId } from '@shared/book'
 import { buildChatSystem, buildChatUserTurn } from '@shared/prompts/chat'
 import { buildDigestSystem, buildDigestUser, buildTitleSystem } from '@shared/prompts/background'
 import { proposalSummary } from '@shared/proposals/parse'
-import type { ChatMessage, ChatTurn, ModelChoice, Thread } from '@shared/types'
+import type { ChatMessage, ChatTurn, Mention, ModelChoice, Thread } from '@shared/types'
+import { messagesFor, type Messages } from '@shared/i18n'
 import { friendlyError, runCompletion } from '@/lib/ai'
+import { getT } from '@/lib/i18n'
 import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
 import { toast, useUi } from '@/stores/ui'
@@ -15,7 +17,29 @@ import { summariesFor } from './summaries'
 
 const HISTORY_LIMIT = 24
 
-export function newThread(title = 'New thread', brief = ''): Thread {
+/** The stored title of a new thread, in English in every language. afterReply() replaces it with a title from the AI. */
+const EN = messagesFor('en')
+
+export const NEW_THREAD_TITLE = 'New thread'
+
+/** The title to show for a thread. A new thread, and the planning sync thread of an older book, show their title in the interface language. */
+export function threadTitle(t: Messages, title: string): string {
+  if (title === NEW_THREAD_TITLE) return t.chat.newThread
+  if (title === EN.plan.sync.threadTitle) return t.plan.sync.threadTitle
+  return title
+}
+
+/** The purpose to show for a thread. The purpose of the planning sync thread shows in the interface language. */
+export function threadBrief(t: Messages, brief: string): string {
+  return brief === EN.plan.sync.threadBrief ? t.plan.sync.threadBrief : brief
+}
+
+/** The label to show for a mention. */
+export function mentionLabel(t: Messages, m: Pick<Mention, 'kind' | 'label'>): string {
+  return m.kind === 'thread' ? threadTitle(t, m.label) : m.label
+}
+
+export function newThread(title = NEW_THREAD_TITLE, brief = ''): Thread {
   const now = new Date().toISOString()
   return { id: newId('th'), title, brief, digest: '', digestedCount: 0, createdAt: now, updatedAt: now, pinned: false, route: null, messages: [] }
 }
@@ -47,7 +71,8 @@ export async function sendMessage(text: string): Promise<void> {
 
   const route = chatRoute(thread)
   if (!route) {
-    toast('Connect an AI first.', { action: { label: 'Open settings', run: () => useUi.getState().openSettings('ai') } })
+    const t = getT()
+    toast(t.chat.connectFirst, { action: { label: t.chat.openSettings, run: () => useUi.getState().openSettings('ai') } })
     return
   }
 
@@ -145,7 +170,7 @@ async function afterReply(threadId: string): Promise<void> {
   let t = get()
   if (!t) return
 
-  if (t.title === 'New thread' && t.messages.length >= 2) {
+  if (t.title === NEW_THREAD_TITLE && t.messages.length >= 2) {
     const first = t.messages[0]
     const r = await runCompletion({
       route,

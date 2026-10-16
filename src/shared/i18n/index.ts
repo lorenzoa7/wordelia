@@ -38,6 +38,12 @@ export function categoryName(t: Messages, c: Pick<CategoryDef, 'id' | 'name'>): 
   return c.name
 }
 
+/** The name of the category in a planning folder, for example "Characters" → "Personagens". */
+export function folderCategoryName(t: Messages, folder: string, categories: Array<Pick<CategoryDef, 'id' | 'name' | 'folder'>>): string {
+  const c = categories.find((x) => x.folder === folder)
+  return c ? categoryName(t, c) : folder
+}
+
 /** "Claude · Opus · Medium" */
 export function routeText(t: Messages, route: ModelChoice | null, models?: ModelInfo[], notSet = '—', defaultModel = '—'): string {
   if (!route) return notSet

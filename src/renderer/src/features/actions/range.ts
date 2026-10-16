@@ -38,5 +38,9 @@ export function normalizeRange(doc: PMNode, from: number, to: number): { from: n
       pos += after.nodeSize
     }
   }
+  // Spaces at the ends of the selection stay out: the AI gets the text without them,
+  // so a rewrite that kept them in the range would delete them and join two words.
+  while (b > a && /^\s$/.test(doc.textBetween(b - 1, b))) b--
+  while (b > a && /^\s$/.test(doc.textBetween(a, a + 1))) a++
   return { from: a, to: Math.max(a, b) }
 }

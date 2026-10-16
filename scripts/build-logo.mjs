@@ -31,11 +31,14 @@ function caret(x, size) {
   return `<rect x="${x.toFixed(1)}" y="${top.toFixed(1)}" width="${w}" height="${(bottom - top).toFixed(1)}" rx="${(w / 3).toFixed(1)}" fill="${RIBBON}"/>`
 }
 
+// Space between the last letter and the caret, in em. 0.04 looked glued to the "a".
+const CARET_GAP = 0.11
+
 function wordmark(color) {
   font = fontRegular
   const size = 100
   const t = textPath('wordelia', size)
-  const caretX = t.advance + size * 0.04
+  const caretX = t.advance + size * CARET_GAP
   const width = caretX + size * 0.075 + 4
   const top = -size * 0.72
   const height = size * 0.9
@@ -88,6 +91,20 @@ await writeFile(
     .replace('<path ', '<path class="wm-ink" ')
     .replace(`fill="${RIBBON}"`, 'class="wm-caret"')
 )
+// README version: the wordmark on a paper card, so it reads on light and dark pages.
+{
+  const inner = wordmark(INK)
+  const vb = /viewBox="([^"]+)"/.exec(inner)[1].split(' ').map(Number)
+  const [vx, vy, vw, vh] = vb
+  const padX = 44
+  const padY = 30
+  const body = inner.replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '')
+  const card = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vx - padX} ${vy - padY} ${vw + padX * 2} ${vh + padY * 2}" fill="none">
+  <rect x="${vx - padX + 1}" y="${vy - padY + 1}" width="${vw + padX * 2 - 2}" height="${vh + padY * 2 - 2}" rx="26" fill="${PAPER}" stroke="#D9CFBD" stroke-width="2"/>
+${body}</svg>
+`
+  await writeFile('resources/brand/wordmark-card.svg', card)
+}
 const iconSvg = icon()
 await writeFile('resources/brand/icon.svg', iconSvg)
 

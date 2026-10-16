@@ -1,13 +1,13 @@
 export default async function ({ page, shot, openBook }) {
   await openBook()
   await shot('write')
-  // Select a sentence and open the selection menu.
-  const p = page.locator('.manuscript p').first()
-  await p.click()
-  await page.keyboard.press('Home')
-  await page.keyboard.down('Shift')
-  for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowDown')
-  await page.keyboard.up('Shift')
+  // Select the first paragraph and open the selection menu.
+  await page.locator('.manuscript p').first().click()
+  await page.evaluate(() => {
+    const ed = window.__wordelia.editor()
+    const first = ed.state.doc.firstChild
+    ed.chain().focus().setTextSelection({ from: 1, to: 1 + first.content.size }).run()
+  })
   await page.waitForTimeout(400)
   await shot('selection-menu')
   // Run Polish (mock AI) and wait for the review.

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'motion/react'
 import { DotsThree, FileArrowUp, FolderOpen, Plus, Trash, WarningCircle } from '@phosphor-icons/react'
-import { formatCount } from '@shared/book'
+import type { Messages } from '@shared/i18n'
 import type { LibraryItem } from '@shared/types'
 import { Button, IconButton, Menu, MenuItem } from '@/ui'
 import { Logo } from '@/app/Logo'
@@ -9,19 +9,19 @@ import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
 import { toast, useUi } from '@/stores/ui'
 import { invoke, isE2E } from '@/lib/api'
+import { getT, useT } from '@/lib/i18n'
 import { NewBookDialog } from './NewBookDialog'
 import { ImportDialog } from './ImportDialog'
 import './library.css'
 
-const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
-
-function timeAgo(iso: string): string {
+function timeAgo(t: Messages, iso: string): string {
+  const rtf = new Intl.RelativeTimeFormat(t.common.locale, { numeric: 'auto' })
   const d = (Date.now() - new Date(iso).getTime()) / 1000
-  if (d < 60) return 'just now'
+  if (d < 60) return t.library.justNow
   if (d < 3600) return rtf.format(-Math.floor(d / 60), 'minute')
   if (d < 86400) return rtf.format(-Math.floor(d / 3600), 'hour')
   if (d < 86400 * 30) return rtf.format(-Math.floor(d / 86400), 'day')
-  return new Date(iso).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+  return new Date(iso).toLocaleDateString(t.common.locale, { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 export async function openBookAt(root: string): Promise<void> {
@@ -29,11 +29,12 @@ export async function openBookAt(root: string): Promise<void> {
     const snap = await invoke('book:open', root)
     useBook.getState().open(snap)
   } catch (err) {
-    toast(`Could not open the book: ${err instanceof Error ? err.message : String(err)}`, { kind: 'error' })
+    toast(getT().library.couldNotOpen(err instanceof Error ? err.message : String(err)), { kind: 'error' })
   }
 }
 
 export function LibraryView(): React.JSX.Element {
+  const t = useT()
   const library = useApp((s) => s.library)
   const refresh = useApp((s) => s.refreshLibrary)
   const newOpen = useUi((s) => s.newBookOpen)
@@ -47,7 +48,7 @@ export function LibraryView(): React.JSX.Element {
   }, [])
 
   const openFolder = async (): Promise<void> => {
-    const dir = await invoke('book:pickFolder', { title: 'Open a book folder' })
+    const dir = await invoke('book:pickFolder', { title: t.library.openFolderTitle })
     if (dir) await openBookAt(dir)
   }
 
@@ -66,23 +67,23 @@ export function LibraryView(): React.JSX.Element {
           transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
         >
           <Logo height={44} blink />
-          <p className="library-tagline">A quiet desk for your book, with an editor at your side.</p>
+          <p className="library-tagline">{t.library.tagline}</p>
           <div className="library-actions">
             <Button variant="ribbon" icon={<Plus size={15} weight="bold" />} onClick={() => setNewOpen(true)}>
-              New book
+              {t.library.newBook}
             </Button>
             <Button icon={<FolderOpen size={15} />} onClick={() => void openFolder()}>
-              Open folder
+              {t.library.openFolder}
             </Button>
             <Button variant="ghost" icon={<FileArrowUp size={15} />} onClick={() => void startImport()}>
-              Import DOCX or Markdown
+              {t.library.importFile}
             </Button>
           </div>
         </motion.header>
 
         {library.length > 0 ? (
           <section className="library-shelf">
-            <h2 className="caps">Your books</h2>
+            <h2 className="caps">{t.library.yourBooks}</h2>
             <div className="book-grid">
               {library.map((item, i) => (
                 <BookCard key={item.root} item={item} index={i} onRemoved={() => void refresh()} />
@@ -98,9 +99,10 @@ export function LibraryView(): React.JSX.Element {
           >
             <div className="empty-sheet grain">
               <p className="empty-line">
-                Chapter One<span className="empty-caret" />
+                {t.library.emptyLine}
+                <span className="empty-caret" />
               </p>
-              <p className="empty-hint">Your first book starts here. Every book is a plain folder of files on this computer.</p>
+              <p className="empty-hint">{t.library.emptyHint}</p>
             </div>
           </motion.section>
         )}
@@ -112,6 +114,7 @@ export function LibraryView(): React.JSX.Element {
 }
 
 function BookCard({ item, index, onRemoved }: { item: LibraryItem; index: number; onRemoved: () => void }): React.JSX.Element {
+  const t = useT()
   return (
     <motion.div
       className={`book-card${item.missing ? ' is-missing' : ''}`}
@@ -127,35 +130,33 @@ function BookCard({ item, index, onRemoved }: { item: LibraryItem; index: number
         <span className="book-card-meta">
           {item.missing ? (
             <>
-              <WarningCircle size={13} /> Folder not found
+              <WarningCircle size={13} /> {t.library.folderNotFound}
             </>
           ) : (
-            <>
-              {formatCount(item.words)} words · {item.chapters} {item.chapters === 1 ? 'chapter' : 'chapters'}
-            </>
+            <>{t.library.bookMeta(item.words, item.chapters)}</>
           )}
         </span>
-        <span className="book-card-time">{timeAgo(item.openedAt)}</span>
+        <span className="book-card-time">{timeAgo(t, item.openedAt)}</span>
       </button>
       <div className="book-card-menu">
         <Menu
           align="end"
           trigger={
-            <IconButton label="Book options">
+            <IconButton label={t.library.bookOptions}>
               <DotsThree size={18} weight="bold" />
             </IconButton>
           }
         >
           {!item.missing && (
             <MenuItem icon={<FolderOpen size={15} />} onSelect={() => void invoke('book:reveal', item.root)}>
-              Show folder
+              {t.library.showFolder}
             </MenuItem>
           )}
           <MenuItem
             icon={<Trash size={15} />}
             onSelect={() => void invoke('library:remove', item.root).then(onRemoved)}
           >
-            Remove from list
+            {t.library.removeFromList}
           </MenuItem>
         </Menu>
       </div>

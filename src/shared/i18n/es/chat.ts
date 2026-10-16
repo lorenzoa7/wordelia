@@ -1,3 +1,90 @@
 import type { chat as en } from '../en/chat'
 
-export const chat: typeof en = {}
+export const chat: typeof en = {
+  entryNotFound: 'No se encontró el texto a cambiar en la nota. Quizás cambió.',
+  entryManyMatches: 'El texto a cambiar aparece más de una vez en la nota. Pide a la IA un fragmento más largo.',
+  panel: 'Chat',
+  newThread: 'Nueva conversación',
+  threadOptions: 'Opciones de la conversación',
+  titleAndPurpose: 'Título y propósito…',
+  pin: 'Fijar',
+  unpin: 'Desfijar',
+  deleteTitle: (title) => `¿Eliminar “${title}”?`,
+  deleteMessage: 'Se eliminarán los mensajes de esta conversación. Las demás conversaciones conservan sus propios resúmenes.',
+  deleteThread: 'Eliminar conversación',
+  purpose: 'Propósito',
+  searchThreads: 'Buscar conversaciones',
+  noThreads: 'Aún no hay conversaciones.',
+  messages: (v) => (v === 1 ? '1 mensaje' : `${v} mensajes`),
+  thread: 'Conversación',
+  editorDescription: 'El propósito ayuda a la IA a concentrarse. Las demás conversaciones ven el propósito y el resumen de esta conversación.',
+  title: 'Título',
+  purposeHint: 'Ejemplo: el arco de Heitor en la segunda parte. Su culpa y su lealtad a los Carpinteiros.',
+  digest: 'Resumen (lo mantiene la IA)',
+
+  emptyTitle: 'Tu editor está aquí.',
+  emptyText: 'Lee todo el libro, la planificación y tus otras conversaciones. Puede proponer cambios, y tú apruebas cada uno.',
+  suggestions: [
+    '¿Cuál es la parte más débil de este capítulo?',
+    'Compara este capítulo con la planificación. ¿Hay algo incoherente?',
+    'Sugiere tres títulos para este capítulo.',
+    '¿Qué escena se podría cortar o fusionar con otra?'
+  ],
+
+  chapterNumber: (v) => `Capítulo ${v}`,
+  mentionList: 'Mención',
+  mention: 'Mencionar',
+  removeQuote: 'Quitar cita',
+  removeMention: 'Quitar mención',
+  composer: 'Mensaje para tu editor',
+  askQuote: 'Pregunta sobre la cita…',
+  placeholder: 'Pregúntale a tu editor. Escribe @ para mencionar un capítulo, una nota o una conversación.',
+  stop: 'Detener',
+  send: 'Enviar',
+
+  modelForThread: 'Modelo de esta conversación',
+  notSet: 'Sin definir',
+  defaultModel: 'Modelo predeterminado',
+  defaultRoute: (route) => `Predeterminado (${route})`,
+  noAi: 'No hay IA conectada',
+  effort: 'Esfuerzo',
+  defaultEffort: (level, cli) =>
+    level ? `Predeterminado (${level})` : cli ? 'Predeterminado (decide el programa)' : 'Predeterminado (decide el modelo)',
+
+  bulkPartial: (ok, total, failed) =>
+    `Se aplicaron ${ok} de ${total} propuestas. ${failed === 1 ? '1 no se pudo aplicar' : `${failed} no se pudieron aplicar`}: el texto cambió.`,
+  bulkApplied: (ok, chapters) =>
+    `Se aplicaron ${ok} propuestas.${chapters ? ' Las versiones de antes del cambio están en el historial del capítulo.' : ''}`,
+  toReview: (v) => `${v} propuestas por revisar`,
+  copyFailed: 'No se pudo copiar.',
+  openChapterFirst: 'Primero abre un capítulo.',
+  copyReply: 'Copiar la respuesta',
+  insertHint: 'Insertar la respuesta en el cursor, en el capítulo abierto (Ctrl+Z lo deshace)',
+  insert: 'Insertar en el capítulo',
+  thinking: 'El editor está pensando',
+
+  undoUnsafe: 'El texto se editó después del cambio de la IA, así que Deshacer podría borrar tus palabras nuevas. Usa Ctrl+Z o el historial de versiones.',
+  changeApplied: (label) => `Cambio aplicado en “${label}”.`,
+  changesApplied: (v, label) => (v === 1 ? `1 cambio aplicado en “${label}”.` : `${v} cambios aplicados en “${label}”.`),
+  inlineView: 'Vista en línea',
+  splitView: 'Vista lado a lado',
+  toggleView: 'Alternar la vista de los cambios',
+  rejectChange: 'Rechazar cambio',
+  acceptChange: 'Aceptar cambio',
+  applied: 'Aplicado',
+  rejected: 'Rechazado',
+  notFound: 'No encontrado',
+  entryCreated: (label) => `Nota “${label}” creada en la planificación.`,
+  entryUpdated: (label) => `Nota “${label}” actualizada en la planificación.`,
+  replacesEntry: 'reemplaza la nota',
+  dismiss: 'Descartar',
+  replace: 'Reemplazar',
+  aliases: (names) => `Otros nombres: ${names}`,
+  showLess: 'Mostrar menos',
+  showAll: 'Mostrar todo',
+  fileMissing: (label) => `El archivo "${label}" no existe.`,
+  createOnlyEntries: 'La IA solo puede crear notas de la planificación.',
+
+  connectFirst: 'Primero conecta una IA.',
+  openSettings: 'Abrir ajustes'
+}

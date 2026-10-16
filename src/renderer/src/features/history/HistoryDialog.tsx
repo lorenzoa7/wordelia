@@ -9,18 +9,21 @@ import { invoke } from '@/lib/api'
 import { useBook } from '@/stores/book'
 import { toast } from '@/stores/ui'
 import { flushEditor } from '@/features/editor/registry'
-import { snapshot } from './snapshots'
+import type { Messages } from '@shared/i18n'
+import { useT } from '@/lib/i18n'
+import { SNAPSHOT_EN, snapshot, snapshotLabel } from './snapshots'
 import './history.css'
 
-function when(iso: string): string {
+function when(t: Messages, iso: string): string {
   if (!iso) return ''
   const d = new Date(iso)
-  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-  if (d.toDateString() === new Date().toDateString()) return `Today, ${time}`
-  return `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${time}`
+  const time = d.toLocaleTimeString(t.common.locale, { hour: 'numeric', minute: '2-digit' })
+  if (d.toDateString() === new Date().toDateString()) return t.history.today(time)
+  return `${d.toLocaleDateString(t.common.locale, { month: 'short', day: 'numeric' })}, ${time}`
 }
 
 export function HistoryDialog({ chapterId, onClose }: { chapterId: string | null; onClose: () => void }): React.JSX.Element {
+  const t = useT()
   const root = useBook((s) => s.root)
   const chapter = useBook((s) => s.chapters.find((c) => c.id === chapterId))
   const [items, setItems] = useState<HistoryItem[] | null>(null)
@@ -52,9 +55,9 @@ export function HistoryDialog({ chapterId, onClose }: { chapterId: string | null
 
   const restore = (): void => {
     if (!chapter || body == null) return
-    snapshot(chapter.id, 'Before restore')
+    snapshot(chapter.id, SNAPSHOT_EN.labels.beforeRestore)
     useBook.getState().restoreChapter(chapter.id, body)
-    toast(`“${chapter.title}” is back to the version of ${when(items?.find((i) => i.id === selected)?.at ?? '')}.`)
+    toast(t.history.restored(chapter.title, when(t, items?.find((i) => i.id === selected)?.at ?? '')))
     onClose()
   }
 
@@ -62,35 +65,35 @@ export function HistoryDialog({ chapterId, onClose }: { chapterId: string | null
     <Dialog
       open={chapterId !== null}
       onOpenChange={(v) => !v && onClose()}
-      title={chapter ? `History of “${chapter.title}”` : 'History'}
-      description="Wordelia keeps versions when you open a chapter, every few minutes while you write, and before AI changes."
+      title={chapter ? t.history.titleOf(chapter.title) : t.history.title}
+      description={t.history.description}
       width={900}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
-            Close
+            {t.common.close}
           </Button>
           <Button variant="primary" icon={<ClockCounterClockwise size={14} />} disabled={body == null} onClick={restore}>
-            Restore this version
+            {t.history.restore}
           </Button>
         </>
       }
     >
       {items === null ? (
         <div className="history-empty">
-          <Spinner /> Reading the history…
+          <Spinner /> {t.history.reading}
         </div>
       ) : items.length === 0 ? (
-        <div className="history-empty">No versions yet. Wordelia saves one when you open the chapter and while you write.</div>
+        <div className="history-empty">{t.history.empty}</div>
       ) : (
         <div className="history">
           <ol className="history-list">
             {items.map((it) => (
               <li key={it.id}>
                 <button aria-current={it.id === selected ? 'true' : undefined} className={clsx('history-item', it.id === selected && 'is-active')} onClick={() => setSelected(it.id)}>
-                  <span className="history-when">{when(it.at)}</span>
+                  <span className="history-when">{when(t, it.at)}</span>
                   <span className="history-label">
-                    {it.label} · {it.words.toLocaleString('en-US')} words
+                    {snapshotLabel(t, it.label)} · {t.common.words(it.words)}
                   </span>
                 </button>
               </li>
@@ -99,7 +102,7 @@ export function HistoryDialog({ chapterId, onClose }: { chapterId: string | null
           <div className="history-preview">
             {stats && (
               <div className="history-stats">
-                If you restore this version: <span className="plus">+{stats.added}</span> <span className="minus">−{stats.removed}</span> words
+                {t.history.ifRestore} <span className="plus">+{t.common.number(stats.added)}</span> <span className="minus">−{t.common.number(stats.removed)}</span> {t.history.words}
               </div>
             )}
             <div className="history-text prose">

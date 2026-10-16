@@ -64,7 +64,9 @@ export function bookBlock(m: BookManifest): string {
   const dash = m.typography.dialogueDash
   const lines = [
     `<book title="${escapeAttr(m.title)}" author="${escapeAttr(m.author)}" language="${escapeAttr(languageName(m.language))}"${m.genre ? ` genre="${escapeAttr(m.genre)}"` : ''}>`,
-    `Dialogue punctuation: dialogue lines start with "${dash} " (the character ${dash === '—' ? 'U+2014 em dash' : 'U+2015 horizontal bar'}). Speech tags inside a line are set off with the same dash.`,
+    m.typography.dialogueStyle === 'quotes'
+      ? 'Dialogue punctuation: dialogue goes inside double quotation marks (“…”), with speech tags outside the quotes.'
+      : `Dialogue punctuation: dialogue lines start with "${dash} " (the character ${dash === '—' ? 'U+2014 em dash' : 'U+2015 horizontal bar'}). Speech tags inside a line are set off with the same dash.`,
     'Scene breaks inside a chapter are a line with "* * *".',
     '</book>'
   ]

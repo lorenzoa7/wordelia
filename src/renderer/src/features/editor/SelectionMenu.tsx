@@ -7,6 +7,7 @@ import { Kbd, Menu, MenuItem, MenuLabel, MenuSeparator, Tooltip } from '@/ui'
 import { ActionIcon } from '@/features/actions/ActionIcon'
 import { runAction } from '@/features/actions/runAction'
 import { addQuote } from '@/features/chat/chatStore'
+import { actionName, useT } from '@/lib/i18n'
 import { reviewKey, textWithMap } from './review'
 
 /** The small menu above a text selection: Reply, the default action, and more actions. */
@@ -14,6 +15,7 @@ export function SelectionMenu({ editor }: { editor: Editor }): React.JSX.Element
   const actions = useApp((s) => s.settings?.actions ?? [])
   const defaultId = useApp((s) => s.settings?.defaultActionId)
   const primary = actions.find((a) => a.id === defaultId) ?? actions[0]
+  const t = useT()
 
   const reply = (): void => {
     const { from, to } = editor.state.selection
@@ -21,7 +23,7 @@ export function SelectionMenu({ editor }: { editor: Editor }): React.JSX.Element
     if (!text) return
     const book = useBook.getState()
     const ch = book.chapters.find((c) => c.id === book.activeChapterId)
-    addQuote({ text, source: { kind: 'chapter', id: ch?.id ?? '', label: ch?.title ?? 'Chapter' } })
+    addQuote({ text, source: { kind: 'chapter', id: ch?.id ?? '', label: ch?.title ?? t.editor.selection.chapter } })
     editor.commands.setTextSelection(to)
   }
 
@@ -36,17 +38,17 @@ export function SelectionMenu({ editor }: { editor: Editor }): React.JSX.Element
         return textWithMap(state.doc, from, to).text.trim().length > 0
       }}
     >
-      <Tooltip label="Ask the chat about this" side="top">
+      <Tooltip label={t.editor.selection.askChat} side="top">
         <button className="sel-btn" onMouseDown={(e) => e.preventDefault()} onClick={reply}>
           <ArrowBendUpLeft size={14} />
-          <span>Reply</span>
+          <span>{t.editor.selection.reply}</span>
         </button>
       </Tooltip>
       {primary && (
-        <Tooltip label={<>{primary.name} with AI <Kbd>Ctrl+J</Kbd></>} side="top">
+        <Tooltip label={<>{t.editor.selection.withAi(actionName(t, primary))} <Kbd>Ctrl+J</Kbd></>} side="top">
           <button className="sel-btn sel-primary" onMouseDown={(e) => e.preventDefault()} onClick={() => void runAction(primary)}>
             <ActionIcon name={primary.icon} size={14} weight="fill" />
-            <span>{primary.name}</span>
+            <span>{actionName(t, primary)}</span>
           </button>
         </Tooltip>
       )}
@@ -55,19 +57,19 @@ export function SelectionMenu({ editor }: { editor: Editor }): React.JSX.Element
           side="bottom"
           align="end"
           trigger={
-            <button className="sel-btn sel-more" aria-label="More actions" onMouseDown={(e) => e.preventDefault()}>
+            <button className="sel-btn sel-more" aria-label={t.editor.selection.moreActions} onMouseDown={(e) => e.preventDefault()}>
               <CaretDown size={12} />
             </button>
           }
         >
-          <MenuLabel>Actions</MenuLabel>
+          <MenuLabel>{t.editor.selection.actions}</MenuLabel>
           {actions.map((a, i) => (
             <MenuItem key={a.id} icon={<ActionIcon name={a.icon} />} onSelect={() => void runAction(a)} shortcut={i < 9 ? `Alt+${i + 1}` : undefined}>
-              {a.name}
+              {actionName(t, a)}
             </MenuItem>
           ))}
           <MenuSeparator />
-          <MenuItem onSelect={() => useUiOpenActions()}>Edit actions…</MenuItem>
+          <MenuItem onSelect={() => useUiOpenActions()}>{t.editor.selection.editActions}</MenuItem>
         </Menu>
       )}
     </BubbleMenu>

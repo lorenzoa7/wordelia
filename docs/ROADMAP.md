@@ -4,7 +4,7 @@ This file is the source of truth for progress. Update it after each task. Mark a
 
 ## Current focus
 
-> **Milestone:** M8 — polish and release
+> **Milestone:** M8 — polish and release (version 0.2.0)
 > **Next task:** Collect feedback from the first real use of the app on "O Paraíso Perdido". Then fix what the author finds.
 > **Not verified:** Codex and the two API transports. The user has no Codex account, and no API keys are set. The scripted provider (`WORDELIA_MOCK_AI=1`) covers their UI flows.
 
@@ -104,6 +104,15 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] Effort for each task and each action, with the levels that each model supports (Claude Code: low to max; Codex: from its model list). The chat model menu also sets the effort
 - [x] Claude Code models come from the installed CLI (new aliases such as "fable" appear after `claude update`); the settings show which model answered last
 - [x] Codex login check through `account/read`: an expired login shows "Not connected" at start
+
+## Version 0.2
+
+- [x] Interface in English, Portuguese (Brazil) and Spanish: 7 parts translated in parallel, language in Settings → General and on the welcome screen
+- [x] Dialogue style for each book (dash or quotation marks), from the book language; the AI prompt follows it
+- [x] Chat effort Medium by default; settings version 3 moves Claude Code chat routes from High to Medium
+- [x] Selections without spaces at the ends (a rewrite no longer joins two words); CRLF files read as LF
+- [x] README in simple English with English screenshots (sample book `e2e/fixtures/sample-book-en`, `--en` flag of `scripts/shot.mjs`); logo on a paper card
+- [x] Releases from tags: `.github/workflows/release.yml`
 
 ## Later (not in version 1)
 

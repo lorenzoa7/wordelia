@@ -3,6 +3,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { CompletionRequest, CompletionResult, ModelInfo, ProviderStatus, StreamEvent } from '@shared/types'
 import { EFFORT_ORDER } from '@shared/ai/effort'
+import { mainT } from '../i18n'
 import { getSecret } from '../settings'
 import { classifyError, type ProviderTransport } from './transport'
 
@@ -27,10 +28,11 @@ export const anthropicApi: ProviderTransport = {
 
   async status(): Promise<ProviderStatus> {
     const c = await client()
-    if (!c) return { provider: 'anthropic', installed: true, loggedIn: false, detail: 'Add an API key.' }
+    const t = (await mainT()).main.ai
+    if (!c) return { provider: 'anthropic', installed: true, loggedIn: false, detail: t.addApiKey }
     try {
       await c.models.list({ limit: 1 })
-      return { provider: 'anthropic', installed: true, loggedIn: true, detail: 'API key works.' }
+      return { provider: 'anthropic', installed: true, loggedIn: true, detail: t.apiKeyWorks }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       return { provider: 'anthropic', installed: true, loggedIn: false, detail: msg.slice(0, 200) }
@@ -68,7 +70,8 @@ export const anthropicApi: ProviderTransport = {
 
   async complete(req: CompletionRequest, onEvent: (e: StreamEvent) => void, signal: AbortSignal): Promise<CompletionResult> {
     const c = await client()
-    if (!c) return { ok: false, text: '', error: 'Add an Anthropic API key in Settings.', errorKind: 'not-logged-in' }
+    const t = (await mainT()).main.ai
+    if (!c) return { ok: false, text: '', error: t.anthropicAddKey, errorKind: 'not-logged-in' }
     const model = req.route.model || 'claude-opus-5-5'
     let text = ''
     try {
@@ -107,19 +110,19 @@ export const anthropicApi: ProviderTransport = {
       }
       onEvent({ type: 'usage', ...usage })
       if (final.stop_reason === 'refusal') {
-        return { ok: false, text, model: final.model, error: 'The model declined this request.', errorKind: 'other', usage }
+        return { ok: false, text, model: final.model, error: t.refusal, errorKind: 'other', usage }
       }
       return { ok: true, text, model: final.model, usage }
     } catch (err) {
-      if (signal.aborted) return { ok: false, text, model, error: 'Cancelled.', errorKind: 'cancelled' }
+      if (signal.aborted) return { ok: false, text, model, error: t.cancelled, errorKind: 'cancelled' }
       if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
-        return { ok: false, text, model, error: 'The Anthropic API key was rejected.', errorKind: 'not-logged-in' }
+        return { ok: false, text, model, error: t.anthropicKeyRejected, errorKind: 'not-logged-in' }
       }
       if (err instanceof Anthropic.RateLimitError) {
-        return { ok: false, text, model, error: 'Rate limit reached. Try again soon.', errorKind: 'rate-limit' }
+        return { ok: false, text, model, error: t.rateLimit, errorKind: 'rate-limit' }
       }
       if (err instanceof Anthropic.APIConnectionError) {
-        return { ok: false, text, model, error: 'Could not reach the Anthropic API.', errorKind: 'network' }
+        return { ok: false, text, model, error: t.anthropicUnreachable, errorKind: 'network' }
       }
       const msg = err instanceof Error ? err.message : String(err)
       return { ok: false, text, model, error: msg, errorKind: classifyError(msg) }

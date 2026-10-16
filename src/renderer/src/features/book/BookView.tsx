@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
 import { useUi } from '@/stores/ui'
+import { useT } from '@/lib/i18n'
 import { PageEditor } from '@/features/editor/PageEditor'
 import { ChapterSidebar } from '@/features/write/ChapterSidebar'
 import { StatusBar } from '@/features/write/StatusBar'
@@ -20,6 +21,7 @@ const CHAT_MIN = 320
 const CHAT_MAX = 680
 
 export function BookView(): React.JSX.Element {
+  const t = useT()
   const view = useBook((s) => s.view)
   const sidebarOpen = useApp((s) => s.settings?.ui.sidebarOpen ?? true)
   const chatOpen = useApp((s) => s.settings?.ui.chatOpen ?? true)
@@ -115,7 +117,7 @@ export function BookView(): React.JSX.Element {
             role="separator"
             tabIndex={0}
             aria-orientation="vertical"
-            aria-label="Chat width. Use the arrow keys to change it."
+            aria-label={t.app.chatWidth}
             aria-valuemin={CHAT_MIN}
             aria-valuemax={CHAT_MAX}
             aria-valuenow={Math.round(chatW)}

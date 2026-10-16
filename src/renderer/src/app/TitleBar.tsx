@@ -18,15 +18,17 @@ import { useApp } from '@/stores/app'
 import { useBook, type BookView } from '@/stores/book'
 import { useUi } from '@/stores/ui'
 import { invoke } from '@/lib/api'
+import { useT } from '@/lib/i18n'
 import { Logo } from './Logo'
 import { ProviderBadge } from './ProviderBadge'
 
-const VIEWS: Array<{ id: BookView; label: string; icon: React.ReactNode; key: string }> = [
-  { id: 'write', label: 'Write', icon: <PenNib size={14} />, key: 'Ctrl+1' },
-  { id: 'plan', label: 'Plan', icon: <Notebook size={14} />, key: 'Ctrl+2' }
+const VIEWS: Array<{ id: BookView; icon: React.ReactNode; key: string }> = [
+  { id: 'write', icon: <PenNib size={14} />, key: 'Ctrl+1' },
+  { id: 'plan', icon: <Notebook size={14} />, key: 'Ctrl+2' }
 ]
 
 export function TitleBar(): React.JSX.Element {
+  const t = useT()
   const root = useBook((s) => s.root)
   const title = useBook((s) => s.manifest?.title)
   const view = useBook((s) => s.view)
@@ -41,7 +43,7 @@ export function TitleBar(): React.JSX.Element {
       <div className="titlebar-left">
         {root && (
           <IconButton
-            label={ui?.sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+            label={ui?.sidebarOpen ? t.app.hideSidebar : t.app.showSidebar}
             shortcut="Ctrl+\"
             onClick={() => setUi({ sidebarOpen: !ui?.sidebarOpen })}
             className="no-drag"
@@ -52,8 +54,8 @@ export function TitleBar(): React.JSX.Element {
         <button
           className="titlebar-logo no-drag"
           onClick={() => root && void useBook.getState().close().then(() => useApp.getState().refreshLibrary())}
-          aria-label="Library"
-          title={root ? 'Back to the library' : undefined}
+          aria-label={t.app.library}
+          title={root ? t.app.backToLibrary : undefined}
         >
           <Logo height={15} />
         </button>
@@ -72,20 +74,20 @@ export function TitleBar(): React.JSX.Element {
               }
             >
               <MenuItem icon={<SlidersHorizontal size={15} />} onSelect={() => openSettings('book')}>
-                Book settings
+                {t.app.bookSettings}
               </MenuItem>
               <MenuItem icon={<Export size={15} />} shortcut="Ctrl+Shift+E" onSelect={() => setExportOpen(true)}>
-                Export…
+                {t.app.exportBook}
               </MenuItem>
               <MenuItem icon={<FolderOpen size={15} />} onSelect={() => void invoke('book:reveal', root)}>
-                Show folder
+                {t.app.showFolder}
               </MenuItem>
               <MenuSeparator />
               <MenuItem
                 icon={<SignOut size={15} />}
                 onSelect={() => void useBook.getState().close().then(() => useApp.getState().refreshLibrary())}
               >
-                Close book
+                {t.app.closeBook}
               </MenuItem>
             </Menu>
           </>
@@ -93,17 +95,17 @@ export function TitleBar(): React.JSX.Element {
       </div>
 
       {root && (
-        <nav className="view-switch no-drag" aria-label="View">
+        <nav className="view-switch no-drag" aria-label={t.app.viewNav}>
           {VIEWS.map((v) => (
             <button
               key={v.id}
               className={clsx('view-tab', view === v.id && 'is-active')}
               aria-current={view === v.id ? 'page' : undefined}
               onClick={() => setView(v.id)}
-              title={`${v.label} (${v.key})`}
+              title={`${t.app.views[v.id]} (${v.key})`}
             >
               {v.icon}
-              <span>{v.label}</span>
+              <span>{t.app.views[v.id]}</span>
               {view === v.id && <motion.span layoutId="view-underline" className="view-underline" transition={{ type: 'spring', stiffness: 500, damping: 38 }} />}
             </button>
           ))}
@@ -114,7 +116,7 @@ export function TitleBar(): React.JSX.Element {
         <ProviderBadge />
         {root && (
           <IconButton
-            label={ui?.chatOpen ? 'Hide chat' : 'Show chat'}
+            label={ui?.chatOpen ? t.app.hideChat : t.app.showChat}
             shortcut="Ctrl+L"
             active={ui?.chatOpen}
             onClick={() => setUi({ chatOpen: !ui?.chatOpen })}
@@ -122,7 +124,7 @@ export function TitleBar(): React.JSX.Element {
             <ChatCircleText size={17} />
           </IconButton>
         )}
-        <IconButton label="Settings" shortcut="Ctrl+," onClick={() => openSettings()}>
+        <IconButton label={t.common.settings} shortcut="Ctrl+," onClick={() => openSettings()}>
           <Gear size={17} />
         </IconButton>
       </div>

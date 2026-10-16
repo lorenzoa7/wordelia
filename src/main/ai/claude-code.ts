@@ -5,6 +5,7 @@ import { app } from 'electron'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { CompletionRequest, CompletionResult, ModelInfo, ProviderStatus, StreamEvent } from '@shared/types'
+import { mainT } from '../i18n'
 import { getSettings } from '../settings'
 import { claudeCandidates, resolveBin, type ResolvedBin } from './resolve-bin'
 import { classifyError, flattenConversation, runCli, type ProviderTransport } from './transport'
@@ -31,7 +32,8 @@ export const claudeCode: ProviderTransport = {
 
   async status(): Promise<ProviderStatus> {
     const b = await bin()
-    if (!b) return { provider: 'claude-code', installed: false, loggedIn: false, detail: 'The claude CLI was not found.' }
+    const t = (await mainT()).main.ai
+    if (!b) return { provider: 'claude-code', installed: false, loggedIn: false, detail: t.claudeNotFound }
     const ver = await runCli(b, ['--version'], { timeoutMs: 15000 })
     const version = ver.stdout.trim().split(/\s+/)[0] || undefined
     const [auth, latest] = await Promise.all([runCli(b, ['auth', 'status'], { timeoutMs: 15000 }), latestVersion('claude-code')])
@@ -51,7 +53,7 @@ export const claudeCode: ProviderTransport = {
       version,
       latestVersion: latest,
       account,
-      detail: loggedIn === false ? 'Run "claude auth login" in a terminal to log in.' : b.path
+      detail: loggedIn === false ? t.claudeLogin : b.path
     }
   },
 
@@ -62,8 +64,9 @@ export const claudeCode: ProviderTransport = {
 
   async complete(req: CompletionRequest, onEvent: (e: StreamEvent) => void, signal: AbortSignal): Promise<CompletionResult> {
     const b = await bin()
-    if (!b) return { ok: false, text: '', error: 'Claude Code is not installed.', errorKind: 'not-installed' }
-    if (signal.aborted) return { ok: false, text: '', error: 'Cancelled.', errorKind: 'cancelled' }
+    const t = (await mainT()).main.ai
+    if (!b) return { ok: false, text: '', error: t.claudeNotInstalled, errorKind: 'not-installed' }
+    if (signal.aborted) return { ok: false, text: '', error: t.cancelled, errorKind: 'cancelled' }
     const cwd = await workDir()
     const sysFile = join(cwd, `system-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`)
     await writeFile(sysFile, req.system, 'utf8')
@@ -101,7 +104,7 @@ export const claudeCode: ProviderTransport = {
         if (res.result.ok) await rememberResolved(b, req.route.model || 'sonnet', res.result.model).catch(() => {})
         return res.result
       }
-      return { ok: false, text: '', error: 'The claude CLI rejected its arguments.', errorKind: 'other' }
+      return { ok: false, text: '', error: t.claudeBadArgs, errorKind: 'other' }
     } finally {
       await rm(sysFile, { force: true })
     }
@@ -123,6 +126,7 @@ async function runOnce(
   onEvent: (e: StreamEvent) => void,
   signal: AbortSignal
 ): Promise<{ result: CompletionResult; retryWithout?: string }> {
+  const t = (await mainT()).main.ai
   let text = ''
   let streamedText = false
   let model: string | undefined
@@ -144,7 +148,7 @@ async function runOnce(
         model = typeof ev.model === 'string' ? ev.model : undefined
         onEvent({ type: 'start', model })
       } else if (ev.type === 'system' && ev.subtype === 'api_retry') {
-        onEvent({ type: 'status', message: 'Retrying…' })
+        onEvent({ type: 'status', message: t.retrying })
       } else if (ev.type === 'stream_event') {
         const e = ev.event as { type?: string; delta?: { type?: string; text?: string } }
         if (e?.type === 'content_block_delta' && e.delta?.type === 'text_delta' && e.delta.text) {
@@ -180,7 +184,7 @@ async function runOnce(
     }
   })
 
-  if (res.aborted) return { result: { ok: false, text, model, error: 'Cancelled.', errorKind: 'cancelled' } }
+  if (res.aborted) return { result: { ok: false, text, model, error: t.cancelled, errorKind: 'cancelled' } }
 
   const unknown = /unknown option '?(--[\w-]+)'?/i.exec(res.stderr)
   if (res.code !== 0 && unknown && OPTIONAL_FLAGS.concat('--effort').includes(unknown[1])) {
@@ -191,6 +195,6 @@ async function runOnce(
   if (done && !done.isError) {
     return { result: { ok: true, text: text || done.result || '', model, usage: done.usage } }
   }
-  const error = (done?.result || assistantError || res.stderr.trim() || `claude exited with code ${res.code}`).slice(0, 600)
+  const error = (done?.result || assistantError || res.stderr.trim() || t.claudeExited(res.code)).slice(0, 600)
   return { result: { ok: false, text, model, error, errorKind: classifyError(error) } }
 }

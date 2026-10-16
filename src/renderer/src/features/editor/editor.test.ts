@@ -74,6 +74,12 @@ describe('normalizeRange', () => {
     expect(st.doc.textBetween(r.from, r.to)).toBe('Segundo')
   })
 
+  it('leaves the spaces at both ends out of the range', () => {
+    const st = docOf('Um dois três quatro.')
+    const r = normalizeRange(st.doc, posOf(st, ' dois'), posOf(st, 'quatro'))
+    expect(st.doc.textBetween(r.from, r.to)).toBe('dois três')
+  })
+
   it('keeps a normal selection', () => {
     const st = docOf('Um dois três.')
     const r = normalizeRange(st.doc, posOf(st, 'dois'), posOf(st, ' três'))

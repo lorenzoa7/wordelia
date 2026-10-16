@@ -9,11 +9,37 @@
   animation: fade-in var(--dur-slow) var(--ease-out);
 }
 .welcome {
+  position: relative;
   width: min(560px, calc(100vw - 48px));
   padding: 44px 48px 36px;
   border-radius: 6px;
   background: var(--paper);
   box-shadow: var(--shadow-page), 0 40px 80px -30px rgba(40, 28, 14, 0.4);
+}
+.welcome-lang {
+  position: absolute;
+  top: var(--s-3);
+  right: var(--s-3);
+}
+.welcome-lang-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.welcome-lang-btn:hover,
+.welcome-lang-btn[data-state='open'] {
+  border-color: var(--rule);
+  color: var(--ink);
 }
 .welcome-step {
   display: flex;

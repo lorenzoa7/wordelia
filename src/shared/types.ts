@@ -40,6 +40,8 @@ export interface Typography {
   /** Books do not indent the first paragraph of a chapter or scene. */
   indentFirstParagraph: boolean
   dialogueDash: DialogueDash
+  /** How dialogue is set: a dash at the start of the line (Portuguese, Spanish, French) or quotation marks (English, German) */
+  dialogueStyle: 'dash' | 'quotes'
   smartQuotes: boolean
   smartEllipsis: boolean
   sceneBreak: SceneBreakStyle
@@ -196,6 +198,8 @@ export interface ProviderStatus {
   version?: string
   /** The newest published version of the CLI, when the app could check */
   latestVersion?: string
+  /** Why the provider is not connected, when the app knows: the saved login has expired */
+  reason?: 'expired'
   detail?: string
   account?: string
 }

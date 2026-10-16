@@ -12,6 +12,7 @@ import { Spinner, Tooltip } from '@/ui'
 import { useBook } from '@/stores/book'
 import { typesetForBook } from '@/lib/typeset'
 import { toast } from '@/stores/ui'
+import { folderCategoryName, useT } from '@/lib/i18n'
 import { applyCreate, applyEditHunk, markAfter, resolveTarget, restoreSnapshot, setHunkStates, snapshotOf, type Snapshot } from './applyProposal'
 
 type EditSeg = Extract<Segment, { kind: 'edit' }>
@@ -87,6 +88,7 @@ function HunkView({ hunk, split }: { hunk: Hunk; split: boolean }): React.JSX.El
 }
 
 function EditCard({ segment: raw, message, thread, streaming }: Props & { segment: EditSeg }): React.JSX.Element {
+  const t = useT()
   const [split, setSplit] = useState(false)
   const [busy, setBusy] = useState(false)
   const target = resolveTarget(raw.file)
@@ -122,10 +124,10 @@ function EditCard({ segment: raw, message, thread, streaming }: Props & { segmen
     toast(label, {
       ms: 8000,
       action: {
-        label: 'Undo',
+        label: t.common.undo,
         run: () => {
           if (!restoreSnapshot(snap)) {
-            toast('The text changed after the AI change, so Undo could stop your new words. Use Ctrl+Z or the version history.', { kind: 'error' })
+            toast(t.chat.undoUnsafe, { kind: 'error' })
             return
           }
           for (const i of accepted) setHunkState(thread, message.id, keys[i], 'pending')
@@ -137,7 +139,7 @@ function EditCard({ segment: raw, message, thread, streaming }: Props & { segmen
     const snap = snapshotOf(segment.file)
     if (apply(i)) {
       markAfter(snap)
-      offerUndo(snap, [i], `Change applied to “${target.label}”.`)
+      offerUndo(snap, [i], t.chat.changeApplied(target.label))
     }
   }
   const reject = (i: number): void => {
@@ -154,7 +156,7 @@ function EditCard({ segment: raw, message, thread, streaming }: Props & { segmen
     }
     setBusy(false)
     markAfter(snap)
-    if (accepted.length) offerUndo(snap, accepted, `${accepted.length} change${accepted.length > 1 ? 's' : ''} applied to “${target.label}”.`)
+    if (accepted.length) offerUndo(snap, accepted, t.chat.changesApplied(accepted.length, target.label))
   }
 
   const Icon = target.kind === 'chapter' ? BookOpenText : Notebook
@@ -166,7 +168,7 @@ function EditCard({ segment: raw, message, thread, streaming }: Props & { segmen
   return (
     <motion.div className="proposal" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
       <header className="proposal-head">
-        <button className="proposal-file" onClick={open} title="Open">
+        <button className="proposal-file" onClick={open} title={t.common.open}>
           <Icon size={14} />
           <span>{target.label}</span>
         </button>
@@ -175,8 +177,8 @@ function EditCard({ segment: raw, message, thread, streaming }: Props & { segmen
           <span className="minus">−{totals.removed}</span>
         </span>
         <span className="proposal-spacer" />
-        <Tooltip label={split ? 'Inline view' : 'Split view'}>
-          <button className="proposal-icon" onClick={() => setSplit(!split)} aria-label="Toggle diff view">
+        <Tooltip label={split ? t.chat.inlineView : t.chat.splitView}>
+          <button className="proposal-icon" onClick={() => setSplit(!split)} aria-label={t.chat.toggleView}>
             {split ? <Rows size={14} /> : <Columns size={14} />}
           </button>
         </Tooltip>
@@ -186,10 +188,10 @@ function EditCard({ segment: raw, message, thread, streaming }: Props & { segmen
           pending.length > 0 && (
             <>
               <button className="proposal-btn" onClick={() => keys.forEach((k, i) => pending.includes(k) && reject(i))}>
-                {segment.hunks.length > 1 ? 'Reject all' : 'Reject'}
+                {segment.hunks.length > 1 ? t.common.rejectAll : t.common.reject}
               </button>
               <button className="proposal-btn is-accept" onClick={acceptAll} disabled={busy}>
-                <Check size={12} weight="bold" /> Accept{segment.hunks.length > 1 ? ' all' : ''}
+                <Check size={12} weight="bold" /> {segment.hunks.length > 1 ? t.common.acceptAll : t.common.accept}
               </button>
             </>
           )
@@ -203,10 +205,10 @@ function EditCard({ segment: raw, message, thread, streaming }: Props & { segmen
               <HunkView hunk={h} split={split} />
               {!streaming && h.complete && segment.hunks.length > 1 && st === 'pending' && (
                 <div className="hunk-actions">
-                  <button onClick={() => reject(i)} aria-label="Reject change">
+                  <button onClick={() => reject(i)} aria-label={t.chat.rejectChange}>
                     <X size={12} />
                   </button>
-                  <button className="is-accept" onClick={() => accept(i)} aria-label="Accept change">
+                  <button className="is-accept" onClick={() => accept(i)} aria-label={t.chat.acceptChange}>
                     <Check size={12} weight="bold" />
                   </button>
                 </div>
@@ -221,21 +223,22 @@ function EditCard({ segment: raw, message, thread, streaming }: Props & { segmen
 }
 
 function HunkBadge({ state }: { state: HunkState }): React.JSX.Element {
+  const t = useT()
   return (
     <span className={clsx('hunk-badge', `is-${state}`)}>
       {state === 'accepted' && (
         <>
-          <Check size={11} weight="bold" /> Applied
+          <Check size={11} weight="bold" /> {t.chat.applied}
         </>
       )}
       {state === 'rejected' && (
         <>
-          <X size={11} /> Rejected
+          <X size={11} /> {t.chat.rejected}
         </>
       )}
       {state === 'failed' && (
         <>
-          <WarningCircle size={11} /> Not found
+          <WarningCircle size={11} /> {t.chat.notFound}
         </>
       )}
     </span>
@@ -243,12 +246,14 @@ function HunkBadge({ state }: { state: HunkState }): React.JSX.Element {
 }
 
 function CreateCard({ segment, message, thread, streaming }: Props & { segment: CreateSeg }): React.JSX.Element {
+  const t = useT()
   const [expanded, setExpanded] = useState(false)
   const key = hunkKey(segment.index, 0)
   const state = message?.hunks?.[key] ?? 'pending'
   const target = resolveTarget(segment.file)
   const { data, body } = readFrontmatter(segment.content)
-  const category = segment.file.replace(/^planning\//, '').split('/').slice(0, -1).join('/')
+  const categories = useBook((s) => s.manifest?.planning.categories ?? [])
+  const category = folderCategoryName(t, segment.file.replace(/^planning\//, '').split('/').slice(0, -1).join('/'), categories)
   // After the user creates the entry, it exists: the card still shows where it went.
   const exists = target.kind === 'entry' && state === 'pending'
 
@@ -257,7 +262,7 @@ function CreateCard({ segment, message, thread, streaming }: Props & { segment: 
     const res = await applyCreate(segment.file, segment.content)
     setHunkState(thread, message.id, key, res.ok ? 'accepted' : 'failed')
     if (!res.ok) toast(res.reason, { kind: 'error' })
-    else toast(`${exists ? 'Updated' : 'Created'} “${target.label}” in the planning.`)
+    else toast(exists ? t.chat.entryUpdated(target.label) : t.chat.entryCreated(target.label))
   }
 
   return (
@@ -267,17 +272,17 @@ function CreateCard({ segment, message, thread, streaming }: Props & { segment: 
           <FilePlus size={14} />
           <span>{target.label}</span>
         </span>
-        <span className="proposal-cat">{exists ? 'replaces the entry' : category}</span>
+        <span className="proposal-cat">{exists ? t.chat.replacesEntry : category}</span>
         <span className="proposal-spacer" />
         {streaming ? (
           <Spinner size={12} />
         ) : state === 'pending' ? (
           <>
             <button className="proposal-btn" onClick={() => thread && message && setHunkState(thread, message.id, key, 'rejected')}>
-              Dismiss
+              {t.chat.dismiss}
             </button>
             <button className="proposal-btn is-accept" onClick={() => void create()}>
-              <Check size={12} weight="bold" /> {exists ? 'Replace' : 'Create'}
+              <Check size={12} weight="bold" /> {exists ? t.chat.replace : t.common.create}
             </button>
           </>
         ) : (
@@ -287,12 +292,12 @@ function CreateCard({ segment, message, thread, streaming }: Props & { segment: 
       <div id={`create-${segment.index}`} className={clsx('proposal-body prose', !expanded && 'is-clamped')}>
         {typeof data.summary === 'string' && <p className="proposal-summary">{data.summary}</p>}
         {Array.isArray(data.aliases) && data.aliases.length > 0 && (
-          <p className="proposal-aliases">Also: {(data.aliases as unknown[]).map(String).join(', ')}</p>
+          <p className="proposal-aliases">{t.chat.aliases((data.aliases as unknown[]).map(String).join(', '))}</p>
         )}
         <ReactMarkdown>{body}</ReactMarkdown>
       </div>
       <button className="proposal-more" aria-expanded={expanded} aria-controls={`create-${segment.index}`} onClick={() => setExpanded(!expanded)}>
-        {expanded ? 'Show less' : 'Show all'}
+        {expanded ? t.chat.showLess : t.chat.showAll}
       </button>
     </motion.div>
   )

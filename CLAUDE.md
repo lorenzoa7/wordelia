@@ -29,6 +29,7 @@ Installers go to GitHub Releases, never into git. To release: change `version` i
 
 - `src/shared/` must stay pure: no Node, DOM or Electron imports.
 - The renderer never uses Node. Add an IPC channel in `src/shared/ipc.ts`, a handler in `src/main/ipc.ts` and a method in `src/preload/index.ts`.
+- Every text that the user can see goes through `src/shared/i18n` (`useT()` / `getT()` in the renderer, `mainT()` in main). Add it in English, Portuguese (Brazil) and Spanish. Read `src/shared/i18n/README.md`.
 - Colors, spacing, fonts and motion come from tokens in `src/renderer/src/styles/tokens.css`. Do not hard-code them in components.
 - The AI never changes text without user approval. All AI changes go through proposals or the inline diff.
 - Prose in docs: ASD-STE100 Simplified Technical English. Short sentences, active voice.

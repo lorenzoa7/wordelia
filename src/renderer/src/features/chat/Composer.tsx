@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowUp, At, Quotes, Stop, X } from '@phosphor-icons/react'
 import clsx from 'clsx'
-import { routeLabel } from '@shared/ai/routes'
-import { EFFORT_LABELS, defaultEffortLabel, effortChoices, nearestEffort } from '@shared/ai/effort'
-import type { Mention, ModelChoice, Thread } from '@shared/types'
+import { effortChoices, nearestEffort } from '@shared/ai/effort'
+import type { Mention, ModelChoice, ModelInfo, Thread } from '@shared/types'
 import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
+import { folderCategoryName, routeText, useT } from '@/lib/i18n'
 import { Menu, MenuItem, MenuLabel, MenuSeparator } from '@/ui'
 import { useChat } from './chatStore'
-import { sendMessage, stopReply } from './send'
+import { mentionLabel, sendMessage, stopReply } from './send'
 import { MentionIcon } from './MessageView'
 
 interface Candidate extends Mention {
@@ -16,22 +16,25 @@ interface Candidate extends Mention {
 }
 
 function useCandidates(query: string | null): Candidate[] {
+  const t = useT()
   const chapters = useBook((s) => s.chapters)
   const entries = useBook((s) => s.entries)
   const threads = useBook((s) => s.threads)
+  const categories = useBook((s) => s.manifest?.planning.categories)
   return useMemo(() => {
     if (query === null) return []
     const q = query.toLowerCase()
     const all: Candidate[] = [
-      ...chapters.map((c, i) => ({ kind: 'chapter' as const, id: c.id, label: c.title, sub: `Chapter ${i + 1}` })),
-      ...entries.map((e) => ({ kind: 'entry' as const, id: e.id, label: e.name, sub: e.category })),
-      ...threads.map((t) => ({ kind: 'thread' as const, id: t.id, label: t.title, sub: 'Thread' }))
+      ...chapters.map((c, i) => ({ kind: 'chapter' as const, id: c.id, label: c.title, sub: t.chat.chapterNumber(i + 1) })),
+      ...entries.map((e) => ({ kind: 'entry' as const, id: e.id, label: e.name, sub: folderCategoryName(t, e.category, categories ?? []) })),
+      ...threads.map((th) => ({ kind: 'thread' as const, id: th.id, label: th.title, sub: t.chat.thread }))
     ]
-    return all.filter((c) => c.label.toLowerCase().includes(q)).slice(0, 8)
-  }, [query, chapters, entries, threads])
+    return all.filter((c) => mentionLabel(t, c).toLowerCase().includes(q)).slice(0, 8)
+  }, [query, chapters, entries, threads, categories, t])
 }
 
 export function Composer({ thread }: { thread: Thread | null }): React.JSX.Element {
+  const t = useT()
   const draft = useChat((s) => s.draft)
   const setDraft = useChat((s) => s.setDraft)
   const quotes = useChat((s) => s.quotes)
@@ -80,7 +83,7 @@ export function Composer({ thread }: { thread: Thread | null }): React.JSX.Eleme
   return (
     <div className="composer-wrap">
       {mentionQuery !== null && candidates.length > 0 && (
-        <div className="mention-pop" role="listbox" id="mention-list" aria-label="Mention">
+        <div className="mention-pop" role="listbox" id="mention-list" aria-label={t.chat.mentionList}>
           {candidates.map((c, i) => (
             <button
               key={`${c.kind}-${c.id}`}
@@ -95,7 +98,7 @@ export function Composer({ thread }: { thread: Thread | null }): React.JSX.Eleme
               }}
             >
               <MentionIcon kind={c.kind} />
-              <span className="mention-label">{c.label}</span>
+              <span className="mention-label">{mentionLabel(t, c)}</span>
               <span className="mention-sub">{c.sub}</span>
             </button>
           ))}
@@ -108,15 +111,15 @@ export function Composer({ thread }: { thread: Thread | null }): React.JSX.Eleme
               <span key={q.id} className="quote-chip" title={q.text}>
                 <Quotes size={11} weight="fill" />
                 <span className="quote-chip-text">{q.text}</span>
-                <button onClick={() => removeQuote(q.id)} aria-label="Remove quote">
+                <button onClick={() => removeQuote(q.id)} aria-label={t.chat.removeQuote}>
                   <X size={10} />
                 </button>
               </span>
             ))}
             {mentions.map((m) => (
               <span key={m.id} className="mention-chip">
-                <MentionIcon kind={m.kind} /> {m.label}
-                <button onClick={() => removeMention(m.id)} aria-label="Remove mention">
+                <MentionIcon kind={m.kind} /> {mentionLabel(t, m)}
+                <button onClick={() => removeMention(m.id)} aria-label={t.chat.removeMention}>
                   <X size={10} />
                 </button>
               </span>
@@ -127,13 +130,13 @@ export function Composer({ thread }: { thread: Thread | null }): React.JSX.Eleme
           ref={ref}
           className="composer-input"
           rows={1}
-          aria-label="Message to your editor"
+          aria-label={t.chat.composer}
           role="combobox"
           aria-autocomplete="list"
           aria-expanded={mentionQuery !== null && candidates.length > 0}
           aria-controls="mention-list"
           aria-activedescendant={mentionQuery !== null && candidates.length > 0 ? `mention-${highlight}` : undefined}
-          placeholder={quotes.length ? 'Ask about the quote…' : 'Ask your editor. Type @ to mention a chapter, entry or thread.'}
+          placeholder={quotes.length ? t.chat.askQuote : t.chat.placeholder}
           value={draft}
           spellCheck
           onChange={(e) => onChange(e.target.value)}
@@ -173,18 +176,18 @@ export function Composer({ thread }: { thread: Thread | null }): React.JSX.Eleme
               setMentionQuery('')
               ref.current?.focus()
             }}
-            aria-label="Mention"
+            aria-label={t.chat.mention}
           >
             <At size={15} />
           </button>
           <ModelPicker thread={thread} />
           <span className="composer-spacer" />
           {streaming ? (
-            <button className="composer-send is-stop" onClick={() => thread && stopReply(thread.id)} aria-label="Stop">
+            <button className="composer-send is-stop" onClick={() => thread && stopReply(thread.id)} aria-label={t.chat.stop}>
               <Stop size={14} weight="fill" />
             </button>
           ) : (
-            <button className="composer-send" onClick={submit} disabled={!draft.trim() && !quotes.length} aria-label="Send">
+            <button className="composer-send" onClick={submit} disabled={!draft.trim() && !quotes.length} aria-label={t.chat.send}>
               <ArrowUp size={15} weight="bold" />
             </button>
           )}
@@ -195,6 +198,8 @@ export function Composer({ thread }: { thread: Thread | null }): React.JSX.Eleme
 }
 
 function ModelPicker({ thread }: { thread: Thread | null }): React.JSX.Element {
+  const t = useT()
+  const label = (r: ModelChoice | null, list?: ModelInfo[]): string => routeText(t, r, list, t.chat.notSet, t.chat.defaultModel)
   const settings = useApp((s) => s.settings)
   const models = useApp((s) => s.models)
   const status = useApp((s) => s.status)
@@ -215,22 +220,22 @@ function ModelPicker({ thread }: { thread: Thread | null }): React.JSX.Element {
     <Menu
       side="top"
       trigger={
-        <button className="composer-model" title="Model for this thread">
-          {routeLabel(route, route ? models[route.provider] : undefined)}
+        <button className="composer-model" title={t.chat.modelForThread}>
+          {label(route, route ? models[route.provider] : undefined)}
         </button>
       }
     >
       {thread && (
         <>
           <MenuItem checked={!thread.route} onSelect={() => choose(null)}>
-            Default ({routeLabel(settings?.routes.chat ?? null, settings?.routes.chat ? models[settings.routes.chat.provider] : undefined)})
+            {t.chat.defaultRoute(label(settings?.routes.chat ?? null, settings?.routes.chat ? models[settings.routes.chat.provider] : undefined))}
           </MenuItem>
           <MenuSeparator />
         </>
       )}
       {ready.map((p) => (
         <div key={p}>
-          <MenuLabel>{routeLabel({ provider: p, model: '' }).split(' · ')[0]}</MenuLabel>
+          <MenuLabel>{label({ provider: p, model: '' }).split(' · ')[0]}</MenuLabel>
           {(models[p] ?? []).slice(0, 8).map((m) => (
             <MenuItem
               key={m.id}
@@ -246,17 +251,20 @@ function ModelPicker({ thread }: { thread: Thread | null }): React.JSX.Element {
           ))}
         </div>
       ))}
-      {ready.length === 0 && <MenuItem disabled>No AI connected</MenuItem>}
+      {ready.length === 0 && <MenuItem disabled>{t.chat.noAi}</MenuItem>}
       {route && efforts && (
         <>
           <MenuSeparator />
-          <MenuLabel>Effort</MenuLabel>
+          <MenuLabel>{t.chat.effort}</MenuLabel>
           <MenuItem checked={!route.effort} onSelect={() => choose({ provider: route.provider, model: route.model })}>
-            {defaultEffortLabel(current, route.provider === 'claude-code' || route.provider === 'codex')}
+            {t.chat.defaultEffort(
+              current?.defaultEffort ? t.common.efforts[current.defaultEffort] : undefined,
+              route.provider === 'claude-code' || route.provider === 'codex'
+            )}
           </MenuItem>
           {efforts.map((e) => (
             <MenuItem key={e} checked={route.effort === e} onSelect={() => choose({ provider: route.provider, model: route.model, effort: e })}>
-              {EFFORT_LABELS[e]}
+              {t.common.efforts[e]}
             </MenuItem>
           ))}
         </>

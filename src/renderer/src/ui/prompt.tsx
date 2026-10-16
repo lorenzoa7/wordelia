@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { create } from 'zustand'
+import { useT } from '@/lib/i18n'
 import { Button, Dialog, Field, TextInput } from './index'
 
 type Request =
@@ -19,6 +20,7 @@ export function askConfirm(opts: { title: string; message: string; confirm?: str
 }
 
 export function PromptHost(): React.JSX.Element {
+  const t = useT()
   const req = usePrompt((s) => s.req)
   const [value, setValue] = useState('')
   useEffect(() => {
@@ -42,14 +44,14 @@ export function PromptHost(): React.JSX.Element {
       footer={
         <>
           <Button variant="ghost" onClick={() => close(req?.kind === 'confirm' ? false : null)}>
-            Cancel
+            {t.common.cancel}
           </Button>
           <Button
             variant={req?.kind === 'confirm' && req.danger ? 'ribbon' : 'primary'}
             onClick={() => close(req?.kind === 'text' ? value.trim() || null : true)}
             disabled={req?.kind === 'text' && !value.trim()}
           >
-            {req?.confirm ?? (req?.kind === 'confirm' ? 'Confirm' : 'OK')}
+            {req?.confirm ?? (req?.kind === 'confirm' ? t.common.confirm : t.common.ok)}
           </Button>
         </>
       }

@@ -4,6 +4,7 @@ import type { Editor } from '@tiptap/core'
 import { applyHunk, findText } from '@shared/proposals/apply'
 import { markdownToPlain } from '@shared/book'
 import { useBook } from '@/stores/book'
+import { getT } from '@/lib/i18n'
 import { sliceFromMarkdown, textWithMap } from './review'
 
 interface Active {
@@ -44,8 +45,8 @@ export function applyToChapter(chapterId: string, find: string, replace: string)
     const { text, map } = textWithMap(state.doc, 0, docSize)
     const plainFind = markdownToPlain(find).trim()
     const m = findText(text, plainFind)
-    if (!m) return { ok: false, reason: 'The text to change was not found in the chapter. It may have changed.' }
-    if (m.count > 1) return { ok: false, reason: 'The text to change appears more than once in the chapter. Ask the AI for a longer passage.' }
+    if (!m) return { ok: false, reason: getT().editor.apply.notFound }
+    if (m.count > 1) return { ok: false, reason: getT().editor.apply.manyMatches }
     const from = map[m.start]
     const to = map[m.end - 1] + 1
     const slice = sliceFromMarkdown(state.schema, replace)
@@ -55,7 +56,7 @@ export function applyToChapter(chapterId: string, find: string, replace: string)
   }
   const book = useBook.getState()
   const ch = book.chapters.find((c) => c.id === chapterId)
-  if (!ch) return { ok: false, reason: 'The chapter does not exist.' }
+  if (!ch) return { ok: false, reason: getT().editor.apply.noChapter }
   const r = applyHunk(ch.body, find, replace)
   if (!r.ok) return r
   book.setChapterBody(chapterId, r.text)

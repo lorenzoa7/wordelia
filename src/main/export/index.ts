@@ -4,19 +4,23 @@ import { BrowserWindow, dialog, net } from 'electron'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { DocxExportRequest, FontFaceSpec, PdfExportRequest, TextExportRequest } from '@shared/ipc'
+import { mainT } from '../i18n'
 import { buildDocx } from './docx'
 
-async function askPath(win: BrowserWindow | undefined, defaultName: string, ext: string, label: string): Promise<string | null> {
+type ExportKind = 'pdf' | 'docx' | 'markdown' | 'text'
+
+async function askPath(win: BrowserWindow | undefined, defaultName: string, ext: string, kind: ExportKind): Promise<string | null> {
   // End-to-end tests write exports to a folder without a dialog.
   const testDir = process.env['WORDELIA_EXPORT_DIR']
   if (testDir) return join(testDir, `${defaultName}.${ext}`)
-  const opts = { title: `Export ${label}`, defaultPath: `${defaultName}.${ext}`, filters: [{ name: label, extensions: [ext] }] }
+  const t = (await mainT()).main.export[kind]
+  const opts = { title: t.title, defaultPath: `${defaultName}.${ext}`, filters: [{ name: t.filter, extensions: [ext] }] }
   const res = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts)
   return res.canceled || !res.filePath ? null : res.filePath
 }
 
 export async function exportText(win: BrowserWindow | undefined, req: TextExportRequest): Promise<string | null> {
-  const path = await askPath(win, req.defaultName, req.extension, req.extension === 'md' ? 'Markdown' : 'Text')
+  const path = await askPath(win, req.defaultName, req.extension, req.extension === 'md' ? 'markdown' : 'text')
   if (!path) return null
   await writeFile(path, req.content, 'utf8')
   return path
@@ -61,7 +65,7 @@ export async function fontFaceCss(fonts: FontFaceSpec[]): Promise<string> {
 }
 
 export async function exportPdf(win: BrowserWindow | undefined, req: PdfExportRequest): Promise<string | null> {
-  const path = await askPath(win, req.defaultName, 'pdf', 'PDF')
+  const path = await askPath(win, req.defaultName, 'pdf', 'pdf')
   if (!path) return null
   const css = await fontFaceCss(req.fonts ?? [])
   const html = req.html.replace('/* FONT_FACES */', css)
@@ -70,7 +74,7 @@ export async function exportPdf(win: BrowserWindow | undefined, req: PdfExportRe
 }
 
 export async function exportDocx(win: BrowserWindow | undefined, req: DocxExportRequest): Promise<string | null> {
-  const path = await askPath(win, req.defaultName, 'docx', 'Word document')
+  const path = await askPath(win, req.defaultName, 'docx', 'docx')
   if (!path) return null
   await writeFile(path, await buildDocx(req.book))
   return path

@@ -1,30 +1,43 @@
 <p align="center">
-  <img src="resources/brand/wordmark.svg" alt="Wordelia" width="320">
+  <img src="resources/brand/wordmark-card.svg" alt="Wordelia" width="340">
 </p>
 
 <p align="center"><em>A quiet desk for your book, with an editor at your side.</em></p>
 
-Wordelia is a desktop writing app for novelists. It looks like a simple word processor. An AI editor works beside you, like Cursor works beside a programmer. You write the book. The AI polishes, answers, remembers and keeps the story consistent. You approve every change.
+Wordelia is a desktop app for novelists. You write on a simple page. An AI editor works at your side. You approve every change.
 
 ![Inline review of an AI rewrite](docs/images/inline-review.png)
 
 ## Download
 
-Get the Windows installer from [Releases](https://github.com/lorenzoa7/wordelia/releases). The installer has no code signature yet, so Windows SmartScreen shows a warning: select **More info**, then **Run anyway**.
+Get the Windows installer from [Releases](https://github.com/lorenzoa7/wordelia/releases). The installer has no code signature yet. Windows SmartScreen shows a warning: select **More info**, then **Run anyway**.
 
 ## What it does
 
-- **Write on a page.** Chapters are tabs in a sidebar. The page uses real book typography: first-line indents, justified text, scene breaks. Type `--` and get the dialogue dash.
-- **Polish with one key.** Select text and press `Ctrl+J`. The AI rewrites the selection with your writing rules, and reads the text before and after it. The change shows on the page as a diff: red for removed words, green for new words. Press `Enter` to accept or `Esc` to reject.
-- **Your own actions.** Polish, Tighten, Fix grammar only, Show don't tell, Expand — or write your own. Each action can use a different model.
-- **Chat with an editor that knows the book.** The chat reads the manuscript, the planning and your other chat threads. It proposes changes as diff cards. You accept or reject each change.
-- **Connected threads.** Keep one thread per character or per part of the plot. Each thread keeps a short digest. All threads read the digests of the others, so they do not contradict each other.
-- **Plan the story.** Characters, places, world and plot, as notes with images and aliases. Each note shows where its names appear in the manuscript.
-- **Sync the planning.** Press *Sync with manuscript*. The AI reads the chapters that changed and proposes new characters and new facts.
-- **Never lose a word.** Wordelia saves as you type, keeps versions of each chapter (when you open it, every few minutes, and before every AI change), and lets you compare and restore them. Deleted chapters go to a trash folder in the book.
-- **Small comforts.** A daily word goal, focus mode, typewriter scrolling, and optional typewriter sounds.
-- **Import and export.** Import DOCX (from Google Docs or Word), Markdown or text. Export a print-ready PDF (book or standard manuscript format), a DOCX with real Word styles (Google Docs opens it without loss), Markdown or text.
-- **Your files, your AI.** A book is a folder of Markdown files on your computer. Put it in Google Drive, OneDrive or git. Connect the AI that you already pay for.
+### ✍️ Write
+- Write your chapters on a page with book typography.
+- Type `--` to get a dash.
+- Wordelia saves as you type and keeps versions of each chapter.
+
+### ✨ Polish with one key
+- Select text and press `Ctrl+J`.
+- The AI rewrites the text with your writing rules.
+- You see the change on the page. Press `Enter` to accept it or `Esc` to reject it.
+- Make your own actions. Each action can use a different model.
+
+### 💬 Chat with your editor
+- The chat reads your chapters, your planning and your other threads.
+- It proposes changes as diffs. You accept or reject each change.
+
+### 🗺️ Plan the story
+- Keep entries for characters, places, the world and the plot.
+- Press **Sync with manuscript**. The AI adds new facts from your chapters.
+
+### More
+- A book is a folder of Markdown files on your computer.
+- Import DOCX. Export PDF, DOCX, Markdown or text.
+- Use your Claude or ChatGPT plan, or an API key. Choose a model and an effort for each task.
+- The app is in English, Portuguese (Brazil) and Spanish.
 
 | Chat with proposals | Planning |
 |---|---|

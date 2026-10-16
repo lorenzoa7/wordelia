@@ -1,9 +1,10 @@
-export default async function ({ page, shot, openBook }) {
+export default async function ({ page, shot, openBook, book }) {
   await openBook()
   await page.waitForTimeout(600)
   await page.locator('.manuscript p').first().click()
-  await page.keyboard.press('Home')
-  await page.keyboard.type('Naquela noite, ')
+  // The start of the chapter (Home goes only to the start of the visual line).
+  await page.evaluate(() => window.__wordelia.editor().commands.focus('start'))
+  await page.keyboard.type(book.includes('Lighthouse') ? 'That night, ' : 'Naquela noite, ')
   await page.waitForTimeout(600)
   // Switching chapters saves a version.
   await page.locator('.chapter-item').nth(1).click()

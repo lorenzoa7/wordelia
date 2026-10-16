@@ -28,6 +28,8 @@ export const common = {
   next: 'Next',
   done: 'Done',
   continue: 'Continue',
+  confirm: 'Confirm',
+  ok: 'OK',
   settings: 'Settings',
   loading: 'Loading…',
   untitled: 'Untitled',

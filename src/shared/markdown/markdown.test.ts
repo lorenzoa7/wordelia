@@ -219,3 +219,12 @@ describe('review findings', () => {
     expect(rt(d)).toEqual(d)
   })
 })
+
+describe('line ends', () => {
+  it('reads chapter files with CRLF line ends as LF', async () => {
+    const { chapterFromFile } = await import('../book')
+    const ch = chapterFromFile('A.md', '---\r\nid: ch_1\r\ntitle: A\r\n---\r\nUm.\r\n\r\nDois.\r\n', 'x')
+    expect(ch.id).toBe('ch_1')
+    expect(ch.body.split('\n\n')).toEqual(['Um.', 'Dois.\n'])
+  })
+})

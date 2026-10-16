@@ -6,6 +6,7 @@ import clsx from 'clsx'
 import { markdownToPlain } from '@shared/book'
 import { useBook } from '@/stores/book'
 import { useUi } from '@/stores/ui'
+import { useT } from '@/lib/i18n'
 import { findKey } from './find'
 
 function countIn(text: string, q: string, cs: boolean, ww: boolean): number {
@@ -26,6 +27,8 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
   const input = useRef<HTMLInputElement>(null)
   const chapters = useBook((s) => s.chapters)
   const activeId = useBook((s) => s.activeChapterId)
+  const t = useT()
+  const tf = t.editor.find
 
   const st = useEditorState({
     editor,
@@ -88,15 +91,15 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
           transition={{ type: 'spring', stiffness: 500, damping: 36 }}
         >
           <div className="find-row">
-            <button className={clsx('find-toggle', showReplace && 'is-open')} onClick={() => setShowReplace(!showReplace)} aria-label="Replace" aria-expanded={showReplace}>
+            <button className={clsx('find-toggle', showReplace && 'is-open')} onClick={() => setShowReplace(!showReplace)} aria-label={tf.replaceToggle} aria-expanded={showReplace}>
               <CaretRight size={12} />
             </button>
             <input
               ref={input}
               autoFocus
               className="find-input"
-              aria-label="Find"
-              placeholder="Find"
+              aria-label={tf.find}
+              placeholder={tf.find}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {
@@ -108,20 +111,20 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
                 if (e.key === 'Escape') close()
               }}
             />
-            <span className="find-count" aria-live="polite">{query ? (st.count ? `${st.current + 1}/${st.count}` : 'No results') : ''}</span>
-            <button className={clsx('find-opt', cs && 'is-on')} onClick={() => setCs(!cs)} title="Match case" aria-label="Match case" aria-pressed={cs}>
+            <span className="find-count" aria-live="polite">{query ? (st.count ? `${st.current + 1}/${st.count}` : tf.noResults) : ''}</span>
+            <button className={clsx('find-opt', cs && 'is-on')} onClick={() => setCs(!cs)} title={tf.matchCase} aria-label={tf.matchCase} aria-pressed={cs}>
               Aa
             </button>
-            <button className={clsx('find-opt', ww && 'is-on')} onClick={() => setWw(!ww)} title="Whole word" aria-label="Whole word" aria-pressed={ww}>
-              W
+            <button className={clsx('find-opt', ww && 'is-on')} onClick={() => setWw(!ww)} title={tf.wholeWord} aria-label={tf.wholeWord} aria-pressed={ww}>
+              {tf.wholeWordShort}
             </button>
-            <button className="icon-btn" onClick={() => editor.commands.findPrev()} aria-label="Previous">
+            <button className="icon-btn" onClick={() => editor.commands.findPrev()} aria-label={tf.previous}>
               <ArrowUp size={14} />
             </button>
-            <button className="icon-btn" onClick={() => editor.commands.findNext()} aria-label="Next">
+            <button className="icon-btn" onClick={() => editor.commands.findNext()} aria-label={tf.next}>
               <ArrowDown size={14} />
             </button>
-            <button className="icon-btn" onClick={close} aria-label="Close">
+            <button className="icon-btn" onClick={close} aria-label={t.common.close}>
               <X size={14} />
             </button>
           </div>
@@ -130,8 +133,8 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
               <span className="find-toggle-space" />
               <input
                 className="find-input"
-                aria-label="Replace with"
-                placeholder="Replace"
+                aria-label={tf.replaceWith}
+                placeholder={tf.replace}
                 value={replace}
                 onChange={(e) => setReplace(e.target.value)}
                 onKeyDown={(e) => {
@@ -143,16 +146,16 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
                 }}
               />
               <button className="find-text-btn" disabled={!st.count} onClick={() => editor.commands.replaceCurrent(replace)}>
-                Replace
+                {tf.replace}
               </button>
               <button className="find-text-btn" disabled={!st.count} onClick={() => editor.commands.replaceAll(replace)}>
-                Replace all
+                {tf.replaceAll}
               </button>
             </div>
           )}
           {others.length > 0 && (
             <div className="find-others">
-              <span className="caps">Other chapters</span>
+              <span className="caps">{tf.otherChapters}</span>
               {others.map((c) => (
                 <button key={c.id} className="find-other" onClick={() => useBook.getState().selectChapter(c.id)}>
                   <span>{c.title}</span>

@@ -2,7 +2,18 @@
 
 Each version has its Windows installer in GitHub Releases. The release workflow copies the section of the version from this file to the release notes.
 
-## 0.1.0 — 2026-10-15
+## 0.2.0 (2026-10-15)
+
+### New
+- The app is in English, Portuguese (Brazil) and Spanish. Select the language in Settings → General or on the welcome screen. English is the default.
+- Dialogue style for each book: a dash at the start of the line, or quotation marks. New books get the style of their language. The AI follows it.
+
+### Changed
+- The suggested chat effort is now Medium. Opus at Medium gives very good answers and is faster. Old Claude Code chat settings move from High to Medium.
+- More space between the logo and its caret.
+- The README has a simpler summary, English screenshots and a logo that you can see on dark pages.
+
+## 0.1.0 (2026-10-15)
 
 The first version.
 

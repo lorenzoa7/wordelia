@@ -8,6 +8,7 @@ import type { ExportSettings, PageSize } from '@shared/types'
 import { Button, Dialog, Field, Select, Switch } from '@/ui'
 import { invoke } from '@/lib/api'
 import { BOOK_FONTS, fontStack } from '@/lib/fonts'
+import { getT, useT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
 import { toast } from '@/stores/ui'
 import { flushEditor } from '@/features/editor/registry'
@@ -16,14 +17,15 @@ import './export.css'
 
 type Format = 'pdf' | 'docx' | 'md' | 'txt'
 
-const FORMATS: Array<{ id: Format; label: string; hint: string; icon: React.ReactNode }> = [
-  { id: 'pdf', label: 'PDF', hint: 'Print-ready pages', icon: <FilePdf size={20} /> },
-  { id: 'docx', label: 'Word', hint: 'Also for Google Docs', icon: <FileDoc size={20} /> },
-  { id: 'md', label: 'Markdown', hint: 'One file', icon: <MarkdownLogo size={20} /> },
-  { id: 'txt', label: 'Plain text', hint: 'No formatting', icon: <FileText size={20} /> }
+const FORMATS: Array<{ id: Format; icon: React.ReactNode }> = [
+  { id: 'pdf', icon: <FilePdf size={20} /> },
+  { id: 'docx', icon: <FileDoc size={20} /> },
+  { id: 'md', icon: <MarkdownLogo size={20} /> },
+  { id: 'txt', icon: <FileText size={20} /> }
 ]
 
 export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }): React.JSX.Element {
+  const t = useT()
   const manifest = useBook((s) => s.manifest)
   const [format, setFormat] = useState<Format>('pdf')
   const [settings, setSettings] = useState<ExportSettings | null>(null)
@@ -62,10 +64,13 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
       book.updateManifest({ export: s })
       if (path) {
         onOpenChange(false)
-        toast(`Exported to ${path.split(/[\\/]/).pop()}`, { action: { label: 'Show', run: () => void invoke('window:showItem', path!) } })
+        const tt = getT()
+        toast(tt.exportDialog.exportedTo(path.split(/[\\/]/).pop() ?? path), {
+          action: { label: tt.exportDialog.show, run: () => void invoke('window:showItem', path!) }
+        })
       }
     } catch (err) {
-      toast(`Export failed: ${err instanceof Error ? err.message : String(err)}`, { kind: 'error' })
+      toast(getT().exportDialog.exportFailed(err instanceof Error ? err.message : String(err)), { kind: 'error' })
     } finally {
       setBusy(false)
     }
@@ -77,16 +82,16 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
     <Dialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Export"
-      description="Make a file to send to readers, editors or publishers."
+      title={t.common.export}
+      description={t.exportDialog.description}
       width={820}
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t.common.cancel}
           </Button>
           <Button variant="primary" onClick={() => void run()} disabled={busy || !s}>
-            {busy ? 'Exporting…' : `Export ${FORMATS.find((f) => f.id === format)?.label}`}
+            {busy ? t.exportDialog.exporting : t.exportDialog.formats[format].button}
           </Button>
         </>
       }
@@ -98,8 +103,8 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
               {FORMATS.map((f) => (
                 <button key={f.id} aria-pressed={format === f.id} className={clsx('format-card', format === f.id && 'is-active')} onClick={() => setFormat(f.id)}>
                   {f.icon}
-                  <span className="format-label">{f.label}</span>
-                  <span className="format-hint">{f.hint}</span>
+                  <span className="format-label">{t.exportDialog.formats[f.id].label}</span>
+                  <span className="format-hint">{t.exportDialog.formats[f.id].hint}</span>
                 </button>
               ))}
             </div>
@@ -113,93 +118,90 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
                   >
                     <BookOpen size={16} />
                     <span>
-                      <b>Book</b>
-                      <small>Pages like a printed novel</small>
+                      <b>{t.exportDialog.presets.book.name}</b>
+                      <small>{t.exportDialog.presets.book.hint}</small>
                     </span>
                   </button>
                   <button aria-pressed={s.preset === 'manuscript'} className={clsx('preset', s.preset === 'manuscript' && 'is-active')} onClick={() => setSettings(presetSettings('manuscript', s, manifest.typography.fontFamily))}>
                     <Files size={16} />
                     <span>
-                      <b>Manuscript</b>
-                      <small>Standard format for agents and publishers</small>
+                      <b>{t.exportDialog.presets.manuscript.name}</b>
+                      <small>{t.exportDialog.presets.manuscript.hint}</small>
                     </span>
                   </button>
                 </div>
                 <div className="export-grid">
-                  <Field label="Page size">
+                  <Field label={t.exportDialog.pageSize}>
                     <Select
                       value={s.pageSize}
                       onValueChange={(v) => set({ pageSize: v as PageSize })}
-                      options={(Object.keys(PAGE_SIZES) as PageSize[]).map((k) => ({ value: k, label: PAGE_SIZES[k].label }))}
-                      ariaLabel="Page size"
+                      options={(Object.keys(PAGE_SIZES) as PageSize[]).map((k) => ({ value: k, label: t.exportDialog.pageSizes[k] }))}
+                      ariaLabel={t.exportDialog.pageSize}
                     />
                   </Field>
-                  <Field label="Font">
+                  <Field label={t.exportDialog.font}>
                     <Select
                       value={s.typography.fontFamily}
                       onValueChange={(v) => setTypo({ fontFamily: v })}
                       options={BOOK_FONTS.map((f) => ({ value: f.family, label: f.label, style: { fontFamily: fontStack(f.family) } }))}
-                      ariaLabel="Font"
+                      ariaLabel={t.exportDialog.font}
                     />
                   </Field>
-                  <Field label="Size">
+                  <Field label={t.exportDialog.size}>
                     <Select
                       value={String(s.typography.fontSize)}
                       onValueChange={(v) => setTypo({ fontSize: Number(v) })}
-                      options={[9, 10, 10.5, 11, 11.5, 12, 13, 14].map((n) => ({ value: String(n), label: `${n} pt` }))}
-                      ariaLabel="Size"
+                      options={[9, 10, 10.5, 11, 11.5, 12, 13, 14].map((n) => ({ value: String(n), label: `${t.common.number(n)} pt` }))}
+                      ariaLabel={t.exportDialog.size}
                     />
                   </Field>
-                  <Field label="Line spacing">
+                  <Field label={t.exportDialog.lineSpacing}>
                     <Select
                       value={String(s.typography.lineHeight)}
                       onValueChange={(v) => setTypo({ lineHeight: Number(v) })}
-                      options={[1.15, 1.3, 1.45, 1.5, 1.6, 2].map((n) => ({ value: String(n), label: n === 2 ? 'Double' : String(n) }))}
-                      ariaLabel="Line spacing"
+                      options={[1.15, 1.3, 1.45, 1.5, 1.6, 2].map((n) => ({ value: String(n), label: n === 2 ? t.exportDialog.double : t.common.number(n) }))}
+                      ariaLabel={t.exportDialog.lineSpacing}
                     />
                   </Field>
-                  <Field label="Chapter heading">
+                  <Field label={t.exportDialog.chapterHeading}>
                     <Select
                       value={s.chapterHeading}
                       onValueChange={(v) => set({ chapterHeading: v as ExportSettings['chapterHeading'] })}
-                      options={[
-                        { value: 'number-title', label: 'Number and title' },
-                        { value: 'word-number-title', label: '“Chapter One” and title' },
-                        { value: 'title', label: 'Title only' },
-                        { value: 'number', label: 'Number only' }
-                      ]}
-                      ariaLabel="Chapter heading"
+                      options={(['number-title', 'word-number-title', 'title', 'number'] as const).map((k) => ({ value: k, label: t.exportDialog.headings[k] }))}
+                      ariaLabel={t.exportDialog.chapterHeading}
                     />
                   </Field>
-                  <Field label="Scene break">
+                  <Field label={t.exportDialog.sceneBreak}>
                     <Select
                       value={s.sceneBreak}
                       onValueChange={(v) => set({ sceneBreak: v as ExportSettings['sceneBreak'] })}
-                      options={Object.entries(SCENE_BREAK_GLYPH).map(([k, g]) => ({ value: k, label: g || 'Blank line' }))}
-                      ariaLabel="Scene break"
+                      options={Object.entries(SCENE_BREAK_GLYPH).map(([k, g]) => ({ value: k, label: g || t.exportDialog.blankLine }))}
+                      ariaLabel={t.exportDialog.sceneBreak}
                     />
                   </Field>
                 </div>
                 <div className="export-switches">
-                  <Field label="Title page" inline>
+                  <Field label={t.exportDialog.titlePage} inline>
                     <Switch checked={s.titlePage} onCheckedChange={(v) => set({ titlePage: v })} />
                   </Field>
-                  <Field label="Page numbers" inline>
+                  <Field label={t.exportDialog.pageNumbers} inline>
                     <Switch checked={s.pageNumbers} onCheckedChange={(v) => set({ pageNumbers: v })} />
                   </Field>
-                  <Field label="Running header" inline>
+                  <Field label={t.exportDialog.runningHeader} inline>
                     <Switch checked={s.runningHeader} onCheckedChange={(v) => set({ runningHeader: v })} />
                   </Field>
-                  <Field label="Each chapter on a new page" inline>
+                  <Field label={t.exportDialog.newPage} inline>
                     <Switch checked={s.chapterStartsOnNewPage} onCheckedChange={(v) => set({ chapterStartsOnNewPage: v })} />
                   </Field>
                 </div>
-                {format === 'docx' && (
-                  <p className="export-note">For Google Docs: upload the .docx file to Google Drive and open it with Google Docs. The fonts are Google Fonts, so they look the same.</p>
-                )}
+                {format === 'docx' && <p className="export-note">{t.exportDialog.docxNote}</p>}
               </>
             )}
-            {!paged && <p className="export-note">One file with all chapters, in order. {format === 'md' ? 'Formatting stays as Markdown.' : 'Formatting is removed.'}</p>}
+            {!paged && (
+              <p className="export-note">
+                {t.exportDialog.oneFile} {format === 'md' ? t.exportDialog.mdNote : t.exportDialog.txtNote}
+              </p>
+            )}
           </div>
           {paged && <PagePreview settings={s} />}
         </div>
@@ -210,6 +212,7 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
 
 /** A small live preview of one page, to scale. */
 function PagePreview({ settings: s }: { settings: ExportSettings }): React.JSX.Element {
+  const t = useT()
   const manifest = useBook((st) => st.manifest)!
   const chapters = useBook((st) => st.chapters)
   const size = PAGE_SIZES[s.pageSize]
@@ -231,6 +234,7 @@ function PagePreview({ settings: s }: { settings: ExportSettings }): React.JSX.E
     <div className="preview-wrap">
       <div
         className="preview-page"
+        lang={manifest.language}
         style={{
           width: size.w * scale,
           height: size.h * scale,
@@ -254,7 +258,7 @@ function PagePreview({ settings: s }: { settings: ExportSettings }): React.JSX.E
         </div>
         {s.pageNumbers && s.preset !== 'manuscript' && <div className="preview-folio" style={{ bottom: (s.margins.bottom * scale) / 2.4, fontSize: pt(s.typography.fontSize - 2) }}>1</div>}
       </div>
-      <span className="preview-caption">{PAGE_SIZES[s.pageSize].label}</span>
+      <span className="preview-caption">{t.exportDialog.pageSizes[s.pageSize]}</span>
     </div>
   )
 }

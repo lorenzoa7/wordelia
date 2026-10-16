@@ -1,3 +1,198 @@
 // Texts of one part of the app. See src/shared/i18n/README.md.
 
-export const settings = {}
+const n = (v: number): string => v.toLocaleString('en')
+
+export const settings = {
+  /** The dialog and its tabs */
+  dialog: {
+    sections: 'Settings sections',
+    general: 'Appearance',
+    book: 'This book',
+    ai: 'AI',
+    actions: 'Actions'
+  },
+  /** The Appearance tab */
+  general: {
+    language: 'Language',
+    interfaceLanguage: 'Interface language',
+    languageHint: 'This is the language of the app. Set the language of each book in “This book”.',
+    theme: 'Theme',
+    themes: { light: 'Paper', dark: 'Lamplight', system: 'System' },
+    writing: 'Writing',
+    pageZoom: 'Page zoom',
+    dailyGoal: 'Daily goal (words)',
+    dailyGoalAria: 'Daily goal',
+    goalWords: (v: number): string => `${v} words`,
+    goalOff: 'Off',
+    spellcheck: 'Spell check',
+    focusMode: 'Focus mode (dim other paragraphs)',
+    typewriterSounds: 'Typewriter sounds',
+    typewriterScrolling: 'Typewriter scrolling',
+    keyboard: 'Keyboard',
+    /** Names of the keyboard shortcuts */
+    shortcuts: {
+      polish: 'Polish the selection',
+      otherActions: 'Other actions',
+      acceptReject: 'Accept or reject an AI change',
+      dialogueDash: 'Dialogue dash',
+      sceneBreak: 'Scene break',
+      findReplace: 'Find and replace',
+      toggleChat: 'Show or hide the chat',
+      toggleSidebar: 'Show or hide the sidebar',
+      writePlan: 'Write / Plan'
+    }
+  },
+  /** The This book tab */
+  book: {
+    book: 'Book',
+    title: 'Title',
+    author: 'Author',
+    subtitle: 'Subtitle',
+    genre: 'Genre',
+    genrePlaceholder: 'Dark fantasy, mystery…',
+    language: 'Language',
+    languageHint: 'The AI writes book text in this language.',
+    /** Names of the book languages, by language code */
+    languages: {
+      'pt-BR': 'Português (Brasil)',
+      'pt-PT': 'Português (Portugal)',
+      'en-US': 'English (US)',
+      'en-GB': 'English (UK)',
+      es: 'Español',
+      fr: 'Français',
+      de: 'Deutsch',
+      it: 'Italiano'
+    } as Record<string, string>,
+    textOnPage: 'Text on the page',
+    /** Sample text in the typography preview */
+    previewDialogue: (dash: string): string => `${dash} Did you feel that? ${dash} asked the old man, and the candles bent toward the door.`,
+    previewNarration: 'Miguel did not answer. Outside, the wind kept its own counsel.',
+    font: 'Font',
+    size: 'Size (pt)',
+    sizeAria: 'Size',
+    lineSpacing: 'Line spacing',
+    indent: 'First-line indent (em)',
+    indentAria: 'Indent',
+    alignment: 'Alignment',
+    justified: 'Justified',
+    left: 'Left',
+    paragraphSpace: 'Space between paragraphs',
+    paragraphSpaceAria: 'Paragraph spacing',
+    noSpace: 'None (book style)',
+    indentFirst: 'Indent the first paragraph of a chapter or scene',
+    typing: 'Typing',
+    dialogueStyle: 'Dialogue',
+    dialogueStyleDash: 'A dash at the start of the line',
+    dialogueStyleQuotes: 'Quotation marks',
+    dialogueStyleHint: 'The AI writes dialogue in this style.',
+    previewQuoted: '“Did you feel that?” asked the old man, and the candles bent toward the door.',
+    dialogueDash: 'Dialogue dash (type --)',
+    dialogueDashAria: 'Dialogue dash',
+    emDash: '— em dash (U+2014)',
+    horizontalBar: '― horizontal bar (U+2015)',
+    smartQuotes: 'Smart quotes',
+    smartEllipsis: 'Three dots become an ellipsis (…)',
+    sceneBreak: 'Scene break in exports',
+    sceneBreakAria: 'Scene break',
+    blankLine: 'Blank line'
+  },
+  /** The AI tab */
+  ai: {
+    connections: 'Connections',
+    free: 'Wordelia is free. Connect the AI you already pay for.',
+    modelsForTasks: 'Models for each task',
+    modelsNote: 'Pick a model for each kind of work. Fast models feel better for actions; the strongest models give the best chat and planning.',
+    /** Shown in bold before effortNote */
+    effortTerm: 'Effort',
+    effortNote:
+      'is how long the model thinks before it answers. More effort gives better answers, but they take longer and use more of your plan. Each action can have its own model and effort (Settings → Actions).',
+    /** How to connect each provider. Text in `backticks` shows as code. */
+    help: {
+      'claude-code':
+        'Uses your Claude Pro or Max plan. Install Claude Code, then run `claude auth login` in a terminal. Wordelia runs your own `claude` program; it never sees your password or tokens.',
+      codex: 'Uses your ChatGPT plan. Install the Codex CLI, then run `codex login` in a terminal. Wordelia runs your own `codex` program.',
+      anthropic: 'Pay per use with an API key from console.anthropic.com. The key is encrypted on this computer.',
+      openai: 'Pay per use with an API key from platform.openai.com. The key is encrypted on this computer.'
+    },
+    connected: 'Connected',
+    notInstalled: 'Not installed',
+    notConnected: 'Not connected',
+    checkAgain: 'Check again',
+    use: (provider: string): string => `Use ${provider}`,
+    providerConnected: (provider: string): string => `${provider} connected.`,
+    keyFailed: (detail: string): string => `The key did not work: ${detail}`,
+    allTasksUse: (provider: string): string => `All tasks now use ${provider}.`,
+    found: (version?: string, account?: string): string =>
+      `Found on this computer${version ? ` (version ${version})` : ''}${account ? `, logged in as ${account}` : ''}. Wordelia uses this login; it does not store it.`,
+    keySaved: 'The key is saved in the key store of the system.',
+    update: 'Update…',
+    newVersion: (version: string): string => `Version ${version} is out. New models often need the newest version.`,
+    updateClaude: 'The button runs “claude update” in a terminal.',
+    updateCodex: 'Update Codex with the tool that installed it.',
+    apiKey: 'API key',
+    keyPlaceholderSaved: 'A key is saved. Paste a new one to replace it.',
+    keyPlaceholder: 'Paste your API key',
+    saveKey: 'Save key',
+    logIn: 'Log in…',
+    logInHint: 'Opens a terminal window. Come back here and press the check button when you are done.',
+    programPath: 'Program path',
+    programPathPlaceholder: (program: string): string => `Full path to the ${program} program (leave empty to find it automatically)`,
+    setProgramPath: 'Set the program path',
+    modelsAvailable: (v: number): string => `${v} ${v === 1 ? 'model' : 'models'} available`,
+    useForAll: 'Use for all tasks',
+    connectFirst: 'Connect a provider above to choose models.',
+    cliDefault: 'CLI default',
+    lastAnswer: (model: string): string => `Last answer: ${model}`,
+    provider: 'Provider',
+    model: 'Model',
+    providerAria: (task: string): string => `${task} provider`,
+    modelAria: (task: string): string => `${task} model`,
+    effortAria: (task: string): string => `${task} effort`,
+    /** The "Default" effort choice: what happens when Wordelia sends no effort. `effort` is the name of the default level, if known. */
+    defaultEffort: (effort: string | undefined, cli: boolean): string =>
+      effort ? `Default (${effort})` : cli ? 'Default (the CLI decides)' : 'Default (the model decides)',
+    noEffort: 'No effort setting'
+  },
+  /** The Actions tab */
+  actions: {
+    notePrefix: 'Actions run on selected text from the menu above the selection. Each action follows the',
+    noteRules: 'writing rules of the book',
+    noteSuffix: 'and reads the text around the selection.',
+    /** Name of an action that the user just added */
+    newAction: 'New action',
+    deleteTitle: (name: string): string => `Delete “${name}”?`,
+    deleteMessage: 'This action will be removed.',
+    resetTitle: 'Restore the default actions?',
+    resetMessage: 'Your changes to the built-in actions will be lost. Your own actions stay.',
+    restore: 'Restore',
+    new: 'New',
+    restoreBuiltIn: 'Restore the built-in actions',
+    restoreDefaults: 'Restore defaults',
+    name: 'Name',
+    nameAria: 'Action name',
+    icon: 'Icon',
+    instructions: 'Instructions',
+    instructionsHint: 'What the AI must do with the selected text. Your writing rules are added automatically.',
+    model: 'Model',
+    sameAsActions: 'Same as Actions',
+    effort: 'Effort',
+    sameAsModel: 'Same as the model',
+    noEffort: 'This model has no effort setting.',
+    /** "Runs on <model>(why).<tail>" */
+    runsOn: 'Runs on',
+    noModelYet: 'no model yet',
+    defaultModel: 'Default model',
+    cliChooses: ' (the CLI chooses the effort)',
+    modelChooses: ' (the model chooses the effort)',
+    runsOnTail: '. More effort is slower and uses more of your plan.',
+    context: 'Context around the selection',
+    contextAria: 'Context',
+    contextLittle: 'A little (300 characters)',
+    contextSome: 'Some (1,500)',
+    contextLot: 'A lot (3,000)',
+    contextMost: 'Most of the chapter (8,000)',
+    characters: (v: number): string => `${n(v)} characters`,
+    isMain: 'Main action (Ctrl+J)',
+    makeMain: 'Make main action'
+  }
+}

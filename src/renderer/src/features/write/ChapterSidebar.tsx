@@ -10,8 +10,10 @@ import { useBook } from '@/stores/book'
 import { toast, useUi } from '@/stores/ui'
 import { useChat } from '@/features/chat/chatStore'
 import { useApp } from '@/stores/app'
+import { useT } from '@/lib/i18n'
 
 export function ChapterSidebar(): React.JSX.Element {
+  const t = useT()
   const chapters = useBook((s) => s.chapters)
   const activeId = useBook((s) => s.activeChapterId)
   const [renaming, setRenaming] = useState<string | null>(null)
@@ -19,8 +21,8 @@ export function ChapterSidebar(): React.JSX.Element {
   return (
     <div className="sidebar">
       <div className="sidebar-head">
-        <span className="caps">Chapters</span>
-        <IconButton label="New chapter" onClick={() => void useBook.getState().addChapter(activeId)}>
+        <span className="caps">{t.write.chapters}</span>
+        <IconButton label={t.write.newChapter} onClick={() => void useBook.getState().addChapter(activeId)}>
           <Plus size={15} />
         </IconButton>
       </div>
@@ -44,7 +46,7 @@ export function ChapterSidebar(): React.JSX.Element {
         ))}
       </Reorder.Group>
       <button className="sidebar-add" onClick={() => void useBook.getState().addChapter(chapters[chapters.length - 1]?.id ?? null)}>
-        <Plus size={13} /> Add chapter
+        <Plus size={13} /> {t.write.addChapter}
       </button>
     </div>
   )
@@ -65,6 +67,7 @@ function ChapterItem({
   onRename: () => void
   onRenamed: () => void
 }): React.JSX.Element {
+  const t = useT()
   const words = countMarkdownWords(chapter.body)
   const [value, setValue] = useState(chapter.title)
 
@@ -79,14 +82,14 @@ function ChapterItem({
 
   const remove = async (): Promise<void> => {
     const ok = await askConfirm({
-      title: `Delete “${chapter.title}”?`,
-      message: "The file moves to the book's .wordelia/trash folder. You can get it back from there.",
-      confirm: 'Delete',
+      title: t.write.deleteTitle(chapter.title),
+      message: t.write.deleteMessage,
+      confirm: t.common.delete,
       danger: true
     })
     if (!ok) return
     await useBook.getState().deleteChapter(chapter.id)
-    toast(`“${chapter.title}” moved to the trash folder.`)
+    toast(t.write.deleted(chapter.title))
   }
 
   return (
@@ -96,7 +99,7 @@ function ChapterItem({
       tabIndex={renaming ? -1 : 0}
       data-chapter={chapter.id}
       aria-current={active ? 'page' : undefined}
-      aria-label={`Chapter ${index + 1}: ${chapter.title}, ${words} words. F2 renames, Alt and arrow keys move it.`}
+      aria-label={t.write.chapterLabel(index + 1, chapter.title, words)}
       onClick={() => !renaming && useBook.getState().selectChapter(chapter.id)}
       onDoubleClick={onRename}
       onKeyDown={(e) => {
@@ -126,7 +129,7 @@ function ChapterItem({
       {renaming ? (
         <input
           className="chapter-item-input"
-          aria-label="Chapter title"
+          aria-label={t.write.chapterTitle}
           autoFocus
           value={value}
           onChange={(e) => setValue(e.target.value)}
@@ -152,22 +155,22 @@ function ChapterItem({
           align="start"
           side="right"
           trigger={
-            <IconButton label="Chapter options">
+            <IconButton label={t.write.chapterOptions}>
               <DotsThree size={16} weight="bold" />
             </IconButton>
           }
         >
           <MenuItem icon={<PencilSimple size={15} />} onSelect={() => { setValue(chapter.title); onRename() }}>
-            Rename
+            {t.common.rename}
           </MenuItem>
           <MenuItem icon={<Plus size={15} />} onSelect={() => void useBook.getState().addChapter(chapter.id)}>
-            New chapter after this
+            {t.write.newChapterAfter}
           </MenuItem>
           <MenuItem icon={<ArrowUp size={15} />} shortcut="Alt+↑" disabled={index === 0} onSelect={() => move(-1)}>
-            Move up
+            {t.write.moveUp}
           </MenuItem>
           <MenuItem icon={<ArrowDown size={15} />} shortcut="Alt+↓" onSelect={() => move(1)}>
-            Move down
+            {t.write.moveDown}
           </MenuItem>
           <MenuItem
             icon={<ArrowBendUpLeft size={15} />}
@@ -177,14 +180,14 @@ function ChapterItem({
               setTimeout(() => document.querySelector<HTMLTextAreaElement>('.composer-input')?.focus(), 200)
             }}
           >
-            Mention in chat
+            {t.write.mention}
           </MenuItem>
           <MenuItem icon={<ClockCounterClockwise size={15} />} onSelect={() => useUi.getState().openHistory(chapter.id)}>
-            Version history…
+            {t.write.versionHistoryMenu}
           </MenuItem>
           <MenuSeparator />
           <MenuItem danger icon={<Trash size={15} />} onSelect={() => void remove()}>
-            Delete chapter
+            {t.write.deleteChapter}
           </MenuItem>
         </Menu>
       </span>

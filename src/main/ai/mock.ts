@@ -22,6 +22,8 @@ function polish(text: string): string {
   let out = text
   for (const [re, rep] of SWAPS) out = out.replace(re, rep)
   out = out.replace(/(^|[.!?]\s+)([a-zà-ú])/g, (_m, a: string, b: string) => a + b.toUpperCase())
+  // A selection that starts in the middle of a sentence keeps its small first letter.
+  if (/^[a-zà-ú]/.test(text)) out = out.charAt(0).toLowerCase() + out.slice(1)
   if (out === text) out = text.replace(/,\s*/, ' — ')
   return out
 }
@@ -35,6 +37,7 @@ function between(src: string, open: string, close: string): string | null {
 
 function reply(req: CompletionRequest): string {
   const last = req.messages[req.messages.length - 1]?.content ?? ''
+  const english = /language="[^"]*English/.test(req.system)
   if (req.purpose === 'action') {
     const sel = between(last, '<selection>\n', '\n</selection>') ?? between(last, '<selection>', '</selection>') ?? last
     return `<rewrite>\n${polish(sel.trim())}\n</rewrite>`
@@ -42,6 +45,23 @@ function reply(req: CompletionRequest): string {
   if (req.purpose === 'background' && /short title/i.test(req.system)) return 'The opening paragraph'
   if (req.purpose === 'background') {
     return '- The writer and the assistant discussed the current chapter.\n- Decision: keep the tone dark and quiet.'
+  }
+  if (req.purpose === 'sync' && english) {
+    return [
+      'I found one new character in the changed chapters.',
+      '',
+      '<create file="planning/Characters/The Visitor.md">',
+      '---',
+      'aliases: [the man from the blue boat]',
+      'summary: A stranger found in a blue boat. He speaks of streets that do not exist on the island.',
+      '---',
+      '## Role',
+      'A mystery that arrives with the storm.',
+      '## Appearance',
+      '- Hands of someone who never worked at sea.',
+      '- A silver ring with a lighthouse engraved on it.',
+      '</create>'
+    ].join('\n')
   }
   if (req.purpose === 'sync') {
     return [
@@ -59,10 +79,13 @@ function reply(req: CompletionRequest): string {
   }
   // Chat: propose an edit to the first paragraph of the current chapter.
   const chapter = /<chapter file="([^"]+)"[^>]*current="true"[^>]*>\n([\s\S]*?)\n<\/chapter>/.exec(req.system)
-  const firstPara = chapter?.[2].split(/\n\n/).find((p) => p.trim().length > 40)
+  // The first paragraph with words to improve, so the diff shows real changes.
+  const paras = chapter?.[2].split(/\n\n/).filter((p) => p.trim().length > 40) ?? []
+  const improvable = (p: string): boolean => SWAPS.slice(0, -1).some(([re]) => new RegExp(re.source, re.flags.replace('g', '')).test(p))
+  const firstPara = paras.find(improvable) ?? paras[0]
   if (chapter && firstPara && /edit|change|improve|rewrite|melhor|mude|reescrev/i.test(last)) {
     return [
-      'Here is a tighter version of the opening paragraph. It keeps the facts and the voice.',
+      'Here is a tighter version of this paragraph. It keeps the facts and the voice.',
       '',
       `<edit file="${chapter[1]}">`,
       `<find>${firstPara.trim()}</find>`,
@@ -75,9 +98,9 @@ function reply(req: CompletionRequest): string {
   return [
     'Good question. Three things stand out in this chapter:',
     '',
-    '1. **The opening image is strong.** The empty church at dawn sets the tone at once.',
-    '2. **The Traveller needs one concrete detail** that the reader can remember — a smell, a scar, a way of speaking.',
-    "3. **Miguel's reaction** comes a little fast. One more beat of doubt would make the angel more frightening.",
+    '1. **The opening image is strong.** The lamp lit at six sharp sets the tone at once.',
+    '2. **The visitor needs one concrete detail** that the reader can remember: a smell, a scar, a way of speaking.',
+    "3. **Marta's reaction** comes a little fast. One more beat of doubt would make the blue boat more frightening.",
     '',
     'Do you want me to propose an edit for one of these?'
   ].join('\n')

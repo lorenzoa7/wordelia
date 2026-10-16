@@ -6,18 +6,20 @@ import clsx from 'clsx'
 import type { Thread } from '@shared/types'
 import { Button, Dialog, Field, IconButton, Menu, MenuItem, MenuSeparator, TextArea, TextInput } from '@/ui'
 import { useBook } from '@/stores/book'
+import { useT } from '@/lib/i18n'
 import { useChat } from './chatStore'
 import { askConfirm } from '@/ui/prompt'
-import { newThread } from './send'
+import { newThread, threadBrief, threadTitle } from './send'
 import { MessageView, StreamingMessage } from './MessageView'
 import { Composer } from './Composer'
 import './chat.css'
 
 export function ChatPanel(): React.JSX.Element {
+  const t = useT()
   const threads = useBook((s) => s.threads)
   const activeId = useChat((s) => s.activeThreadId)
   const setActive = useChat((s) => s.setActiveThread)
-  const thread = threads.find((t) => t.id === activeId) ?? null
+  const thread = threads.find((th) => th.id === activeId) ?? null
   const streaming = useChat((s) => (thread ? s.streaming[thread.id] : undefined))
   const [editing, setEditing] = useState<Thread | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -37,37 +39,37 @@ export function ChatPanel(): React.JSX.Element {
   }, [count, streaming?.text.length, activeId, streaming])
 
   const create = (): void => {
-    const t = newThread()
-    useBook.getState().saveThread(t, true)
-    setActive(t.id)
+    const th = newThread()
+    useBook.getState().saveThread(th, true)
+    setActive(th.id)
     setTimeout(() => document.querySelector<HTMLTextAreaElement>('.composer-input')?.focus(), 50)
   }
 
   return (
-    <aside className="chat-panel" aria-label="Chat">
+    <aside className="chat-panel" aria-label={t.chat.panel}>
       <header className="chat-head">
         <ThreadSwitcher threads={threads} active={thread} onSelect={setActive} onCreate={create} />
         <div className="chat-head-actions">
-          <IconButton label="New thread" onClick={create}>
+          <IconButton label={t.chat.newThread} onClick={create}>
             <Plus size={16} />
           </IconButton>
           {thread && (
             <Menu
               align="end"
               trigger={
-                <IconButton label="Thread options">
+                <IconButton label={t.chat.threadOptions}>
                   <DotsThree size={18} weight="bold" />
                 </IconButton>
               }
             >
               <MenuItem icon={<NotePencil size={15} />} onSelect={() => setEditing(thread)}>
-                Title and purpose…
+                {t.chat.titleAndPurpose}
               </MenuItem>
               <MenuItem
                 icon={<PushPin size={15} />}
                 onSelect={() => useBook.getState().saveThread({ ...thread, pinned: !thread.pinned })}
               >
-                {thread.pinned ? 'Unpin' : 'Pin'}
+                {thread.pinned ? t.chat.unpin : t.chat.pin}
               </MenuItem>
               <MenuSeparator />
               <MenuItem
@@ -75,9 +77,9 @@ export function ChatPanel(): React.JSX.Element {
                 icon={<Trash size={15} />}
                 onSelect={() =>
                   void askConfirm({
-                    title: `Delete “${thread.title}”?`,
-                    message: 'The messages of this thread will be deleted. Other threads keep their own digests.',
-                    confirm: 'Delete',
+                    title: t.chat.deleteTitle(threadTitle(t, thread.title)),
+                    message: t.chat.deleteMessage,
+                    confirm: t.common.delete,
                     danger: true
                   }).then((ok) => {
                     if (!ok) return
@@ -86,7 +88,7 @@ export function ChatPanel(): React.JSX.Element {
                   })
                 }
               >
-                Delete thread
+                {t.chat.deleteThread}
               </MenuItem>
             </Menu>
           )}
@@ -94,7 +96,7 @@ export function ChatPanel(): React.JSX.Element {
       </header>
       {thread?.brief && (
         <div className="chat-brief">
-          <span className="caps">Purpose</span> {thread.brief}
+          <span className="caps">{t.chat.purpose}</span> {threadBrief(t, thread.brief)}
         </div>
       )}
 
@@ -128,42 +130,43 @@ function ThreadSwitcher({
   onSelect: (id: string) => void
   onCreate: () => void
 }): React.JSX.Element {
+  const t = useT()
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
   const sorted = useMemo(() => {
     const list = [...threads].sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt.localeCompare(a.updatedAt))
     const f = q.trim().toLowerCase()
-    return f ? list.filter((t) => `${t.title} ${t.brief} ${t.digest}`.toLowerCase().includes(f)) : list
-  }, [threads, q])
+    return f ? list.filter((th) => `${threadTitle(t, th.title)} ${th.brief} ${th.digest}`.toLowerCase().includes(f)) : list
+  }, [threads, q, t])
 
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
         <button className="thread-switch">
           <ChatsCircle size={16} />
-          <span>{active?.title ?? 'New thread'}</span>
+          <span>{active ? threadTitle(t, active.title) : t.chat.newThread}</span>
           <CaretDown size={11} />
         </button>
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content className="thread-pop" align="start" sideOffset={6}>
-          <input className="thread-search" aria-label="Search threads" placeholder="Search threads" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+          <input className="thread-search" aria-label={t.chat.searchThreads} placeholder={t.chat.searchThreads} value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
           <div className="thread-list">
-            {sorted.length === 0 && <p className="thread-none">No threads yet.</p>}
-            {sorted.map((t) => (
+            {sorted.length === 0 && <p className="thread-none">{t.chat.noThreads}</p>}
+            {sorted.map((th) => (
               <button
-                key={t.id}
-                className={clsx('thread-item', t.id === active?.id && 'is-active')}
+                key={th.id}
+                className={clsx('thread-item', th.id === active?.id && 'is-active')}
                 onClick={() => {
-                  onSelect(t.id)
+                  onSelect(th.id)
                   setOpen(false)
                 }}
               >
                 <span className="thread-item-title">
-                  {t.pinned && <PushPin size={11} weight="fill" />}
-                  {t.title}
+                  {th.pinned && <PushPin size={11} weight="fill" />}
+                  {threadTitle(t, th.title)}
                 </span>
-                <span className="thread-item-sub">{t.brief || firstLine(t.digest) || `${t.messages.length} ${t.messages.length === 1 ? 'message' : 'messages'}`}</span>
+                <span className="thread-item-sub">{threadBrief(t, th.brief) || firstLine(th.digest) || t.chat.messages(th.messages.length)}</span>
               </button>
             ))}
           </div>
@@ -174,7 +177,7 @@ function ThreadSwitcher({
               setOpen(false)
             }}
           >
-            <Plus size={13} /> New thread
+            <Plus size={13} /> {t.chat.newThread}
           </button>
         </Popover.Content>
       </Popover.Portal>
@@ -187,11 +190,14 @@ function firstLine(s: string): string {
 }
 
 function ThreadEditor({ thread, onClose }: { thread: Thread | null; onClose: () => void }): React.JSX.Element {
+  const t = useT()
   const [title, setTitle] = useState('')
   const [brief, setBrief] = useState('')
+  // A new thread shows its title in the interface language. If the user keeps that title, the stored title stays.
+  const shownTitle = thread ? threadTitle(t, thread.title) : ''
   useEffect(() => {
     if (thread) {
-      setTitle(thread.title)
+      setTitle(shownTitle)
       setBrief(thread.brief)
     }
   }, [thread])
@@ -199,33 +205,36 @@ function ThreadEditor({ thread, onClose }: { thread: Thread | null; onClose: () 
     <Dialog
       open={thread !== null}
       onOpenChange={(v) => !v && onClose()}
-      title="Thread"
-      description="The purpose helps the AI focus. Other threads see this thread's purpose and digest."
+      title={t.chat.thread}
+      description={t.chat.editorDescription}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
-            Cancel
+            {t.common.cancel}
           </Button>
           <Button
             variant="primary"
             onClick={() => {
-              if (thread) useBook.getState().saveThread({ ...thread, title: title.trim() || thread.title, brief: brief.trim() })
+              if (thread) {
+                const next = title.trim()
+                useBook.getState().saveThread({ ...thread, title: next && next !== shownTitle ? next : thread.title, brief: brief.trim() })
+              }
               onClose()
             }}
           >
-            Save
+            {t.common.save}
           </Button>
         </>
       }
     >
-      <Field label="Title">
+      <Field label={t.chat.title}>
         <TextInput value={title} onChange={(e) => setTitle(e.target.value)} />
       </Field>
-      <Field label="Purpose" hint="Example: Heitor's arc in part two. His guilt and his loyalty to the Carpinteiros.">
+      <Field label={t.chat.purpose} hint={t.chat.purposeHint}>
         <TextArea value={brief} onChange={(e) => setBrief(e.target.value)} rows={3} />
       </Field>
       {thread?.digest && (
-        <Field label="Digest (kept by the AI)">
+        <Field label={t.chat.digest}>
           <div className="digest-box">{thread.digest}</div>
         </Field>
       )}
@@ -233,24 +242,16 @@ function ThreadEditor({ thread, onClose }: { thread: Thread | null; onClose: () 
   )
 }
 
-const SUGGESTIONS = [
-  'What is the weakest part of this chapter?',
-  'Check this chapter against the planning. Is anything inconsistent?',
-  'Suggest three titles for this chapter.',
-  'Which scene could be cut or merged?'
-]
-
 function ChatEmpty(): React.JSX.Element {
+  const t = useT()
   const setDraft = useChat((s) => s.setDraft)
   return (
     <AnimatePresence>
       <motion.div className="chat-empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
-        <p className="chat-empty-title">Your editor is here.</p>
-        <p className="chat-empty-text">
-          It reads the whole book, the planning, and your other threads. It can propose changes; you approve each one.
-        </p>
+        <p className="chat-empty-title">{t.chat.emptyTitle}</p>
+        <p className="chat-empty-text">{t.chat.emptyText}</p>
         <div className="chat-suggestions">
-          {SUGGESTIONS.map((s) => (
+          {t.chat.suggestions.map((s) => (
             <button
               key={s}
               className="chat-suggestion"

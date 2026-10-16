@@ -7,8 +7,11 @@ import { wordsToday } from './today'
 import { formatCount } from '@shared/book'
 import { saver, type SaveState } from '@/stores/saver'
 import { useStats } from '@/features/editor/stats'
+import { useT } from '@/lib/i18n'
 
 export function StatusBar(): React.JSX.Element {
+  const t = useT()
+  const s = t.write.status
   const { chapterWords, bookWords, selectionWords } = useStats()
   const [save, setSave] = useState<SaveState>('saved')
   useEffect(() => saver.subscribe(setSave), [])
@@ -20,40 +23,40 @@ export function StatusBar(): React.JSX.Element {
 
   return (
     <footer className="status-bar">
-      <span>
+      <span className="status-left">
         {selectionWords > 0 ? (
           <>
-            <b>{selectionWords.toLocaleString('en-US')}</b> selected ·{' '}
+            <b>{t.common.number(selectionWords)}</b> {s.selected} ·{' '}
           </>
         ) : null}
-        <b>{chapterWords.toLocaleString('en-US')}</b> words in chapter · {formatCount(bookWords)} in book · {minutes} min read
+        <b>{t.common.number(chapterWords)}</b> {s.wordsInChapter} · {s.inBook(formatCount(bookWords))} · {s.minRead(minutes)}
       </span>
       <span className="status-right">
       {goal > 0 && (
-        <span className={`today${progress >= 1 ? ' is-done' : ''}`} title={`Daily goal: ${goal} words`}>
+        <span className={`today${progress >= 1 ? ' is-done' : ''}`} title={s.dailyGoal(goal)}>
           <span className="today-bar">
             <span style={{ width: `${progress * 100}%` }} />
           </span>
-          {progress >= 1 ? 'Goal reached · ' : ''}+{written.toLocaleString('en-US')} today
+          {progress >= 1 ? `${s.goalReached} · ` : ''}{s.today(t.common.number(written))}
         </span>
       )}
-      <button className="status-btn" onClick={() => useUi.getState().openHistory(useBook.getState().activeChapterId)} title="Version history">
-        <ClockCounterClockwise size={12} /> History
+      <button className="status-btn" onClick={() => useUi.getState().openHistory(useBook.getState().activeChapterId)} title={s.versionHistory}>
+        <ClockCounterClockwise size={12} /> {s.history}
       </button>
       <span className={`save-state is-${save}`} title={save === 'error' ? saver.error : undefined} role="status" aria-live="polite">
         {save === 'saved' && (
           <>
-            <CheckCircle size={12} /> Saved
+            <CheckCircle size={12} /> {s.saved}
           </>
         )}
         {save === 'saving' && (
           <>
-            <CloudArrowUp size={12} /> Saving…
+            <CloudArrowUp size={12} /> {s.saving}
           </>
         )}
         {save === 'error' && (
           <>
-            <WarningCircle size={12} /> Not saved
+            <WarningCircle size={12} /> {s.notSaved}
           </>
         )}
       </span>

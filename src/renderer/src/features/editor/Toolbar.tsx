@@ -21,6 +21,7 @@ import { IconButton, Menu, MenuItem, MenuLabel, MenuSeparator } from '@/ui'
 import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
 import { useUi } from '@/stores/ui'
+import { useT } from '@/lib/i18n'
 
 const ALIGN_ICONS = {
   left: <TextAlignLeft size={17} />,
@@ -35,6 +36,8 @@ export function Toolbar({ editor }: { editor: Editor }): React.JSX.Element {
   const setUi = useApp((s) => s.setUi)
   const setFindOpen = useUi((s) => s.setFindOpen)
   const openSettings = useUi((s) => s.openSettings)
+  const t = useT()
+  const tb = t.editor.toolbar
 
   const st = useEditorState({
     editor,
@@ -62,26 +65,26 @@ export function Toolbar({ editor }: { editor: Editor }): React.JSX.Element {
 
   return (
     <div className="toolbar-wrap">
-      <div className="toolbar" aria-label="Formatting">
-        <IconButton label="Undo" shortcut="Ctrl+Z" disabled={!st.canUndo} onClick={() => run().undo().run()}>
+      <div className="toolbar" aria-label={tb.formatting}>
+        <IconButton label={t.common.undo} shortcut="Ctrl+Z" disabled={!st.canUndo} onClick={() => run().undo().run()}>
           <ArrowArcLeft size={17} />
         </IconButton>
-        <IconButton label="Redo" shortcut="Ctrl+Y" disabled={!st.canRedo} onClick={() => run().redo().run()}>
+        <IconButton label={tb.redo} shortcut="Ctrl+Y" disabled={!st.canRedo} onClick={() => run().redo().run()}>
           <ArrowArcRight size={17} />
         </IconButton>
         <span className="toolbar-sep" />
 
         <Menu
           trigger={
-            <button className="toolbar-select toolbar-font" aria-label="Font">
+            <button className="toolbar-select toolbar-font" aria-label={tb.font}>
               <span style={{ fontFamily: fontStack(st.font ?? bookFont) }}>{st.font ?? bookFont}</span>
               <CaretDown size={10} />
             </button>
           }
         >
-          <MenuLabel>Selected text</MenuLabel>
+          <MenuLabel>{tb.selectedText}</MenuLabel>
           <MenuItem checked={!st.font} onSelect={() => run().unsetFontFamily().run()}>
-            Book font ({bookFont})
+            {tb.bookFont(bookFont)}
           </MenuItem>
           <MenuSeparator />
           {BOOK_FONTS.map((f) => (
@@ -95,19 +98,19 @@ export function Toolbar({ editor }: { editor: Editor }): React.JSX.Element {
             </MenuItem>
           ))}
           <MenuSeparator />
-          <MenuItem onSelect={() => openSettings('book')}>Change the font of the whole book…</MenuItem>
+          <MenuItem onSelect={() => openSettings('book')}>{tb.changeBookFont}</MenuItem>
         </Menu>
 
         <Menu
           trigger={
-            <button className="toolbar-select toolbar-size" aria-label="Font size">
+            <button className="toolbar-select toolbar-size" aria-label={tb.fontSize}>
               <span>{st.size ?? bookSize}</span>
               <CaretDown size={10} />
             </button>
           }
         >
           <MenuItem checked={!st.size} onSelect={() => run().unsetFontSize().run()}>
-            Book size ({bookSize})
+            {tb.bookSize(bookSize)}
           </MenuItem>
           <MenuSeparator />
           {FONT_SIZES.map((s) => (
@@ -118,20 +121,20 @@ export function Toolbar({ editor }: { editor: Editor }): React.JSX.Element {
         </Menu>
         <span className="toolbar-sep" />
 
-        <IconButton label="Bold" shortcut="Ctrl+B" active={st.bold} onClick={() => run().toggleBold().run()}>
+        <IconButton label={tb.bold} shortcut="Ctrl+B" active={st.bold} onClick={() => run().toggleBold().run()}>
           <TextB size={17} weight={st.bold ? 'bold' : 'regular'} />
         </IconButton>
-        <IconButton label="Italic" shortcut="Ctrl+I" active={st.italic} onClick={() => run().toggleItalic().run()}>
+        <IconButton label={tb.italic} shortcut="Ctrl+I" active={st.italic} onClick={() => run().toggleItalic().run()}>
           <TextItalic size={17} />
         </IconButton>
-        <IconButton label="Underline" shortcut="Ctrl+U" active={st.underline} onClick={() => run().toggleUnderline().run()}>
+        <IconButton label={tb.underline} shortcut="Ctrl+U" active={st.underline} onClick={() => run().toggleUnderline().run()}>
           <TextUnderline size={17} />
         </IconButton>
         <span className="toolbar-sep" />
 
         <Menu
           trigger={
-            <button className="icon-btn toolbar-align" aria-label="Alignment" title="Alignment">
+            <button className="icon-btn toolbar-align" aria-label={tb.alignment} title={tb.alignment}>
               {ALIGN_ICONS[align as keyof typeof ALIGN_ICONS] ?? ALIGN_ICONS.left}
               <CaretDown size={9} />
             </button>
@@ -139,29 +142,29 @@ export function Toolbar({ editor }: { editor: Editor }): React.JSX.Element {
         >
           {(['left', 'center', 'right', 'justify'] as const).map((a) => (
             <MenuItem key={a} icon={ALIGN_ICONS[a]} checked={st.align === a} onSelect={() => run().setTextAlign(a).run()}>
-              {a[0].toUpperCase() + a.slice(1)}
+              {tb.align[a]}
             </MenuItem>
           ))}
           <MenuSeparator />
           <MenuItem icon={<TextAlignJustify size={17} />} checked={!st.align} onSelect={() => run().unsetTextAlign().run()}>
-            Book default
+            {tb.bookDefault}
           </MenuItem>
         </Menu>
-        <IconButton label="No first-line indent" active={st.noIndent} onClick={() => run().toggleNoIndent().run()}>
+        <IconButton label={tb.noIndent} active={st.noIndent} onClick={() => run().toggleNoIndent().run()}>
           <TextIndent size={17} />
         </IconButton>
-        <IconButton label="Scene break" shortcut="Ctrl+Shift+Enter" onClick={() => run().insertSceneBreak().run()}>
+        <IconButton label={tb.sceneBreak} shortcut="Ctrl+Shift+Enter" onClick={() => run().insertSceneBreak().run()}>
           <Asterisk size={17} />
         </IconButton>
         <span className="toolbar-sep" />
-        <IconButton label="Find and replace" shortcut="Ctrl+F" onClick={() => setFindOpen(true)}>
+        <IconButton label={tb.findReplace} shortcut="Ctrl+F" onClick={() => setFindOpen(true)}>
           <MagnifyingGlass size={17} />
         </IconButton>
-        <IconButton label="Focus mode" active={ui?.focusMode} onClick={() => setUi({ focusMode: !ui?.focusMode })}>
+        <IconButton label={tb.focusMode} active={ui?.focusMode} onClick={() => setUi({ focusMode: !ui?.focusMode })}>
           <CrosshairSimple size={17} />
         </IconButton>
         <IconButton
-          label="Typewriter scrolling"
+          label={tb.typewriterScrolling}
           active={ui?.typewriterScroll}
           onClick={() => setUi({ typewriterScroll: !ui?.typewriterScroll })}
         >

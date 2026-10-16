@@ -227,10 +227,20 @@
   color: var(--ribbon);
 }
 
+/* One line in every language: the counts shorten with an ellipsis, the right side keeps its size. */
+.status-left {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .status-right {
   display: inline-flex;
   align-items: center;
   gap: var(--s-4);
+  flex-shrink: 0;
+  margin-left: var(--s-4);
+  white-space: nowrap;
 }
 .status-btn {
   display: inline-flex;

@@ -1,5 +1,6 @@
 # Build the Windows installer and publish it to GitHub Releases.
 # Start it with a version tag: git tag v0.2.0 && git push origin v0.2.0
+# A manual run (workflow_dispatch) only builds, to check that the build works.
 name: Release
 
 on:
@@ -15,9 +16,9 @@ jobs:
     name: Windows installer
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
           cache: npm
@@ -30,12 +31,12 @@ jobs:
 
       - run: npx electron-vite build
 
-      - name: Build the installer and publish it to the release
-        run: npx electron-builder --win --publish always
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # electron-builder only builds. Its own publishing uploads files in parallel, and two
+      # uploads can both try to create the release (HTTP 422). gh makes the release in one step.
+      - name: Build the installer
+        run: npx electron-builder --win --publish never
 
-      - name: Add the release notes from CHANGELOG.md
+      - name: Publish the installer with the notes from CHANGELOG.md
         if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
         env:
@@ -43,4 +44,10 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           awk -v v="${TAG#v}" '$0 ~ "^## " v "( |$)" {on=1; next} /^## / {on=0} on' CHANGELOG.md > notes.md
-          if [ -s notes.md ]; then gh release edit "$TAG" --notes-file notes.md; fi
+          if [ ! -s notes.md ]; then echo "Wordelia ${TAG#v}" > notes.md; fi
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" release/*.exe --clobber
+            gh release edit "$TAG" --title "Wordelia ${TAG#v}" --notes-file notes.md
+          else
+            gh release create "$TAG" release/*.exe --verify-tag --title "Wordelia ${TAG#v}" --notes-file notes.md
+          fi

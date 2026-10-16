@@ -302,9 +302,14 @@ export interface ProviderSettings {
   binPath?: string
 }
 
+/** Languages of the app interface. The language of a book is a separate setting. */
+export type Locale = 'en' | 'pt-BR' | 'es'
+
 export interface AppSettings {
-  /** 2: Claude Code routes have an explicit effort */
-  version: 2
+  /** 2: Claude Code routes have an explicit effort. 3: the chat effort default is medium. */
+  version: 3
+  /** Language of the interface */
+  language: Locale
   theme: ThemeSetting
   ui: {
     sidebarOpen: boolean

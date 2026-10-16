@@ -15,7 +15,7 @@ export const EFFORT_LABELS: Record<Effort, string> = {
 
 /** Suggested effort for each task: more thought for the chat and the planning, speed for actions. */
 export const TASK_EFFORT: Record<TaskKind, Effort> = {
-  chat: 'high',
+  chat: 'medium',
   action: 'medium',
   sync: 'high',
   background: 'low'

@@ -42,7 +42,7 @@ describe('effort', () => {
   })
   it('suggests an explicit effort for each Claude Code task', () => {
     const r = suggestRoutes('claude-code', [{ id: 'opus', label: 'Opus', efforts: ['low', 'medium', 'high'] }])
-    expect(r.chat).toEqual({ provider: 'claude-code', model: 'opus', effort: 'high' })
+    expect(r.chat).toEqual({ provider: 'claude-code', model: 'opus', effort: 'medium' })
     expect(r.action).toEqual({ provider: 'claude-code', model: 'sonnet', effort: 'medium' })
     expect(r.background).toEqual({ provider: 'claude-code', model: 'haiku', effort: 'low' })
   })

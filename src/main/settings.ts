@@ -12,7 +12,8 @@ const secretsFile = (): string => join(app.getPath('userData'), 'secrets.json')
 
 export function defaultSettings(): AppSettings {
   return {
-    version: 2,
+    version: 3,
+    language: 'en',
     theme: 'light',
     ui: { sidebarOpen: true, chatOpen: true, focusMode: false, typewriterScroll: false, zoom: 1, chatWidth: 400 },
     editor: { spellcheck: true, showWordCount: true, typewriterSounds: false, dailyGoal: 500 },
@@ -43,7 +44,8 @@ export async function getSettings(): Promise<AppSettings> {
     providers: { ...d.providers, ...(raw.providers ?? {}) },
     routes: migrateRoutes(raw.version, { ...d.routes, ...(raw.routes ?? {}) }),
     actions: Array.isArray(raw.actions) && raw.actions.length ? raw.actions : d.actions,
-    version: 2
+    language: raw.language === 'pt-BR' || raw.language === 'es' ? raw.language : 'en',
+    version: 3
   }
   return cache
 }
@@ -53,11 +55,17 @@ export async function getSettings(): Promise<AppSettings> {
  * Give those routes the suggested effort of their task.
  */
 function migrateRoutes(version: number | undefined, routes: ModelRoutes): ModelRoutes {
-  if (version === 2) return routes
   const out = { ...routes }
-  for (const task of Object.keys(out) as TaskKind[]) {
-    const r = out[task]
-    if (r?.provider === 'claude-code' && !r.effort) out[task] = { ...r, effort: TASK_EFFORT[task] }
+  if (!version || version < 2) {
+    for (const task of Object.keys(out) as TaskKind[]) {
+      const r = out[task]
+      if (r?.provider === 'claude-code' && !r.effort) out[task] = { ...r, effort: TASK_EFFORT[task] }
+    }
+  }
+  // Version 3: the suggested chat effort went from high to medium (Opus at medium is very good for chat).
+  if (!version || version < 3) {
+    const chat = out.chat
+    if (chat?.provider === 'claude-code' && chat.effort === 'high') out.chat = { ...chat, effort: 'medium' }
   }
   return out
 }

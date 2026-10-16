@@ -176,7 +176,7 @@ The model lists come from the providers, so new models appear without an app upd
 
 `src/main/ai/claude-models.ts` reads the help text again when the `claude` program changes (path, size, time). It also keeps the model that answered for each alias (`claude-models.json` in the app data folder), so the settings can show "Opus — Claude Opus 5.5".
 
-Each task route (`ModelChoice`) has an explicit effort. Settings version 2 gave old Claude Code routes the suggested effort of their task (`TASK_EFFORT` in `src/shared/ai/effort.ts`: chat high, actions medium, sync high, background low). An action can override the effort of its route (`AiAction.effort`). When the model does not support an effort, the app uses the nearest lower level (`nearestEffort`).
+Each task route (`ModelChoice`) has an explicit effort. Settings version 2 gave old Claude Code routes the suggested effort of their task (`TASK_EFFORT` in `src/shared/ai/effort.ts`: chat medium, actions medium, sync high, background low; settings version 3 moved Claude Code chat routes from high to medium). An action can override the effort of its route (`AiAction.effort`). When the model does not support an effort, the app uses the nearest lower level (`nearestEffort`).
 
 #### Provider status
 

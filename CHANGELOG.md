@@ -2,6 +2,38 @@
 
 Each version has its Windows installer in GitHub Releases. The release workflow copies the section of the version from this file to the release notes.
 
+## 0.5.0 (2026-10-17)
+
+### New
+- Chat proposals show in the text by themselves: the change shows as a word diff, with ✓ and ✕ after it. "Show in text" now only goes to the change, from where you are.
+- The planning map: Plan → Overview → Map. All entries as a graph, linked when one entry names another. Hover shows the links; a click opens the entry.
+- The thread list is a full view in the chat panel. Use the ← button next to the thread title. Each thread shows its state.
+- Mentions in the chat are in the text: type "@Jo", choose "José", and the name shows as a pill in your sentence.
+- Page zoom: Ctrl+= and Ctrl+- zoom, Ctrl+0 goes back to 100 %, Ctrl+wheel also zooms.
+- Page margins in Settings → This book: Top, Bottom, Left and Right, in centimeters.
+
+### Changed
+- The chat answers are shorter and more direct.
+- The "Claude" badge is gone from the title bar. A warning shows only when no AI is connected.
+- The logo is at the far left. The sidebar button is in the sidebar header; when the sidebar is hidden, a small button shows at the top left of the page.
+- "Sync manuscript" is now "Update notes from the chapters", with a tooltip that tells what it does.
+- "Typewriter scrolling" is now "Keep the typing line in the middle".
+- The daily word goal is a number box.
+- The sidebar follows the chapter on screen while you scroll.
+- The thread purpose has its own strip above the messages.
+- Icons line up with their text.
+
+### Fixed
+- Enter at the end of a page: the new line shows on the next page at once.
+- The actions menu in the selection bubble opens under its button, not in a corner.
+- The scene break is centered again.
+- "Show in text" two times no longer marks a proposal as rejected.
+- The chat scrolls to your message as soon as you send it.
+- A long chapter title wraps in the page heading.
+- A dropdown in Settings opens only when you click the dropdown itself.
+- The proposal card header no longer overlaps with a long chapter title.
+- A quick close and open of another book no longer leaves a blank window.
+
 ## 0.4.0 (2026-10-17)
 
 ### New

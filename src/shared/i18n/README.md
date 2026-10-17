@@ -43,7 +43,7 @@ Outside React (stores, plain functions): `getT()` from `@/lib/i18n`. In the main
 | Category | Categoria | Categoría |
 | Entry (a planning note) | Nota | Nota |
 | Alias | Outro nome | Otro nombre |
-| Sync with manuscript (button) | Sincronizar manuscrito | Sincronizar manuscrito |
+| Update notes / from the chapters (the sync button) | Atualizar notas / pelos capítulos | Actualizar notas / desde los capítulos |
 | Writing rules | Regras de escrita | Reglas de escritura |
 | Write / Plan (views) | Escrever / Planejar | Escribir / Planificar |
 | Chat | Chat | Chat |

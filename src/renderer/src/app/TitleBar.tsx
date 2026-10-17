@@ -10,6 +10,7 @@ import {
   Notebook,
   PenNib,
   SidebarSimple,
+  Scroll,
   SignOut,
   SlidersHorizontal
 } from '@phosphor-icons/react'
@@ -23,6 +24,7 @@ import { useT } from '@/lib/i18n'
 import { installUpdate, useUpdate } from '@/lib/update'
 import { Logo } from './Logo'
 import { ProviderBadge } from './ProviderBadge'
+import { RULES_CATEGORY } from '@/features/plan/PlanSidebar'
 
 const VIEWS: Array<{ id: BookView; icon: React.ReactNode; key: string }> = [
   { id: 'write', icon: <PenNib size={14} />, key: 'Ctrl+1' },
@@ -77,6 +79,9 @@ export function TitleBar(): React.JSX.Element {
             >
               <MenuItem icon={<SlidersHorizontal size={15} />} onSelect={() => openSettings('book')}>
                 {t.app.bookSettings}
+              </MenuItem>
+              <MenuItem icon={<Scroll size={15} />} onSelect={() => useBook.getState().selectCategory(RULES_CATEGORY)}>
+                {t.plan.writingRules}
               </MenuItem>
               <MenuItem icon={<Export size={15} />} shortcut="Ctrl+Shift+E" onSelect={() => setExportOpen(true)}>
                 {t.app.exportBook}

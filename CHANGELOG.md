@@ -2,6 +2,14 @@
 
 Each version has its Windows installer in GitHub Releases. The release workflow copies the section of the version from this file to the release notes.
 
+## 0.3.1 (2026-10-17)
+
+### Changed
+- The writing rules are easier to find: the book menu (the book title at the top) and Settings → This book now open them.
+
+### Fixed
+- Markdown that you paste into the writing rules or a planning note (for example "## Rules" or "- item") becomes headings and lists. Before, the signs stayed as text, and the AI got them escaped.
+
 ## 0.3.0 (2026-10-16)
 
 ### New

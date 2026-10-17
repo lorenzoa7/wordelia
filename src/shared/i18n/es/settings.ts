@@ -55,6 +55,9 @@ export const settings: typeof en = {
     }
   },
   book: {
+    writingRules: 'Reglas de escritura',
+    writingRulesHint: 'Tus reglas para la IA: estilo, voz, diálogos, palabras a evitar. Todas las acciones y el chat las siguen.',
+    editWritingRules: 'Editar reglas de escritura',
     book: 'Libro',
     title: 'Título',
     author: 'Autor',

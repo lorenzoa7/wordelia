@@ -1,5 +1,8 @@
 import type { SceneBreakStyle, Typography } from '@shared/types'
-import { Field, Select, Switch, TextInput } from '@/ui'
+import { Scroll } from '@phosphor-icons/react'
+import { Button, Field, Select, Switch, TextInput } from '@/ui'
+import { useUi } from '@/stores/ui'
+import { RULES_CATEGORY } from '@/features/plan/PlanSidebar'
 import { useBook } from '@/stores/book'
 import { useT } from '@/lib/i18n'
 import { BOOK_FONTS, fontStack } from '@/lib/fonts'
@@ -46,6 +49,18 @@ export function BookTab(): React.JSX.Element | null {
           options={LANGUAGES.map((l) => ({ value: l.value, label: tr.languages[l.value] ?? l.label }))}
           ariaLabel={tr.language}
         />
+      </Field>
+      <Field label={tr.writingRules} hint={tr.writingRulesHint}>
+        <Button
+          size="sm"
+          icon={<Scroll size={14} />}
+          onClick={() => {
+            useUi.getState().closeSettings()
+            useBook.getState().selectCategory(RULES_CATEGORY)
+          }}
+        >
+          {tr.editWritingRules}
+        </Button>
       </Field>
 
       <h3 className="settings-h">{tr.textOnPage}</h3>

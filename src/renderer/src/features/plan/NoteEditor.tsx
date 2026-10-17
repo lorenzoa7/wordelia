@@ -14,6 +14,7 @@ import { registerFlusher } from '@/lib/flush'
 import { useT } from '@/lib/i18n'
 import { WikiLinks } from '@/features/editor/wiki-links'
 import { wikiLinkOptions } from './links'
+import { sliceFromMarkdown } from '@/features/editor/review'
 
 /** A rich-text editor for notes (planning entries, writing rules). Markdown in, Markdown out. */
 export function NoteEditor({
@@ -62,7 +63,11 @@ export function NoteEditor({
     {
       extensions,
       content: parseMarkdown(value) as object,
-      editorProps: { attributes: { class: 'note-text prose', spellcheck: 'true', lang: language, 'aria-label': quoteLabel ? t.plan.noteEditor.notesAbout(quoteLabel) : t.plan.noteEditor.notes } },
+      editorProps: {
+        attributes: { class: 'note-text prose', spellcheck: 'true', lang: language, 'aria-label': quoteLabel ? t.plan.noteEditor.notesAbout(quoteLabel) : t.plan.noteEditor.notes },
+        // Notes are Markdown: pasted text such as "## Rules" or "- item" becomes a heading or a list, not literal signs.
+        clipboardTextParser: (text, _context, _plain, view) => sliceFromMarkdown(view.state.schema, text)
+      },
       onUpdate: ({ editor: e }) => {
         clearTimeout(timer.current)
         timer.current = setTimeout(() => {

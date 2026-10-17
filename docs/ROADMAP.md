@@ -119,6 +119,11 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] App updates from GitHub Releases (electron-updater): background download, "Update ready" in the title bar, restart saves first; Settings → General → Updates
 - [x] Public repository; examples use the sample book, not the novel of the author
 
+## Version 0.3.1
+
+- [x] Writing rules in the book menu and in Settings → This book
+- [x] Pasted Markdown in notes and writing rules becomes headings and lists
+
 ## Later (not in version 1)
 
 - Sync to a git remote from the app

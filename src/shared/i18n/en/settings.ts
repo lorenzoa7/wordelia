@@ -59,6 +59,9 @@ export const settings = {
   },
   /** The This book tab */
   book: {
+    writingRules: 'Writing rules',
+    writingRulesHint: 'Your rules for the AI: style, voice, dialogue, words to avoid. Every action and the chat follow them.',
+    editWritingRules: 'Edit writing rules',
     book: 'Book',
     title: 'Title',
     author: 'Author',

@@ -70,15 +70,18 @@ export function Tooltip({
   label,
   shortcut,
   side = 'bottom',
+  delay,
   children
 }: {
   label: ReactNode
   shortcut?: string
   side?: 'top' | 'bottom' | 'left' | 'right'
+  /** Milliseconds before the tooltip shows. The default comes from TooltipProvider. */
+  delay?: number
   children: ReactNode
 }): React.JSX.Element {
   return (
-    <RTooltip.Root>
+    <RTooltip.Root delayDuration={delay}>
       <RTooltip.Trigger asChild>{children}</RTooltip.Trigger>
       <RTooltip.Portal>
         <RTooltip.Content side={side} sideOffset={6} className="tooltip">

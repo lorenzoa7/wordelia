@@ -1,12 +1,23 @@
-// Typing speed in a long chapter. Set IMPORT_FILE to a DOCX of a real book.
-export default async function ({ page }) {
+// Typing speed in a long chapter. Set IMPORT_FILE to a DOCX of a real book, or PERF_BOOK to a book
+// folder (a copy is opened).
+import { cp } from 'node:fs/promises'
+import { join } from 'node:path'
+
+export default async function ({ page, work }) {
   const file = process.env.IMPORT_FILE
-  if (!file) throw new Error('Set IMPORT_FILE')
-  await page.evaluate((p) => window.__wordelia.importFile(p), file)
-  await page.waitForSelector('.import-chapters', { timeout: 30000 })
-  // Planning build off: only typing is measured.
-  await page.locator('.dialog .switch').click()
-  await page.locator('.dialog-foot .btn-primary').click()
+  const folder = process.env.PERF_BOOK
+  if (!file && !folder) throw new Error('Set IMPORT_FILE or PERF_BOOK')
+  if (folder) {
+    const copy = join(work, 'perf-book')
+    await cp(folder, copy, { recursive: true })
+    await page.evaluate((p) => window.__wordelia.openBook(p), copy)
+  } else {
+    await page.evaluate((p) => window.__wordelia.importFile(p), file)
+    await page.waitForSelector('.import-chapters', { timeout: 30000 })
+    // Planning build off: only typing is measured.
+    await page.locator('.dialog .switch').click()
+    await page.locator('.dialog-foot .btn-primary').click()
+  }
   await page.waitForSelector('.manuscript', { timeout: 30000 })
   // The longest chapter
   const words = await page.locator('.chapter-item-words').allInnerTexts()

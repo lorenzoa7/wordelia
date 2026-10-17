@@ -25,7 +25,8 @@ const scenarios = [
   ['chat', '--en'],
   ['pages', '--en'],
   ['reveal'],
-  ['reopen']
+  ['reopen'],
+  ['pagebreak', '--en']
 ]
 
 function run(args) {

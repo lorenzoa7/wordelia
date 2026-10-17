@@ -245,7 +245,10 @@ export const Pagination = Extension.create<PaginationOptions>({
           let frame = 0
           let timer: ReturnType<typeof setTimeout> | undefined
           let rounds = 0
-          const run = (): void => {
+          /** Height of the editor after the last measure: a new height means new lines */
+          let height = -1
+          let queued = false
+          const run = (fromEdit = false): void => {
             frame = 0
             const m = opts.metrics()
             if (!m || view.isDestroyed) return
@@ -254,16 +257,21 @@ export const Pagination = Extension.create<PaginationOptions>({
             const cur = paginationKey.getState(view.state)
             if (cur && same(cur, result)) {
               rounds = 0
+              height = (view.dom as HTMLElement).offsetHeight
               return
             }
             // Never loop: a layout that does not settle stops after a few rounds.
             if (++rounds > 4) return
-            view.dispatch(view.state.tr.setMeta(paginationKey, { ...result, metrics: m }).setMeta('addToHistory', false).setMeta('allowDuringReview', true))
+            const tr = view.state.tr.setMeta(paginationKey, { ...result, metrics: m }).setMeta('addToHistory', false).setMeta('allowDuringReview', true)
+            // Typing moved the cursor onto a new page: keep it on screen.
+            if (fromEdit && view.hasFocus()) tr.scrollIntoView()
+            view.dispatch(tr)
+            height = (view.dom as HTMLElement).offsetHeight
           }
           const schedule = (delay: number): void => {
             clearTimeout(timer)
             timer = setTimeout(() => {
-              if (!frame) frame = requestAnimationFrame(run)
+              if (!frame) frame = requestAnimationFrame(() => run())
             }, delay)
           }
           const onResize = (): void => schedule(60)
@@ -278,9 +286,18 @@ export const Pagination = Extension.create<PaginationOptions>({
           schedule(0)
           return {
             update(v, prevState) {
-              // Typing: measure after a short pause. Our own gap updates do not change the text.
-              if (v.state.doc !== prevState.doc) {
-                rounds = 0
+              // Our own gap updates do not change the text.
+              if (v.state.doc === prevState.doc) return
+              rounds = 0
+              // A new line (Enter, or a word that wraps): measure before the browser paints, so a
+              // new page shows at once, like a word processor. Other typing: after a short pause.
+              if ((v.dom as HTMLElement).offsetHeight !== height && !queued) {
+                queued = true
+                queueMicrotask(() => {
+                  queued = false
+                  if (!v.isDestroyed) run(true)
+                })
+              } else {
                 schedule(120)
               }
             },

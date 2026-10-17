@@ -23,6 +23,15 @@ export const chat = {
   title: 'Title',
   purposeHint: "Example: Marta's arc in part two. Her doubts and her loyalty to Elias.",
   digest: 'Digest (kept by the AI)',
+  /** The view with the list of all threads */
+  threads: 'Threads',
+  /** The back button of a thread: it opens the list of all threads */
+  allThreads: 'All threads',
+  pinned: 'Pinned',
+  recent: 'Recent',
+  noMatches: (q: string): string => `No thread matches “${q}”.`,
+  /** Tooltip of the purpose strip above the messages */
+  editPurpose: 'Edit the purpose',
 
   // Empty chat
   emptyTitle: 'Your editor is here.',

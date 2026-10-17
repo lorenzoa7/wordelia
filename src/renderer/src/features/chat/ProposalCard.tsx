@@ -183,39 +183,43 @@ function EditCard({ segment: raw, message, thread, streaming }: Props & { segmen
 
   return (
     <motion.div className="proposal" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+      {/* The name and the counts on the left, the buttons on the right. When both do not fit, the buttons go to a second line. */}
       <header className="proposal-head">
-        <button
-          className="proposal-file"
-          onClick={open}
-          title={target.kind === 'chapter' && !streaming && firstPending >= 0 ? t.chat.showInTextHint : t.common.open}
-        >
-          <Icon size={14} />
-          <span>{target.label}</span>
-        </button>
-        <span className="proposal-stats">
-          <span className="plus">+{totals.added}</span>
-          <span className="minus">−{totals.removed}</span>
-        </span>
-        <span className="proposal-spacer" />
-        <Tooltip label={split ? t.chat.inlineView : t.chat.splitView}>
-          <button className="proposal-icon" onClick={() => setSplit(!split)} aria-label={t.chat.toggleView}>
-            {split ? <Rows size={14} /> : <Columns size={14} />}
+        <div className="proposal-title">
+          <button
+            className="proposal-file"
+            onClick={open}
+            title={target.kind === 'chapter' && !streaming && firstPending >= 0 ? t.chat.showInTextHint : t.common.open}
+          >
+            <Icon size={14} />
+            <span>{target.label}</span>
           </button>
-        </Tooltip>
-        {streaming ? (
-          <Spinner size={12} />
-        ) : (
-          pending.length > 0 && (
-            <>
-              <button className="proposal-btn" onClick={() => keys.forEach((k, i) => pending.includes(k) && reject(i))}>
-                {segment.hunks.length > 1 ? t.common.rejectAll : t.common.reject}
-              </button>
-              <button className="proposal-btn is-accept" onClick={acceptAll} disabled={busy}>
-                <Check size={12} weight="bold" /> {segment.hunks.length > 1 ? t.common.acceptAll : t.common.accept}
-              </button>
-            </>
-          )
-        )}
+          <span className="proposal-stats">
+            <span className="plus">+{totals.added}</span>
+            <span className="minus">−{totals.removed}</span>
+          </span>
+        </div>
+        <div className="proposal-tools">
+          <Tooltip label={split ? t.chat.inlineView : t.chat.splitView}>
+            <button className="proposal-icon" onClick={() => setSplit(!split)} aria-label={t.chat.toggleView}>
+              {split ? <Rows size={14} /> : <Columns size={14} />}
+            </button>
+          </Tooltip>
+          {streaming ? (
+            <Spinner size={12} />
+          ) : (
+            pending.length > 0 && (
+              <>
+                <button className="proposal-btn" onClick={() => keys.forEach((k, i) => pending.includes(k) && reject(i))}>
+                  {segment.hunks.length > 1 ? t.common.rejectAll : t.common.reject}
+                </button>
+                <button className="proposal-btn is-accept" onClick={acceptAll} disabled={busy}>
+                  <Check size={12} weight="bold" /> {segment.hunks.length > 1 ? t.common.acceptAll : t.common.accept}
+                </button>
+              </>
+            )
+          )}
+        </div>
       </header>
       <div className="proposal-hunks">
         {segment.hunks.map((h, i) => {
@@ -305,26 +309,29 @@ function CreateCard({ segment, message, thread, streaming }: Props & { segment: 
   return (
     <motion.div className="proposal is-create" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
       <header className="proposal-head">
-        <span className="proposal-file">
-          <FilePlus size={14} />
-          <span>{target.label}</span>
-        </span>
-        <span className="proposal-cat">{exists ? t.chat.replacesEntry : category}</span>
-        <span className="proposal-spacer" />
-        {streaming ? (
-          <Spinner size={12} />
-        ) : state === 'pending' ? (
-          <>
-            <button className="proposal-btn" onClick={() => thread && message && setHunkState(thread, message.id, key, 'rejected')}>
-              {t.chat.dismiss}
-            </button>
-            <button className="proposal-btn is-accept" onClick={() => void create()}>
-              <Check size={12} weight="bold" /> {exists ? t.chat.replace : t.common.create}
-            </button>
-          </>
-        ) : (
-          <HunkBadge state={state} />
-        )}
+        <div className="proposal-title">
+          <span className="proposal-file">
+            <FilePlus size={14} />
+            <span>{target.label}</span>
+          </span>
+          <span className="proposal-cat">{exists ? t.chat.replacesEntry : category}</span>
+        </div>
+        <div className="proposal-tools">
+          {streaming ? (
+            <Spinner size={12} />
+          ) : state === 'pending' ? (
+            <>
+              <button className="proposal-btn" onClick={() => thread && message && setHunkState(thread, message.id, key, 'rejected')}>
+                {t.chat.dismiss}
+              </button>
+              <button className="proposal-btn is-accept" onClick={() => void create()}>
+                <Check size={12} weight="bold" /> {exists ? t.chat.replace : t.common.create}
+              </button>
+            </>
+          ) : (
+            <HunkBadge state={state} />
+          )}
+        </div>
       </header>
       <div id={`create-${segment.index}`} className={clsx('proposal-body prose', !expanded && 'is-clamped')}>
         {typeof data.summary === 'string' && <p className="proposal-summary">{data.summary}</p>}

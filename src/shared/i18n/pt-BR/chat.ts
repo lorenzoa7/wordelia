@@ -21,6 +21,12 @@ export const chat: typeof en = {
   title: 'Título',
   purposeHint: 'Exemplo: o arco de Marta na parte dois. As dúvidas dela e a lealdade a Elias.',
   digest: 'Resumo (mantido pela IA)',
+  threads: 'Conversas',
+  allThreads: 'Todas as conversas',
+  pinned: 'Fixadas',
+  recent: 'Recentes',
+  noMatches: (q) => `Nenhuma conversa com “${q}”.`,
+  editPurpose: 'Editar o propósito',
 
   emptyTitle: 'Seu editor está aqui.',
   emptyText: 'Ele lê o livro inteiro, o planejamento e as suas outras conversas. Ele pode propor mudanças, e você aprova cada uma.',

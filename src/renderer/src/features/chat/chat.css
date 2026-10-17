@@ -101,6 +101,17 @@ button.chat-title:hover {
   font-weight: 700;
   color: var(--ink);
 }
+/* New thread: a soft tone of the panel, not a paper button. The hover makes it a step darker. */
+.btn.thread-new {
+  border-color: transparent;
+  background: var(--desk-3);
+  color: var(--ink-2);
+}
+.btn.thread-new:hover:not(:disabled) {
+  border-color: var(--rule);
+  background: color-mix(in srgb, var(--desk-3) 82%, var(--ink-5));
+  color: var(--ink);
+}
 
 /* ---------- The list of all threads ---------- */
 .thread-search-wrap {

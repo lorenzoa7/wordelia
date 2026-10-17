@@ -15,6 +15,18 @@ export default async function ({ app, page, shot, openBook }) {
   })
   console.log(JSON.stringify(overlap))
   if (overlap.bookRight > overlap.tabsLeft) throw new Error('The book title overlaps the view tabs')
+  // A hidden sidebar: the show button at the corner and the editor toolbar do not overlap.
+  await page.keyboard.press('Control+Backslash')
+  await page.waitForTimeout(700)
+  await shot('write-sidebar-hidden')
+  const clear = await page.evaluate(() => {
+    const a = document.querySelector('.sidebar-show').getBoundingClientRect()
+    const b = document.querySelector('.toolbar').getBoundingClientRect()
+    return a.right <= b.left || a.bottom <= b.top
+  })
+  if (!clear) throw new Error('The show sidebar button overlaps the editor toolbar')
+  await page.keyboard.press('Control+Backslash')
+  await page.waitForTimeout(700)
   await page.keyboard.press('Control+2')
   await page.waitForTimeout(700)
   await shot('plan')

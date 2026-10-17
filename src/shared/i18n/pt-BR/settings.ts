@@ -40,7 +40,7 @@ export const settings: typeof en = {
     spellcheck: 'Verificação ortográfica',
     focusMode: 'Modo foco (atenua os outros parágrafos)',
     typewriterSounds: 'Sons de máquina de escrever',
-    typewriterScrolling: 'Rolagem de máquina de escrever',
+    typewriterScrolling: 'Manter a linha digitada no meio da tela',
     keyboard: 'Teclado',
     actionKeysHint: 'Mude os atalhos das ações em “Ações”.',
     shortcuts: {

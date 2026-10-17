@@ -20,7 +20,7 @@ export const editor: typeof en = {
     sceneBreak: 'Salto de escena',
     findReplace: 'Buscar y reemplazar',
     focusMode: 'Modo concentración',
-    typewriterScrolling: 'Desplazamiento de máquina de escribir'
+    typewriterScrolling: 'Mantener la línea escrita en el centro'
   },
   selection: {
     askChat: 'Preguntar al chat sobre esto',

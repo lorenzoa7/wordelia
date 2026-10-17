@@ -21,7 +21,7 @@ export const editor = {
     sceneBreak: 'Scene break',
     findReplace: 'Find and replace',
     focusMode: 'Focus mode',
-    typewriterScrolling: 'Typewriter scrolling'
+    typewriterScrolling: 'Keep the typing line in the middle'
   },
   /** The small menu above a text selection */
   selection: {

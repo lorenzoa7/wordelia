@@ -43,7 +43,7 @@ export const settings = {
     spellcheck: 'Spell check',
     focusMode: 'Focus mode (dim other paragraphs)',
     typewriterSounds: 'Typewriter sounds',
-    typewriterScrolling: 'Typewriter scrolling',
+    typewriterScrolling: 'Keep the typing line in the middle',
     keyboard: 'Keyboard',
     /** Shown under the list of shortcuts */
     actionKeysHint: 'Change the shortcuts of the actions in “Actions”.',

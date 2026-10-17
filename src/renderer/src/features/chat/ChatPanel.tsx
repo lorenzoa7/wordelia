@@ -132,7 +132,6 @@ export function ChatPanel(): React.JSX.Element {
       {listOpen ? (
         <ThreadList
           threads={threads}
-          activeId={thread?.id ?? null}
           animate={switched.current}
           onOpen={open}
           onCreate={create}
@@ -275,7 +274,6 @@ function fold(s: string): string {
  */
 function ThreadList({
   threads,
-  activeId,
   animate,
   onOpen,
   onCreate,
@@ -284,7 +282,6 @@ function ThreadList({
   onClose
 }: {
   threads: Thread[]
-  activeId: string | null
   animate: boolean
   onOpen: (id: string) => void
   onCreate: () => void
@@ -326,10 +323,10 @@ function ThreadList({
     const st = statuses[th.id] ?? { state: null, pending: 0 }
     const statusText =
       st.state === 'working' ? t.chat.statusWorking : st.state === 'needs-you' ? t.chat.statusNeedsYou(st.pending) : st.state === 'unseen' ? t.chat.statusUnseen : ''
-    const active = th.id === activeId
+    // No row looks selected: in the list, the user is in no thread.
     return (
-      <div key={th.id} className={clsx('thread-row', active && 'is-active', st.state && `has-${st.state}`)} role="listitem">
-        <button className="thread-item" aria-current={active ? 'true' : undefined} onClick={() => onOpen(th.id)} onKeyDown={onItemKey}>
+      <div key={th.id} className={clsx('thread-row', st.state && `has-${st.state}`)} role="listitem">
+        <button className="thread-item" onClick={() => onOpen(th.id)} onKeyDown={onItemKey}>
           <StatusDot state={st.state} className="thread-item-dot" />
           <span className="thread-item-main">
             <span className="thread-item-top">

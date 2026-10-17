@@ -176,9 +176,6 @@ button.chat-title:hover {
 .thread-row:hover {
   background: var(--desk-3);
 }
-.thread-row.is-active {
-  background: var(--ribbon-wash);
-}
 .thread-item {
   display: flex;
   align-items: flex-start;

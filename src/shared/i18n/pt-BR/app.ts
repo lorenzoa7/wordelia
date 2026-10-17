@@ -25,10 +25,11 @@ export const app: typeof en = {
   openHint: 'Arraste ou clique para mostrar',
   provider: {
     connect: 'Conectar uma IA',
-    checking: 'Verificando…',
-    notConnected: (name) => `${name}: não conectado`,
-    ready: (name) => `IA pronta: ${name}`,
-    openSettings: 'Abrir configurações de IA'
+    connectHint: 'Nenhuma IA está conectada. Abra Configurações → IA para conectar uma.',
+    notConnectedShort: 'IA não conectada',
+    notConnectedHint: (name) => `${name} não está conectado. Abra Configurações → IA para conectar.`,
+    expired: 'Login da IA expirou',
+    expiredHint: (name) => `O login do ${name} expirou. Abra Configurações → IA para entrar de novo.`
   },
   aiErrors: {
     notInstalled: 'O provedor de IA não está instalado.',

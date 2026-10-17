@@ -26,13 +26,14 @@ export const app = {
   resizeHint: 'Drag to resize. Drag to the edge to hide.',
   /** Tooltip of the edge when its panel is hidden */
   openHint: 'Drag or click to show',
-  /** The AI badge in the title bar */
+  /** The warning in the title bar when the chat has no AI. It opens Settings → AI. */
   provider: {
     connect: 'Connect an AI',
-    checking: 'Checking…',
-    notConnected: (name: string): string => `${name}: not connected`,
-    ready: (name: string): string => `AI ready: ${name}`,
-    openSettings: 'Open AI settings'
+    connectHint: 'No AI is connected. Open Settings → AI to connect one.',
+    notConnectedShort: 'AI not connected',
+    notConnectedHint: (name: string): string => `${name} is not connected. Open Settings → AI to connect it.`,
+    expired: 'AI login expired',
+    expiredHint: (name: string): string => `The login of ${name} has expired. Open Settings → AI to log in again.`
   },
   /** Errors of an AI call, in words for the user */
   aiErrors: {

@@ -1,6 +1,6 @@
 // UI primitives. Behavior from Radix (accessible), look from ui.css.
 
-import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
+import { createContext, forwardRef, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react'
 import { Dialog as RDialog, DropdownMenu, Select as RSelect, Switch as RSwitch, Tooltip as RTooltip } from 'radix-ui'
 import { CaretDown, Check, X } from '@phosphor-icons/react'
 import clsx from 'clsx'
@@ -230,6 +230,14 @@ export function Dialog({
 /* Form controls                                                        */
 /* ------------------------------------------------------------------ */
 
+/** Ties the label of a Field to its control. The control takes `controlId`; `labelId` names it. */
+const FieldContext = createContext<{ controlId: string; labelId: string } | null>(null)
+
+/**
+ * A label and its control. The label is not wrapped around the control: a click beside the
+ * control does nothing, so a dropdown opens only from its own box. A click on the label text
+ * focuses a text box or flips a switch; it never opens a dropdown.
+ */
 export function Field({
   label,
   hint,
@@ -241,29 +249,37 @@ export function Field({
   children: ReactNode
   inline?: boolean
 }): React.JSX.Element {
+  const id = useId()
+  const ids = useMemo(() => ({ controlId: `${id}control`, labelId: `${id}label` }), [id])
   return (
     <div className={clsx('field', inline && 'field-inline')}>
-      <label className="field-main">
-        <span className="field-label">{label}</span>
-        <span className="field-control">{children}</span>
-      </label>
+      <div className="field-main">
+        <label className="field-label" id={ids.labelId} htmlFor={ids.controlId}>
+          {label}
+        </label>
+        <span className="field-control">
+          <FieldContext.Provider value={ids}>{children}</FieldContext.Provider>
+        </span>
+      </div>
       {hint && <span className="field-hint">{hint}</span>}
     </div>
   )
 }
 
 export const TextInput = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(function TextInput(
-  { className, ...rest },
+  { className, id, ...rest },
   ref
 ) {
-  return <input ref={ref} className={clsx('input', className)} {...rest} />
+  const field = useContext(FieldContext)
+  return <input ref={ref} id={id ?? field?.controlId} className={clsx('input', className)} {...rest} />
 })
 
 export const TextArea = forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HTMLTextAreaElement>>(function TextArea(
-  { className, ...rest },
+  { className, id, ...rest },
   ref
 ) {
-  return <textarea ref={ref} className={clsx('input textarea', className)} {...rest} />
+  const field = useContext(FieldContext)
+  return <textarea ref={ref} id={id ?? field?.controlId} className={clsx('input textarea', className)} {...rest} />
 })
 
 export function Switch({
@@ -275,10 +291,145 @@ export function Switch({
   onCheckedChange: (v: boolean) => void
   label?: string
 }): React.JSX.Element {
+  const field = useContext(FieldContext)
   return (
-    <RSwitch.Root className="switch" checked={checked} onCheckedChange={onCheckedChange} aria-label={label}>
+    <RSwitch.Root
+      className="switch"
+      id={field?.controlId}
+      checked={checked}
+      onCheckedChange={onCheckedChange}
+      aria-label={label}
+      aria-labelledby={label ? undefined : field?.labelId}
+    >
       <RSwitch.Thumb className="switch-thumb" />
     </RSwitch.Root>
+  )
+}
+
+/**
+ * A box for a number. Typing stays in the box; Enter or leaving the box saves it, Esc puts the
+ * saved value back. The arrow keys step the value (Shift: ten steps) and save at once. The box
+ * accepts a comma or a point for decimals and shows the number in the interface language.
+ */
+export function NumberInput({
+  value,
+  onCommit,
+  min = 0,
+  max = Number.MAX_SAFE_INTEGER,
+  step = 1,
+  decimals = 0,
+  unit,
+  id,
+  ariaLabel,
+  className
+}: {
+  value: number
+  onCommit: (v: number) => void
+  min?: number
+  max?: number
+  step?: number
+  /** Digits after the decimal point */
+  decimals?: number
+  /** Text after the number in the box, for example "words a day" */
+  unit?: string
+  id?: string
+  ariaLabel?: string
+  className?: string
+}): React.JSX.Element {
+  const t = useT()
+  const field = useContext(FieldContext)
+  const unitId = useId()
+  const input = useRef<HTMLInputElement>(null)
+  const locale = t.common.locale
+  const format = useCallback(
+    (v: number): string => v.toLocaleString(locale, { minimumFractionDigits: decimals, maximumFractionDigits: decimals, useGrouping: false }),
+    [locale, decimals]
+  )
+  const [draft, setDraft] = useState(() => format(value))
+  const [editing, setEditing] = useState(false)
+  // A change from somewhere else shows, but not while the user types.
+  useEffect(() => {
+    if (!editing) setDraft(format(value))
+  }, [value, editing, format])
+
+  const round = (n: number): number => {
+    const f = 10 ** decimals
+    return Math.min(max, Math.max(min, Math.round(n * f) / f))
+  }
+  const parse = (text: string): number | null => {
+    const clean = text.replace(/\s/g, '')
+    if (!clean) return min
+    // Decimals accept a comma or a point. Whole numbers ignore group separators ("1.000", "1,000").
+    const n = decimals ? Number(clean.replace(',', '.')) : Number(clean.replace(/[.,]/g, ''))
+    return Number.isFinite(n) ? n : null
+  }
+  const commit = (next: number | null): void => {
+    const v = next === null ? value : round(next)
+    setDraft(format(v))
+    if (v !== value) onCommit(v)
+  }
+  // The width of the longest value, in characters: the UI font is monospaced.
+  const chars = Math.max(String(Math.trunc(max)).length, String(Math.trunc(min)).length) + (decimals ? decimals + 1 : 0)
+
+  return (
+    <span
+      className={clsx('number-input', unit && 'has-unit', className)}
+      onMouseDown={(e) => {
+        // A click on the unit or the padding puts the cursor in the box.
+        if (e.target !== input.current) {
+          e.preventDefault()
+          input.current?.focus()
+        }
+      }}
+    >
+      <input
+        ref={input}
+        id={id ?? field?.controlId}
+        className="number-input-box"
+        type="text"
+        inputMode={decimals ? 'decimal' : 'numeric'}
+        role="spinbutton"
+        aria-valuemin={min}
+        aria-valuemax={max}
+        aria-valuenow={value}
+        aria-label={ariaLabel}
+        aria-labelledby={ariaLabel ? undefined : [field?.labelId, unit ? unitId : null].filter(Boolean).join(' ') || undefined}
+        autoComplete="off"
+        spellCheck={false}
+        style={{ width: `${chars + 0.5}ch` }}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onFocus={(e) => {
+          setEditing(true)
+          e.target.select()
+        }}
+        onBlur={() => {
+          setEditing(false)
+          commit(parse(draft))
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            commit(parse(draft))
+            input.current?.select()
+          } else if (e.key === 'Escape' && draft !== format(value)) {
+            setDraft(format(value))
+          } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+            e.preventDefault()
+            const base = parse(draft) ?? value
+            const delta = (e.key === 'ArrowUp' ? step : -step) * (e.shiftKey ? 10 : 1)
+            // Step to the next multiple of the step: 512 → 550 → 600.
+            const stepped = Math.round((delta > 0 ? Math.floor(base / step + 1e-9) * step + delta : Math.ceil(base / step - 1e-9) * step + delta) * 1e6) / 1e6
+            commit(stepped)
+          }
+        }}
+      />
+      {unit && (
+        <span className="number-input-unit" id={unitId}>
+          {unit}
+        </span>
+      )}
+    </span>
   )
 }
 
@@ -304,9 +455,11 @@ export function Select({
   className?: string
   ariaLabel?: string
 }): React.JSX.Element {
+  // In a Field, the label names the box, but a click on the label does not open it.
+  const field = useContext(FieldContext)
   return (
     <RSelect.Root value={value} onValueChange={onValueChange}>
-      <RSelect.Trigger className={clsx('select', className)} aria-label={ariaLabel}>
+      <RSelect.Trigger className={clsx('select', className)} aria-label={ariaLabel} aria-labelledby={ariaLabel ? undefined : field?.labelId}>
         <RSelect.Value placeholder={placeholder} />
         <RSelect.Icon className="select-caret">
           <CaretDown size={12} />

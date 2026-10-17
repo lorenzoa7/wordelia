@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { motion } from 'motion/react'
-import { ArrowLeft, BookOpenText, CaretRight, ChatCircleText, DownloadSimple, ImageSquare, Plus, Trash, X } from '@phosphor-icons/react'
+import { ArrowLeft, BookOpenText, CaretRight, ChatCircleText, DownloadSimple, Graph, ImageSquare, Plus, Trash, X } from '@phosphor-icons/react'
 import { markdownToPlain } from '@shared/book'
 import { entryNames } from '@shared/prompts/context'
 import type { Entry } from '@shared/types'
@@ -12,6 +12,7 @@ import { useBook } from '@/stores/book'
 import { useUi } from '@/stores/ui'
 import { useChat } from '@/features/chat/chatStore'
 import { useApp } from '@/stores/app'
+import { MAP_PAGE, MapView, PlanViewSwitch, mapBack, useReturnsToMap } from '@/features/graph'
 import { NoteEditor } from './NoteEditor'
 import { CategoryIcon } from './PlanSidebar'
 import { importNotes } from './importNotes'
@@ -20,6 +21,7 @@ import './plan.css'
 
 /** One level up: from an entry to its category, from a category to the overview. */
 function goBack(): void {
+  if (mapBack()) return
   const s = useBook.getState()
   const entry = s.entries.find((e) => e.id === s.activeEntryId)
   if (entry) s.selectCategory(entry.category)
@@ -56,7 +58,13 @@ export function PlanView(): React.JSX.Element {
         }
       }}
     >
-      {activeEntry ? <EntryEditor key={activeEntry.id} entry={activeEntry} /> : <CategoryGrid key={activeCategory ?? ''} folder={activeCategory} />}
+      {activeEntry ? (
+        <EntryEditor key={activeEntry.id} entry={activeEntry} />
+      ) : activeCategory === MAP_PAGE ? (
+        <MapView />
+      ) : (
+        <CategoryGrid key={activeCategory ?? ''} folder={activeCategory} />
+      )}
     </div>
   )
 }
@@ -153,7 +161,10 @@ function CategoryGrid({ folder }: { folder: string | null }): React.JSX.Element 
           </header>
         ) : (
           <header className="plan-hero">
-            <h1>{t.plan.overview.title}</h1>
+            <div className="plan-hero-top">
+              <h1>{t.plan.overview.title}</h1>
+              <PlanViewSwitch active="cards" />
+            </div>
             <p>{t.plan.overview.intro}</p>
             {total === 0 && (
               <div className="plan-hero-actions">
@@ -224,6 +235,7 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
   const category = useBook((s) => s.manifest?.planning.categories.find((c) => c.folder === entry.category))
   const [name, setName] = useState(entry.name)
   const [aliasDraft, setAliasDraft] = useState('')
+  const fromMap = useReturnsToMap(entry.id)
   useEffect(() => setName(entry.name), [entry.name])
 
   const mentions = useMemo(() => {
@@ -275,7 +287,11 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
         transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
       >
         <div className="entry-crumbs">
-          <BackLink label={category ? categoryName(t, category) : entry.category} icon={<CategoryIcon name={category?.icon ?? 'Folder'} size={13} />} />
+          {fromMap ? (
+            <BackLink label={t.plan.map.map} icon={<Graph size={13} />} />
+          ) : (
+            <BackLink label={category ? categoryName(t, category) : entry.category} icon={<CategoryIcon name={category?.icon ?? 'Folder'} size={13} />} />
+          )}
           <span className="entry-tools">
             <IconButton
               label={t.plan.entry.askChat}

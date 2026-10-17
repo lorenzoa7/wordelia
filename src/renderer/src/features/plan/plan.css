@@ -287,6 +287,13 @@
   letter-spacing: var(--tracking-tight);
   text-wrap: balance;
 }
+/* The overview title with the "Cards | Map" switch */
+.plan-hero-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s-4);
+}
 .plan-hero-category {
   padding: 0 0 var(--s-6);
 }

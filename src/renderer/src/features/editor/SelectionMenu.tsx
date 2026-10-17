@@ -63,8 +63,8 @@ export function SelectionMenu({ editor }: { editor: Editor }): React.JSX.Element
           }
         >
           <MenuLabel>{t.editor.selection.actions}</MenuLabel>
-          {actions.map((a, i) => (
-            <MenuItem key={a.id} icon={<ActionIcon name={a.icon} />} onSelect={() => void runAction(a)} shortcut={i < 9 ? `Alt+${i + 1}` : undefined}>
+          {actions.map((a) => (
+            <MenuItem key={a.id} icon={<ActionIcon name={a.icon} />} onSelect={() => void runAction(a)} shortcut={a.shortcut}>
               {actionName(t, a)}
             </MenuItem>
           ))}

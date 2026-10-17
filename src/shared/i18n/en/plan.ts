@@ -37,6 +37,41 @@ export const plan = {
     /** The card that adds an entry to a category */
     newCard: 'New'
   },
+  /** The map: a graph of the entries and the links between them */
+  map: {
+    /** The switch on the overview: the cards or the map */
+    views: 'Planning views',
+    cards: 'Cards',
+    map: 'Map',
+    /** Under the title of the map */
+    stats: (entries: number, links: number): string =>
+      `${entries === 1 ? '1 entry' : `${entries} entries`} · ${links === 1 ? '1 link' : `${links} links`}`,
+    searchPlaceholder: 'Find an entry',
+    search: 'Find an entry on the map',
+    clearSearch: 'Clear the search',
+    /** Next to the search box */
+    matches: (n: number): string => (n === 0 ? 'No match' : n === 1 ? '1 match' : `${n} matches`),
+    categories: 'Categories',
+    /** Tooltip of a category chip */
+    toggleCategory: (category: string, shown: boolean): string => (shown ? `Hide ${category}` : `Show ${category}`),
+    chapters: 'Chapters',
+    chaptersHint: 'Show the chapters and the entries that they mention',
+    zoomIn: 'Zoom in',
+    zoomOut: 'Zoom out',
+    fit: 'Fit to screen',
+    /** The map for screen readers */
+    label: (entries: number, links: number): string =>
+      `Map of ${entries} entries and ${links} links. Use the search box to find and open an entry.`,
+    /** In the card of a node */
+    links: (n: number): string => (n === 0 ? 'No links' : n === 1 ? '1 link' : `${n} links`),
+    chapter: (n: number): string => `Chapter ${n}`,
+    emptyTitle: 'Nothing to map yet',
+    emptyText: 'The map shows the entries of the planning and the links between them. Add characters, places and notes, and they show here.',
+    noLinksTitle: 'No links yet',
+    noLinks: 'An entry links to another entry when its summary or its notes use the name of the other entry, or [[Name]].',
+    allHidden: 'All the categories are hidden.',
+    showAll: 'Show all'
+  },
   entry: {
     deleteTitle: (name: string): string => `Delete “${name}”?`,
     deleteMessage: "The file moves to the book's .wordelia/trash folder.",

@@ -167,6 +167,20 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] Model names with versions everywhere ("Opus 5.5"): the app reads the model of each claude alias from the first CLI event, once for each CLI version, with no request to the API
 - [x] Proposal cards: wider Accept button, "Show in text" on each change (`revealProposal`), a bar for all the proposals of a reply ("3 proposals in this reply", "Apply all 3")
 
+## Version 0.5 — second feedback of the author
+
+### Editor
+
+- [x] Enter at the end of a page: the new line shows on the next page at once (the page measure runs before the browser paints when the text gets taller or shorter; scenario `pagebreak`)
+- [x] The sidebar follows the chapter on screen while scrolling, also when the cursor is in another chapter
+- [x] The menu of more actions in the selection bubble opens under its button (scenario `selmenu`)
+- [x] Page zoom: Ctrl+=, Ctrl+-, Ctrl+0 and Ctrl+wheel; the chapter heading follows the zoom (scenario `zoom`)
+- [x] Pages use the left (inner) and the right (outer) margins of the book
+- [x] The scene break in the text is centered again
+- [x] "Typewriter scrolling" is now "Keep the typing line in the middle"
+- [x] Chat proposals show in the text by themselves, with Accept and Reject; "Show in text" scrolls from where the user is and never decides a proposal (scenario `reveal`)
+
+
 ## Later (not in version 1)
 
 - Sync to a git remote from the app

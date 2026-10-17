@@ -304,6 +304,17 @@ export default async function ({ page, shot, openBook, book, work }) {
   await page.waitForTimeout(600)
   await shot('fit')
 
+  // Reduced motion: a new layout is at rest at once.
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.waitForTimeout(100)
+  await page.locator('.map-chip').nth(1).click()
+  await page.waitForTimeout(120)
+  const still = await ada.getAttribute('transform')
+  await page.waitForTimeout(400)
+  if ((await ada.getAttribute('transform')) !== still) fail('With reduced motion the map still moves')
+  await page.locator('.map-chip').nth(1).click()
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+
   // 3. Empty states: a book without entries, then entries without links.
   const blank = join(work, 'books', 'Blank Map')
   await mkdir(join(blank, 'manuscript'), { recursive: true })

@@ -3,7 +3,6 @@
 // so 300 nodes stay smooth.
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { useReducedMotion } from 'motion/react'
 import { ArrowsIn, Minus, Plus } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { adjacency, type MapNode, type PlanningMap } from '@shared/planning/graph'
@@ -23,6 +22,19 @@ const memory = new Map<string, Memory>()
 
 function signature(map: PlanningMap): string {
   return `${map.nodes.map((n) => n.id).join(',')}|${map.edges.map(edgeKey).join(',')}`
+}
+
+/** The setting of the system, also when it changes while the map is open. */
+function usePrefersReducedMotion(): boolean {
+  const query = '(prefers-reduced-motion: reduce)'
+  const [reduce, setReduce] = useState(() => window.matchMedia(query).matches)
+  useEffect(() => {
+    const mq = window.matchMedia(query)
+    const on = (): void => setReduce(mq.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
+  return reduce
 }
 
 /** All labels show when the map is small or near. */
@@ -47,7 +59,7 @@ export interface MapCanvasProps {
 }
 
 export function MapCanvas({ map, memoryKey, colorOf, labelOf, matches, ariaLabel, onOpen, renderCard, texts }: MapCanvasProps): React.JSX.Element {
-  const reduce = useReducedMotion() ?? false
+  const reduce = usePrefersReducedMotion()
   const stageRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const worldRef = useRef<SVGGElement>(null)
@@ -75,6 +87,10 @@ export function MapCanvas({ map, memoryKey, colorOf, labelOf, matches, ariaLabel
     return new Set(ranked.slice(0, MAJOR_LABELS).map((n) => n.id))
   }, [map])
   const matchSet = useMemo(() => new Set(matches), [matches])
+  // A node that left the map (a filter, a change on disk) is not under the pointer any more.
+  useEffect(() => {
+    if (hover && !nodeById.has(hover)) setHover(null)
+  }, [hover, nodeById])
   const near = useMemo(() => (hover ? new Set([hover, ...(adj.get(hover) ?? [])]) : null), [hover, adj])
 
   /* ---------- Drawing (only refs: also safe from old closures) ---------- */
@@ -359,7 +375,7 @@ export function MapCanvas({ map, memoryKey, colorOf, labelOf, matches, ariaLabel
       <svg
         ref={svgRef}
         className={clsx('map-svg', hover && 'has-focus', !hover && matches.length > 0 && 'has-search', grabbing && `is-grabbing-${grabbing}`)}
-        role="img"
+        role="application"
         aria-label={ariaLabel}
         tabIndex={0}
         onKeyDown={onKeyDown}

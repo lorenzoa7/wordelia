@@ -1,6 +1,8 @@
 // Words that many parts of the app use. English is the source language: the other
 // languages must have the same keys (TypeScript checks it).
 
+import { DEFAULT_ACTIONS } from '../../ai/defaults'
+
 const n = (v: number): string => v.toLocaleString('en-US')
 
 export const common = {
@@ -52,6 +54,12 @@ export const common = {
   },
   /** Names of the built-in actions, by action id */
   builtinActions: { polish: 'Polish', tighten: 'Tighten', grammar: 'Fix grammar only', show: "Show, don't tell", expand: 'Expand' } as Record<string, string>,
+  /**
+   * Instructions of the built-in actions, by action id. The app shows them, and sends them to the AI,
+   * while the user has not changed them (see `actionInstructions`). The English text is the text of
+   * DEFAULT_ACTIONS in src/shared/ai/defaults.ts. Translate each line; keep the same lines.
+   */
+  builtinActionInstructions: Object.fromEntries(DEFAULT_ACTIONS.map((a) => [a.id, a.instructions])) as Record<string, string>,
   /** Names of the default planning categories, by category id */
   categories: { characters: 'Characters', places: 'Places', world: 'World', plot: 'Plot', notes: 'Notes' } as Record<string, string>
 }

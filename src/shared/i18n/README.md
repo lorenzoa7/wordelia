@@ -25,8 +25,8 @@ Outside React (stores, plain functions): `getT()` from `@/lib/i18n`. In the main
 - Keep the English text exactly as it was. Tests and screenshots look for it.
 - Text with a value is a function: `deleted: (title: string) => \`Deleted “${title}”.\``. Plurals are functions of a number.
 - Numbers and dates: `t.common.number(n)` and `t.common.locale`.
-- Do not put AI prompts here. Prompts stay in English (`src/shared/prompts`).
-- Brand and program names do not change: Wordelia, Claude, Claude Code, Codex, Anthropic API, OpenAI API, ChatGPT, Obsidian, Google Docs, Word, `claude`, `codex`. Key names do not change: Ctrl, Alt, Shift, Enter, Esc.
+- Do not put AI prompts here. Prompts stay in English (`src/shared/prompts`). One exception: the instructions of the built-in actions (`common.builtinActionInstructions`). The user reads and edits them in the settings, so they are in the interface language. The English text comes from `DEFAULT_ACTIONS`; keep the same lines in each translation.
+- Brand and program names do not change: Wordelia, Claude, Claude Code, Codex, Anthropic API, OpenAI API, ChatGPT, Obsidian, Google Docs, Word, `claude`, `codex`. Key names do not change: Ctrl, Alt, Shift, Enter, Esc. Effort names do not change: Minimal, Low, Medium, High, Extra high, Max.
 - Use the terms below. Write like the English: short labels, sentence case, the same tone. Portuguese uses "você". Spanish uses "tú", neutral Latin American Spanish.
 
 ## Terms

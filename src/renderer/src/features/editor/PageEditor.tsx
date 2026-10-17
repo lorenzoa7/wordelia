@@ -15,7 +15,7 @@ import { useT } from '@/lib/i18n'
 import { fontStack } from '@/lib/fonts'
 import { registerFlusher } from '@/lib/flush'
 import { editorExtensions } from './extensions'
-import { getChapterEditor, registerChapterEditor, setActiveEditor, useActiveEditor, whenChapterEditor } from './registry'
+import { getChapterEditor, hasCursor, registerChapterEditor, setActiveEditor, useActiveEditor, whenChapterEditor } from './registry'
 import { repaginate, type PageMetrics } from './pagination'
 import { Toolbar } from './Toolbar'
 import { SelectionMenu } from './SelectionMenu'
@@ -97,7 +97,8 @@ export function PageEditor(): React.JSX.Element | null {
     if (jump.focus) whenChapterEditor(jump.id, (e) => setTimeout(() => e.editor.commands.focus('start'), 30))
   }, [jump])
 
-  // While nothing has the cursor, the chapter on screen is the active one.
+  // The chapter on screen is the active one in the sidebar, like the outline of a word processor.
+  // The toolbar and the actions stay on the chapter with the cursor, if there is one.
   useEffect(() => {
     const desk = deskRef.current
     if (!desk) return
@@ -106,7 +107,6 @@ export function PageEditor(): React.JSX.Element | null {
       if (frame) return
       frame = requestAnimationFrame(() => {
         frame = 0
-        if (desk.contains(document.activeElement) && document.activeElement?.closest('.manuscript')) return
         const box = desk.getBoundingClientRect()
         const line = box.top + box.height * 0.3
         for (const el of desk.querySelectorAll<HTMLElement>('[data-chapter]')) {
@@ -115,7 +115,7 @@ export function PageEditor(): React.JSX.Element | null {
             const id = el.dataset.chapter!
             useBook.getState().setActiveChapter(id)
             const e = getChapterEditor(id)
-            if (e) setActiveEditor(e)
+            if (e && !hasCursor()) setActiveEditor(e)
             break
           }
         }

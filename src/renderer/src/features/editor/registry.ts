@@ -33,7 +33,7 @@ export function registerChapterEditor(e: ChapterEditor): () => void {
   const queued = waiting.get(e.chapterId) ?? []
   waiting.delete(e.chapterId)
   for (const fn of queued) fn(e)
-  if (useBook.getState().activeChapterId === e.chapterId) setActiveEditor(e)
+  if (useBook.getState().activeChapterId === e.chapterId && !hasCursor()) setActiveEditor(e)
   return () => {
     if (editors.get(e.chapterId) === e) editors.delete(e.chapterId)
     if (useActiveEditor.getState().active === e) useActiveEditor.setState({ active: null })
@@ -50,6 +50,12 @@ export function whenChapterEditor(chapterId: string, fn: (e: ChapterEditor) => v
   const e = getChapterEditor(chapterId)
   if (e) return fn(e)
   waiting.set(chapterId, [...(waiting.get(chapterId) ?? []), fn])
+}
+
+/** True when the text cursor is in one of the chapters. */
+export function hasCursor(): boolean {
+  for (const e of editors.values()) if (!e.editor.isDestroyed && e.editor.view.hasFocus()) return true
+  return false
 }
 
 export function setActiveEditor(a: ChapterEditor | null): void {

@@ -214,6 +214,17 @@ The chat shows the thinking in one line while the reply streams, and keeps it in
 6. Other threads: title, brief and digest of each thread.
 7. The proposal protocol.
 
+#### Reply style
+
+The author reads the chat in a narrow panel. The "How you reply" block of the chat prompt (`src/shared/prompts/chat.ts`) asks for short, direct replies:
+
+- The answer comes first. There is no preamble, and the AI does not repeat the question.
+- A reply has a few sentences. It is longer only when the author asks for depth, or when the task needs it. Proposals have no limit.
+- There are no closing offers ("Do you want me to…") and no summary at the end.
+- Lists are only for separate points.
+
+The AI replies in the language of the author. The scripted provider (`src/main/ai/mock.ts`) writes replies in the same style.
+
 ### 5.3 Proposal protocol
 
 The AI writes changes as tags in its reply:

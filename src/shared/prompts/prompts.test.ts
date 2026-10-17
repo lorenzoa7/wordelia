@@ -59,6 +59,19 @@ describe('chat system prompt', () => {
     entries.pop()
   })
 
+  it('asks for short, direct replies and keeps the language rule', () => {
+    const s = system('c1')
+    const style = s.slice(s.indexOf('# How you reply'), s.indexOf('# Proposing changes'))
+    expect(style).toContain('Answer first.')
+    expect(style).toMatch(/few sentences/)
+    expect(style).toMatch(/No preamble/)
+    expect(style).toMatch(/Do you want me to/)
+    expect(style).toMatch(/Proposals are not limited/)
+    expect(s).toContain('Reply in the language that the author uses with you.')
+    // The old rule asked for lists. Lists are now only for separate points.
+    expect(s).not.toContain('use a list when you have several points')
+  })
+
   it('uses summaries when the book does not fit', () => {
     const s = system('c1', 12, { c3: 'Resumo do capítulo três.' })
     expect(s).toContain('Resumo do capítulo três.')

@@ -214,6 +214,17 @@ The chat shows the thinking in one line while the reply streams, and keeps it in
 6. Other threads: title, brief and digest of each thread.
 7. The proposal protocol.
 
+#### Reply style
+
+The author reads the chat in a narrow panel. The "How you reply" block of the chat prompt (`src/shared/prompts/chat.ts`) asks for short, direct replies:
+
+- The answer comes first. There is no preamble, and the AI does not repeat the question.
+- A reply has a few sentences. It is longer only when the author asks for depth, or when the task needs it. Proposals have no limit.
+- There are no closing offers ("Do you want me to…") and no summary at the end.
+- Lists are only for separate points.
+
+The AI replies in the language of the author. The scripted provider (`src/main/ai/mock.ts`) writes replies in the same style.
+
 ### 5.3 Proposal protocol
 
 The AI writes changes as tags in its reply:
@@ -249,6 +260,26 @@ The digest of the thread starts again when it covered removed messages.
 #### Thread states
 
 The thread list shows a state for each thread (`src/renderer/src/features/chat/status.tsx`): proposals wait for a decision, a reply that the user did not see (`Thread.readAt`, set when the thread shows in the open chat), or a reply in progress. The chat button in the title bar has a dot when the chat is closed and a thread needs the user.
+
+#### The chat panel
+
+`src/renderer/src/features/chat/ChatPanel.tsx` shows one of two views. `useChat.listOpen` selects the view.
+
+- **Thread view.** The header has a back button (←), the title and the options. The back button opens the thread list. It has a dot when another thread needs the user. A click on the title opens "Title and purpose". Under the header, the purpose strip shows the brief of the thread. It gets a shadow when messages scroll under it. Then the messages and the composer.
+- **Thread list.** All threads of the book, in the full height of the panel: the pinned threads first, then the most recent. Each row shows the state, the time, one line (the state, the brief or the digest) and an options menu. The search ignores accents. The arrow keys move through the list, Enter opens a thread, and Esc goes back to the open thread. A thread does not count as seen while the list shows.
+
+`setActiveThread` closes the list. A quote, a mention from outside the chat, and the planning sync also close it, so the composer or the thread shows. When the book opens, the chat shows the most recently changed thread.
+
+When the user sends a message, the chat goes to the end of the thread at once (also when the thread opens). While a reply streams, the chat follows it only when the user is near the end.
+
+#### The composer and mentions
+
+The composer (`Composer.tsx`) and the edit box of a sent message use `ChatInput.tsx`: a small TipTap editor with a document, paragraphs, text, hard breaks, undo and an inline `mention` node (an atom with `kind`, `id` and `label`).
+
+- "@" and up to 30 letters after a space open the list of chapters, entries and threads. Up, Down, Enter, Tab and Esc work in the list. The choice becomes a pill in the text, with a space after it. Backspace (or Delete) next to a pill removes the whole pill.
+- Enter sends. Shift+Enter starts a new line. A paste is plain text.
+- The draft stays in the chat store as TipTap JSON (`draftDoc`), with its text (`draft`) and its mentions. Code outside the composer (a suggestion, "Mention in chat", "Ask the chat about this entry") changes the draft through the store and increments `draftRev`. Then the composer loads the draft and puts the cursor at the end.
+- `src/renderer/src/features/chat/draft.ts` reads and writes the draft (pure functions with tests). A sent message keeps the text with each mention as "@Label", and `mentions` with the ids. The prompt builder reads the ids, as before. The chat finds "@Label" in the text again (`splitMentions`) to show each mention as a pill in its place. Older messages have their mentions apart from the text: the chat shows these above the text.
 
 ### 5.4 Actions
 

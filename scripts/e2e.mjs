@@ -23,6 +23,7 @@ const scenarios = [
   ['panels'],
   ['plannav'],
   ['chat', '--en'],
+  ['chatview'],
   ['pages', '--en'],
   ['reveal'],
   ['reopen'],

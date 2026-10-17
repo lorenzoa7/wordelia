@@ -121,13 +121,13 @@ export default async function ({ app, page, shot, openBook }) {
   await slow(90)
   await send('Suggest three titles for this chapter.')
   await page.waitForSelector('.think-line', { timeout: 10000 })
-  // Back to the first thread while the new one works.
-  await page.locator('.thread-switch').click()
-  await page.waitForSelector('.thread-pop', { timeout: 5000 })
+  // Back to the first thread while the new one works: the back button opens the list of threads.
+  await page.locator('.chat-back').click()
+  await page.waitForSelector('.thread-view', { timeout: 5000 })
   await page.locator('.thread-item').nth(1).click()
   await page.waitForTimeout(300)
-  await page.locator('.thread-switch').click()
-  await page.waitForSelector('.thread-item .status-dot.is-working', { timeout: 5000 })
+  await page.locator('.chat-back').click()
+  await page.waitForSelector('.thread-row .status-dot.is-working', { timeout: 5000 })
   await page.waitForTimeout(300)
   await shot('threads-working')
   await page.keyboard.press('Escape')
@@ -139,11 +139,13 @@ export default async function ({ app, page, shot, openBook }) {
   )
   await slow(12)
   await page.waitForTimeout(500)
-  await page.locator('.thread-switch').click()
-  await page.waitForSelector('.thread-item .status-dot.is-unseen', { timeout: 10000 })
+  await page.locator('.chat-back').click()
+  await page.waitForSelector('.thread-row .status-dot.is-unseen', { timeout: 10000 })
   await page.waitForTimeout(300)
   await shot('threads-status')
+  // Esc goes back to the open thread.
   await page.keyboard.press('Escape')
+  await page.waitForSelector('.chat-thread', { timeout: 5000 })
 
   // 10. With the chat closed, the chat button has a dot.
   await page.keyboard.press('Control+l')

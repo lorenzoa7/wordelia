@@ -107,19 +107,13 @@ function reply(req: CompletionRequest): string {
       `<edit file="${chapter[1]}">`,
       `<find>${firstPara.trim()}</find>`,
       `<replace>${polish(firstPara.trim())}</replace>`,
-      '</edit>',
-      '',
-      'Tell me if you want a bolder version.'
+      '</edit>'
     ].join('\n')
   }
   return [
-    'Good question. Three things stand out in this chapter:',
+    "**Marta's reaction is the weakest part:** it comes too fast. One more beat of doubt would make the blue boat more frightening.",
     '',
-    '1. **The opening image is strong.** The lamp lit at six sharp sets the tone at once.',
-    '2. **The visitor needs one concrete detail** that the reader can remember: a smell, a scar, a way of speaking.',
-    "3. **Marta's reaction** comes a little fast. One more beat of doubt would make the blue boat more frightening.",
-    '',
-    'Do you want me to propose an edit for one of these?'
+    'The visitor also needs one concrete detail that the reader can remember: a smell, a scar, a way of speaking.'
   ].join('\n')
 }
 

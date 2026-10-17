@@ -1,48 +1,79 @@
 .book {
+  position: relative;
   display: flex;
   height: 100%;
   border-top: 1px solid var(--rule-soft);
 }
-.book-sidebar,
-.book-chat {
-  flex-shrink: 0;
-  overflow: hidden;
-  height: 100%;
-}
-.book-sidebar-inner,
-.book-chat-inner {
-  height: 100%;
-}
-.book-chat-inner {
-  float: right;
-}
-.book-chat {
+
+/* ---------- Side panels: the sidebar and the chat ---------- */
+.side-panel {
   position: relative;
+  flex-shrink: 0;
+  height: 100%;
+  overflow: hidden;
 }
-.chat-resizer {
+/* The content keeps its width and slides out while the panel closes. */
+.side-panel-inner {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 0;
-  width: 6px;
-  z-index: 5;
-  cursor: col-resize;
 }
-.chat-resizer::after {
+.side-panel-left .side-panel-inner {
+  left: 0;
+}
+.side-panel-right .side-panel-inner {
+  right: 0;
+}
+/* The line between the sidebar and the page stays on the edge while the panel moves. */
+.book-sidebar {
+  box-shadow: inset -1px 0 0 var(--rule);
+}
+
+/* The edge: drag to resize, past the minimum to close, from the window edge to open. */
+.panel-edge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  z-index: 6;
+  cursor: col-resize;
+  touch-action: none;
+}
+.panel-edge-left {
+  left: 0;
+}
+.panel-edge-right {
+  right: 0;
+}
+.panel-edge::after {
   content: '';
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 0;
+  left: 3px;
   width: 2px;
+  border-radius: 1px;
   background: transparent;
   transition: background-color var(--dur-fast) var(--ease-out);
 }
-.chat-resizer:hover::after,
-.book-chat.is-resizing .chat-resizer::after {
-  background: var(--ribbon);
+/* A closed chat: only the half of the edge inside the window shows. */
+.panel-edge-right.is-closed::after {
+  left: 1px;
 }
-.book-chat.is-resizing {
+.panel-edge:hover::after {
+  background: var(--ribbon);
+  transition-delay: 120ms;
+}
+.panel-edge.is-dragging::after,
+.panel-edge:focus-visible::after {
+  background: var(--ribbon);
+  transition-delay: 0ms;
+}
+.panel-edge:focus-visible {
+  outline: none;
+}
+.side-panel.is-resizing,
+.side-panel.is-resizing + .book-main {
   user-select: none;
 }
 .book-main {
@@ -68,13 +99,14 @@
   flex-direction: column;
   height: 100%;
   padding: var(--s-3) var(--s-2) var(--s-3) var(--s-3);
-  border-right: 1px solid var(--rule);
 }
 .sidebar-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 2px 0 8px;
+  /* The same height with or without a button, so the views do not jump */
+  min-height: 30px;
+  padding: 0 2px 0 10px;
   margin-bottom: var(--s-2);
 }
 .chapter-list {
@@ -107,6 +139,10 @@
 .chapter-item:hover {
   background: var(--desk-2);
   color: var(--ink);
+}
+/* The list scrolls, so the ring goes inside the item. */
+.chapter-item:focus-visible {
+  outline-offset: -2px;
 }
 .chapter-item.is-active {
   background: var(--paper);
@@ -175,7 +211,8 @@
   display: inline-flex;
 }
 .chapter-item:hover .chapter-item-words,
-.chapter-item:focus-within .chapter-item-words {
+.chapter-item:focus-within .chapter-item-words,
+.chapter-item:has(.chapter-item-menu [data-state='open']) .chapter-item-words {
   display: none;
 }
 .sidebar-add {
@@ -195,9 +232,17 @@
     background-color var(--dur-fast) var(--ease-out),
     color var(--dur-fast) var(--ease-out);
 }
+.sidebar-add svg {
+  flex-shrink: 0;
+  translate: 0 var(--icon-lift);
+}
 .sidebar-add:hover {
   border-color: var(--ink-4);
+  background: var(--desk-2);
   color: var(--ink);
+}
+.sidebar-add:active {
+  background: var(--desk-3);
 }
 
 /* ---------- Status bar ---------- */
@@ -246,16 +291,28 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 2px 6px;
+  height: 22px;
+  padding: 0 6px;
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--ink-3);
   font-size: var(--text-xs);
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.status-btn svg,
+.save-state svg {
+  flex-shrink: 0;
+  translate: 0 var(--icon-lift);
 }
 .status-btn:hover {
   background: var(--desk-2);
   color: var(--ink);
+}
+.status-btn:active {
+  background: var(--desk-3);
 }
 
 .today {

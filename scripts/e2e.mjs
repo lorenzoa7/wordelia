@@ -19,7 +19,9 @@ const scenarios = [
   ['keyboard'],
   ['paste'],
   ['reorder'],
-  ['external']
+  ['external'],
+  ['panels'],
+  ['plannav']
 ]
 
 function run(args) {

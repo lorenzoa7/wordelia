@@ -4,6 +4,12 @@ export const plan: typeof en = {
   newEntryName: 'Nueva nota',
   writingRules: 'Reglas de escritura',
   name: 'Nombre',
+  backTo: (to) => `Volver a ${to}`,
+  category: {
+    count: (n) => (n === 1 ? '1 nota' : `${n} notas`),
+    newEntry: 'Nueva nota',
+    importNotes: 'Importar notas'
+  },
   sidebar: {
     planning: 'Planificación',
     syncWithManuscript: 'Sincronizar manuscrito',

@@ -35,6 +35,7 @@
 }
 .btn-icon {
   display: inline-flex;
+  translate: 0 var(--icon-lift);
 }
 .btn-primary {
   background: var(--ink);
@@ -46,7 +47,7 @@
 }
 .btn-ribbon {
   background: var(--ribbon);
-  color: #fff8f2;
+  color: var(--on-ribbon);
   box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.2);
 }
 .btn-ribbon:hover:not(:disabled) {
@@ -81,6 +82,7 @@
 .icon-btn {
   display: inline-grid;
   place-items: center;
+  flex-shrink: 0;
   width: 30px;
   height: 30px;
   padding: 0;
@@ -90,15 +92,27 @@
   color: var(--ink-3);
   transition:
     background-color var(--dur-fast) var(--ease-out),
-    color var(--dur-fast) var(--ease-out);
+    color var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
 }
 .icon-btn:hover:not(:disabled) {
+  background: var(--desk-3);
+  color: var(--ink);
+}
+.icon-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.icon-btn[data-state='open'] {
   background: var(--desk-3);
   color: var(--ink);
 }
 .icon-btn.is-active {
   color: var(--ribbon);
   background: var(--ribbon-wash);
+}
+.icon-btn.is-active:hover:not(:disabled) {
+  color: var(--ribbon);
+  background: var(--ribbon-soft);
 }
 .icon-btn:disabled {
   opacity: 0.35;
@@ -182,6 +196,13 @@
   width: 18px;
   color: var(--ink-3);
   flex-shrink: 0;
+  translate: 0 var(--icon-lift);
+}
+.menu-item[data-highlighted] .menu-item-icon {
+  color: var(--ink-2);
+}
+.menu-item.is-danger .menu-item-icon {
+  color: inherit;
 }
 .menu-item-label {
   flex: 1;
@@ -199,8 +220,9 @@
   margin: 5px 4px;
   background: var(--rule-soft);
 }
+/* The label lines up with the item labels: item padding + icon + gap */
 .menu-label {
-  padding: 8px 10px 4px 30px;
+  padding: 8px 10px 4px calc(6px + 18px + var(--s-2));
 }
 
 /* ---------- Dialog ---------- */
@@ -237,8 +259,16 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--s-4);
+  gap: var(--s-3);
   padding: var(--s-6) var(--s-6) var(--s-3);
+}
+.dialog-head > div {
+  flex: 1;
+  min-width: 0;
+}
+/* The close button sits in the corner, on the line of the title. */
+.dialog-head > .icon-btn {
+  margin: -4px -10px 0 0;
 }
 .dialog-title {
   margin: 0;
@@ -255,6 +285,10 @@
 .dialog-body {
   padding: var(--s-2) var(--s-6) var(--s-4);
   overflow-y: auto;
+}
+/* A dialog with only a question (a confirm) has no body. */
+.dialog-body:empty {
+  display: none;
 }
 .dialog-foot {
   display: flex;
@@ -313,6 +347,9 @@
 .input::placeholder {
   color: var(--ink-4);
 }
+.input:hover:not(:focus):not(:disabled) {
+  border-color: var(--ink-5);
+}
 .input:focus {
   border-color: var(--ribbon);
   box-shadow: 0 0 0 3px var(--ribbon-wash);
@@ -341,8 +378,26 @@
   font-size: var(--text-sm);
   text-align: left;
 }
+.select {
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
 .select:hover {
   border-color: var(--ink-4);
+}
+.select[data-state='open'] {
+  border-color: var(--ribbon);
+  box-shadow: 0 0 0 3px var(--ribbon-wash);
+}
+.select[data-disabled] {
+  opacity: 0.45;
+}
+.select[data-state='open'] .select-caret {
+  rotate: 180deg;
+}
+.select-caret {
+  transition: rotate var(--dur-med) var(--ease-out);
 }
 .select > span:first-child {
   min-width: 0;
@@ -370,8 +425,17 @@
   background: var(--ink-5);
   transition: background-color var(--dur-med) var(--ease-out);
 }
+.switch:hover {
+  background: var(--ink-4);
+}
 .switch[data-state='checked'] {
   background: var(--ribbon);
+}
+.switch[data-state='checked']:hover {
+  background: var(--ribbon-2);
+}
+.switch:disabled {
+  opacity: 0.45;
 }
 .switch-thumb {
   display: block;
@@ -399,7 +463,8 @@
 /* ---------- Toasts ---------- */
 .toasts {
   position: fixed;
-  bottom: var(--s-6);
+  /* Above the status bar, so the save state stays in view */
+  bottom: var(--s-12);
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -413,26 +478,69 @@
   display: flex;
   align-items: center;
   gap: var(--s-3);
-  max-width: 560px;
-  padding: 10px 14px;
+  max-width: min(560px, calc(100vw - 48px));
+  min-height: 40px;
+  padding: 8px 14px;
   border-radius: var(--radius-md);
   background: var(--ink);
   color: var(--paper);
   font-size: var(--text-sm);
+  line-height: 1.4;
   box-shadow: var(--shadow-pop);
   pointer-events: auto;
 }
+.toast:has(.toast-close) {
+  padding-right: 6px;
+}
 .toast.is-error {
   background: var(--ribbon);
-  color: #fff8f2;
+  color: var(--on-ribbon);
 }
-.toast button {
+.toast-icon {
+  flex-shrink: 0;
+  translate: 0 var(--icon-lift);
+}
+.toast-message {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.toast-action {
+  flex-shrink: 0;
+  padding: 3px 6px;
+  margin: -3px -2px;
   border: 0;
+  border-radius: var(--radius-xs);
   background: transparent;
   color: inherit;
   font-weight: 700;
+  white-space: nowrap;
   text-decoration: underline;
   text-underline-offset: 3px;
+  transition: background-color var(--dur-fast) var(--ease-out);
+}
+.toast-close {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  opacity: 0.7;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    opacity var(--dur-fast) var(--ease-out);
+}
+.toast-action:hover,
+.toast-close:hover {
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  opacity: 1;
+}
+.toast :focus-visible {
+  outline-color: currentColor;
 }
 
 /* ---------- Keyframes ---------- */

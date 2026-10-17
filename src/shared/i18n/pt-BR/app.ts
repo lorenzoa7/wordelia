@@ -20,6 +20,9 @@ export const app: typeof en = {
   showChat: 'Mostrar chat',
   hideChat: 'Ocultar chat',
   chatWidth: 'Largura do chat. Use as setas para mudar.',
+  sidebarWidth: 'Largura da barra lateral. Use as setas para mudar.',
+  resizeHint: 'Arraste para mudar a largura. Arraste até a borda para ocultar.',
+  openHint: 'Arraste ou clique para mostrar',
   provider: {
     connect: 'Conectar uma IA',
     checking: 'Verificando…',

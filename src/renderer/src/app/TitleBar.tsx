@@ -15,7 +15,7 @@ import {
   SlidersHorizontal
 } from '@phosphor-icons/react'
 import clsx from 'clsx'
-import { IconButton, Menu, MenuItem, MenuSeparator } from '@/ui'
+import { IconButton, Menu, MenuItem, MenuSeparator, Tooltip } from '@/ui'
 import { useApp } from '@/stores/app'
 import { useBook, type BookView } from '@/stores/book'
 import { useUi } from '@/stores/ui'
@@ -24,12 +24,13 @@ import { useT } from '@/lib/i18n'
 import { installUpdate, useUpdate } from '@/lib/update'
 import { Logo } from './Logo'
 import { ProviderBadge } from './ProviderBadge'
-import { RULES_CATEGORY } from '@/features/plan/PlanSidebar'
 
 const VIEWS: Array<{ id: BookView; icon: React.ReactNode; key: string }> = [
   { id: 'write', icon: <PenNib size={14} />, key: 'Ctrl+1' },
   { id: 'plan', icon: <Notebook size={14} />, key: 'Ctrl+2' }
 ]
+
+const closeBook = (): void => void useBook.getState().close().then(() => useApp.getState().refreshLibrary())
 
 export function TitleBar(): React.JSX.Element {
   const t = useT()
@@ -49,30 +50,32 @@ export function TitleBar(): React.JSX.Element {
           <IconButton
             label={ui?.sidebarOpen ? t.app.hideSidebar : t.app.showSidebar}
             shortcut="Ctrl+\"
+            active={ui?.sidebarOpen}
             onClick={() => setUi({ sidebarOpen: !ui?.sidebarOpen })}
             className="no-drag"
           >
             <SidebarSimple size={17} />
           </IconButton>
         )}
-        <button
-          className="titlebar-logo no-drag"
-          onClick={() => root && void useBook.getState().close().then(() => useApp.getState().refreshLibrary())}
-          aria-label={t.app.library}
-          title={root ? t.app.backToLibrary : undefined}
-        >
-          <Logo height={15} />
-        </button>
+        {root ? (
+          <Tooltip label={t.app.backToLibrary}>
+            <button className="titlebar-logo no-drag" onClick={closeBook} aria-label={t.app.backToLibrary}>
+              <Logo height={15} />
+            </button>
+          </Tooltip>
+        ) : (
+          <span className="titlebar-logo">
+            <Logo height={15} />
+          </span>
+        )}
         {root && (
           <>
-            <span className="titlebar-sep" aria-hidden>
-              /
-            </span>
+            <span className="titlebar-sep" aria-hidden />
             <Menu
               trigger={
                 <button className="titlebar-book no-drag">
                   <BookOpenText size={14} />
-                  <span>{title}</span>
+                  <span className="titlebar-book-title">{title}</span>
                   <CaretDown size={11} />
                 </button>
               }
@@ -80,7 +83,7 @@ export function TitleBar(): React.JSX.Element {
               <MenuItem icon={<SlidersHorizontal size={15} />} onSelect={() => openSettings('book')}>
                 {t.app.bookSettings}
               </MenuItem>
-              <MenuItem icon={<Scroll size={15} />} onSelect={() => useBook.getState().selectCategory(RULES_CATEGORY)}>
+              <MenuItem icon={<Scroll size={15} />} onSelect={() => useUi.getState().openSettings('rules')}>
                 {t.plan.writingRules}
               </MenuItem>
               <MenuItem icon={<Export size={15} />} shortcut="Ctrl+Shift+E" onSelect={() => setExportOpen(true)}>
@@ -90,10 +93,7 @@ export function TitleBar(): React.JSX.Element {
                 {t.app.showFolder}
               </MenuItem>
               <MenuSeparator />
-              <MenuItem
-                icon={<SignOut size={15} />}
-                onSelect={() => void useBook.getState().close().then(() => useApp.getState().refreshLibrary())}
-              >
+              <MenuItem icon={<SignOut size={15} />} onSelect={closeBook}>
                 {t.app.closeBook}
               </MenuItem>
             </Menu>
@@ -104,22 +104,23 @@ export function TitleBar(): React.JSX.Element {
       {root && (
         <nav className="view-switch no-drag" aria-label={t.app.viewNav}>
           {VIEWS.map((v) => (
-            <button
-              key={v.id}
-              className={clsx('view-tab', view === v.id && 'is-active')}
-              aria-current={view === v.id ? 'page' : undefined}
-              onClick={() => setView(v.id)}
-              title={`${t.app.views[v.id]} (${v.key})`}
-            >
-              {v.icon}
-              <span>{t.app.views[v.id]}</span>
-              {view === v.id && <motion.span layoutId="view-underline" className="view-underline" transition={{ type: 'spring', stiffness: 500, damping: 38 }} />}
-            </button>
+            <Tooltip key={v.id} label={t.app.views[v.id]} shortcut={v.key}>
+              <button
+                className={clsx('view-tab', view === v.id && 'is-active')}
+                aria-current={view === v.id ? 'page' : undefined}
+                aria-keyshortcuts={v.key.replace('Ctrl', 'Control')}
+                onClick={() => setView(v.id)}
+              >
+                {v.icon}
+                <span>{t.app.views[v.id]}</span>
+                {view === v.id && <motion.span layoutId="view-underline" className="view-underline" transition={{ type: 'spring', stiffness: 500, damping: 38 }} />}
+              </button>
+            </Tooltip>
           ))}
         </nav>
       )}
 
-      <div className="titlebar-right no-drag">
+      <div className="titlebar-right">
         <UpdateBadge />
         <ProviderBadge />
         {root && (
@@ -146,9 +147,11 @@ function UpdateBadge(): React.JSX.Element | null {
   const u = useUpdate()
   if (u.state !== 'ready') return null
   return (
-    <button className="update-badge" onClick={installUpdate} title={t.app.update.badgeHint(u.version)}>
-      <ArrowCircleUp size={14} weight="bold" />
-      {t.app.update.badge}
-    </button>
+    <Tooltip label={t.app.update.badgeHint(u.version)}>
+      <button className="update-badge" onClick={installUpdate}>
+        <ArrowCircleUp size={14} weight="bold" />
+        <span>{t.app.update.badge}</span>
+      </button>
+    </Tooltip>
   )
 }

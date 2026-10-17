@@ -21,6 +21,9 @@
 
   --tracking-caps: 0.14em;
   --tracking-tight: -0.01em;
+  /* Courier Prime sits high in its line box. An icon beside UI text moves up by this
+     much, so that it centers on the capital letters (use with `translate: 0 var(--icon-lift)`). */
+  --icon-lift: -0.07em;
 
   /* Space (4 px grid) */
   --s-1: 4px;
@@ -76,6 +79,7 @@
   --ribbon-2: #8f2f22;
   --ribbon-soft: #f3e0d9;
   --ribbon-wash: rgba(168, 58, 43, 0.12);
+  --on-ribbon: #fff8f2; /* Text on a ribbon background */
 
   --pen: #2f6a52; /* AI insertions: an editor's green pen */
   --pen-soft: #dfeadf;
@@ -120,6 +124,8 @@
   --ribbon-2: #ec8d72;
   --ribbon-soft: #3d2620;
   --ribbon-wash: rgba(224, 122, 95, 0.16);
+  /* The dark ribbon is light: white text on it is hard to read, dark text is not. */
+  --on-ribbon: #1f1410;
 
   --pen: #8cc3a4;
   --pen-soft: #22352b;

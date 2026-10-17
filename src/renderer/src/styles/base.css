@@ -46,10 +46,10 @@ button {
   outline: none;
 }
 
+/* The ring follows the shape of the element (a pill stays a pill). */
 :focus-visible {
   outline: 1.5px solid var(--focus);
   outline-offset: 2px;
-  border-radius: var(--radius-xs);
 }
 /* Text fields show focus with their own border. */
 input:focus-visible,

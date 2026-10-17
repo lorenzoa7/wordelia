@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Reorder } from 'motion/react'
-import { ArrowBendUpLeft, ArrowDown, ArrowUp, ClockCounterClockwise, DotsThree, PencilSimple, Plus, Trash } from '@phosphor-icons/react'
+import { ArrowDown, ArrowUp, ChatCircleText, ClockCounterClockwise, DotsThree, PencilSimple, Plus, Trash } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { countMarkdownWords, formatCount } from '@shared/book'
 import type { Chapter } from '@shared/types'
@@ -37,6 +37,7 @@ export function ChapterSidebar(): React.JSX.Element {
             <ChapterItem
               chapter={c}
               index={i}
+              last={i === chapters.length - 1}
               active={c.id === activeId}
               renaming={renaming === c.id}
               onRename={() => setRenaming(c.id)}
@@ -55,6 +56,7 @@ export function ChapterSidebar(): React.JSX.Element {
 function ChapterItem({
   chapter,
   index,
+  last,
   active,
   renaming,
   onRename,
@@ -62,6 +64,7 @@ function ChapterItem({
 }: {
   chapter: Chapter
   index: number
+  last: boolean
   active: boolean
   renaming: boolean
   onRename: () => void
@@ -169,11 +172,11 @@ function ChapterItem({
           <MenuItem icon={<ArrowUp size={15} />} shortcut="Alt+↑" disabled={index === 0} onSelect={() => move(-1)}>
             {t.write.moveUp}
           </MenuItem>
-          <MenuItem icon={<ArrowDown size={15} />} shortcut="Alt+↓" onSelect={() => move(1)}>
+          <MenuItem icon={<ArrowDown size={15} />} shortcut="Alt+↓" disabled={last} onSelect={() => move(1)}>
             {t.write.moveDown}
           </MenuItem>
           <MenuItem
-            icon={<ArrowBendUpLeft size={15} />}
+            icon={<ChatCircleText size={15} />}
             onSelect={() => {
               useChat.getState().addMention({ kind: 'chapter', id: chapter.id, label: chapter.title })
               useApp.getState().setUi({ chatOpen: true })

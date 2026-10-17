@@ -14,41 +14,39 @@ import { ExportDialog } from '@/features/export/ExportDialog'
 import { useActionShortcuts } from '@/features/actions/useActionShortcuts'
 import { HistoryDialog } from '@/features/history/HistoryDialog'
 import { startAutoSnapshots } from '@/features/history/snapshots'
+import { SidePanel } from './SidePanel'
 import './book.css'
 
-const SIDEBAR_W = 256
-const CHAT_MIN = 320
-const CHAT_MAX = 680
+const SIDEBAR = { min: 200, max: 420, default: 256 }
+const CHAT = { min: 320, max: 680, default: 400 }
+/** The page keeps at least this width. In a narrow window the chat gives up width first, then the sidebar. */
+const MAIN_MIN = 560
+
+const clampTo = (r: { min: number; max: number }, v: number): number => Math.min(r.max, Math.max(r.min, v))
+
+function useWindowWidth(): number {
+  const [w, setW] = useState(window.innerWidth)
+  useEffect(() => {
+    const on = (): void => setW(window.innerWidth)
+    window.addEventListener('resize', on)
+    return () => window.removeEventListener('resize', on)
+  }, [])
+  return w
+}
 
 export function BookView(): React.JSX.Element {
   const t = useT()
   const view = useBook((s) => s.view)
   const sidebarOpen = useApp((s) => s.settings?.ui.sidebarOpen ?? true)
+  const sidebarWidth = useApp((s) => s.settings?.ui.sidebarWidth ?? SIDEBAR.default)
   const chatOpen = useApp((s) => s.settings?.ui.chatOpen ?? true)
-  const savedWidth = useApp((s) => s.settings?.ui.chatWidth ?? 400)
-  const [chatW, setChatW] = useState(savedWidth)
-  const [resizing, setResizing] = useState(false)
-  useEffect(() => setChatW(savedWidth), [savedWidth])
-
-  const startResize = (e: React.PointerEvent): void => {
-    e.preventDefault()
-    const startX = e.clientX
-    const startW = chatW
-    let w = startW
-    setResizing(true)
-    const move = (ev: PointerEvent): void => {
-      w = Math.min(CHAT_MAX, Math.max(CHAT_MIN, startW + (startX - ev.clientX)))
-      setChatW(w)
-    }
-    const up = (): void => {
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', up)
-      setResizing(false)
-      useApp.getState().setUi({ chatWidth: Math.round(w) })
-    }
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', up)
-  }
+  const chatWidth = useApp((s) => s.settings?.ui.chatWidth ?? CHAT.default)
+  const setUi = useApp((s) => s.setUi)
+  const vw = useWindowWidth()
+  const sideNow = sidebarOpen ? clampTo(SIDEBAR, sidebarWidth) : 0
+  const chatFit = vw - MAIN_MIN - sideNow
+  const chatNow = chatOpen ? Math.max(CHAT.min, Math.min(clampTo(CHAT, chatWidth), chatFit)) : 0
+  const sidebarFit = vw - MAIN_MIN - chatNow
   const exportOpen = useUi((s) => s.exportOpen)
   const setExportOpen = useUi((s) => s.setExportOpen)
   const historyChapterId = useUi((s) => s.historyChapterId)
@@ -59,16 +57,21 @@ export function BookView(): React.JSX.Element {
 
   return (
     <div className="book">
-      <motion.div
+      <SidePanel
+        side="left"
         className="book-sidebar"
-        initial={false}
-        animate={{ width: sidebarOpen ? SIDEBAR_W : 0, opacity: sidebarOpen ? 1 : 0 }}
-        transition={{ type: 'spring', stiffness: 380, damping: 40 }}
+        edgeClassName="sidebar-resizer"
+        open={sidebarOpen}
+        width={sidebarWidth}
+        min={SIDEBAR.min}
+        max={SIDEBAR.max}
+        defaultWidth={SIDEBAR.default}
+        fit={sidebarFit}
+        label={t.app.sidebarWidth}
+        onChange={(p) => setUi({ ...(p.open !== undefined && { sidebarOpen: p.open }), ...(p.width !== undefined && { sidebarWidth: p.width }) })}
       >
-        <div className="book-sidebar-inner" style={{ width: SIDEBAR_W }} inert={!sidebarOpen}>
-          {view === 'write' ? <ChapterSidebar /> : <PlanSidebar />}
-        </div>
-      </motion.div>
+        {view === 'write' ? <ChapterSidebar /> : <PlanSidebar />}
+      </SidePanel>
 
       <div className="book-main">
         <AnimatePresence mode="wait" initial={false}>
@@ -85,39 +88,21 @@ export function BookView(): React.JSX.Element {
         </AnimatePresence>
       </div>
 
-      <motion.div
-        className={`book-chat${resizing ? ' is-resizing' : ''}`}
-        initial={false}
-        animate={{ width: chatOpen ? chatW : 0, opacity: chatOpen ? 1 : 0 }}
-        transition={resizing ? { duration: 0 } : { type: 'spring', stiffness: 380, damping: 40 }}
+      <SidePanel
+        side="right"
+        className="book-chat"
+        edgeClassName="chat-resizer"
+        open={chatOpen}
+        width={chatWidth}
+        min={CHAT.min}
+        max={CHAT.max}
+        defaultWidth={CHAT.default}
+        fit={chatFit}
+        label={t.app.chatWidth}
+        onChange={(p) => setUi({ ...(p.open !== undefined && { chatOpen: p.open }), ...(p.width !== undefined && { chatWidth: p.width }) })}
       >
-        {chatOpen && (
-          <div
-            className="chat-resizer"
-            role="separator"
-            tabIndex={0}
-            aria-orientation="vertical"
-            aria-label={t.app.chatWidth}
-            aria-valuemin={CHAT_MIN}
-            aria-valuemax={CHAT_MAX}
-            aria-valuenow={Math.round(chatW)}
-            onPointerDown={startResize}
-            onDoubleClick={() => useApp.getState().setUi({ chatWidth: 400 })}
-            onKeyDown={(e) => {
-              const step = e.shiftKey ? 60 : 20
-              const next = e.key === 'ArrowLeft' ? chatW + step : e.key === 'ArrowRight' ? chatW - step : null
-              if (next == null) return
-              e.preventDefault()
-              const w = Math.min(CHAT_MAX, Math.max(CHAT_MIN, next))
-              setChatW(w)
-              useApp.getState().setUi({ chatWidth: w })
-            }}
-          />
-        )}
-        <div className="book-chat-inner" style={{ width: chatW }} inert={!chatOpen}>
-          <ChatPanel />
-        </div>
-      </motion.div>
+        <ChatPanel />
+      </SidePanel>
       <ExportDialog open={exportOpen} onOpenChange={setExportOpen} />
       <HistoryDialog chapterId={historyChapterId} onClose={() => useUi.getState().openHistory(null)} />
     </div>

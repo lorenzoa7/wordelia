@@ -30,6 +30,7 @@
 }
 .format-card:hover {
   border-color: var(--ink-4);
+  color: var(--ink-2);
 }
 .format-card.is-active {
   border-color: var(--ribbon);
@@ -57,11 +58,23 @@
   align-items: flex-start;
   gap: 10px;
   padding: 10px 12px;
-  border: 1px solid var(--rule);
+  border: 1.5px solid var(--rule);
   border-radius: var(--radius-md);
   background: transparent;
   text-align: left;
   color: var(--ink-3);
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.preset svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.preset:hover {
+  border-color: var(--ink-4);
+  color: var(--ink-2);
 }
 .preset span {
   display: flex;
@@ -75,11 +88,13 @@
 .preset small {
   font-size: var(--text-2xs);
   line-height: 1.4;
+  color: var(--ink-3);
 }
+/* Selected: the same ribbon mark as the format cards */
 .preset.is-active {
-  border-color: var(--ink-3);
-  background: var(--paper-2);
-  color: var(--ink);
+  border-color: var(--ribbon);
+  background: var(--ribbon-wash);
+  color: var(--ribbon);
 }
 .export-grid {
   display: grid;

@@ -21,6 +21,11 @@ export const app = {
   showChat: 'Show chat',
   hideChat: 'Hide chat',
   chatWidth: 'Chat width. Use the arrow keys to change it.',
+  sidebarWidth: 'Sidebar width. Use the arrow keys to change it.',
+  /** Tooltip of the edge between a side panel and the page */
+  resizeHint: 'Drag to resize. Drag to the edge to hide.',
+  /** Tooltip of the edge when its panel is hidden */
+  openHint: 'Drag or click to show',
   /** The AI badge in the title bar */
   provider: {
     connect: 'Connect an AI',

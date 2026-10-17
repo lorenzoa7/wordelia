@@ -5,6 +5,14 @@ export const plan = {
   newEntryName: 'New entry',
   writingRules: 'Writing rules',
   name: 'Name',
+  /** Tooltip of the back link at the top of a Plan page. `to` is "Overview" or a category name. */
+  backTo: (to: string): string => `Back to ${to}`,
+  category: {
+    /** Under the title of a category page */
+    count: (n: number): string => (n === 1 ? '1 entry' : `${n} entries`),
+    newEntry: 'New entry',
+    importNotes: 'Import notes'
+  },
   sidebar: {
     planning: 'Planning',
     syncWithManuscript: 'Sync with manuscript',

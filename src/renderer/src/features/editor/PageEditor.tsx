@@ -22,6 +22,7 @@ import { SelectionMenu } from './SelectionMenu'
 import { ReviewBar } from './ReviewBar'
 import { FindBar } from './FindBar'
 import { useEditorStats } from './stats'
+import { usePageZoom } from './zoom'
 import { typewriterSound } from './typewriter-sound'
 import { cleanPastedHtml } from './paste'
 import './editor.css'
@@ -30,17 +31,22 @@ const MM = 96 / 25.4
 /** Space between two sheets of paper, in pixels at zoom 1 */
 const SHEET_GAP = 18
 
-/** Page geometry of the book: the page size and margins of its export settings, at the zoom of the screen. */
-function pageGeometry(m: BookManifest, zoom: number): PageMetrics & { width: number; marginX: number } {
+type Geometry = PageMetrics & { width: number; marginLeft: number; marginRight: number }
+
+/**
+ * Page geometry of the book: the page size and margins of its export settings, at the zoom of the
+ * screen. The screen shows a right-hand page: the inner margin (the spine) is on the left.
+ */
+function pageGeometry(m: BookManifest, zoom: number): Geometry {
   const size = PAGE_SIZES[m.export.pageSize] ?? PAGE_SIZES.A5
   const mg = m.export.margins
-  const marginX = ((mg.inner + mg.outer) / 2) * MM * zoom
   const marginTop = mg.top * MM * zoom
   const marginBottom = mg.bottom * MM * zoom
   const height = size.h * MM * zoom
   return {
     width: size.w * MM * zoom,
-    marginX,
+    marginLeft: mg.inner * MM * zoom,
+    marginRight: mg.outer * MM * zoom,
     marginTop,
     marginBottom,
     contentHeight: height - marginTop - marginBottom,
@@ -129,6 +135,7 @@ export function PageEditor(): React.JSX.Element | null {
   }, [])
 
   useEditorStats(active?.editor ?? null)
+  const zoomBadge = usePageZoom(deskRef)
 
   if (!manifest || !typo || !geometry) return null
 
@@ -141,7 +148,8 @@ export function PageEditor(): React.JSX.Element | null {
     '--book-align': typo.align,
     '--page-zoom': String(zoom),
     '--page-w': `${geometry.width}px`,
-    '--page-mx': `${geometry.marginX}px`,
+    '--page-ml': `${geometry.marginLeft}px`,
+    '--page-mr': `${geometry.marginRight}px`,
     '--page-mt': `${geometry.marginTop}px`,
     '--page-mb': `${geometry.marginBottom}px`,
     '--page-gap': `${geometry.gap}px`,
@@ -162,6 +170,11 @@ export function PageEditor(): React.JSX.Element | null {
         </div>
       </div>
       {active && <SelectionMenu editor={active.editor} />}
+      {zoomBadge !== null && (
+        <div className="zoom-badge" role="status">
+          {Math.round(zoomBadge * 100)}%
+        </div>
+      )}
     </div>
   )
 }
@@ -169,7 +182,7 @@ export function PageEditor(): React.JSX.Element | null {
 interface SheetProps {
   chapterId: string
   index: number
-  geometry: PageMetrics & { width: number; marginX: number }
+  geometry: Geometry
   deskRef: React.RefObject<HTMLDivElement | null>
   onTyping: () => void
 }
@@ -208,7 +221,7 @@ function ChapterSheet({ chapterId, index, geometry, deskRef, onTyping }: SheetPr
     const known = sheetHeights.get(chapterId)
     if (known) return known
     const words = countMarkdownWords(chapter.body)
-    const lines = (words * 6.2 * 0.5 * parseFloat(getComputedStyle(document.documentElement).fontSize || '16')) / Math.max(200, geometry.width - 2 * geometry.marginX)
+    const lines = (words * 6.2 * 0.5 * parseFloat(getComputedStyle(document.documentElement).fontSize || '16')) / Math.max(200, geometry.width - geometry.marginLeft - geometry.marginRight)
     const linesPerPage = geometry.contentHeight / 26
     const pages = Math.max(1, Math.ceil((lines + 6) / linesPerPage))
     return pages * (geometry.contentHeight + geometry.marginTop + geometry.marginBottom) + (pages - 1) * geometry.gap

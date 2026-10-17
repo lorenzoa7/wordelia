@@ -220,7 +220,8 @@ export const settings: typeof en = {
       list: 'Listas',
       heading: 'Títulos',
       rename: 'Renombrar un capítulo',
-      closeWindow: 'Cerrar la ventana'
+      closeWindow: 'Cerrar la ventana',
+      zoom: 'Zoom de la página'
     },
     isMain: 'Acción principal',
     makeMain: 'Hacerla la acción principal',

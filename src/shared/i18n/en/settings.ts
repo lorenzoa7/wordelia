@@ -241,7 +241,8 @@ export const settings = {
       list: 'Lists',
       heading: 'Headings',
       rename: 'Rename a chapter',
-      closeWindow: 'Close the window'
+      closeWindow: 'Close the window',
+      zoom: 'Page zoom'
     },
     isMain: 'Main action',
     makeMain: 'Make it the main action',

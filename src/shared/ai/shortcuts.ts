@@ -110,6 +110,7 @@ export type ReservedShortcut =
   | 'heading'
   | 'rename'
   | 'closeWindow'
+  | 'zoom'
 
 /**
  * Shortcuts that an action cannot use: the editor (TipTap), the app (src/renderer/src/app/shortcuts.ts)
@@ -147,6 +148,7 @@ export const RESERVED_SHORTCUTS: Record<string, ReservedShortcut> = {
   'Ctrl+Alt+1': 'heading',
   'Ctrl+Alt+2': 'heading',
   'Ctrl+Alt+3': 'heading',
+  'Ctrl+0': 'zoom',
   F2: 'rename',
   'Alt+F4': 'closeWindow'
 }

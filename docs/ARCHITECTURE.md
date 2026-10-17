@@ -259,9 +259,19 @@ App data folder (`app.getPath('userData')`):
 - **PDF:** the main process opens a hidden window with print HTML and CSS paged media (`@page` size and margins, margin boxes for page numbers, `break-before: page` for chapters). `webContents.printToPDF` writes the file.
 - **DOCX:** `docx` builds a document with named styles: Normal, First Paragraph, Chapter Number, Chapter Title, Scene Break. Page size, margins and a page number field in the footer. The title page is a separate section without a page number.
 
+## 7a. Pages on screen
+
+The Write view shows the manuscript as pages, like a word processor (`src/renderer/src/features/editor/PageEditor.tsx`).
+
+- **Page geometry.** A page has the page size and the margins of the book's export settings (A5 by default), at the zoom of the screen. It has a fixed width: in a narrow window the desk scrolls sideways.
+- **One scroll for the book.** Every chapter is a sheet that starts on a new page. The sheets follow one another. Each chapter has its own TipTap editor (its own undo history). A chapter far from the screen (more than about two screens) has no editor: it keeps its measured height. The chapter with the cursor, or else the chapter at 30% of the screen height, is the active chapter. `selectChapter` scrolls to a chapter (`chapterJump`); `setActiveChapter` only marks it.
+- **Page breaks** (`pagination.ts`). After each layout, a plugin measures the line boxes of the chapter (from the rectangles of its text) and puts a page gap where a page is full. A gap between paragraphs is a block widget. A gap inside a paragraph is a full-width inline-block: it makes a soft line break, so the line before it stays justified. The plugin works in "flow" coordinates (the y of a line minus the gaps above it), so the result does not depend on the gaps on screen. A break never splits a word. The chapter heading takes the top of the first page.
+- **Registry** (`registry.ts`). The mounted editors, by chapter. The toolbar, the selection menu, the review bar, the find bar and the actions use the active editor (`useActiveEditor`). `applyToChapter` changes a chapter in its editor when it is mounted, else in the store. `revealProposal` opens a chat proposal in the text as an inline diff (Accept applies it and tells the chat).
+- **Find** searches the active chapter, scrolls to each match, and goes on into the next chapter that has a match.
+
 ## 8. Saving
 
-- Editors keep up to 350 ms of typing in memory, then write Markdown to the book store.
+- Each chapter editor keeps up to 350 ms of typing in memory, then writes Markdown to the book store. An editor that unmounts (its chapter scrolled far away) writes first.
 - The store writes files through `saver` (500 ms debounce for each file, ordered writes).
 - Editors register a flusher (`src/renderer/src/lib/flush.ts`). Closing a book runs all flushers, then `saver.flush()`.
 - Closing the window: the main process stops the close, sends `app:flushRequest`, and closes when the renderer answers `app:flushDone` (or after 4 s).

@@ -33,7 +33,7 @@ export default async function ({ page, shot, work }) {
   })
   await page.keyboard.press('Control+2')
   await page.waitForTimeout(600)
-  await page.locator('button', { hasText: 'Sync with manuscript' }).click()
+  await page.locator('.sync-btn').click()
   const t0 = Date.now()
   let reply = null
   while (Date.now() - t0 < 6 * 60_000) {

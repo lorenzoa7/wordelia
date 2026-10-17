@@ -204,6 +204,16 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] The daily goal is a number box with "words a day" (0 turns it off, saved on Enter or blur)
 - [x] The page zoom select has the steps of the zoom keys; the keyboard list shows the zoom keys
 
+## Version 0.6 — third feedback of the author
+
+### Planning map
+
+- [x] No layout shift in the "Cards | Map" switch: its two buttons have the same width, and the cards, the category pages and the map use one column (`--plan-w`) with the same scrollbar gutter. The switch, its buttons and the title keep their place and size on the two pages (the `graph` scenario measures them with the chat open, the chat closed and the sidebar closed; before, the switch moved 9.6 px with the chat open, 76 px with the chat closed and 123 px with the sidebar closed, and the title moved too)
+- [x] Nodes with personality: each entry is a paper token with a soft shadow, a ring and the icon of its category in the category color (one SVG sprite, one `<use>` for each node). Near, an inner ring like the rim of a seal. A chapter is a small closed book with a red ribbon and its number. The size still follows the number of links; hover, dim and search states stay. Far out, small tokens show no icon and get more color (level of detail)
+- [x] Background with depth: a dot grid that moves and zooms with the map and stays sharp at every zoom (the dots keep their size; the step doubles or halves, and every second dot fades first), a soft light in the middle, darker edges and the paper grain. Light and dark themes
+- [x] Faster frames: the labels are in screen units, so no CSS variable changes on each frame, and a frame writes only the attributes that change. With 300 entries: 12 to 16 ms a frame on average, p95 17 to 22 ms (version 0.5: 15 to 21 ms, p95 22 to 28 ms, on the same computer)
+- [x] When all labels show, the layout keeps room for them at the zoom of the fit, so they overlap less. Far out, a small map shows only the major labels
+
 ## Later (not in version 1)
 
 - Sync to a git remote from the app

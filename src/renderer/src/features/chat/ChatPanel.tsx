@@ -5,13 +5,17 @@ import { Popover } from 'radix-ui'
 import clsx from 'clsx'
 import type { Thread } from '@shared/types'
 import { Button, Dialog, Field, IconButton, Menu, MenuItem, MenuSeparator, TextArea, TextInput } from '@/ui'
+import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
 import { useT } from '@/lib/i18n'
+import { SYNC_THREAD_ID } from '@/features/plan/sync'
 import { useChat } from './chatStore'
 import { askConfirm } from '@/ui/prompt'
 import { newThread, threadBrief, threadTitle } from './send'
 import { MessageView, StreamingMessage } from './MessageView'
 import { Composer } from './Composer'
+import { RewindHost } from './RewindDialog'
+import { lastReplyAt, markSeen, StatusDot, useChatAttention, useThreadStatuses } from './status'
 import './chat.css'
 
 export function ChatPanel(): React.JSX.Element {
@@ -21,6 +25,7 @@ export function ChatPanel(): React.JSX.Element {
   const setActive = useChat((s) => s.setActiveThread)
   const thread = threads.find((th) => th.id === activeId) ?? null
   const streaming = useChat((s) => (thread ? s.streaming[thread.id] : undefined))
+  const chatOpen = useApp((s) => s.settings?.ui.chatOpen ?? true)
   const [editing, setEditing] = useState<Thread | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -36,7 +41,27 @@ export function ChatPanel(): React.JSX.Element {
     if (!el) return
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 160
     if (nearBottom || !streaming) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
-  }, [count, streaming?.text.length, activeId, streaming])
+  }, [count, streaming?.text.length, streaming?.thinking?.length, activeId, streaming])
+
+  // The user sees the thread when the chat is open and the window shows. Then its new reply is seen.
+  const lastReply = thread ? lastReplyAt(thread) : ''
+  useEffect(() => {
+    if (!thread || !chatOpen || streaming) return
+    const id = thread.id
+    const mark = (): void => {
+      if (document.visibilityState === 'visible') markSeen(id)
+    }
+    mark()
+    window.addEventListener('focus', mark)
+    document.addEventListener('visibilitychange', mark)
+    return () => {
+      window.removeEventListener('focus', mark)
+      document.removeEventListener('visibilitychange', mark)
+    }
+  }, [thread?.id, chatOpen, lastReply, Boolean(streaming)])
+
+  // Edit, Rewind and Retry wait while the thread works. The planning sync thread has its own requests.
+  const canAct = Boolean(thread) && !streaming && thread?.id !== SYNC_THREAD_ID
 
   const create = (): void => {
     const th = newThread()
@@ -105,16 +130,17 @@ export function ChatPanel(): React.JSX.Element {
           <ChatEmpty />
         ) : (
           <div className="chat-messages" role="log" aria-live="polite" aria-relevant="additions">
-            {thread.messages.map((m) => (
-              <MessageView key={m.id} message={m} thread={thread} />
+            {thread.messages.map((m, i) => (
+              <MessageView key={m.id} message={m} thread={thread} index={i} after={thread.messages.length - 1 - i} canAct={canAct} />
             ))}
-            {streaming && <StreamingMessage text={streaming.text} />}
+            {streaming && <StreamingMessage streaming={streaming} />}
           </div>
         )}
       </div>
 
       <Composer thread={thread} />
       <ThreadEditor thread={editing} onClose={() => setEditing(null)} />
+      <RewindHost />
     </aside>
   )
 }
@@ -133,6 +159,9 @@ function ThreadSwitcher({
   const t = useT()
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
+  const statuses = useThreadStatuses()
+  // A dot on the switch when another thread needs the user.
+  const elsewhere = useChatAttention(active?.id)
   const sorted = useMemo(() => {
     const list = [...threads].sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt.localeCompare(a.updatedAt))
     const f = q.trim().toLowerCase()
@@ -146,6 +175,7 @@ function ThreadSwitcher({
           <ChatsCircle size={16} />
           <span>{active ? threadTitle(t, active.title) : t.chat.newThread}</span>
           <CaretDown size={11} />
+          {elsewhere && <StatusDot state={elsewhere} className="thread-switch-dot" />}
         </button>
       </Popover.Trigger>
       <Popover.Portal>
@@ -153,22 +183,35 @@ function ThreadSwitcher({
           <input className="thread-search" aria-label={t.chat.searchThreads} placeholder={t.chat.searchThreads} value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
           <div className="thread-list">
             {sorted.length === 0 && <p className="thread-none">{t.chat.noThreads}</p>}
-            {sorted.map((th) => (
-              <button
-                key={th.id}
-                className={clsx('thread-item', th.id === active?.id && 'is-active')}
-                onClick={() => {
-                  onSelect(th.id)
-                  setOpen(false)
-                }}
-              >
-                <span className="thread-item-title">
-                  {th.pinned && <PushPin size={11} weight="fill" />}
-                  {threadTitle(t, th.title)}
-                </span>
-                <span className="thread-item-sub">{threadBrief(t, th.brief) || firstLine(th.digest) || t.chat.messages(th.messages.length)}</span>
-              </button>
-            ))}
+            {sorted.map((th) => {
+              const st = statuses[th.id] ?? { state: null, pending: 0 }
+              const statusText =
+                st.state === 'working' ? t.chat.statusWorking : st.state === 'needs-you' ? t.chat.statusNeedsYou(st.pending) : st.state === 'unseen' ? t.chat.statusUnseen : ''
+              return (
+                <button
+                  key={th.id}
+                  className={clsx('thread-item', th.id === active?.id && 'is-active', st.state && `has-${st.state}`)}
+                  onClick={() => {
+                    onSelect(th.id)
+                    setOpen(false)
+                  }}
+                >
+                  <StatusDot state={st.state} className="thread-item-dot" />
+                  <span className="thread-item-main">
+                    <span className="thread-item-top">
+                      <span className="thread-item-title">
+                        {th.pinned && <PushPin size={11} weight="fill" />}
+                        <span>{threadTitle(t, th.title)}</span>
+                      </span>
+                      <span className="thread-item-time">{timeAgo(th.updatedAt, t.common.locale)}</span>
+                    </span>
+                    <span className={clsx('thread-item-sub', statusText && 'is-status')}>
+                      {statusText || threadBrief(t, th.brief) || firstLine(th.digest) || t.chat.messages(th.messages.length)}
+                    </span>
+                  </span>
+                </button>
+              )
+            })}
           </div>
           <button
             className="thread-new"
@@ -187,6 +230,29 @@ function ThreadSwitcher({
 
 function firstLine(s: string): string {
   return s.split('\n').find((l) => l.trim())?.replace(/^-\s*/, '') ?? ''
+}
+
+/** "5 min ago", "yesterday", in the interface language. */
+function timeAgo(iso: string, locale: string): string {
+  const then = Date.parse(iso)
+  if (!Number.isFinite(then)) return ''
+  const s = Math.round((then - Date.now()) / 1000)
+  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto', style: 'short' })
+  const steps: Array<[Intl.RelativeTimeFormatUnit, number]> = [
+    ['second', 60],
+    ['minute', 60],
+    ['hour', 24],
+    ['day', 7],
+    ['week', 4.35],
+    ['month', 12],
+    ['year', Infinity]
+  ]
+  let v = s
+  for (const [unit, size] of steps) {
+    if (Math.abs(v) < size) return unit === 'second' ? rtf.format(0, 'second') : rtf.format(Math.round(v), unit)
+    v /= size
+  }
+  return ''
 }
 
 function ThreadEditor({ thread, onClose }: { thread: Thread | null; onClose: () => void }): React.JSX.Element {

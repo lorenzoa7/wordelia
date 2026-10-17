@@ -25,6 +25,7 @@ import { installUpdate, useUpdate } from '@/lib/update'
 import { Logo } from './Logo'
 import { ProviderBadge } from './ProviderBadge'
 import { RULES_CATEGORY } from '@/features/plan/PlanSidebar'
+import { ChatAttentionDot } from '@/features/chat/status'
 
 const VIEWS: Array<{ id: BookView; icon: React.ReactNode; key: string }> = [
   { id: 'write', icon: <PenNib size={14} />, key: 'Ctrl+1' },
@@ -128,8 +129,10 @@ export function TitleBar(): React.JSX.Element {
             shortcut="Ctrl+L"
             active={ui?.chatOpen}
             onClick={() => setUi({ chatOpen: !ui?.chatOpen })}
+            className="chat-toggle"
           >
             <ChatCircleText size={17} />
+            <ChatAttentionDot hidden={ui?.chatOpen} />
           </IconButton>
         )}
         <IconButton label={t.common.settings} shortcut="Ctrl+," onClick={() => openSettings()}>

@@ -65,13 +65,61 @@ export const chat = {
     `Applied ${ok} of ${total} proposals. ${failed} could not be applied: the text changed.`,
   bulkApplied: (ok: number, chapters: boolean): string =>
     `Applied ${ok} proposals.${chapters ? ' The versions from before the change are in the chapter history.' : ''}`,
-  toReview: (v: number): string => `${v} proposals to review`,
   copyFailed: 'Could not copy.',
   openChapterFirst: 'Open a chapter first.',
   copyReply: 'Copy the reply',
-  insertHint: 'Insert the reply at the cursor in the open chapter (Ctrl+Z undoes it)',
-  insert: 'Insert into chapter',
+  insertHint: 'Put this reply into the open chapter, where the cursor is. Ctrl+Z undoes it.',
+  insert: 'Insert at cursor',
+  /** aria-label while the AI works */
   thinking: 'The editor is thinking',
+  retry: 'Retry',
+  retryHint: 'Remove this reply and ask again',
+  editMessage: 'Edit',
+  editHint: 'Edit this message and send it again',
+  rewind: 'Rewind',
+  rewindHint: 'Rewind to here: remove the messages after this one',
+  copyMessage: 'Copy the message',
+  /** Under the box of an edited message */
+  editAfter: (v: number): string =>
+    v === 0
+      ? 'The AI answers again.'
+      : `Sending removes the ${v === 1 ? 'message' : `${v} messages`} after this one. The AI answers again.`,
+  noReply: 'No reply yet.',
+  getReply: 'Get a reply',
+
+  // Thinking, while the AI works
+  thoughtProcess: 'Thought process',
+  showThinking: 'Show the thinking',
+  hideThinking: 'Hide the thinking',
+  phaseReading: 'Reading the chapter and the planning…',
+  phaseEdit: (label: string): string => `Writing a change to “${label}”…`,
+  phaseCreate: 'Writing a planning note…',
+
+  // Rewind
+  rewindTitle: 'Rewind the thread?',
+  rewindText: (v: number): string => `The ${v === 1 ? 'message' : `${v} messages`} after this one will leave the thread.`,
+  rewindConfirm: 'Rewind',
+  editTitle: 'Send the edited message?',
+  editMessageText: (v: number): string =>
+    `Your edited message takes the place of the old one${v ? `, and the ${v === 1 ? 'message' : `${v} messages`} after it leave the thread` : ''}. The AI answers again.`,
+  retryTitle: 'Ask for a new reply?',
+  retryText: 'The last reply leaves the thread, and the AI answers again.',
+  rewindBookChanged: 'You accepted changes from these replies:',
+  changeCount: (v: number): string => (v === 1 ? '1 change' : `${v} changes`),
+  noteToTrash: 'new note, goes to the trash',
+  noteComesBack: 'replaced note, the old text comes back',
+  rewindUndo: 'Undo these changes in the book',
+  rewindUndoHint: 'Wordelia saves a version of each chapter first. Text that you changed after the AI change stays as it is.',
+  rewindKeepHint: 'The book stays as it is. Only the thread changes.',
+  undoneAll: (v: number): string => `Undid ${v === 1 ? '1 change' : `${v} changes`} in the book.`,
+  undonePartial: (ok: number, total: number): string =>
+    `Undid ${ok} of ${total} changes in the book. The others changed after the AI change, so they stay. The version history has the text from before.`,
+
+  // Thread states
+  statusWorking: 'Working…',
+  statusNeedsYou: (v: number): string => (v === 1 ? '1 proposal to review' : `${v} proposals to review`),
+  statusNeedsYouShort: 'Needs you',
+  statusUnseen: 'New reply',
 
   // Proposals
   undoUnsafe: 'The text changed after the AI change, so Undo could stop your new words. Use Ctrl+Z or the version history.',
@@ -95,6 +143,13 @@ export const chat = {
   showAll: 'Show all',
   fileMissing: (label: string): string => `The file "${label}" does not exist.`,
   createOnlyEntries: 'The AI can create planning entries only.',
+  showInText: 'Show in text',
+  showInTextHint: 'Open the chapter at this passage and show the change there',
+  passageNotFound: 'The passage was not found in the chapter. It may have changed.',
+  /** The bar for all the proposals of one reply */
+  replyProposals: (v: number): string => (v === 1 ? '1 proposal in this reply' : `${v} proposals in this reply`),
+  applyAll: (v: number): string => `Apply all ${v}`,
+  applyAllHint: 'Apply every change and note of this reply. Chapters get a version in the history first.',
 
   // Sending
   connectFirst: 'Connect an AI first.',

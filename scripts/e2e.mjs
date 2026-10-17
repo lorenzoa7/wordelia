@@ -17,7 +17,8 @@ const scenarios = [
   ['keyboard'],
   ['paste'],
   ['reorder'],
-  ['external']
+  ['external'],
+  ['chat', '--en']
 ]
 
 function run(args) {

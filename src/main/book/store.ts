@@ -182,6 +182,7 @@ function normalizeThread(t: Thread): Thread {
     updatedAt: t.updatedAt ?? t.createdAt ?? new Date().toISOString(),
     pinned: Boolean(t.pinned),
     route: t.route ?? null,
-    messages: t.messages
+    messages: t.messages,
+    ...(typeof t.readAt === 'string' ? { readAt: t.readAt } : {})
   }
 }

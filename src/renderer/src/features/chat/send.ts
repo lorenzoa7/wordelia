@@ -1,4 +1,5 @@
 // Send a chat message: build the context, stream the reply, update the digest.
+// Also: ask again for the last reply, and send an edited message again.
 
 import { newId } from '@shared/book'
 import { buildChatSystem, buildChatUserTurn } from '@shared/prompts/chat'
@@ -12,7 +13,8 @@ import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
 import { toast, useUi } from '@/stores/ui'
 import { flushEditor } from '@/features/editor/registry'
-import { useChat } from './chatStore'
+import { patchStreaming, useChat } from './chatStore'
+import { confirmAndRewind } from './rewind'
 import { summariesFor } from './summaries'
 
 const HISTORY_LIMIT = 24
@@ -41,7 +43,7 @@ export function mentionLabel(t: Messages, m: Pick<Mention, 'kind' | 'label'>): s
 
 export function newThread(title = NEW_THREAD_TITLE, brief = ''): Thread {
   const now = new Date().toISOString()
-  return { id: newId('th'), title, brief, digest: '', digestedCount: 0, createdAt: now, updatedAt: now, pinned: false, route: null, messages: [] }
+  return { id: newId('th'), title, brief, digest: '', digestedCount: 0, createdAt: now, updatedAt: now, pinned: false, route: null, messages: [], readAt: now }
 }
 
 function chatRoute(thread: Thread): ModelChoice | null {
@@ -55,6 +57,12 @@ function budgetFor(route: ModelChoice): number {
   return 90000
 }
 
+function connectFirst(): void {
+  const t = getT()
+  toast(t.chat.connectFirst, { action: { label: t.chat.openSettings, run: () => useUi.getState().openSettings('ai') } })
+}
+
+/** Send the text of the composer, with its quotes and mentions, in the active thread. */
 export async function sendMessage(text: string): Promise<void> {
   const chat = useChat.getState()
   const book = useBook.getState()
@@ -68,34 +76,58 @@ export async function sendMessage(text: string): Promise<void> {
     useChat.getState().setActiveThread(thread.id)
   }
   if (useChat.getState().streaming[thread.id]) return
-
-  const route = chatRoute(thread)
-  if (!route) {
-    const t = getT()
-    toast(t.chat.connectFirst, { action: { label: t.chat.openSettings, run: () => useUi.getState().openSettings('ai') } })
+  if (!chatRoute(thread)) {
+    connectFirst()
     return
   }
 
-  flushEditor()
-  const fresh = useBook.getState()
-  const quotes = chat.quotes
-  const mentions = chat.mentions
   const userMsg: ChatMessage = {
     id: newId('m'),
     role: 'user',
     content: message,
     createdAt: new Date().toISOString(),
-    ...(quotes.length ? { quotes } : {}),
-    ...(mentions.length ? { mentions } : {})
+    ...(chat.quotes.length ? { quotes: chat.quotes } : {}),
+    ...(chat.mentions.length ? { mentions: chat.mentions } : {})
   }
-  const assistantId = newId('m')
-  const base: Thread = { ...thread, messages: [...thread.messages, userMsg], updatedAt: new Date().toISOString() }
-  fresh.saveThread(base, true)
+  useBook.getState().saveThread({ ...thread, messages: [...thread.messages, userMsg], updatedAt: new Date().toISOString() }, true)
   useChat.getState().clearComposer()
+  await requestReply(thread.id)
+}
 
-  // Show the "thinking" dots at once, also while long books get their summaries.
+/** Ask the AI to answer the last message of a thread. That message must be a message of the user. */
+export async function requestReply(threadId: string): Promise<void> {
+  const thread = useBook.getState().threads.find((t) => t.id === threadId)
+  if (!thread || !useBook.getState().manifest || useChat.getState().streaming[threadId]) return
+  const last = thread.messages[thread.messages.length - 1]
+  if (!last || last.role !== 'user') return
+  const route = chatRoute(thread)
+  if (!route) {
+    connectFirst()
+    return
+  }
+
+  flushEditor()
+  const fresh = useBook.getState()
+  const quotes = last.quotes ?? []
+  const mentions = last.mentions ?? []
+  const message = last.content
+  const assistantId = newId('m')
+
+  // Show the reply at once, also while long books get their summaries. Stop works in that phase too.
+  let stopped = false
   useChat.setState((s) => ({
-    streaming: { ...s.streaming, [base.id]: { messageId: assistantId, text: '', requestId: '', cancel: () => {} } }
+    streaming: {
+      ...s.streaming,
+      [threadId]: {
+        messageId: assistantId,
+        text: '',
+        requestId: '',
+        cancel: () => {
+          stopped = true
+          useChat.setState((st) => ({ streaming: { ...st.streaming, [threadId]: undefined } }))
+        }
+      }
+    }
   }))
 
   // Long books: summaries of the chapters that do not fit.
@@ -108,11 +140,12 @@ export async function sendMessage(text: string): Promise<void> {
   const summaries = fresh.root
     ? await summariesFor(fresh.root, fresh.chapters, keepFull, budget, settingsNow?.routes.background ?? route)
     : {}
+  if (stopped) return
 
   const system = buildChatSystem({
     book: { manifest: fresh.manifest!, writingRules: fresh.writingRules, chapters: fresh.chapters, entries: fresh.entries, threads: fresh.threads },
-    thread: base,
-    currentChapterId: fresh.view === 'write' ? fresh.activeChapterId : fresh.activeChapterId,
+    thread,
+    currentChapterId: fresh.activeChapterId,
     currentEntryId: fresh.view === 'plan' ? fresh.activeEntryId : null,
     mentions,
     quotes,
@@ -121,26 +154,31 @@ export async function sendMessage(text: string): Promise<void> {
     manuscriptBudget: budget
   })
 
-  const history: ChatTurn[] = thread.messages.slice(-HISTORY_LIMIT).map((m) => ({
+  // Thinking is never part of the history: only the text of each message goes back to the AI.
+  const history: ChatTurn[] = thread.messages.slice(0, -1).slice(-HISTORY_LIMIT).map((m) => ({
     role: m.role,
     content: m.role === 'assistant' ? proposalSummary(m.content, m.hunks ?? {}) : renderUser(m)
   }))
   history.push({ role: 'user', content: buildChatUserTurn(message || 'What do you think about this passage?', quotes, mentions, fresh.threads, fresh.chapters) })
 
   const handle = runCompletion({ route, purpose: 'chat', system, messages: history }, (e, soFar) => {
-    if (e.type !== 'text') return
-    useChat.setState((s) => ({
-      streaming: { ...s.streaming, [base.id]: { messageId: assistantId, text: soFar, requestId: handle.id, cancel: handle.cancel } }
-    }))
+    if (e.type === 'text') patchStreaming(threadId, { text: soFar })
+    else if (e.type === 'thinking') patchStreaming(threadId, (s) => ({ thinking: (s.thinking ?? '') + e.delta }))
+    else if (e.type === 'status') patchStreaming(threadId, { status: e.message })
   })
-  useChat.setState((s) => ({
-    streaming: { ...s.streaming, [base.id]: { messageId: assistantId, text: '', requestId: handle.id, cancel: handle.cancel } }
-  }))
+  patchStreaming(threadId, { requestId: handle.id, cancel: handle.cancel })
 
   const result = await handle.done
-  useChat.setState((s) => ({ streaming: { ...s.streaming, [base.id]: undefined } }))
+  const thought = useChat.getState().streaming[threadId]?.thinking?.trim()
+  useChat.setState((s) => ({
+    streaming: { ...s.streaming, [threadId]: undefined },
+    ...(thought ? { thoughts: { ...s.thoughts, [assistantId]: thought } } : {})
+  }))
 
-  const latest = useBook.getState().threads.find((t) => t.id === base.id) ?? base
+  if (!result.ok && !result.text && result.errorKind === 'cancelled') return
+  const latest = useBook.getState().threads.find((t) => t.id === threadId)
+  // The thread was deleted while the reply streamed.
+  if (!latest) return
   const reply: ChatMessage = {
     id: assistantId,
     role: 'assistant',
@@ -149,11 +187,42 @@ export async function sendMessage(text: string): Promise<void> {
     model: result.model,
     ...(result.ok ? {} : { error: friendlyError(result) })
   }
-  if (!result.ok && !result.text && result.errorKind === 'cancelled') return
   const done: Thread = { ...latest, messages: [...latest.messages, reply], updatedAt: new Date().toISOString() }
   useBook.getState().saveThread(done, true)
 
   if (result.ok) void afterReply(done.id)
+}
+
+/** Remove the last reply of a thread and ask again. Asks first when that reply changed the book. */
+export async function retryLast(threadId: string): Promise<void> {
+  const th = useBook.getState().threads.find((t) => t.id === threadId)
+  if (!th || useChat.getState().streaming[threadId]) return
+  const last = th.messages[th.messages.length - 1]
+  if (last?.role === 'assistant' && !(await confirmAndRewind(th, th.messages.length - 1, 'retry'))) return
+  await requestReply(threadId)
+}
+
+/**
+ * Send an edited message again: the message and everything after it leave the thread, the new text
+ * takes its place with the same quotes and mentions, and the AI answers again. False: the user cancelled.
+ */
+export async function resendEdited(threadId: string, messageId: string, text: string): Promise<boolean> {
+  const th = useBook.getState().threads.find((t) => t.id === threadId)
+  if (!th || useChat.getState().streaming[threadId]) return false
+  const at = th.messages.findIndex((m) => m.id === messageId)
+  const old = th.messages[at]
+  if (!old || old.role !== 'user') return false
+  if (!chatRoute(th)) {
+    connectFirst()
+    return false
+  }
+  if (!(await confirmAndRewind(th, at, 'edit'))) return false
+  const kept = useBook.getState().threads.find((t) => t.id === threadId)
+  if (!kept) return false
+  const edited: ChatMessage = { ...old, id: newId('m'), content: text.trim(), createdAt: new Date().toISOString() }
+  useBook.getState().saveThread({ ...kept, messages: [...kept.messages, edited], updatedAt: new Date().toISOString() }, true)
+  void requestReply(threadId)
+  return true
 }
 
 function renderUser(m: ChatMessage): string {

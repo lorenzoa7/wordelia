@@ -55,13 +55,58 @@ export const chat: typeof en = {
     `Se aplicaron ${ok} de ${total} propuestas. ${failed === 1 ? '1 no se pudo aplicar' : `${failed} no se pudieron aplicar`}: el texto cambió.`,
   bulkApplied: (ok, chapters) =>
     `Se aplicaron ${ok} propuestas.${chapters ? ' Las versiones de antes del cambio están en el historial del capítulo.' : ''}`,
-  toReview: (v) => `${v} propuestas por revisar`,
   copyFailed: 'No se pudo copiar.',
   openChapterFirst: 'Primero abre un capítulo.',
   copyReply: 'Copiar la respuesta',
-  insertHint: 'Insertar la respuesta en el cursor, en el capítulo abierto (Ctrl+Z lo deshace)',
-  insert: 'Insertar en el capítulo',
+  insertHint: 'Pone esta respuesta en el capítulo abierto, donde está el cursor. Ctrl+Z lo deshace.',
+  insert: 'Insertar en el cursor',
   thinking: 'El editor está pensando',
+  retry: 'Reintentar',
+  retryHint: 'Quitar esta respuesta y preguntar de nuevo',
+  editMessage: 'Editar',
+  editHint: 'Editar este mensaje y enviarlo de nuevo',
+  rewind: 'Volver',
+  rewindHint: 'Volver hasta aquí: quitar los mensajes después de este',
+  copyMessage: 'Copiar el mensaje',
+  editAfter: (v) =>
+    v === 0
+      ? 'La IA responde de nuevo.'
+      : v === 1
+        ? 'Al enviar, el mensaje después de este sale de la conversación. La IA responde de nuevo.'
+        : `Al enviar, los ${v} mensajes después de este salen de la conversación. La IA responde de nuevo.`,
+  noReply: 'Aún no hay respuesta.',
+  getReply: 'Pedir una respuesta',
+
+  thoughtProcess: 'Razonamiento',
+  showThinking: 'Mostrar el razonamiento',
+  hideThinking: 'Ocultar el razonamiento',
+  phaseReading: 'Leyendo el capítulo y la planificación…',
+  phaseEdit: (label) => `Escribiendo un cambio en “${label}”…`,
+  phaseCreate: 'Escribiendo una nota de la planificación…',
+
+  rewindTitle: '¿Volver la conversación hasta aquí?',
+  rewindText: (v) => (v === 1 ? 'El mensaje después de este sale de la conversación.' : `Los ${v} mensajes después de este salen de la conversación.`),
+  rewindConfirm: 'Volver',
+  editTitle: '¿Enviar el mensaje editado?',
+  editMessageText: (v) =>
+    `El mensaje editado reemplaza al anterior${v === 1 ? ', y el mensaje después de él sale de la conversación' : v ? `, y los ${v} mensajes después de él salen de la conversación` : ''}. La IA responde de nuevo.`,
+  retryTitle: '¿Pedir una respuesta nueva?',
+  retryText: 'La última respuesta sale de la conversación, y la IA responde de nuevo.',
+  rewindBookChanged: 'Aceptaste cambios de estas respuestas:',
+  changeCount: (v) => (v === 1 ? '1 cambio' : `${v} cambios`),
+  noteToTrash: 'nota nueva, va a la papelera',
+  noteComesBack: 'nota reemplazada, vuelve el texto anterior',
+  rewindUndo: 'Deshacer estos cambios en el libro',
+  rewindUndoHint: 'Antes, Wordelia guarda una versión de cada capítulo. El texto que cambiaste después del cambio de la IA se queda como está.',
+  rewindKeepHint: 'El libro se queda como está. Solo cambia la conversación.',
+  undoneAll: (v) => (v === 1 ? 'Se deshizo 1 cambio en el libro.' : `Se deshicieron ${v} cambios en el libro.`),
+  undonePartial: (ok, total) =>
+    `Se deshicieron ${ok} de ${total} cambios en el libro. Los demás cambiaron después del cambio de la IA, así que se quedan. El historial de versiones tiene el texto de antes.`,
+
+  statusWorking: 'Trabajando…',
+  statusNeedsYou: (v) => (v === 1 ? '1 propuesta por revisar' : `${v} propuestas por revisar`),
+  statusNeedsYouShort: 'Te necesita',
+  statusUnseen: 'Respuesta nueva',
 
   undoUnsafe: 'El texto se editó después del cambio de la IA, así que Deshacer podría borrar tus palabras nuevas. Usa Ctrl+Z o el historial de versiones.',
   changeApplied: (label) => `Cambio aplicado en “${label}”.`,
@@ -84,6 +129,12 @@ export const chat: typeof en = {
   showAll: 'Mostrar todo',
   fileMissing: (label) => `El archivo "${label}" no existe.`,
   createOnlyEntries: 'La IA solo puede crear notas de la planificación.',
+  showInText: 'Mostrar en el texto',
+  showInTextHint: 'Abrir el capítulo en este fragmento y mostrar el cambio ahí',
+  passageNotFound: 'No se encontró el fragmento en el capítulo. Quizás cambió.',
+  replyProposals: (v) => (v === 1 ? '1 propuesta en esta respuesta' : `${v} propuestas en esta respuesta`),
+  applyAll: (v) => `Aplicar las ${v}`,
+  applyAllHint: 'Aplicar cada cambio y cada nota de esta respuesta. Antes, cada capítulo recibe una versión en el historial.',
 
   connectFirst: 'Primero conecta una IA.',
   openSettings: 'Abrir ajustes'

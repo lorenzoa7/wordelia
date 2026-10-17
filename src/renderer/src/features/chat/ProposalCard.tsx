@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'motion/react'
-import { BookOpenText, Check, Columns, FilePlus, Notebook, Rows, WarningCircle, X } from '@phosphor-icons/react'
+import { BookOpenText, Check, Columns, Crosshair, FilePlus, Notebook, Rows, WarningCircle, X } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import ReactMarkdown from 'react-markdown'
 import { markdownToPlain } from '@shared/book'
@@ -13,6 +13,7 @@ import { useBook } from '@/stores/book'
 import { typesetForBook } from '@/lib/typeset'
 import { toast } from '@/stores/ui'
 import { folderCategoryName, useT } from '@/lib/i18n'
+import { revealProposal } from '@/features/editor/registry'
 import { applyCreate, applyEditHunk, markAfter, resolveTarget, restoreSnapshot, setHunkStates, snapshotOf, type Snapshot } from './applyProposal'
 
 type EditSeg = Extract<Segment, { kind: 'edit' }>
@@ -160,15 +161,34 @@ function EditCard({ segment: raw, message, thread, streaming }: Props & { segmen
   }
 
   const Icon = target.kind === 'chapter' ? BookOpenText : Notebook
+  /** Take the user to the passage in the chapter and show the change there. The editor applies it on Accept. */
+  const reveal = (i: number): void => {
+    if (target.kind !== 'chapter' || !thread || !message) return
+    const h = segment.hunks[i]
+    // A version from before the change, as for an Accept in the chat.
+    snapshotOf(segment.file)
+    const found = revealProposal(target.chapter.id, h.find, h.replace, (accepted) =>
+      setHunkState(thread, message.id, keys[i], accepted ? 'accepted' : 'rejected')
+    )
+    if (!found) toast(t.chat.passageNotFound, { kind: 'error' })
+  }
+  const firstPending = segment.hunks.findIndex((h, i) => h.complete && pending.includes(keys[i]))
   const open = (): void => {
-    if (target.kind === 'chapter') useBook.getState().selectChapter(target.chapter.id)
+    if (target.kind === 'chapter') {
+      if (!streaming && firstPending >= 0) reveal(firstPending)
+      else useBook.getState().selectChapter(target.chapter.id)
+    }
     if (target.kind === 'entry') useBook.getState().selectEntry(target.entry.id)
   }
 
   return (
     <motion.div className="proposal" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
       <header className="proposal-head">
-        <button className="proposal-file" onClick={open} title={t.common.open}>
+        <button
+          className="proposal-file"
+          onClick={open}
+          title={target.kind === 'chapter' && !streaming && firstPending >= 0 ? t.chat.showInTextHint : t.common.open}
+        >
           <Icon size={14} />
           <span>{target.label}</span>
         </button>
@@ -203,14 +223,30 @@ function EditCard({ segment: raw, message, thread, streaming }: Props & { segmen
           return (
             <div key={i} className={clsx('hunk', `is-${st}`)}>
               <HunkView hunk={h} split={split} />
-              {!streaming && h.complete && segment.hunks.length > 1 && st === 'pending' && (
-                <div className="hunk-actions">
-                  <button onClick={() => reject(i)} aria-label={t.chat.rejectChange}>
-                    <X size={12} />
-                  </button>
-                  <button className="is-accept" onClick={() => accept(i)} aria-label={t.chat.acceptChange}>
-                    <Check size={12} weight="bold" />
-                  </button>
+              {!streaming && h.complete && st === 'pending' && (target.kind === 'chapter' || segment.hunks.length > 1) && (
+                <div className="hunk-foot">
+                  {target.kind === 'chapter' && (
+                    <Tooltip label={t.chat.showInTextHint}>
+                      <button className="hunk-reveal" onClick={() => reveal(i)}>
+                        <Crosshair size={12} /> {t.chat.showInText}
+                      </button>
+                    </Tooltip>
+                  )}
+                  <span className="proposal-spacer" />
+                  {segment.hunks.length > 1 && (
+                    <>
+                      <Tooltip label={t.chat.rejectChange}>
+                        <button className="hunk-icon" onClick={() => reject(i)} aria-label={t.chat.rejectChange}>
+                          <X size={12} />
+                        </button>
+                      </Tooltip>
+                      <Tooltip label={t.chat.acceptChange}>
+                        <button className="hunk-icon is-accept" onClick={() => accept(i)} aria-label={t.chat.acceptChange}>
+                          <Check size={12} weight="bold" />
+                        </button>
+                      </Tooltip>
+                    </>
+                  )}
                 </div>
               )}
               {st !== 'pending' && <HunkBadge state={st} />}
@@ -260,7 +296,8 @@ function CreateCard({ segment, message, thread, streaming }: Props & { segment: 
   const create = async (): Promise<void> => {
     if (!thread || !message) return
     const res = await applyCreate(segment.file, segment.content)
-    setHunkState(thread, message.id, key, res.ok ? 'accepted' : 'failed')
+    // Keep the replaced entry, so a rewind of the thread can bring it back.
+    setHunkStates(thread, message.id, { [key]: res.ok ? 'accepted' : 'failed' }, res.ok && res.previous ? { [key]: res.previous } : undefined)
     if (!res.ok) toast(res.reason, { kind: 'error' })
     else toast(exists ? t.chat.entryUpdated(target.label) : t.chat.entryCreated(target.label))
   }

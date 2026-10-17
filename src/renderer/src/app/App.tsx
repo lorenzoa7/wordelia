@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AnimatePresence, MotionConfig, motion } from 'motion/react'
+import { MotionConfig } from 'motion/react'
 import { TooltipProvider } from '@/ui'
 import { PromptHost } from '@/ui/prompt'
 import { useApp } from '@/stores/app'
@@ -99,33 +99,18 @@ export function App(): React.JSX.Element {
       <div className="app">
         <TitleBar />
         <main className="app-main" inert={!onboarded}>
-          {ready && !booting && (
-            <AnimatePresence mode="wait" initial={false}>
-              {root ? (
-                <motion.div
-                  key={`book-${root}`}
-                  className="app-view"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.25 }}
-                >
-                  <BookView />
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="library"
-                  className="app-view"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.25 }}
-                >
-                  <LibraryView />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          )}
+          {/* A fade in with CSS: a quick close and open of another book can never leave a view invisible. */}
+          {ready &&
+            !booting &&
+            (root ? (
+              <div key={`book-${root}`} className="app-view view-enter">
+                <BookView />
+              </div>
+            ) : (
+              <div key="library" className="app-view view-enter">
+                <LibraryView />
+              </div>
+            ))}
         </main>
         {ready && !booting && <Welcome />}
         {ready && <SettingsDialog />}

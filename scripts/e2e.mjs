@@ -32,7 +32,8 @@ const scenarios = [
   ['zoom', '--en'],
   ['longtitle', '--en'],
   ['graph', '--en'],
-  ['graph', '--en', '--dark']
+  ['graph', '--en', '--dark'],
+  ['switchbook']
 ]
 
 function run(args) {

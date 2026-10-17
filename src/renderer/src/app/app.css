@@ -12,6 +12,19 @@
   position: absolute;
   inset: 0;
 }
+.view-enter {
+  animation: view-in var(--dur-slow) var(--ease-out) both;
+}
+@keyframes view-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .view-enter {
+    animation: none;
+  }
+}
 
 /* ---------- Logo ---------- */
 .logo {

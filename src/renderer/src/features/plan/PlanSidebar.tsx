@@ -35,12 +35,6 @@ export function CategoryIcon({ name, size = 15 }: { name: string; size?: number 
   return <Icon size={size} />
 }
 
-/**
- * @deprecated The writing rules moved to Settings → Writing rules (`useUi.getState().openSettings('rules')`).
- * Kept only for old callers; the Plan view shows the overview for it.
- */
-export const RULES_CATEGORY = '__rules'
-
 export function PlanSidebar(): React.JSX.Element {
   const t = useT()
   const manifest = useBook((s) => s.manifest)

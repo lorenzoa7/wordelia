@@ -317,17 +317,18 @@
   right: 14px;
   z-index: 10;
   display: flex;
-  /* In a narrow window the toolbar scrolls sideways instead of covering the sidebars. */
-  justify-content: safe center;
-  overflow-x: auto;
-  scrollbar-width: none;
+  justify-content: center;
   padding: var(--s-3) var(--s-3) var(--s-2);
   pointer-events: none;
 }
 .toolbar {
   display: flex;
+  /* In a narrow window the toolbar takes two rows: every button stays on screen. */
+  flex-wrap: wrap;
+  justify-content: center;
   align-items: center;
   gap: 1px;
+  max-width: 100%;
   padding: 4px;
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--paper) 88%, transparent);
@@ -372,6 +373,10 @@
 .toolbar-select[data-state='open'] {
   background: var(--desk-3);
   color: var(--ink);
+}
+.toolbar-font span,
+.toolbar-size span {
+  font-size: 14px;
 }
 .toolbar-font span {
   max-width: 128px;
@@ -423,7 +428,7 @@
 }
 .sel-primary {
   background: var(--ribbon);
-  color: #fff8f2;
+  color: var(--on-ribbon);
 }
 .sel-primary:hover {
   background: var(--ribbon-2);

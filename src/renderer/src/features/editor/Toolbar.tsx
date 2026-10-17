@@ -104,7 +104,7 @@ export function Toolbar({ editor }: { editor: Editor }): React.JSX.Element {
         <Menu
           trigger={
             <button className="toolbar-select toolbar-size" aria-label={tb.fontSize}>
-              <span>{st.size ?? bookSize}</span>
+              <span style={{ fontFamily: fontStack(st.font ?? bookFont) }}>{st.size ?? bookSize}</span>
               <CaretDown size={10} />
             </button>
           }

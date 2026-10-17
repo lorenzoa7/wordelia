@@ -39,7 +39,7 @@ Outside React (stores, plain functions): `getT()` from `@/lib/i18n`. In the main
 | Manuscript | Manuscrito | Manuscrito |
 | Scene break | Quebra de cena | Salto de escena |
 | Planning | Planejamento | Planificación |
-| Story bible | Bíblia da história | Biblia de la historia |
+| Story world | Universo da história | Universo de la historia |
 | Category | Categoria | Categoría |
 | Entry (a planning note) | Nota | Nota |
 | Alias | Outro nome | Otro nombre |

@@ -78,13 +78,12 @@ export function PlanSidebar(): React.JSX.Element {
       >
         <button
           className={clsx('sync-btn', pending > 0 && 'has-pending')}
-          aria-label={`${t.plan.sidebar.updateNotes} ${t.plan.sidebar.updateNotesFrom}`}
+          aria-label={t.plan.sidebar.sync}
           onClick={() => void startPlanningSync()}
         >
           <ArrowsClockwise size={15} />
           <span className="sync-text">
-            <span className="sync-label">{t.plan.sidebar.updateNotes}</span>
-            <span className="sync-sub">{t.plan.sidebar.updateNotesFrom}</span>
+            <span className="sync-label">{t.plan.sidebar.sync}</span>
           </span>
           {pending > 0 && <span className="sync-count">{pending}</span>}
         </button>

@@ -20,7 +20,7 @@ export function buildSyncSystem(input: SyncPromptInput): string {
   const h = known ?? planningHeadings('en')!
   const translate = known ? '' : ` (translate the headings to ${lang})`
   return [
-    'You maintain the planning (the story bible) of a novel. The planning holds what the author needs to keep the story consistent: characters, places, the world and its rules, and the plot.',
+    'You maintain the planning (the reference notes) of a novel. The planning holds what the author needs to keep the story consistent: characters, places, the world and its rules, and the plot.',
     '',
     input.bootstrap
       ? 'The planning is new. Read the chapters and build the planning: one entry for each character, place, group, object or rule of the world that matters to the story.'

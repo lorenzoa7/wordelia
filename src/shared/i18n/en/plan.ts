@@ -15,9 +15,8 @@ export const plan = {
   },
   sidebar: {
     planning: 'Planning',
-    /** The sync button, on two lines: "Update notes" / "from the chapters" */
-    updateNotes: 'Update notes',
-    updateNotesFrom: 'from the chapters',
+    /** The sync button. Its tooltip says what it does. */
+    sync: 'Sync',
     /** Tooltip of the sync button: what it does */
     updateNotesHint:
       'The AI reads the chapters that changed since the last update and proposes changes to your planning notes. You accept or reject each change. The AI does not change the manuscript.',
@@ -35,7 +34,7 @@ export const plan = {
     addCategory: 'Add category'
   },
   overview: {
-    title: 'The story bible',
+    title: 'The world of the story',
     intro: 'Characters, places, the world and the plot. The AI reads this planning in every chat and action, so the book stays consistent.',
     buildFromManuscript: 'Build the planning from the manuscript',
     noNotesYet: 'No notes yet.',

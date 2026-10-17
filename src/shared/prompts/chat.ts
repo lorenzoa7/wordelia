@@ -150,7 +150,7 @@ export function buildChatSystem(input: ChatPromptInput): string {
     PROTOCOL,
     `# Writing rules of the book\n${writingRulesBlock(book.writingRules)}`,
     `# The book\n${bookBlock(m)}`,
-    `# Planning\nThe planning is the story bible. Language of the book: ${languageName(m.language)}.\n${planningIndex(book.entries)}`,
+    `# Planning\nThe planning holds the facts of the story. Language of the book: ${languageName(m.language)}.\n${planningIndex(book.entries)}`,
     manuscript.stable ? `# Manuscript: the other chapters\n${manuscript.stable}` : '',
     `# Manuscript: outline and the open chapter\n${manuscript.current}`,
     entries.length ? `# Planning entries that matter now\n${entries.map(entryBlock).join('\n\n')}` : '',

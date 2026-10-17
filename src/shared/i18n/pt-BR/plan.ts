@@ -12,8 +12,8 @@ export const plan: typeof en = {
   },
   sidebar: {
     planning: 'Planejamento',
-    updateNotes: 'Atualizar notas',
-    updateNotesFrom: 'pelos capítulos',
+    /** The sync button. Its tooltip says what it does. */
+    sync: 'Sincronizar',
     updateNotesHint:
       'A IA lê os capítulos que mudaram desde a última atualização e propõe mudanças nas notas do planejamento. Você aceita ou rejeita cada mudança. A IA não muda o manuscrito.',
     changedChapters: (count) =>
@@ -30,7 +30,7 @@ export const plan: typeof en = {
     addCategory: 'Adicionar categoria'
   },
   overview: {
-    title: 'A bíblia da história',
+    title: 'O universo da história',
     intro: 'Personagens, lugares, o mundo e a trama. A IA lê este planejamento em cada chat e ação, e assim o livro fica coerente.',
     buildFromManuscript: 'Criar o planejamento a partir do manuscrito',
     noNotesYet: 'Nada escrito ainda.',

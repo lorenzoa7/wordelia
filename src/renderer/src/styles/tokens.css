@@ -21,9 +21,15 @@
 
   --tracking-caps: 0.14em;
   --tracking-tight: -0.01em;
-  /* Courier Prime sits high in its line box. An icon beside UI text moves up by this
-     much, so that it centers on the capital letters (use with `translate: 0 var(--icon-lift)`). */
-  --icon-lift: -0.07em;
+  /* Courier Prime sits high in its line box. An icon beside UI text moves up by this much,
+     so that its middle meets the optical middle of the text: the middle of the capitals
+     (labels have capitals), or the middle of the x-height for text in small letters only.
+     Use it with `translate: 0 var(--icon-lift)` on the icon. The text rounds to whole pixels,
+     so the best lift changes with the display scale: see the media queries below.
+     `node scripts/shot.mjs icons` measures every icon on the main screens. */
+  --icon-lift: -0.14em;
+  /* The open book icon draws low in its box: it moves up a little more. */
+  --icon-lift-book: calc(var(--icon-lift) - 0.06em);
 
   /* Space (4 px grid) */
   --s-1: 4px;
@@ -100,6 +106,19 @@
   --grain-opacity: 0.35;
 
   color-scheme: light;
+}
+
+/* Display scale 125 %: the text rounds up, the icons need more lift. */
+@media (min-resolution: 1.2dppx) {
+  :root {
+    --icon-lift: -0.16em;
+  }
+}
+/* Display scale 150 % and more: the text sits where its font puts it, the icons need less lift. */
+@media (min-resolution: 1.5dppx) {
+  :root {
+    --icon-lift: -0.11em;
+  }
 }
 
 /* Dark theme: "Lamplight" */

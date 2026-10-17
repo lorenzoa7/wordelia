@@ -3,7 +3,7 @@
 import { create } from 'zustand'
 import type { Editor } from '@tiptap/core'
 import { newId } from '@shared/book'
-import type { Mention, Quote } from '@shared/types'
+import type { Mention, Quote, Thread } from '@shared/types'
 import { useApp } from '@/stores/app'
 import { appendMention, docFromText, readDraft, withoutMention, type DraftDoc } from './draft'
 
@@ -19,7 +19,13 @@ export interface Streaming {
 }
 
 interface ChatState {
+  /** The open thread. While `blank` shows, the thread that was open before it: Esc in the thread list goes back to it. */
   activeThreadId: string | null
+  /**
+   * The new thread that shows, before its first message. It is not in the book and not on disk:
+   * the first message saves it (`sendMessage`). It goes away when the user leaves it.
+   */
+  blank: Thread | null
   /** The chat shows the list of all threads, not the active thread */
   listOpen: boolean
   /** The text of the composer. A mention shows as "@Label" in it. */
@@ -37,8 +43,11 @@ interface ChatState {
   thoughts: Record<string, string>
   /** The user message that is open for editing */
   editingId: string | null
-  /** Show a thread. This also closes the thread list. */
+  /** Show a thread. This also closes the thread list and forgets the new thread. */
   setActiveThread(id: string | null): void
+  /** Show a new thread without messages. Nothing is saved until its first message. */
+  openBlank(thread: Thread): void
+  /** Show or hide the thread list. The list forgets the new thread: an empty thread never stays. */
   setListOpen(open: boolean): void
   /** Put plain text in the composer, in the place of the draft */
   setDraft(v: string): void
@@ -54,6 +63,7 @@ interface ChatState {
 
 export const useChat = create<ChatState>((set, get) => ({
   activeThreadId: null,
+  blank: null,
   listOpen: false,
   draft: '',
   draftDoc: null,
@@ -64,10 +74,13 @@ export const useChat = create<ChatState>((set, get) => ({
   thoughts: {},
   editingId: null,
   setActiveThread(id) {
-    set({ activeThreadId: id, editingId: null, listOpen: false })
+    set({ activeThreadId: id, blank: null, editingId: null, listOpen: false })
+  },
+  openBlank(thread) {
+    set({ blank: thread, editingId: null, listOpen: false })
   },
   setListOpen(open) {
-    set({ listOpen: open, editingId: null })
+    set(open ? { listOpen: true, blank: null, editingId: null } : { listOpen: false, editingId: null })
   },
   setDraft(v) {
     set({ draftDoc: docFromText(v), draft: v, mentions: [], draftRev: get().draftRev + 1 })

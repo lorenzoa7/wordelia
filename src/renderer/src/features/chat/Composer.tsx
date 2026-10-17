@@ -8,10 +8,10 @@ import { PROVIDER_LABELS } from '@shared/ai/routes'
 import type { Messages } from '@shared/i18n'
 import type { ModelChoice, ModelInfo, ProviderId, Thread } from '@shared/types'
 import { useApp } from '@/stores/app'
-import { useBook } from '@/stores/book'
 import { useT } from '@/lib/i18n'
 import { registerComposer, useChat } from './chatStore'
 import { sendMessage, stopReply } from './send'
+import { saveThreadChange } from './threads'
 import { ChatInput } from './ChatInput'
 
 export function Composer({ thread }: { thread: Thread | null }): React.JSX.Element {
@@ -139,7 +139,8 @@ function ModelPicker({ thread }: { thread: Thread | null }): React.JSX.Element {
       void useApp.getState().updateSettings({ routes: { ...settings!.routes, chat: choice } })
       return
     }
-    useBook.getState().saveThread({ ...thread, route: choice })
+    // The blank thread keeps its model until its first message saves it.
+    saveThreadChange({ ...thread, route: choice })
   }
   const pick = (p: ProviderId, m: ModelInfo): void => {
     const e = route?.effort ? nearestEffort(route.effort, m) : undefined

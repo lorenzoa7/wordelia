@@ -15,21 +15,21 @@ import { MessageView, StreamingMessage } from './MessageView'
 import { Composer } from './Composer'
 import { RewindHost } from './RewindDialog'
 import { lastReplyAt, markSeen, StatusDot, useChatAttention, useThreadStatuses } from './status'
+import { hasMessages, latestThread, saveThreadChange, startThread } from './threads'
+import { isE2E } from '@/lib/api'
 import './chat.css'
-
-/** The most recently changed thread. */
-function latest(threads: Thread[]): Thread | undefined {
-  return threads.reduce<Thread | undefined>((a, b) => (!a || b.updatedAt > a.updatedAt ? b : a), undefined)
-}
 
 export function ChatPanel(): React.JSX.Element {
   const t = useT()
   const threads = useBook((s) => s.threads)
   const activeId = useChat((s) => s.activeThreadId)
+  const blank = useChat((s) => s.blank)
   const listOpen = useChat((s) => s.listOpen)
   const setActive = useChat((s) => s.setActiveThread)
   const setListOpen = useChat((s) => s.setListOpen)
-  const thread = threads.find((th) => th.id === activeId) ?? null
+  const saved = threads.find((th) => th.id === activeId) ?? null
+  // The thread that shows: the blank new thread, else the open thread.
+  const thread = blank ?? saved
   const streaming = useChat((s) => (thread ? s.streaming[thread.id] : undefined))
   const chatOpen = useApp((s) => s.settings?.ui.chatOpen ?? true)
   const [editing, setEditing] = useState<Thread | null>(null)
@@ -44,10 +44,17 @@ export function ChatPanel(): React.JSX.Element {
     switched.current = true
   }
 
-  // Open the most recent thread when the book opens. An open thread list stays open.
+  // No open thread (a book without threads, or the open thread was deleted): show a blank thread.
+  // An open thread that is not in the book yet (the planning sync makes its thread) does not get one.
+  useLayoutEffect(() => {
+    if (!listOpen && !blank && !activeId) useChat.setState({ blank: newThread() })
+  }, [listOpen, blank, activeId])
+
+  // Hooks for end-to-end tests and screenshots.
   useEffect(() => {
-    if (!activeId && threads.length) useChat.setState({ activeThreadId: latest(threads)?.id ?? null })
-  }, [activeId, threads])
+    const hooks = isE2E() ? (window as unknown as { __wordelia?: Record<string, unknown> }).__wordelia : undefined
+    if (hooks) hooks.chat = useChat
+  }, [])
 
   // Keep the newest message in view.
   const count = thread?.messages.length ?? 0
@@ -70,7 +77,7 @@ export function ChatPanel(): React.JSX.Element {
       return
     }
     // A thread that opens, and a new message of the user: go to the end at once, so the whole message shows.
-    const key = `${activeId}|${lastUserId}`
+    const key = `${thread?.id}|${lastUserId}`
     if (key !== jumped.current) {
       jumped.current = key
       el.scrollTop = el.scrollHeight
@@ -78,7 +85,7 @@ export function ChatPanel(): React.JSX.Element {
     }
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 160
     if (nearBottom || !streaming) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
-  }, [count, streaming?.text.length, streaming?.thinking?.length, activeId, Boolean(streaming), listOpen, lastUserId])
+  }, [count, streaming?.text.length, streaming?.thinking?.length, thread?.id, Boolean(streaming), listOpen, lastUserId])
 
   // The user sees the thread when the chat is open, the thread shows and the window shows. Then its new reply is seen.
   const lastReply = thread ? lastReplyAt(thread) : ''
@@ -100,12 +107,6 @@ export function ChatPanel(): React.JSX.Element {
   // Edit, Rewind and Retry wait while the thread works. The planning sync thread has its own requests.
   const canAct = Boolean(thread) && !streaming && thread?.id !== SYNC_THREAD_ID
 
-  const create = (): void => {
-    const th = newThread()
-    useBook.getState().saveThread(th, true)
-    setActive(th.id)
-    focusComposer(50)
-  }
   const open = (id: string): void => {
     setActive(id)
     focusComposer(50)
@@ -119,12 +120,12 @@ export function ChatPanel(): React.JSX.Element {
     }).then(async (ok) => {
       if (!ok) return
       const wasActive = th.id === useChat.getState().activeThreadId
-      const others = useBook.getState().threads.length > 1
       await useBook.getState().deleteThread(th.id)
       if (!wasActive) return
-      useChat.setState({ activeThreadId: null })
-      // The other threads show, so the user picks the next one. Without other threads, the empty chat shows.
-      setListOpen(others)
+      const next = latestThread(useBook.getState().threads)
+      useChat.setState({ activeThreadId: next?.id ?? null })
+      // The other threads show, so the user picks the next one (Esc opens the most recent). Without other threads, a blank thread shows.
+      setListOpen(Boolean(next))
     })
 
   return (
@@ -134,7 +135,7 @@ export function ChatPanel(): React.JSX.Element {
           threads={threads}
           animate={switched.current}
           onOpen={open}
-          onCreate={create}
+          onCreate={startThread}
           onEdit={setEditing}
           onDelete={askDelete}
           onClose={
@@ -148,7 +149,7 @@ export function ChatPanel(): React.JSX.Element {
         />
       ) : (
         <div className={clsx('chat-view chat-thread', switched.current && 'is-entering')}>
-          <ThreadHead thread={thread} onList={() => setListOpen(true)} onCreate={create} onEdit={setEditing} onDelete={askDelete} />
+          <ThreadHead thread={thread} saved={thread === saved} onList={() => setListOpen(true)} onCreate={startThread} onEdit={setEditing} onDelete={askDelete} />
           {thread?.brief && (
             <Tooltip label={t.chat.editPurpose}>
               <button className={clsx('chat-brief', scrolled && 'is-scrolled')} onClick={() => setEditing(thread)}>
@@ -185,12 +186,15 @@ export function ChatPanel(): React.JSX.Element {
 /** The header of a thread: back to the list, the title (it opens the title and the purpose), New thread, the options. */
 function ThreadHead({
   thread,
+  saved,
   onList,
   onCreate,
   onEdit,
   onDelete
 }: {
   thread: Thread | null
+  /** False for the blank thread: it has no options until its first message. */
+  saved: boolean
   onList: () => void
   onCreate: () => void
   onEdit: (th: Thread) => void
@@ -224,7 +228,7 @@ function ThreadHead({
         <IconButton label={t.chat.newThread} onClick={onCreate}>
           <Plus size={16} />
         </IconButton>
-        {thread && (
+        {thread && saved && (
           <Menu
             align="end"
             trigger={
@@ -248,7 +252,7 @@ function ThreadMenuItems({ thread, onEdit, onDelete }: { thread: Thread; onEdit:
       <MenuItem icon={<NotePencil size={15} />} onSelect={() => onEdit(thread)}>
         {t.chat.titleAndPurpose}
       </MenuItem>
-      <MenuItem icon={<PushPin size={15} />} onSelect={() => useBook.getState().saveThread({ ...thread, pinned: !thread.pinned })}>
+      <MenuItem icon={<PushPin size={15} />} onSelect={() => saveThreadChange({ ...thread, pinned: !thread.pinned })}>
         {thread.pinned ? t.chat.unpin : t.chat.pin}
       </MenuItem>
       <MenuSeparator />
@@ -273,7 +277,7 @@ function fold(s: string): string {
  * Keys: Up and Down go through the list, Enter opens a thread, Esc goes back to the open thread.
  */
 function ThreadList({
-  threads,
+  threads: all,
   animate,
   onOpen,
   onCreate,
@@ -293,12 +297,14 @@ function ThreadList({
   const t = useT()
   const [q, setQ] = useState('')
   const statuses = useThreadStatuses()
+  // A thread without messages never shows.
+  const threads = useMemo(() => all.filter(hasMessages), [all])
   const listRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const { pinned, recent } = useMemo(() => {
     const f = fold(q.trim())
-    const all = [...threads].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    const shown = f ? all.filter((th) => fold(`${threadTitle(t, th.title)} ${threadBrief(t, th.brief)} ${th.digest}`).includes(f)) : all
+    const sorted = [...threads].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    const shown = f ? sorted.filter((th) => fold(`${threadTitle(t, th.title)} ${threadBrief(t, th.brief)} ${th.digest}`).includes(f)) : sorted
     return { pinned: shown.filter((th) => th.pinned), recent: shown.filter((th) => !th.pinned) }
   }, [threads, q, t])
   const first = pinned[0] ?? recent[0]
@@ -474,8 +480,10 @@ function ThreadEditor({ thread, onClose }: { thread: Thread | null; onClose: () 
               if (thread) {
                 const next = title.trim()
                 // Save the newest version of the thread: a reply can arrive while the dialog is open.
-                const now = useBook.getState().threads.find((th) => th.id === thread.id) ?? thread
-                useBook.getState().saveThread({ ...now, title: next && next !== shownTitle ? next : now.title, brief: brief.trim() })
+                // The blank thread keeps its title and purpose until its first message saves it.
+                const blank = useChat.getState().blank
+                const now = useBook.getState().threads.find((th) => th.id === thread.id) ?? (blank?.id === thread.id ? blank : thread)
+                saveThreadChange({ ...now, title: next && next !== shownTitle ? next : now.title, brief: brief.trim() })
               }
               onClose()
             }}

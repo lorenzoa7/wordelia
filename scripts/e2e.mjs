@@ -26,7 +26,8 @@ const scenarios = [
   ['pages', '--en'],
   ['reveal'],
   ['reopen'],
-  ['pagebreak', '--en']
+  ['pagebreak', '--en'],
+  ['selmenu', '--en']
 ]
 
 function run(args) {

@@ -31,11 +31,20 @@
   background: transparent;
   text-align: left;
 }
+.history-item {
+  transition: background-color var(--dur-fast) var(--ease-out);
+}
 .history-item:hover {
   background: var(--paper-2);
 }
+.history-item:focus-visible {
+  outline-offset: -2px;
+}
 .history-item.is-active {
   background: var(--ribbon-wash);
+}
+.history-item.is-active .history-when {
+  color: var(--ribbon);
 }
 .history-when {
   font-size: var(--text-sm);
@@ -45,6 +54,7 @@
 .history-label {
   font-size: var(--text-xs);
   color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
 }
 .history-preview {
   display: flex;

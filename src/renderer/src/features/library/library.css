@@ -94,6 +94,14 @@
   transform: translateY(-4px);
   box-shadow: var(--shadow-page), 0 24px 40px -20px rgba(64, 48, 28, 0.35);
 }
+.book-card-face:active:not(:disabled) {
+  transform: translateY(-2px);
+  transition-duration: var(--dur-fast);
+}
+/* The ring goes around the page, with the sheets behind it. */
+.book-card-face:focus-visible {
+  outline-offset: 4px;
+}
 .book-card-rule {
   width: 28px;
   height: 3px;
@@ -102,17 +110,23 @@
   background: var(--ribbon);
 }
 .book-card-title {
+  max-width: 100%;
   font-family: var(--font-prose);
   font-size: 22px;
   font-weight: 600;
   line-height: 1.2;
-  letter-spacing: -0.01em;
+  letter-spacing: var(--tracking-tight);
+  overflow-wrap: anywhere;
   display: -webkit-box;
   -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 .book-card-author {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   margin-top: var(--s-2);
   font-family: var(--font-prose);
   font-style: italic;
@@ -137,8 +151,17 @@
   align-items: center;
   gap: 5px;
   margin-top: auto;
+  padding-top: var(--s-3);
   font-size: var(--text-xs);
   color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.book-card-meta svg {
+  flex-shrink: 0;
+  translate: 0 var(--icon-lift);
+}
+.book-card.is-missing .book-card-meta {
+  color: var(--ribbon);
 }
 .book-card-time {
   margin-top: 3px;
@@ -154,11 +177,21 @@
   right: 8px;
   z-index: 2;
   opacity: 0;
-  transition: opacity var(--dur-fast) var(--ease-out);
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    transform var(--dur-slow) var(--ease-out);
+}
+/* The menu rides up with the page on hover. */
+.book-card:hover .book-card-menu {
+  transform: translateY(-4px);
 }
 .book-card:hover .book-card-menu,
-.book-card-menu:focus-within {
+.book-card-menu:focus-within,
+.book-card-menu:has([data-state='open']) {
   opacity: 1;
+}
+.book-card-menu .icon-btn:hover:not(:disabled) {
+  background: var(--paper-2);
 }
 
 /* Empty state: a sheet with a caret */

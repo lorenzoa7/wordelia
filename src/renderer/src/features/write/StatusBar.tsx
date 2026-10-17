@@ -8,6 +8,7 @@ import { formatCount } from '@shared/book'
 import { saver, type SaveState } from '@/stores/saver'
 import { useStats } from '@/features/editor/stats'
 import { useT } from '@/lib/i18n'
+import { Tooltip } from '@/ui'
 
 export function StatusBar(): React.JSX.Element {
   const t = useT()
@@ -33,16 +34,20 @@ export function StatusBar(): React.JSX.Element {
       </span>
       <span className="status-right">
       {goal > 0 && (
-        <span className={`today${progress >= 1 ? ' is-done' : ''}`} title={s.dailyGoal(goal)}>
-          <span className="today-bar">
-            <span style={{ width: `${progress * 100}%` }} />
+        <Tooltip label={s.dailyGoal(goal)} side="top">
+          <span className={`today${progress >= 1 ? ' is-done' : ''}`}>
+            <span className="today-bar">
+              <span style={{ width: `${progress * 100}%` }} />
+            </span>
+            {progress >= 1 ? `${s.goalReached} · ` : ''}{s.today(t.common.number(written))}
           </span>
-          {progress >= 1 ? `${s.goalReached} · ` : ''}{s.today(t.common.number(written))}
-        </span>
+        </Tooltip>
       )}
-      <button className="status-btn" onClick={() => useUi.getState().openHistory(useBook.getState().activeChapterId)} title={s.versionHistory}>
-        <ClockCounterClockwise size={12} /> {s.history}
-      </button>
+      <Tooltip label={s.versionHistory} side="top">
+        <button className="status-btn" onClick={() => useUi.getState().openHistory(useBook.getState().activeChapterId)}>
+          <ClockCounterClockwise size={12} /> {s.history}
+        </button>
+      </Tooltip>
       <span className={`save-state is-${save}`} title={save === 'error' ? saver.error : undefined} role="status" aria-live="polite">
         {save === 'saved' && (
           <>

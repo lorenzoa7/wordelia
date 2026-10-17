@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'motion/react'
-import { DotsThree, FileArrowUp, FolderOpen, Plus, Trash, WarningCircle } from '@phosphor-icons/react'
+import { DotsThree, FileArrowUp, FolderOpen, Plus, WarningCircle, X } from '@phosphor-icons/react'
 import type { Messages } from '@shared/i18n'
 import type { LibraryItem } from '@shared/types'
 import { Button, IconButton, Menu, MenuItem } from '@/ui'
@@ -153,7 +153,7 @@ function BookCard({ item, index, onRemoved }: { item: LibraryItem; index: number
             </MenuItem>
           )}
           <MenuItem
-            icon={<Trash size={15} />}
+            icon={<X size={15} />}
             onSelect={() => void invoke('library:remove', item.root).then(onRemoved)}
           >
             {t.library.removeFromList}

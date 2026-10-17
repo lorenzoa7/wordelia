@@ -51,7 +51,6 @@ export const chat = {
   /** aria-label of the button that starts a mention */
   mention: 'Mention',
   removeQuote: 'Remove quote',
-  removeMention: 'Remove mention',
   composer: 'Message to your editor',
   askQuote: 'Ask about the quote…',
   placeholder: 'Ask your editor. Type @ to mention a chapter, entry or thread.',

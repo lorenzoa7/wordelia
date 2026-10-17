@@ -1,113 +1,49 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { DropdownMenu } from 'radix-ui'
 import { ArrowUp, At, CaretDown, CaretRight, Check, Quotes, Stop, X } from '@phosphor-icons/react'
+import type { Editor } from '@tiptap/core'
 import clsx from 'clsx'
 import { effortChoices, nearestEffort } from '@shared/ai/effort'
 import { PROVIDER_LABELS } from '@shared/ai/routes'
 import type { Messages } from '@shared/i18n'
-import type { Mention, ModelChoice, ModelInfo, ProviderId, Thread } from '@shared/types'
+import type { ModelChoice, ModelInfo, ProviderId, Thread } from '@shared/types'
 import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
-import { folderCategoryName, useT } from '@/lib/i18n'
-import { useChat } from './chatStore'
-import { mentionLabel, sendMessage, stopReply } from './send'
-import { MentionIcon } from './MessageView'
-
-interface Candidate extends Mention {
-  sub?: string
-}
-
-function useCandidates(query: string | null): Candidate[] {
-  const t = useT()
-  const chapters = useBook((s) => s.chapters)
-  const entries = useBook((s) => s.entries)
-  const threads = useBook((s) => s.threads)
-  const categories = useBook((s) => s.manifest?.planning.categories)
-  return useMemo(() => {
-    if (query === null) return []
-    const q = query.toLowerCase()
-    const all: Candidate[] = [
-      ...chapters.map((c, i) => ({ kind: 'chapter' as const, id: c.id, label: c.title, sub: t.chat.chapterNumber(i + 1) })),
-      ...entries.map((e) => ({ kind: 'entry' as const, id: e.id, label: e.name, sub: folderCategoryName(t, e.category, categories ?? []) })),
-      ...threads.map((th) => ({ kind: 'thread' as const, id: th.id, label: th.title, sub: t.chat.thread }))
-    ]
-    return all.filter((c) => mentionLabel(t, c).toLowerCase().includes(q)).slice(0, 8)
-  }, [query, chapters, entries, threads, categories, t])
-}
+import { useT } from '@/lib/i18n'
+import { registerComposer, useChat } from './chatStore'
+import { sendMessage, stopReply } from './send'
+import { ChatInput } from './ChatInput'
 
 export function Composer({ thread }: { thread: Thread | null }): React.JSX.Element {
   const t = useT()
-  const draft = useChat((s) => s.draft)
-  const setDraft = useChat((s) => s.setDraft)
+  const hasText = useChat((s) => s.draft.trim().length > 0)
+  const draftRev = useChat((s) => s.draftRev)
+  const syncDraft = useChat((s) => s.syncDraft)
   const quotes = useChat((s) => s.quotes)
-  const mentions = useChat((s) => s.mentions)
   const removeQuote = useChat((s) => s.removeQuote)
-  const removeMention = useChat((s) => s.removeMention)
-  const addMention = useChat((s) => s.addMention)
   const streaming = useChat((s) => (thread ? s.streaming[thread.id] : undefined))
-  const ref = useRef<HTMLTextAreaElement>(null)
-  const [mentionQuery, setMentionQuery] = useState<string | null>(null)
-  const [highlight, setHighlight] = useState(0)
-  const candidates = useCandidates(mentionQuery)
+  const [editor, setEditor] = useState<Editor | null>(null)
+  // The content of the store when the composer shows (for example after the thread list).
+  const [initial] = useState(() => useChat.getState().draftDoc)
 
-  // Grow with the text.
+  // Code outside the composer changed the draft (a suggestion, a mention from the Plan view, a sent message): load it.
+  const loadedRev = useRef(draftRev)
   useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = `${Math.min(el.scrollHeight, 220)}px`
-  }, [draft])
-
-  const onChange = (v: string): void => {
-    setDraft(v)
-    const el = ref.current
-    const caret = el?.selectionStart ?? v.length
-    const m = /(^|\s)@([^\s@]{0,30})$/.exec(v.slice(0, caret))
-    setMentionQuery(m ? m[2] : null)
-    setHighlight(0)
-  }
-
-  const pick = (c: Candidate): void => {
-    addMention({ kind: c.kind, id: c.id, label: c.label })
-    const el = ref.current
-    const caret = el?.selectionStart ?? draft.length
-    const before = draft.slice(0, caret).replace(/@[^\s@]{0,30}$/, '')
-    setDraft(before + draft.slice(caret))
-    setMentionQuery(null)
-    setTimeout(() => el?.focus(), 0)
-  }
+    if (!editor || editor.isDestroyed || loadedRev.current === draftRev) return
+    loadedRev.current = draftRev
+    editor.commands.setContent((useChat.getState().draftDoc ?? '') as object, { emitUpdate: false })
+    editor.commands.focus('end')
+  }, [draftRev, editor])
 
   const submit = (): void => {
-    if (streaming) return
-    void sendMessage(draft)
+    if (useChat.getState().streaming[thread?.id ?? '']) return
+    void sendMessage(useChat.getState().draft)
   }
 
   return (
     <div className="composer-wrap">
-      {mentionQuery !== null && candidates.length > 0 && (
-        <div className="mention-pop" role="listbox" id="mention-list" aria-label={t.chat.mentionList}>
-          {candidates.map((c, i) => (
-            <button
-              key={`${c.kind}-${c.id}`}
-              id={`mention-${i}`}
-              role="option"
-              aria-selected={i === highlight}
-              tabIndex={-1}
-              className={clsx('mention-option', i === highlight && 'is-active')}
-              onMouseDown={(e) => {
-                e.preventDefault()
-                pick(c)
-              }}
-            >
-              <MentionIcon kind={c.kind} />
-              <span className="mention-label">{mentionLabel(t, c)}</span>
-              <span className="mention-sub">{c.sub}</span>
-            </button>
-          ))}
-        </div>
-      )}
       <div className={clsx('composer', streaming && 'is-busy')}>
-        {(quotes.length > 0 || mentions.length > 0) && (
+        {quotes.length > 0 && (
           <div className="composer-chips">
             {quotes.map((q) => (
               <span key={q.id} className="quote-chip" title={q.text}>
@@ -118,65 +54,29 @@ export function Composer({ thread }: { thread: Thread | null }): React.JSX.Eleme
                 </button>
               </span>
             ))}
-            {mentions.map((m) => (
-              <span key={m.id} className="mention-chip">
-                <MentionIcon kind={m.kind} /> {mentionLabel(t, m)}
-                <button onClick={() => removeMention(m.id)} aria-label={t.chat.removeMention}>
-                  <X size={10} />
-                </button>
-              </span>
-            ))}
           </div>
         )}
-        <textarea
-          ref={ref}
+        <ChatInput
+          initial={initial}
           className="composer-input"
-          rows={1}
-          aria-label={t.chat.composer}
-          role="combobox"
-          aria-autocomplete="list"
-          aria-expanded={mentionQuery !== null && candidates.length > 0}
-          aria-controls="mention-list"
-          aria-activedescendant={mentionQuery !== null && candidates.length > 0 ? `mention-${highlight}` : undefined}
+          ariaLabel={t.chat.composer}
           placeholder={quotes.length ? t.chat.askQuote : t.chat.placeholder}
-          value={draft}
-          spellCheck
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (mentionQuery !== null && candidates.length) {
-              if (e.key === 'ArrowDown') {
-                e.preventDefault()
-                setHighlight((h) => (h + 1) % candidates.length)
-                return
-              }
-              if (e.key === 'ArrowUp') {
-                e.preventDefault()
-                setHighlight((h) => (h - 1 + candidates.length) % candidates.length)
-                return
-              }
-              if (e.key === 'Enter' || e.key === 'Tab') {
-                e.preventDefault()
-                pick(candidates[highlight])
-                return
-              }
-              if (e.key === 'Escape') {
-                setMentionQuery(null)
-                return
-              }
-            }
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              submit()
-            }
+          onChange={syncDraft}
+          onEnter={submit}
+          onReady={(e) => {
+            setEditor(e)
+            registerComposer(e)
           }}
         />
         <div className="composer-row">
           <button
             className="composer-tool"
             onClick={() => {
-              setDraft(draft + (draft && !draft.endsWith(' ') ? ' @' : '@'))
-              setMentionQuery('')
-              ref.current?.focus()
+              if (!editor) return
+              // "@" at the cursor opens the list of mentions. A space before it when the word goes on.
+              const before = editor.state.selection.$from.nodeBefore
+              const glued = before?.isText && !/\s$/.test(before.text ?? '')
+              editor.chain().focus().insertContent(glued ? ' @' : '@').run()
             }}
             aria-label={t.chat.mention}
           >
@@ -189,7 +89,7 @@ export function Composer({ thread }: { thread: Thread | null }): React.JSX.Eleme
               <Stop size={14} weight="fill" />
             </button>
           ) : (
-            <button className="composer-send" onClick={submit} disabled={!draft.trim() && !quotes.length} aria-label={t.chat.send}>
+            <button className="composer-send" onClick={submit} disabled={!hasText && !quotes.length} aria-label={t.chat.send}>
               <ArrowUp size={15} weight="bold" />
             </button>
           )}

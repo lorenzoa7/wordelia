@@ -14,6 +14,9 @@ export default async function ({ app, page, shot, openBook }) {
     await page.keyboard.press('Enter')
   }
   const threads = () => page.evaluate(() => window.__wordelia.book.getState().threads)
+  // A close view of one element, to check small details.
+  const flags = `${pt ? '' : '-en'}${process.argv.includes('--dark') ? '-dark' : ''}`
+  const crop = (name, sel) => page.locator(sel).last().screenshot({ path: `test-results/shots/chatview${flags}-zoom-${name}.png` })
 
   // The Portuguese book with the interface in Portuguese (Brazil), as the author uses it.
   if (pt) {
@@ -148,4 +151,106 @@ export default async function ({ app, page, shot, openBook }) {
   await shot('thread-list-states')
   const list = await threads()
   console.log('threads:', list.length)
+
+  // 6. Inline mentions: "@Mar" opens the list, Enter puts a pill in the text, and the sentence goes on.
+  await page.keyboard.press('Escape')
+  await page.waitForSelector('.chat-thread', { timeout: 5000 })
+  await page.locator('.composer-input').click()
+  await page.keyboard.type(pt ? 'O que você acha da @Mar' : 'What do you think of @Mar')
+  await page.waitForSelector('.mention-pop .mention-option', { timeout: 5000 })
+  await page.waitForTimeout(250)
+  await shot('mention-list')
+  await page.keyboard.press('Enter')
+  const tail = pt ? 'neste capítulo?' : 'in this chapter?'
+  await page.keyboard.type(tail)
+  await page.waitForTimeout(250)
+  if ((await page.locator('.composer-input .mention-pill').count()) !== 1) fail('no mention pill in the composer')
+  await shot('mention-pill')
+  await crop('composer-pill', '.composer')
+  // Backspace just after the pill removes it as one unit. Ctrl+Z brings it back.
+  await page.keyboard.press('Control+End')
+  for (let i = 0; i < tail.length + 1; i++) await page.keyboard.press('ArrowLeft')
+  await page.keyboard.press('Backspace')
+  await page.waitForTimeout(150)
+  const left = await page.evaluate(() => ({ pills: document.querySelectorAll('.composer-input .mention-pill').length, text: document.querySelector('.composer-input').innerText }))
+  console.log('after Backspace:', JSON.stringify(left))
+  if (left.pills !== 0 || /Mar/.test(left.text)) fail('Backspace did not remove the pill as one unit')
+  await page.keyboard.press('Control+z')
+  await page.waitForTimeout(150)
+  if ((await page.locator('.composer-input .mention-pill').count()) !== 1) fail('Ctrl+Z did not bring the pill back')
+  // Shift+Enter starts a new line, Enter sends.
+  await page.keyboard.press('Control+End')
+  await page.keyboard.press('Shift+Enter')
+  await page.keyboard.type(pt ? 'E do @Eli' : 'And @Eli')
+  await page.waitForSelector('.mention-pop .mention-option', { timeout: 5000 })
+  await page.keyboard.press('Tab')
+  await page.waitForTimeout(150)
+  await shot('mention-two-lines')
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(300)
+  const sent = await page.evaluate(() => {
+    const s = window.__wordelia.book.getState()
+    const th = s.threads.slice().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]
+    const m = th.messages.filter((x) => x.role === 'user').at(-1)
+    return { content: m.content, mentions: m.mentions }
+  })
+  console.log('sent message:', JSON.stringify(sent))
+  const want = pt ? 'O que você acha da @Marta neste capítulo?\nE do @Elias' : 'What do you think of @Marta in this chapter?\nAnd @Elias'
+  if (sent.content !== want) fail(`the sent text is "${sent.content}"`)
+  if (sent.mentions?.length !== 2 || sent.mentions.some((m) => m.kind !== 'entry' || !m.id)) fail('the sent message has the wrong mentions')
+  const empty = await page.evaluate(() => document.querySelector('.composer-input').innerText.trim())
+  if (empty) fail('the composer is not empty after send')
+  await idle()
+  await page.waitForTimeout(400)
+  const inline = await page.locator('.msg-user-text .mention-pill').count()
+  if (inline < 2) fail('the sent message does not show its mentions in the text')
+  await shot('mention-sent')
+  await crop('sent-pills', '.msg-user')
+
+  // 7. Edit the message: the pills are in the edit box too.
+  await page.locator('.msg-user-wrap').last().hover()
+  await page.locator('.msg-user-wrap').last().locator('.msg-edit-btn').click()
+  await page.waitForSelector('.msg-edit-input .mention-pill', { timeout: 5000 })
+  await page.waitForTimeout(300)
+  await shot('mention-edit')
+  await page.keyboard.press('Escape')
+  await crop('chat-head', '.chat-head')
+
+  // 8. "Ask the chat about this entry" in the Plan view: a pill at the end of the draft, and the cursor after it.
+  await page.locator('.composer-input').click()
+  await page.keyboard.type(pt ? 'Releia ' : 'Read ')
+  await page.keyboard.press('Control+2')
+  await page.waitForTimeout(700)
+  await page.locator('.entry-card').filter({ has: page.locator('.entry-card-name', { hasText: /^Marta$/ }) }).click()
+  await page.waitForTimeout(600)
+  await page.locator('.entry-tools .icon-btn').first().click()
+  await page.waitForTimeout(600)
+  await page.keyboard.type(pt ? 'e me diga o que falta.' : 'and tell me what is missing.')
+  const asked = await page.evaluate(() => ({
+    pills: document.querySelectorAll('.composer-input .mention-pill').length,
+    text: document.querySelector('.composer-input').innerText.replace(/\s+/g, ' ').trim()
+  }))
+  console.log('mention from the Plan view:', JSON.stringify(asked))
+  if (asked.pills !== 1 || !/(Releia|Read) Marta (e me diga|and tell)/.test(asked.text)) fail('the mention from the Plan view is not at the end of the draft')
+  await shot('mention-from-plan')
+  await page.locator('.composer-input').click()
+  await page.keyboard.press('Control+a')
+  await page.keyboard.press('Backspace')
+  await page.keyboard.press('Control+1')
+  await page.waitForTimeout(600)
+
+  // 9. A narrow panel: the long placeholder makes the composer taller, and nothing is cut.
+  await setChat(320)
+  await page.locator('.chat-back').click()
+  await page.locator('.thread-new').click()
+  await page.waitForSelector('.chat-thread', { timeout: 5000 })
+  await page.waitForTimeout(400)
+  const fits = await page.evaluate(() => {
+    const ph = document.querySelector('.chat-input-placeholder').getBoundingClientRect()
+    const row = document.querySelector('.composer-row').getBoundingClientRect()
+    return { placeholderBottom: Math.round(ph.bottom), rowTop: Math.round(row.top) }
+  })
+  console.log('narrow composer:', JSON.stringify(fits))
+  if (fits.placeholderBottom > fits.rowTop + 1) fail('the placeholder goes under the composer buttons')
+  await shot('composer-narrow')
 }

@@ -204,9 +204,10 @@ export async function retryLast(threadId: string): Promise<void> {
 
 /**
  * Send an edited message again: the message and everything after it leave the thread, the new text
- * takes its place with the same quotes and mentions, and the AI answers again. False: the user cancelled.
+ * takes its place with the same quotes, and the AI answers again. `mentions` are the mentions of the
+ * new text; without them, the message keeps its mentions. False: the user cancelled.
  */
-export async function resendEdited(threadId: string, messageId: string, text: string): Promise<boolean> {
+export async function resendEdited(threadId: string, messageId: string, text: string, mentions?: Mention[]): Promise<boolean> {
   const th = useBook.getState().threads.find((t) => t.id === threadId)
   if (!th || useChat.getState().streaming[threadId]) return false
   const at = th.messages.findIndex((m) => m.id === messageId)
@@ -219,7 +220,9 @@ export async function resendEdited(threadId: string, messageId: string, text: st
   if (!(await confirmAndRewind(th, at, 'edit'))) return false
   const kept = useBook.getState().threads.find((t) => t.id === threadId)
   if (!kept) return false
-  const edited: ChatMessage = { ...old, id: newId('m'), content: text.trim(), createdAt: new Date().toISOString() }
+  const { mentions: oldMentions, ...rest } = old
+  const keep = mentions ?? oldMentions ?? []
+  const edited: ChatMessage = { ...rest, id: newId('m'), content: text.trim(), createdAt: new Date().toISOString(), ...(keep.length ? { mentions: keep } : {}) }
   useBook.getState().saveThread({ ...kept, messages: [...kept.messages, edited], updatedAt: new Date().toISOString() }, true)
   void requestReply(threadId)
   return true

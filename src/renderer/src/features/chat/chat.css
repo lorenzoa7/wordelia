@@ -433,6 +433,7 @@ button.chat-title:hover {
 }
 /* Editing a message of the user */
 .msg-edit {
+  position: relative;
   align-self: stretch;
   margin-left: 8%;
   padding: 9px 11px 8px;
@@ -448,19 +449,17 @@ button.chat-title:hover {
   gap: 5px;
   margin-bottom: 6px;
 }
-.msg-edit-input {
-  display: block;
-  width: 100%;
+.msg-edit .chat-input-box {
   min-height: 44px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  resize: none;
-  font-family: var(--font-ui);
-  font-size: var(--text-md);
-  line-height: 1.5;
-  color: var(--ink);
-  user-select: text;
+}
+.msg-edit-input {
+  max-height: 260px;
+  overflow-y: auto;
+}
+.msg-edit .mention-pop {
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 6px);
 }
 .msg-edit-foot {
   display: flex;
@@ -1092,8 +1091,7 @@ button.proposal-file:hover span {
   gap: 5px;
   padding: 9px 10px 0;
 }
-.quote-chip,
-.mention-chip {
+.quote-chip {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -1105,14 +1103,45 @@ button.proposal-file:hover span {
   font-size: var(--text-xs);
   color: var(--ink-2);
 }
-.mention-chip {
-  padding-right: 8px;
+/* A mention in the text: in the composer, in the edit box and in a sent message */
+.mention-pill {
+  display: inline-flex;
+  /* The label sits on the line of the text around it. */
+  align-items: baseline;
+  gap: 4px;
+  max-width: 100%;
+  margin: 0 1px;
+  padding: 0 5px 0 4px;
+  border-radius: var(--radius-xs);
   background: var(--ribbon-wash);
   color: var(--ink);
   font-weight: 700;
+  line-height: 1.4;
+  white-space: nowrap;
+  vertical-align: baseline;
+  transition: box-shadow var(--dur-fast) var(--ease-out);
 }
-.composer .mention-chip {
-  padding-right: 4px;
+.mention-pill svg {
+  flex-shrink: 0;
+  align-self: center;
+  color: var(--ribbon);
+  translate: 0 var(--icon-lift);
+}
+.mention-pill-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mention-pill.is-selected {
+  box-shadow: 0 0 0 1.5px var(--ribbon);
+}
+.msg-mentions .mention-pill,
+.msg-edit-context .mention-pill {
+  height: 24px;
+  margin: 0;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: var(--text-xs);
 }
 .quote-chip svg {
   color: var(--ribbon);
@@ -1126,8 +1155,7 @@ button.proposal-file:hover span {
   font-family: var(--font-prose);
   font-style: italic;
 }
-.quote-chip button,
-.mention-chip button {
+.quote-chip button {
   display: inline-grid;
   place-items: center;
   width: 18px;
@@ -1137,27 +1165,48 @@ button.proposal-file:hover span {
   background: transparent;
   color: var(--ink-3);
 }
-.quote-chip button:hover,
-.mention-chip button:hover {
+.quote-chip button:hover {
   background: var(--desk-3);
   color: var(--ink);
 }
-.composer-input {
-  display: block;
-  width: 100%;
-  min-height: 44px;
-  padding: 12px 14px 4px;
-  border: 0;
-  background: transparent;
-  resize: none;
+/* The text box of the chat (ChatInput). The editor and its placeholder share one grid cell. */
+.chat-input-box {
+  display: grid;
   font-family: var(--font-ui);
   font-size: var(--text-md);
   line-height: 1.5;
   color: var(--ink);
+}
+.chat-input-box > * {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+.chat-input {
+  display: flex;
+  flex-direction: column;
+}
+.chat-input .ProseMirror {
+  flex: 1;
+  outline: none;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   user-select: text;
 }
-.composer-input::placeholder {
+.chat-input .ProseMirror p {
+  margin: 0;
+}
+.chat-input-placeholder {
   color: var(--ink-4);
+  pointer-events: none;
+  user-select: none;
+}
+.composer .chat-input-box {
+  min-height: 44px;
+  padding: 12px 14px 4px;
+}
+.composer-input {
+  max-height: 220px;
+  overflow-y: auto;
 }
 .composer-row {
   display: flex;

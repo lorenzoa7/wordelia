@@ -1,18 +1,14 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {
   ArrowClockwise,
   ArrowCounterClockwise,
-  At,
-  BookOpenText,
   CaretDown,
-  ChatsCircle,
   Checks,
   Copy,
   CursorText,
   ListChecks,
-  Notebook,
   PencilSimple,
   Quotes,
   WarningCircle
@@ -29,7 +25,10 @@ import { acceptPending, pendingKeys, resolveTarget, setHunkStates } from './appl
 import { Button, Spinner, Tooltip } from '@/ui'
 import { typesetForBook } from '@/lib/typeset'
 import { getT, useT } from '@/lib/i18n'
-import { mentionLabel, resendEdited, retryLast } from './send'
+import { resendEdited, retryLast } from './send'
+import { ChatInput } from './ChatInput'
+import { MentionPill } from './MentionPill'
+import { docFromParts, readDraft, splitMentions } from './draft'
 import { useChat, type Streaming } from './chatStore'
 import { confirmAndRewind } from './rewind'
 import { latestThought, streamPhase, type StreamPhase } from './thinking'
@@ -73,19 +72,13 @@ export const MessageView = memo(function MessageView(props: Props): React.JSX.El
   return <AssistantMessage {...props} />
 })
 
-export function MentionIcon({ kind }: { kind: 'chapter' | 'entry' | 'thread' }): React.JSX.Element {
-  if (kind === 'chapter') return <BookOpenText size={11} />
-  if (kind === 'entry') return <Notebook size={11} />
-  if (kind === 'thread') return <ChatsCircle size={11} />
-  return <At size={11} />
-}
-
 /* ------------------------------------------------------------------ */
 /* Messages of the user: Edit and Rewind                                */
 /* ------------------------------------------------------------------ */
 
 function UserBubble({ message }: { message: ChatMessage }): React.JSX.Element {
-  const t = useT()
+  // Each mention shows as a pill in its place in the text. Older messages kept their mentions apart: they show above the text.
+  const { parts, rest } = useMemo(() => splitMentions(message.content, message.mentions ?? []), [message.content, message.mentions])
   return (
     <div className="msg msg-user">
       {message.quotes?.map((q) => (
@@ -96,16 +89,16 @@ function UserBubble({ message }: { message: ChatMessage }): React.JSX.Element {
           {q.text}
         </blockquote>
       ))}
-      {message.mentions && message.mentions.length > 0 && (
+      {rest.length > 0 && (
         <div className="msg-mentions">
-          {message.mentions.map((m) => (
-            <span key={m.id} className="mention-chip">
-              <MentionIcon kind={m.kind} /> {mentionLabel(t, m)}
-            </span>
+          {rest.map((m) => (
+            <MentionPill key={m.id} mention={m} />
           ))}
         </div>
       )}
-      {message.content && <div className="msg-user-text">{message.content}</div>}
+      {message.content && (
+        <div className="msg-user-text">{parts.map((p, i) => (typeof p === 'string' ? p : <MentionPill key={i} mention={p} />))}</div>
+      )}
     </div>
   )
 }
@@ -156,29 +149,21 @@ function UserMessage({ message, thread, index, after, canAct }: Props): React.JS
 function EditBox({ message, thread, after }: { message: ChatMessage; thread: Thread; after: number }): React.JSX.Element {
   const t = useT()
   const setEditing = useChat((s) => s.setEditing)
-  const [text, setText] = useState(message.content)
+  // The mentions show as pills in the text again. Mentions of older messages, apart from the text, stay apart.
+  const [{ initial, rest }] = useState(() => {
+    const split = splitMentions(message.content, message.mentions ?? [])
+    return { initial: docFromParts(split.parts), rest: split.rest }
+  })
+  const [draft, setDraft] = useState(() => readDraft(initial))
   const [busy, setBusy] = useState(false)
-  const ref = useRef<HTMLTextAreaElement>(null)
 
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    el.focus()
-    el.setSelectionRange(el.value.length, el.value.length)
-  }, [])
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = `${Math.min(el.scrollHeight, 260)}px`
-  }, [text])
-
-  const canSend = Boolean(text.trim() || message.quotes?.length) && !busy
+  const canSend = Boolean(draft.text.trim() || message.quotes?.length) && !busy
   const send = async (): Promise<void> => {
     if (!canSend) return
     setBusy(true)
     try {
-      if (await resendEdited(thread.id, message.id, text)) setEditing(null)
+      const mentions = [...rest, ...draft.mentions.filter((m) => !rest.some((r) => r.id === m.id))]
+      if (await resendEdited(thread.id, message.id, draft.text, mentions)) setEditing(null)
     } finally {
       setBusy(false)
     }
@@ -186,7 +171,7 @@ function EditBox({ message, thread, after }: { message: ChatMessage; thread: Thr
 
   return (
     <div className="msg-edit">
-      {(message.quotes?.length || message.mentions?.length) && (
+      {(message.quotes?.length || rest.length > 0) && (
         <div className="msg-edit-context">
           {message.quotes?.map((q) => (
             <span key={q.id} className="quote-chip" title={q.text}>
@@ -194,30 +179,20 @@ function EditBox({ message, thread, after }: { message: ChatMessage; thread: Thr
               <span className="quote-chip-text">{q.text}</span>
             </span>
           ))}
-          {message.mentions?.map((m) => (
-            <span key={m.id} className="mention-chip">
-              <MentionIcon kind={m.kind} /> {mentionLabel(t, m)}
-            </span>
+          {rest.map((m) => (
+            <MentionPill key={m.id} mention={m} />
           ))}
         </div>
       )}
-      <textarea
-        ref={ref}
+      <ChatInput
+        initial={initial}
         className="msg-edit-input"
-        aria-label={t.chat.editHint}
-        value={text}
-        spellCheck
-        rows={2}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault()
-            void send()
-          } else if (e.key === 'Escape') {
-            e.preventDefault()
-            setEditing(null)
-          }
-        }}
+        ariaLabel={t.chat.editHint}
+        placeholder=""
+        autoFocus
+        onChange={(doc) => setDraft(readDraft(doc))}
+        onEnter={() => void send()}
+        onEscape={() => setEditing(null)}
       />
       <div className="msg-edit-foot">
         <span className="msg-edit-hint">{t.chat.editAfter(after)}</span>

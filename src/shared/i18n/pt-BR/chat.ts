@@ -41,7 +41,6 @@ export const chat: typeof en = {
   mentionList: 'Menção',
   mention: 'Mencionar',
   removeQuote: 'Remover citação',
-  removeMention: 'Remover menção',
   composer: 'Mensagem para o seu editor',
   askQuote: 'Pergunte sobre a citação…',
   placeholder: 'Pergunte ao seu editor. Digite @ para mencionar um capítulo, uma nota ou uma conversa.',

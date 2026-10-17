@@ -9,7 +9,6 @@ import {
   Notebook,
   Path,
   Plus,
-  Scroll,
   SquaresFour,
   UserCircle,
   type IconProps
@@ -36,6 +35,10 @@ export function CategoryIcon({ name, size = 15 }: { name: string; size?: number 
   return <Icon size={size} />
 }
 
+/**
+ * @deprecated The writing rules moved to Settings → Writing rules (`useUi.getState().openSettings('rules')`).
+ * Kept only for old callers; the Plan view shows the overview for it.
+ */
 export const RULES_CATEGORY = '__rules'
 
 export function PlanSidebar(): React.JSX.Element {
@@ -50,6 +53,7 @@ export function PlanSidebar(): React.JSX.Element {
   const pending = useMemo(() => changedChapters().length, [chapters, syncState]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const categories = manifest?.planning.categories ?? []
+  const isOverview = !activeEntry && !categories.some((c) => c.folder === activeCategory)
 
   const addEntry = async (folder: string): Promise<void> => {
     const e = await useBook.getState().createEntry(folder, t.plan.newEntryName)
@@ -73,16 +77,13 @@ export function PlanSidebar(): React.JSX.Element {
       </Tooltip>
 
       <nav className="plan-nav">
-        <button className={clsx('plan-item', !activeCategory && !activeEntry && 'is-active')} onClick={() => useBook.getState().selectCategory(null)}>
+        <button
+          className={clsx('plan-item plan-item-top', isOverview && 'is-active')}
+          aria-current={isOverview ? 'page' : undefined}
+          onClick={() => useBook.getState().selectCategory(null)}
+        >
           <SquaresFour size={15} />
           <span className="plan-item-label">{t.plan.sidebar.overview}</span>
-        </button>
-        <button
-          className={clsx('plan-item', activeCategory === RULES_CATEGORY && 'is-active')}
-          onClick={() => useBook.getState().selectCategory(RULES_CATEGORY)}
-        >
-          <Scroll size={15} />
-          <span className="plan-item-label">{t.plan.writingRules}</span>
         </button>
         <div className="plan-divider" />
         {categories.map((c) => {
@@ -100,7 +101,11 @@ export function PlanSidebar(): React.JSX.Element {
                 >
                   <CaretRight size={10} className={clsx(isOpen && 'is-open')} />
                 </button>
-                <button className="plan-item-main" onClick={() => useBook.getState().selectCategory(c.folder)}>
+                <button
+                  className="plan-item-main"
+                  aria-current={activeCategory === c.folder && !activeEntry ? 'page' : undefined}
+                  onClick={() => useBook.getState().selectCategory(c.folder)}
+                >
                   <CategoryIcon name={c.icon} />
                   <span className="plan-item-label">{label}</span>
                   <span className="plan-item-count">{list.length || ''}</span>

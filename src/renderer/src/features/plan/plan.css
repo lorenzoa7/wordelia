@@ -19,7 +19,7 @@
   width: 100%;
   height: 34px;
   margin-bottom: var(--s-3);
-  padding: 0 10px;
+  padding: 0 8px 0 10px;
   border: 1px solid var(--rule);
   border-radius: var(--radius-sm);
   background: var(--paper);
@@ -33,25 +33,38 @@
 }
 .sync-btn:hover {
   border-color: var(--ink-4);
+  background: var(--paper-2);
   color: var(--ink);
+}
+.sync-btn:active {
+  background: var(--desk-2);
 }
 .sync-btn.has-pending {
   border-color: color-mix(in srgb, var(--ribbon) 40%, var(--rule));
 }
 .sync-btn svg {
+  flex-shrink: 0;
   color: var(--ribbon);
+  translate: 0 var(--icon-lift);
 }
 .sync-btn:hover svg {
   animation: spin 0.9s var(--ease-out);
 }
+.sync-btn > span:not(.sync-count) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .sync-count {
+  flex-shrink: 0;
   margin-left: auto;
   min-width: 20px;
   height: 18px;
   padding: 0 6px;
   border-radius: 9px;
   background: var(--ribbon);
-  color: #fff8f2;
+  color: var(--on-ribbon);
   font-size: var(--text-2xs);
   line-height: 18px;
   text-align: center;
@@ -82,9 +95,26 @@
 .plan-group > .plan-item {
   padding-left: 0;
 }
+/* Overview has no caret: its icon lines up with the category icons below. */
+.plan-item-top {
+  /* caret column + gap */
+  padding-left: 30px;
+}
+.plan-item > svg,
+.plan-item-main > svg {
+  flex-shrink: 0;
+  translate: 0 var(--icon-lift);
+}
 .plan-item:hover {
   background: var(--desk-2);
   color: var(--ink);
+}
+/* The list scrolls, so the rings go inside the items. */
+.plan-item:focus-visible,
+.plan-item-main:focus-visible,
+.plan-caret:focus-visible,
+.plan-entry:focus-visible {
+  outline-offset: -2px;
 }
 .plan-item.is-active {
   background: var(--paper);
@@ -101,6 +131,7 @@
   height: 32px;
   padding: 0;
   border: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: inherit;
   font: inherit;
@@ -116,16 +147,23 @@
 .plan-item-count {
   font-size: var(--text-2xs);
   color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
 }
 .plan-caret {
   display: inline-grid;
   place-items: center;
+  flex-shrink: 0;
   width: 22px;
   height: 32px;
   padding: 0;
   border: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--ink-4);
+  transition: color var(--dur-fast) var(--ease-out);
+}
+.plan-caret:hover {
+  color: var(--ink);
 }
 .plan-caret svg {
   transition: transform var(--dur-fast) var(--ease-out);
@@ -148,17 +186,20 @@
 .plan-item:focus-within .plan-item-count {
   display: none;
 }
+/* The tree line runs under the category icon; the entry names line up with the category name. */
 .plan-entries {
   display: flex;
   flex-direction: column;
-  margin: 2px 0 6px 22px;
-  padding-left: 10px;
+  gap: 1px;
+  margin: 2px 0 6px 37px;
+  padding-left: 7px;
   border-left: 1px solid var(--rule-soft);
 }
 .plan-entry {
+  flex-shrink: 0;
   padding: 5px 8px;
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--ink-3);
   font-size: var(--text-sm);
@@ -172,8 +213,10 @@
   color: var(--ink);
 }
 .plan-entry.is-active {
+  background: var(--paper);
   color: var(--ribbon);
   font-weight: 700;
+  box-shadow: 0 1px 2px rgba(60, 44, 24, 0.07);
 }
 .plan-empty {
   padding: 4px 8px;
@@ -182,17 +225,102 @@
   font-style: italic;
 }
 
-/* ---------- Overview ---------- */
+/* ---------- Back link: "← Overview", "← Characters" ---------- */
+.plan-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  height: 28px;
+  margin-left: -8px;
+  padding: 0 10px 0 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.plan-back > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.plan-back svg {
+  flex-shrink: 0;
+  translate: 0 var(--icon-lift);
+}
+.plan-back-arrow {
+  color: var(--ink-4);
+  transition:
+    transform var(--dur-med) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.plan-back:hover {
+  background: var(--ribbon-wash);
+  color: var(--ink);
+}
+.plan-back:hover .plan-back-arrow {
+  color: var(--ribbon);
+  transform: translateX(-2px);
+}
+.plan-back:active {
+  background: var(--ribbon-soft);
+}
+
+/* ---------- Overview and category pages ---------- */
 .plan-hero {
   padding: var(--s-6) 0 var(--s-8);
 }
 .plan-hero h1 {
   margin: 0 0 8px;
   font-family: var(--font-prose);
-  font-size: 34px;
+  font-size: var(--text-3xl);
   font-weight: 600;
   font-style: italic;
-  letter-spacing: -0.01em;
+  letter-spacing: var(--tracking-tight);
+  text-wrap: balance;
+}
+.plan-hero-category {
+  padding: 0 0 var(--s-6);
+}
+.plan-hero-category .plan-back {
+  margin-bottom: var(--s-5);
+}
+.plan-hero-category h1 {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin: 0;
+}
+.plan-hero-category h1 svg {
+  flex-shrink: 0;
+  color: var(--ribbon);
+}
+.plan-hero-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-4);
+  margin-top: var(--s-3);
+  padding-bottom: var(--s-3);
+  border-bottom: 1px solid var(--rule);
+}
+.plan-hero .plan-hero-count {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.plan-hero-tools {
+  display: flex;
+  gap: var(--s-2);
 }
 .plan-hero p {
   max-width: 560px;
@@ -209,9 +337,8 @@
 .plan-section-title {
   display: flex;
   align-items: center;
-  gap: 8px;
   margin: 0 0 var(--s-4);
-  padding-bottom: 8px;
+  padding-bottom: 6px;
   border-bottom: 1px solid var(--rule);
   font-size: var(--text-sm);
   font-weight: 700;
@@ -219,12 +346,51 @@
   text-transform: uppercase;
   color: var(--ink-2);
 }
-.plan-section-title svg {
+/* The section title opens the category page. */
+.plan-section-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  margin-left: -8px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.plan-section-link svg {
+  flex-shrink: 0;
   color: var(--ribbon);
+  translate: 0 var(--icon-lift);
+}
+.plan-section-link:hover {
+  background: var(--desk-2);
+  color: var(--ink);
+}
+.plan-section-link .plan-section-go {
+  color: var(--ink-4);
+  opacity: 0;
+  transform: translateX(-3px);
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    transform var(--dur-med) var(--ease-out);
+}
+.plan-section-link:hover .plan-section-go,
+.plan-section-link:focus-visible .plan-section-go {
+  opacity: 1;
+  transform: none;
 }
 .plan-section-count {
   color: var(--ink-4);
   font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
 }
 .entry-grid {
   display: grid;
@@ -251,12 +417,17 @@
   transform: translateY(-2px);
   box-shadow: 0 1px 2px rgba(60, 44, 24, 0.07), 0 14px 26px -14px rgba(60, 44, 24, 0.4);
 }
+.entry-card:active {
+  transform: translateY(0);
+}
 .entry-card-name {
+  max-width: 100%;
   font-family: var(--font-prose);
   font-size: 17px;
   font-weight: 600;
   line-height: 1.25;
   color: var(--ink);
+  overflow-wrap: anywhere;
 }
 .entry-card-summary {
   font-family: var(--font-prose);
@@ -280,6 +451,7 @@
 }
 .entry-card-new:hover {
   border-color: var(--ribbon);
+  background: var(--ribbon-wash);
   color: var(--ribbon);
   box-shadow: none;
 }
@@ -330,33 +502,21 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--s-4);
   margin-bottom: var(--s-5);
-}
-.entry-crumbs > button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  margin-left: -8px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--ink-3);
-  font-size: var(--text-xs);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.entry-crumbs > button:hover {
-  background: var(--paper-2);
-  color: var(--ink);
 }
 .entry-tools {
   display: flex;
+  flex-shrink: 0;
   gap: 2px;
+  margin-right: -8px;
+}
+.entry-tools .icon-btn:hover:not(:disabled) {
+  background: var(--paper-2);
 }
 .entry-head {
   display: flex;
+  align-items: flex-start;
   gap: var(--s-6);
   margin-bottom: var(--s-6);
   padding-bottom: var(--s-6);
@@ -386,7 +546,8 @@
   opacity: 0;
   transition: opacity var(--dur-fast) var(--ease-out);
 }
-.entry-portrait:hover .entry-portrait-hint {
+.entry-portrait:hover .entry-portrait-hint,
+.entry-portrait:focus-visible .entry-portrait-hint {
   opacity: 1;
 }
 .entry-fields {
@@ -411,6 +572,7 @@
   user-select: text;
 }
 .entry-summary {
+  display: block;
   width: 100%;
   padding: 3px 6px;
   margin-left: -6px;
@@ -420,8 +582,20 @@
   font-family: var(--font-prose);
   font-size: 15px;
   font-style: italic;
+  line-height: 1.45;
   color: var(--ink-2);
   user-select: text;
+  /* Grows with its text instead of cutting it */
+  field-sizing: content;
+  min-height: 0;
+  resize: none;
+  overflow: hidden;
+}
+.entry-summary::placeholder {
+  color: var(--ink-4);
+}
+.entry-name {
+  text-overflow: ellipsis;
 }
 .entry-name:hover,
 .entry-summary:hover,
@@ -430,8 +604,7 @@
   background: var(--paper-2);
 }
 .entry-name:focus,
-.entry-summary:focus,
-.alias-input:focus {
+.entry-summary:focus {
   box-shadow: inset 0 -2px 0 var(--ribbon);
 }
 .entry-aliases {
@@ -466,6 +639,7 @@
 }
 .alias-chip button:hover {
   background: var(--desk-3);
+  color: var(--ink);
 }
 .alias-input {
   width: 90px;
@@ -476,6 +650,20 @@
   background: transparent;
   font-size: var(--text-xs);
   user-select: text;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    width var(--dur-med) var(--ease-out);
+}
+.alias-input::placeholder {
+  color: var(--ink-4);
+}
+.alias-input:hover {
+  border-color: var(--ink-4);
+}
+.alias-input:focus {
+  width: 140px;
+  border-style: solid;
+  border-color: var(--ribbon);
 }
 .entry-body .note-text {
   min-height: 240px;
@@ -548,32 +736,31 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 4px 9px;
+  max-width: 100%;
+  height: 26px;
+  padding: 0 10px;
   border: 1px solid var(--rule);
   border-radius: var(--radius-pill);
   background: transparent;
   font-size: var(--text-xs);
   color: var(--ink-2);
+  white-space: nowrap;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.mention-link svg {
+  flex-shrink: 0;
+  translate: 0 var(--icon-lift);
 }
 .mention-link span {
   color: var(--ink-4);
 }
 .mention-link:hover {
   border-color: var(--ribbon);
+  background: var(--ribbon-wash);
   color: var(--ink);
-}
-.rules-head h1 {
-  margin: 0 0 8px;
-  font-family: var(--font-prose);
-  font-size: 30px;
-  font-style: italic;
-  font-weight: 600;
-}
-.rules-head p {
-  margin: 0 0 var(--s-6);
-  color: var(--ink-3);
-  line-height: 1.6;
-  font-size: var(--text-sm);
 }
 
 /* [[Wiki links]] */

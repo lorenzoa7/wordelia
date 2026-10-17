@@ -85,6 +85,7 @@ export function MapView(): React.JSX.Element {
   const shownEntries = map.nodes.filter((n) => n.kind === 'entry').length
   const colorOf = (n: MapNode): number => (n.kind === 'chapter' ? -1 : (slots.get(n.category ?? '') ?? 7))
   const labelOf = (n: MapNode): string => (n.kind === 'chapter' ? `${n.order + 1}. ${n.label}` : n.label)
+  const iconOf = (n: MapNode): string => byFolder.get(n.category ?? '')?.icon ?? 'Folder'
   const catLabel = (folder: string): string => folderCategoryName(t, folder, categories)
 
   const open = (n: MapNode): void => {
@@ -111,7 +112,7 @@ export function MapView(): React.JSX.Element {
     return (
       <>
         <span className={clsx('map-card-kind', `slot-${colorOf(n) % 8}`)}>
-          <CategoryIcon name={byFolder.get(n.category ?? '')?.icon ?? 'Folder'} size={12} /> {catLabel(n.category ?? '')}
+          <CategoryIcon name={iconOf(n)} size={12} /> {catLabel(n.category ?? '')}
         </span>
         <span className="map-card-name">{n.label}</span>
         {about && <span className="map-card-about">{about}</span>}
@@ -201,7 +202,7 @@ export function MapView(): React.JSX.Element {
           )}
         </header>
 
-        <div className="map-sheet">
+        <div className="map-sheet grain">
           {entries.length === 0 ? (
             <div className="map-empty">
               <Graph size={40} weight="thin" aria-hidden />
@@ -227,6 +228,7 @@ export function MapView(): React.JSX.Element {
                 memoryKey={root}
                 colorOf={colorOf}
                 labelOf={labelOf}
+                iconOf={iconOf}
                 matches={matches}
                 ariaLabel={t.plan.map.label(shownEntries, map.edges.length)}
                 onOpen={open}

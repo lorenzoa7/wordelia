@@ -327,7 +327,7 @@ export default async function ({ page, shot, openBook, book, work }) {
   await page.waitForTimeout(300)
   if ((await ada.getAttribute('transform')) === before) fail('Drag did not move the node')
   if ((await state()).entry) fail('A drag opened the entry')
-  const world = page.locator('.map-svg > g')
+  const world = page.locator('.map-world')
   const zoom0 = await world.getAttribute('transform')
   const sheet = await page.locator('.map-sheet').boundingBox()
   await page.mouse.move(sheet.x + sheet.width / 2, sheet.y + sheet.height / 2)

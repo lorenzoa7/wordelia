@@ -53,10 +53,38 @@ export function edgeKey(e: { source: string; target: string }): string {
 export const MIN_ZOOM = 0.15
 export const MAX_ZOOM = 4
 
-/** Node size grows with the number of links. */
+/** Node size grows with the number of links. The smallest token still has room for its icon. A chapter: half the height of its book. */
 export function nodeRadius(n: Pick<MapNode, 'degree' | 'kind'>): number {
   const grow = Math.sqrt(n.degree)
-  return n.kind === 'chapter' ? 5 + Math.min(grow * 1.4, 6) : 5 + Math.min(grow * 2.6, 13)
+  return n.kind === 'chapter' ? 11 + Math.min(grow * 1.3, 5) : 9 + Math.min(grow * 2.5, 12)
+}
+
+/** Space between the dots of the background grid at zoom 1, in world units */
+export const GRID_STEP = 24
+/** The smallest space between two dots on the screen, in pixels */
+export const GRID_MIN = 14
+
+export interface Grid {
+  /** Space between two dots on the screen. A tile of the pattern is two steps wide: one big dot and three small dots. */
+  step: number
+  /** Where a tile starts on the screen */
+  x: number
+  y: number
+  /** Opacity of the small dots: they fade out as they come near each other */
+  minor: number
+}
+
+/**
+ * The dot grid of the stage. It moves and zooms with the map, but its dots keep their size on the
+ * screen. The step doubles or halves so that it stays between GRID_MIN and 2 × GRID_MIN pixels.
+ * Before it doubles, every second dot fades out, so the grid never jumps.
+ */
+export function dotGrid(v: View): Grid {
+  const raw = GRID_STEP * v.k
+  const step = raw / Math.pow(2, Math.floor(Math.log2(raw / GRID_MIN)))
+  const tile = step * 2
+  const wrap = (a: number): number => ((a % tile) + tile) % tile
+  return { step, x: wrap(v.x - step / 2), y: wrap(v.y - step / 2), minor: clamp((step - GRID_MIN) / (GRID_MIN / 2), 0, 1) }
 }
 
 /** About the width of one character of a label (at zoom 1) */
@@ -76,23 +104,26 @@ export function labelWidth(n: Pick<MapNode, 'label' | 'kind'>): number {
 /**
  * Keeps the boxes of two nodes (the dot and the label under it) apart, so labels do not overlap.
  * It moves the two nodes along the axis with the smaller overlap. All pairs: fast enough for 300 nodes.
+ * `scale`: the size of a label in the world, compared with zoom 1 (labels keep their size on the screen).
  */
-function forceLabels(strength = 0.5): ((alpha: number) => void) & { initialize: (nodes: LayoutNode[]) => void } {
+function forceLabels(scale: () => number, strength = 0.5): ((alpha: number) => void) & { initialize: (nodes: LayoutNode[]) => void } {
   let nodes: LayoutNode[] = []
   const force = (): void => {
+    const sc = scale()
+    const lh = LABEL_H * sc
     for (let i = 0; i < nodes.length; i++) {
       const a = nodes[i]
       const ax = (a.x ?? 0) + (a.vx ?? 0)
       const ay = (a.y ?? 0) + (a.vy ?? 0)
-      const aw = Math.max(a.w, a.r * 2)
-      const ah = a.r * 2 + LABEL_H
+      const aw = Math.max(a.w * sc, a.r * 2)
+      const ah = a.r * 2 + lh
       for (let j = i + 1; j < nodes.length; j++) {
         const b = nodes[j]
         const dx = (b.x ?? 0) + (b.vx ?? 0) - ax
-        const ox = (aw + Math.max(b.w, b.r * 2)) / 2 + PAD_X - Math.abs(dx)
+        const ox = (aw + Math.max(b.w * sc, b.r * 2)) / 2 + PAD_X - Math.abs(dx)
         if (ox <= 0) continue
         const dy = (b.y ?? 0) + (b.vy ?? 0) - ay
-        const oy = (ah + b.r * 2 + LABEL_H) / 2 + PAD_Y - Math.abs(dy)
+        const oy = (ah + b.r * 2 + lh) / 2 + PAD_Y - Math.abs(dy)
         if (oy <= 0) continue
         if (ox < oy) {
           const m = (ox / 2) * strength * (dx < 0 ? -1 : 1)
@@ -128,6 +159,11 @@ export class MapLayout {
   /** Nodes without links that the user moved: they stay where the user put them */
   private readonly placed = new Set<string>()
   private readonly aspect: number
+  /**
+   * The size of a label in the world, compared with zoom 1. A label keeps its size on the screen, so a
+   * map that fits the stage at zoom 0.7 needs labels about 1.4 times as wide. The canvas sets it from the fit.
+   */
+  labelScale = 1
 
   /**
    * `saved`: the places of the last layout. `unchanged`: the links are the same as in that layout.
@@ -174,14 +210,14 @@ export class MapLayout {
         'link',
         forceLink<LayoutNode, LayoutLink>(links)
           .id((d) => d.id)
-          .distance((l) => 60 + (l.source as LayoutNode).r + (l.target as LayoutNode).r)
+          .distance((l) => 50 + (l.source as LayoutNode).r + (l.target as LayoutNode).r)
       )
       .force('charge', forceManyBody<LayoutNode>().strength(-320).distanceMax(800))
       // A wide stage pulls harder up and down, so the map gets wide too.
       .force('x', forceX<LayoutNode>(0).strength(0.05 / Math.sqrt(clamp(aspect, 0.5, 3))))
       .force('y', forceY<LayoutNode>(0).strength(0.05 * Math.sqrt(clamp(aspect, 0.5, 3))))
-      .force('collide', forceCollide<LayoutNode>((d) => d.r + 6))
-      .force('labels', forceLabels())
+      .force('collide', forceCollide<LayoutNode>((d) => d.r + 4))
+      .force('labels', forceLabels(() => this.labelScale))
     // A map that the user saw before, without changes, starts at rest.
     const known = linked.filter((n) => saved.has(n.id)).length
     this.sim.alpha(!linked.length || (unchanged && known === linked.length) ? 0 : known === 0 ? 1 : 0.5)

@@ -1,13 +1,19 @@
 // The map itself: an SVG graph with pan, zoom, drag and hover.
 // React draws the nodes and the edges once. Each animation frame moves them directly in the DOM,
 // so 300 nodes stay smooth.
+//
+// A node is a paper token: a soft shadow, a disc with a ring in the color of its category and the
+// icon of the category. The icons are symbols in one sprite (`<defs>`), and each node has a `<use>`:
+// React does not draw an icon component for each node. A chapter is a small closed book with a
+// ribbon. Behind the map, a dot grid moves and zooms with it.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createElement, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ArrowsIn, Minus, Plus } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { adjacency, type MapNode, type PlanningMap } from '@shared/planning/graph'
 import { IconButton } from '@/ui'
-import { MapLayout, clamp, edgeKey, fitView, nodeRadius, toWorld, zoomAt, type Point, type View } from './layout'
+import { categoryIcon } from '@/features/plan/PlanSidebar'
+import { MapLayout, clamp, dotGrid, edgeKey, fitView, nodeRadius, toWorld, zoomAt, type Point, type View } from './layout'
 
 interface Memory {
   pos: Map<string, Point>
@@ -40,8 +46,60 @@ function usePrefersReducedMotion(): boolean {
 /** All labels show when the map is small or near. */
 const ALL_LABELS_NODES = 40
 const ALL_LABELS_ZOOM = 1.1
+/** Far out, a small map shows only the major labels too: else they cover each other */
+const MIN_ALL_LABELS_ZOOM = 0.45
 /** Else only the labels of the nodes with the most links */
 const MAJOR_LABELS = 14
+
+/** The id of the symbol of an icon in the sprite */
+const iconId = (name: string): string => `map-icon-${name.replace(/[^\w-]/g, '_')}`
+
+/** The icon of a token: about the size of the inner ring */
+const iconSize = (r: number): number => r * 1.36
+
+/** Size groups of the nodes, for the level of detail: the smallest radius of each group */
+const SIZE_GROUPS: [string, number][] = [
+  ['l', 16],
+  ['m', 12],
+  ['s', 0]
+]
+const sizeGroup = (r: number): string => SIZE_GROUPS.find(([, min]) => r >= min)?.[0] ?? 's'
+
+/**
+ * Level of detail. An icon shows when its token is at least 6 px wide on the screen (radius), a shadow
+ * from zoom 0.5, the inner ring from zoom 1. Fewer things to paint keep a big map smooth when it is far.
+ * near: all · mid: no inner rings · ml: no icons on small tokens · far: icons on big tokens only, no shadows · tiny: none
+ */
+function levelOfDetail(k: number): string {
+  if (k >= 1) return 'near'
+  if (k >= 6 / 9) return 'mid'
+  if (k >= 6 / 12) return 'ml'
+  if (k >= 6 / 16) return 'far'
+  return 'tiny'
+}
+
+/** A chapter: a closed book, 1.5 × r wide and 2 × r high, with a spine and a ribbon. */
+function ChapterBook({ r, n }: { r: number; n: number }): React.JSX.Element {
+  const w = r * 1.5
+  const left = -w / 2
+  const spine = left + r * 0.28
+  // The ribbon hangs from the top edge of the cover, at the right
+  const rx = w / 2 - r * 0.62
+  const rw = r * 0.34
+  const bottom = -r + r * 0.8
+  const digits = String(n).length
+  return (
+    <>
+      <ellipse className="map-shade" cy={r * 0.34} rx={r * 1.15} ry={r * 1.4} fill="url(#map-shade)" />
+      <rect className="map-dot map-book" x={left} y={-r} width={w} height={r * 2} rx={1.6} />
+      <line className="map-book-spine" x1={spine} y1={-r} x2={spine} y2={r} />
+      <path className="map-book-ribbon" d={`M${rx} ${-r}V${bottom}L${rx + rw / 2} ${bottom - r * 0.2}L${rx + rw} ${bottom}V${-r}Z`} />
+      <text className="map-book-no" x={(spine + w / 2) / 2} y={r * 0.38} fontSize={r * (digits > 2 ? 0.6 : 0.88)}>
+        {n}
+      </text>
+    </>
+  )
+}
 
 export interface MapCanvasProps {
   map: PlanningMap
@@ -50,6 +108,8 @@ export interface MapCanvasProps {
   /** Color slot of a node (the order of its category), -1 for a chapter */
   colorOf: (n: MapNode) => number
   labelOf: (n: MapNode) => string
+  /** The icon name of the category of an entry (`CategoryDef.icon`) */
+  iconOf: (n: MapNode) => string
   /** Search results, the best first */
   matches: string[]
   ariaLabel: string
@@ -58,11 +118,14 @@ export interface MapCanvasProps {
   texts: { zoomIn: string; zoomOut: string; fit: string }
 }
 
-export function MapCanvas({ map, memoryKey, colorOf, labelOf, matches, ariaLabel, onOpen, renderCard, texts }: MapCanvasProps): React.JSX.Element {
+export function MapCanvas({ map, memoryKey, colorOf, labelOf, iconOf, matches, ariaLabel, onOpen, renderCard, texts }: MapCanvasProps): React.JSX.Element {
   const reduce = usePrefersReducedMotion()
   const stageRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const worldRef = useRef<SVGGElement>(null)
+  const gridRef = useRef<SVGPatternElement>(null)
+  /** The last values written to the DOM, so a frame writes only what changed */
+  const written = useRef({ labels: '', lod: '', grid: '', at: new WeakMap<Element, string>() })
   const cardRef = useRef<HTMLDivElement>(null)
   const nodeEls = useRef(new Map<string, SVGGElement>())
   const edgeEls = useRef(new Map<string, SVGLineElement>())
@@ -116,24 +179,78 @@ export function MapCanvas({ map, memoryKey, colorOf, labelOf, matches, ariaLabel
     const layout = layoutRef.current
     const svg = svgRef.current
     if (!layout || !svg) return
+    const v = viewRef.current
+    const done = written.current.at
+    // Write an attribute only when its value changes: each write restyles the element.
+    const set = (el: Element | undefined, name: string, value: string): void => {
+      if (!el) return
+      const key = `${name}:${value}`
+      if (done.get(el) === key) return
+      el.setAttribute(name, value)
+      done.set(el, key)
+    }
     for (const n of layout.nodes) {
-      const at = `translate(${(n.x ?? 0).toFixed(1)},${(n.y ?? 0).toFixed(1)})`
-      nodeEls.current.get(n.id)?.setAttribute('transform', at)
-      tagEls.current.get(n.id)?.setAttribute('transform', at)
+      const x = n.x ?? 0
+      const y = n.y ?? 0
+      set(nodeEls.current.get(n.id), 'transform', `translate(${x.toFixed(1)},${y.toFixed(1)})`)
+      // The labels are in screen units, under the node: they keep their size at every zoom.
+      set(tagEls.current.get(n.id), 'transform', `translate(${(x * v.k + v.x).toFixed(1)},${((y + n.r) * v.k + v.y).toFixed(1)})`)
     }
     for (const e of layout.edges) {
       const el = edgeEls.current.get(e.key)
       if (!el) continue
-      el.setAttribute('x1', (e.a.x ?? 0).toFixed(1))
-      el.setAttribute('y1', (e.a.y ?? 0).toFixed(1))
-      el.setAttribute('x2', (e.b.x ?? 0).toFixed(1))
-      el.setAttribute('y2', (e.b.y ?? 0).toFixed(1))
+      const key = `${(e.a.x ?? 0).toFixed(1)} ${(e.a.y ?? 0).toFixed(1)} ${(e.b.x ?? 0).toFixed(1)} ${(e.b.y ?? 0).toFixed(1)}`
+      if (done.get(el) === key) continue
+      done.set(el, key)
+      const [x1, y1, x2, y2] = key.split(' ')
+      el.setAttribute('x1', x1)
+      el.setAttribute('y1', y1)
+      el.setAttribute('x2', x2)
+      el.setAttribute('y2', y2)
     }
-    const v = viewRef.current
     worldRef.current?.setAttribute('transform', `translate(${v.x.toFixed(2)},${v.y.toFixed(2)}) scale(${v.k.toFixed(4)})`)
-    svg.style.setProperty('--map-k', v.k.toFixed(4))
-    svg.dataset.labels = layout.nodes.length <= ALL_LABELS_NODES || v.k >= ALL_LABELS_ZOOM ? 'all' : 'major'
+    const last = written.current
+    const labels = (layout.nodes.length <= ALL_LABELS_NODES && v.k >= MIN_ALL_LABELS_ZOOM) || v.k >= ALL_LABELS_ZOOM ? 'all' : 'major'
+    if (labels !== last.labels) {
+      svg.dataset.labels = labels
+      last.labels = labels
+    }
+    const lod = levelOfDetail(v.k)
+    if (lod !== last.lod) {
+      svg.dataset.lod = lod
+      last.lod = lod
+    }
+    paintGrid(v)
     placeCard()
+  }
+
+  /** The dot grid follows the view. Its pattern changes only when the view moves. */
+  const paintGrid = (v: View): void => {
+    const pattern = gridRef.current
+    if (!pattern) return
+    const g = dotGrid(v)
+    const key = `${g.step.toFixed(3)} ${g.x.toFixed(2)} ${g.y.toFixed(2)} ${g.minor.toFixed(2)}`
+    if (key === written.current.grid) return
+    written.current.grid = key
+    const tile = (g.step * 2).toFixed(3)
+    pattern.setAttribute('width', tile)
+    pattern.setAttribute('height', tile)
+    pattern.setAttribute('x', g.x.toFixed(2))
+    pattern.setAttribute('y', g.y.toFixed(2))
+    const a = (g.step / 2).toFixed(3)
+    const b = (g.step * 1.5).toFixed(3)
+    // One big dot, then three small dots
+    const at = [
+      [a, a],
+      [b, a],
+      [a, b],
+      [b, b]
+    ]
+    pattern.querySelectorAll('circle').forEach((c, i) => {
+      c.setAttribute('cx', at[i][0])
+      c.setAttribute('cy', at[i][1])
+    })
+    pattern.querySelector('g')?.setAttribute('opacity', g.minor.toFixed(2))
   }
 
   const fitTarget = (): View => {
@@ -160,6 +277,8 @@ export function MapCanvas({ map, memoryKey, colorOf, labelOf, matches, ariaLabel
     } else if (autoFit.current) {
       // The view follows the map while it settles.
       const to = fitTarget()
+      // When all labels show, they need their room at the zoom of the fit.
+      layout.labelScale = layout.nodes.length <= ALL_LABELS_NODES ? clamp(1 / to.k, 1, 1.5) : 1
       const v = viewRef.current
       const f = reduceRef.current ? 1 : 0.14
       const next = { x: v.x + (to.x - v.x) * f, y: v.y + (to.y - v.y) * f, k: v.k + (to.k - v.k) * f }
@@ -359,6 +478,8 @@ export function MapCanvas({ map, memoryKey, colorOf, labelOf, matches, ariaLabel
 
   const hovered = hover ? nodeById.get(hover) : undefined
   const best = matches[0]
+  // One symbol for each icon on the map
+  const icons = [...new Set(map.nodes.filter((n) => n.kind === 'entry').map(iconOf))].sort()
   /** The classes of a node, and of its label */
   const states = (n: MapNode): string =>
     clsx(
@@ -384,7 +505,30 @@ export function MapCanvas({ map, memoryKey, colorOf, labelOf, matches, ariaLabel
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
       >
-        <g ref={worldRef}>
+        <defs>
+          {/* The dot grid: the tile, its place and the opacity of the small dots change with the view (paintGrid) */}
+          <pattern id="map-grid" ref={gridRef} patternUnits="userSpaceOnUse" width={48} height={48}>
+            <circle className="map-grid-dot" cx={12} cy={12} r={1} />
+            <g>
+              <circle className="map-grid-dot" cx={36} cy={12} r={1} />
+              <circle className="map-grid-dot" cx={12} cy={36} r={1} />
+              <circle className="map-grid-dot" cx={36} cy={36} r={1} />
+            </g>
+          </pattern>
+          {/* The soft shadow under a node */}
+          <radialGradient id="map-shade">
+            <stop className="map-shade-stop" offset="0" />
+            <stop className="map-shade-stop" offset="0.6" stopOpacity={0.45} />
+            <stop className="map-shade-stop" offset="1" stopOpacity={0} />
+          </radialGradient>
+          {icons.map((name) => (
+            <symbol key={name} id={iconId(name)} viewBox="0 0 256 256" overflow="visible">
+              {createElement(categoryIcon(name), { size: 256, weight: 'bold', overflow: 'visible' })}
+            </symbol>
+          ))}
+        </defs>
+        <rect className="map-grid" width="100%" height="100%" fill="url(#map-grid)" />
+        <g ref={worldRef} className="map-world">
           <g className="map-edges">
             {map.edges.map((e) => {
               const key = edgeKey(e)
@@ -405,10 +549,12 @@ export function MapCanvas({ map, memoryKey, colorOf, labelOf, matches, ariaLabel
           <g className="map-nodes">
             {map.nodes.map((n) => {
               const r = nodeRadius(n)
+              const s = iconSize(r)
               return (
                 <g
                   key={n.id}
                   data-node={n.id}
+                  data-size={sizeGroup(r)}
                   data-label={labelOf(n)}
                   ref={(el) => {
                     if (el) nodeEls.current.set(n.id, el)
@@ -420,34 +566,39 @@ export function MapCanvas({ map, memoryKey, colorOf, labelOf, matches, ariaLabel
                 >
                   <circle className="map-hit" r={r + 7} />
                   {n.kind === 'chapter' ? (
-                    <rect className="map-dot" x={-r * 0.8} y={-r} width={r * 1.6} height={r * 2} rx={1.5} />
+                    <ChapterBook r={r} n={n.order + 1} />
                   ) : (
-                    <circle className="map-dot" r={r} />
+                    <>
+                      <circle className="map-shade" cy={r * 0.3} r={r * 1.4} fill="url(#map-shade)" />
+                      <circle className="map-dot" r={r} />
+                      <circle className="map-rim" r={r - 2.6} />
+                      <use className="map-icon" href={`#${iconId(iconOf(n))}`} x={-s / 2} y={-s / 2} width={s} height={s} />
+                    </>
                   )}
                 </g>
               )
             })}
           </g>
-          {/* The labels have a layer of their own, above all the nodes */}
-          <g className="map-tags">
-            {map.nodes.map((n) => {
-              const label = labelOf(n)
-              return (
-                <g
-                  key={n.id}
-                  ref={(el) => {
-                    if (el) tagEls.current.set(n.id, el)
-                    else tagEls.current.delete(n.id)
-                  }}
-                  className={clsx('map-tag', states(n))}
-                >
-                  <text className="map-label" y={nodeRadius(n) + 3}>
-                    {label.length > 32 ? `${label.slice(0, 30)}…` : label}
-                  </text>
-                </g>
-              )
-            })}
-          </g>
+        </g>
+        {/* The labels: a layer of their own above all the nodes, in screen units (paint) */}
+        <g className="map-tags">
+          {map.nodes.map((n) => {
+            const label = labelOf(n)
+            return (
+              <g
+                key={n.id}
+                ref={(el) => {
+                  if (el) tagEls.current.set(n.id, el)
+                  else tagEls.current.delete(n.id)
+                }}
+                className={clsx('map-tag', states(n))}
+              >
+                <text className="map-label" y={3}>
+                  {label.length > 32 ? `${label.slice(0, 30)}…` : label}
+                </text>
+              </g>
+            )
+          })}
         </g>
       </svg>
 

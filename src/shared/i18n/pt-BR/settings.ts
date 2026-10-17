@@ -33,10 +33,10 @@ export const settings: typeof en = {
     themes: { light: 'Papel', dark: 'Lamparina', system: 'Sistema' },
     writing: 'Escrita',
     pageZoom: 'Zoom da página',
-    dailyGoal: 'Meta diária (palavras)',
+    dailyGoal: 'Meta diária',
     dailyGoalAria: 'Meta diária',
-    goalWords: (v) => `${v} palavras`,
-    goalOff: 'Desligada',
+    goalUnit: 'palavras por dia',
+    goalHint: '0 desliga a meta.',
     spellcheck: 'Verificação ortográfica',
     focusMode: 'Modo foco (atenua os outros parágrafos)',
     typewriterSounds: 'Sons de máquina de escrever',
@@ -50,7 +50,9 @@ export const settings: typeof en = {
       findReplace: 'Localizar e substituir',
       toggleChat: 'Mostrar ou ocultar o chat',
       toggleSidebar: 'Mostrar ou ocultar a barra lateral',
-      writePlan: 'Escrever / Planejar'
+      writePlan: 'Escrever / Planejar',
+      zoomInOut: 'Aumentar / diminuir o zoom',
+      zoomReset: 'Voltar o zoom para 100%'
     }
   },
   book: {
@@ -75,6 +77,13 @@ export const settings: typeof en = {
     textOnPage: 'Texto na página',
     pageSize: 'Tamanho da página',
     pageSizeHint: 'As páginas na tela e o livro exportado usam este tamanho.',
+    margins: 'Margens (centímetros)',
+    marginsHint: 'No PDF de um livro, a margem esquerda fica do lado da lombada em cada página.',
+    marginTop: 'Superior',
+    marginBottom: 'Inferior',
+    marginLeft: 'Esquerda',
+    marginRight: 'Direita',
+    marginAria: (side) => `Margem ${side.toLowerCase()}, em centímetros`,
     previewDialogue: (dash) => `${dash} Você sentiu isso? ${dash} perguntou o velho, e as velas se curvaram para a porta.`,
     previewQuoted: '“Você sentiu isso?”, perguntou o velho, e as velas se curvaram para a porta.',
     previewNarration: 'Elias não respondeu. Lá fora, o vento guardava os próprios segredos.',

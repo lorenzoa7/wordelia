@@ -36,10 +36,11 @@ export const settings = {
     themes: { light: 'Paper', dark: 'Lamplight', system: 'System' },
     writing: 'Writing',
     pageZoom: 'Page zoom',
-    dailyGoal: 'Daily goal (words)',
+    dailyGoal: 'Daily goal',
     dailyGoalAria: 'Daily goal',
-    goalWords: (v: number): string => `${v} words`,
-    goalOff: 'Off',
+    /** The unit after the number of the daily goal */
+    goalUnit: 'words a day',
+    goalHint: '0 turns the goal off.',
     spellcheck: 'Spell check',
     focusMode: 'Focus mode (dim other paragraphs)',
     typewriterSounds: 'Typewriter sounds',
@@ -55,7 +56,9 @@ export const settings = {
       findReplace: 'Find and replace',
       toggleChat: 'Show or hide the chat',
       toggleSidebar: 'Show or hide the sidebar',
-      writePlan: 'Write / Plan'
+      writePlan: 'Write / Plan',
+      zoomInOut: 'Zoom in / out',
+      zoomReset: 'Reset the zoom'
     }
   },
   /** The This book tab */
@@ -82,6 +85,14 @@ export const settings = {
     textOnPage: 'Text on the page',
     pageSize: 'Page size',
     pageSizeHint: 'The pages on screen and the exported book use this size.',
+    margins: 'Margins (centimeters)',
+    marginsHint: 'In the PDF of a book, the left margin is on the spine side of each page.',
+    marginTop: 'Top',
+    marginBottom: 'Bottom',
+    marginLeft: 'Left',
+    marginRight: 'Right',
+    /** aria-label of a margin box. `side` is Top, Bottom, Left or Right. */
+    marginAria: (side: string): string => `${side} margin, in centimeters`,
     /** Sample text in the typography preview */
     previewDialogue: (dash: string): string => `${dash} Did you feel that? ${dash} asked the old man, and the candles bent toward the door.`,
     previewQuoted: '“Did you feel that?” asked the old man, and the candles bent toward the door.',

@@ -50,7 +50,7 @@ export function SettingsDialog(): React.JSX.Element {
                 {bookTitle || t.common.untitled}
               </div>
               <Tabs.Trigger value="book" className="settings-tab">
-                <BookOpenText size={15} /> {d.book}
+                <BookOpenText size={15} className="icon-book" /> {d.book}
               </Tabs.Trigger>
               <Tabs.Trigger value="rules" className="settings-tab">
                 <Scroll size={15} /> {d.rules}

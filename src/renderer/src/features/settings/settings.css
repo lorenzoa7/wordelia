@@ -33,6 +33,10 @@
 }
 .settings-tab svg {
   flex-shrink: 0;
+  translate: 0 var(--icon-lift);
+}
+.settings-tab .icon-book {
+  translate: 0 var(--icon-lift-book);
 }
 .settings-tab:hover {
   background: var(--paper-2);
@@ -124,6 +128,10 @@
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
 }
+.link-btn svg {
+  flex-shrink: 0;
+  translate: 0 var(--icon-lift);
+}
 
 /* Theme cards */
 .theme-picker {
@@ -183,6 +191,15 @@
   font-size: var(--text-sm);
   font-weight: 700;
   color: var(--ink-2);
+}
+.theme-label svg {
+  flex-shrink: 0;
+  translate: 0 var(--icon-lift);
+}
+/* The sun and the moon draw high in their boxes. */
+.theme-light .theme-label svg,
+.theme-dark .theme-label svg {
+  translate: 0 calc(var(--icon-lift) / 2);
 }
 
 .shortcuts {
@@ -494,6 +511,7 @@
   color: var(--ink);
 }
 .provider-more-caret {
+  translate: 0 var(--icon-lift);
   transition: transform var(--dur-med) var(--ease-out);
 }
 .provider-row.is-open .provider-more-caret {
@@ -601,6 +619,7 @@
   place-items: center;
   color: var(--ink-4);
   cursor: help;
+  translate: 0 var(--icon-lift);
 }
 .route-help:hover {
   color: var(--ink-2);
@@ -656,6 +675,7 @@
 }
 .action-item svg {
   flex-shrink: 0;
+  translate: 0 var(--icon-lift);
 }
 .action-item-name {
   flex: 1;
@@ -774,6 +794,7 @@
 }
 .action-main svg {
   color: var(--ribbon);
+  translate: 0 var(--icon-lift);
 }
 .action-delete {
   color: var(--ink-3);
@@ -881,8 +902,33 @@
   color: var(--ribbon);
 }
 
-/* Page size of the book */
-.select.page-size {
-  width: 280px;
-  max-width: 100%;
+/* Page size and margins of the book, side by side */
+.page-setup {
+  align-items: start;
+}
+.margins-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--s-2);
+}
+.margin-box {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.margin-box .number-input {
+  width: 100%;
+}
+.margin-box .number-input-box {
+  flex: 1;
+}
+/* The name of each margin, under its box, on the line of the number */
+.margin-caption {
+  padding-left: calc(var(--s-3) + 1px);
+  overflow: hidden;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

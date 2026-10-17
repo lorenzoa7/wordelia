@@ -2,7 +2,7 @@ import clsx from 'clsx'
 import { Moon, Sun, Desktop } from '@phosphor-icons/react'
 import type { Locale, ThemeSetting } from '@shared/types'
 import { useEffect, useState } from 'react'
-import { Button, Field, Select, Switch } from '@/ui'
+import { Button, Field, NumberInput, Select, Switch } from '@/ui'
 import { invoke } from '@/lib/api'
 import { checkForUpdate, installUpdate, useUpdate } from '@/lib/update'
 import { useApp } from '@/stores/app'
@@ -15,6 +15,17 @@ const THEMES: Array<{ id: ThemeSetting; icon: React.ReactNode }> = [
   { id: 'dark', icon: <Moon size={16} /> },
   { id: 'system', icon: <Desktop size={16} /> }
 ]
+
+/** The zoom steps of the page: the same steps as the zoom keys of the editor (Ctrl+= and Ctrl+-). */
+const ZOOM_STEPS = [0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.2, 1.35, 1.5, 1.75, 2]
+/** The highest daily goal, in words */
+const MAX_GOAL = 100000
+
+/** The zoom choices, with the current zoom also when it is not a step (an old setting). */
+function zoomOptions(zoom: number): Array<{ value: string; label: string }> {
+  const steps = ZOOM_STEPS.includes(zoom) ? ZOOM_STEPS : [...ZOOM_STEPS, zoom].sort((a, b) => a - b)
+  return steps.map((z) => ({ value: String(z), label: `${Math.round(z * 100)}%` }))
+}
 
 export function GeneralTab(): React.JSX.Element | null {
   const settings = useApp((s) => s.settings)
@@ -54,16 +65,18 @@ export function GeneralTab(): React.JSX.Element | null {
         <Select
           value={String(settings.ui.zoom)}
           onValueChange={(v) => setUi({ zoom: Number(v) })}
-          options={[0.9, 1, 1.1, 1.2, 1.35].map((z) => ({ value: String(z), label: `${Math.round(z * 100)}%` }))}
+          options={zoomOptions(settings.ui.zoom)}
           ariaLabel={g.pageZoom}
         />
       </Field>
-      <Field label={g.dailyGoal} inline>
-        <Select
-          value={String(settings.editor.dailyGoal ?? 0)}
-          onValueChange={(v) => void update({ editor: { ...settings.editor, dailyGoal: Number(v) } })}
-          options={[0, 250, 500, 750, 1000, 1500, 2000].map((n) => ({ value: String(n), label: n ? g.goalWords(n) : g.goalOff }))}
-          ariaLabel={g.dailyGoalAria}
+      <Field label={g.dailyGoal} hint={g.goalHint} inline>
+        <NumberInput
+          value={settings.editor.dailyGoal ?? 0}
+          onCommit={(v) => void update({ editor: { ...settings.editor, dailyGoal: v } })}
+          min={0}
+          max={MAX_GOAL}
+          step={50}
+          unit={g.goalUnit}
         />
       </Field>
       <Field label={g.spellcheck} inline>
@@ -98,6 +111,8 @@ export function GeneralTab(): React.JSX.Element | null {
           [g.shortcuts.toggleChat, 'Ctrl+L'],
           [g.shortcuts.toggleSidebar, 'Ctrl+\\'],
           [g.shortcuts.writePlan, 'Ctrl+1 / Ctrl+2'],
+          [g.shortcuts.zoomInOut, 'Ctrl+= / Ctrl+-'],
+          [g.shortcuts.zoomReset, 'Ctrl+0'],
           [t.common.export, 'Ctrl+Shift+E'],
           [t.common.settings, 'Ctrl+,']
         ].map(([label, key], i) => (

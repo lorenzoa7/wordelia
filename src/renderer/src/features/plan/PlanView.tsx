@@ -19,7 +19,7 @@ import { importNotes } from './importNotes'
 import { startPlanningSync } from './sync'
 import './plan.css'
 
-/** One level up: from an entry to its category, from a category to the overview. */
+/** One level up: from an entry to its category, from a category or the map to the overview. An entry opened from the map goes back to the map. */
 function goBack(): void {
   if (mapBack()) return
   const s = useBook.getState()

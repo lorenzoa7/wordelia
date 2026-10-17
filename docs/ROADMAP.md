@@ -138,6 +138,16 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] Effort names in English in all interface languages
 - [x] Page size of the book in Settings → This book
 
+### Editor: pages and the book as one scroll
+
+- [x] Pages on screen, like a word processor: the page size and the margins of the book (Settings → This book → Page size). A full page ends, a band of desk shows, and the text goes on to the next page. A break inside a paragraph keeps the line justified (scenario `pages`)
+- [x] The book is one scroll: every chapter starts on a new page, and scrolling down goes on into the next chapter. Each chapter has its own editor and undo history; a chapter far from the screen keeps its height but has no editor
+- [x] The page has a fixed width. A narrow window scrolls the desk sideways; the toolbar takes two rows
+- [x] Ctrl+Home and Ctrl+End go to the start and the end of the chapter. The arrow keys go on into the previous or the next chapter
+- [x] Find (Ctrl+F) scrolls to each match and goes on into the other chapters. The case and whole-word buttons have hover states and aligned icons
+- [x] A chat proposal shows in the text: its chapter opens, the passage scrolls into view, and the change shows as an inline diff with Accept and Reject (`revealProposal` in `features/editor/registry.ts`, scenario `reveal`)
+- [x] The selection menu shows the shortcut of each action
+
 ### Design review: layout, title bar, Plan navigation
 
 - [x] Side panels: drag the edge of the sidebar or the chat to change its width. Drag it past the minimum and the panel closes. Drag or click the edge at the window side to open it again. The sidebar width is in `settings.ui.sidebarWidth` (scenario `panels`)

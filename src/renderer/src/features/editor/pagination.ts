@@ -89,6 +89,8 @@ interface Unit {
   blockPos: number
   /** The first line of its block, or a block that cannot break */
   first: boolean
+  /** The first line after a page break: it starts a new page */
+  force: boolean
   /** Client coordinates of the start of the line, to find its document position */
   x: number
   y: number
@@ -105,6 +107,12 @@ function lineBoxes(el: HTMLElement): Array<{ top: number; bottom: number; left: 
     if ((n.parentElement as HTMLElement | null)?.closest('.pm-page-gap')) continue
     range.selectNodeContents(n)
     for (const r of range.getClientRects()) if (r.width > 0 || r.height > 0) rects.push(r)
+  }
+  // A line with only a line break (Shift+Enter) has no text, but it takes a line.
+  for (const br of el.querySelectorAll('br')) {
+    if (br.closest('.pm-page-gap')) continue
+    range.selectNode(br)
+    for (const r of range.getClientRects()) if (r.height > 0) rects.push(r)
   }
   rects.sort((a, b) => a.top - b.top || a.left - b.left)
   const lines: Array<{ top: number; bottom: number; left: number }> = []
@@ -132,27 +140,37 @@ function lineBoxes(el: HTMLElement): Array<{ top: number; bottom: number; left: 
 function measure(view: EditorView, m: PageMetrics, firstOffset: number): { breaks: Break[]; tail: number } | null {
   const root = view.dom as HTMLElement
   if (!root.isConnected || root.offsetParent === null) return null
-  const rootTop = root.getBoundingClientRect().top
-  const gaps = Array.from(root.querySelectorAll<HTMLElement>('.pm-page-gap')).map((g) => {
-    const r = g.getBoundingClientRect()
-    return { top: r.top - rootTop, bottom: r.bottom - rootTop }
-  })
-  /** Height of the gaps above a y (relative to the editor top) */
-  const above = (y: number): number => gaps.reduce((s, g) => (g.bottom <= y + EPS ? s + (g.bottom - g.top) : s), 0)
+  // Measure the free flow of the text, with the gaps hidden. A gap inside a paragraph forces a line
+  // break; if it took part in the measure, a gap in a wrong place (from a moment when the AI diff
+  // showed, for example) would keep itself there. The gaps show again before the browser paints.
+  root.classList.add('is-measuring')
+  try {
+    return measureFlow(view, root, m, firstOffset)
+  } finally {
+    root.classList.remove('is-measuring')
+  }
+}
 
+function measureFlow(view: EditorView, root: HTMLElement, m: PageMetrics, firstOffset: number): { breaks: Break[]; tail: number } {
+  const rootTop = root.getBoundingClientRect().top
   const units: Unit[] = []
+  /** The block after a page break starts a new page */
+  let forced = false
   view.state.doc.forEach((node, offset) => {
+    if (node.type.name === 'pageBreak') {
+      forced = true
+      return
+    }
     const dom = view.nodeDOM(offset)
     if (!(dom instanceof HTMLElement)) return
     const style = getComputedStyle(dom)
+    const force = forced
+    forced = false
     if (node.isTextblock && node.content.size > 0) {
       const lines = lineBoxes(dom)
       if (lines.length) {
         lines.forEach((l, i) => {
-          const top = l.top - rootTop
-          const bottom = l.bottom - rootTop
-          const a = above(top)
-          units.push({ top: top - a, bottom: bottom - a, blockPos: offset, first: i === 0, x: l.left + 1, y: (l.top + l.bottom) / 2 })
+          units.push({ top: l.top - rootTop, bottom: l.bottom - rootTop, blockPos: offset, first: i === 0, force: force && i === 0, x: l.left + 1, y: (l.top + l.bottom) / 2 })
         })
         return
       }
@@ -160,8 +178,7 @@ function measure(view: EditorView, m: PageMetrics, firstOffset: number): { break
     const r = dom.getBoundingClientRect()
     const top = r.top - rootTop - (parseFloat(style.marginTop) || 0)
     const bottom = r.bottom - rootTop + (parseFloat(style.marginBottom) || 0)
-    const a = above(top)
-    units.push({ top: top - a, bottom: bottom - a, blockPos: offset, first: true, x: r.left + 1, y: r.top + 1 })
+    units.push({ top, bottom, blockPos: offset, first: true, force, x: r.left + 1, y: r.top + 1 })
   })
   if (!units.length) return { breaks: [], tail: Math.max(0, m.contentHeight - firstOffset) }
 
@@ -169,6 +186,13 @@ function measure(view: EditorView, m: PageMetrics, firstOffset: number): { break
   let pageStart = 0
   let limit = m.contentHeight - firstOffset
   for (const u of units) {
+    // A page break (Ctrl+Enter): the rest of the page stays empty.
+    if (u.force && u.top - pageStart > EPS) {
+      breaks.push({ pos: u.blockPos, inline: false, rest: Math.max(0, limit - (u.top - pageStart)) })
+      pageStart = u.top
+      limit = m.contentHeight
+      continue
+    }
     if (u.bottom - pageStart <= limit + EPS) continue
     // A unit taller than a whole page stays where it is.
     if (u.top - pageStart <= EPS) continue

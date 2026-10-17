@@ -71,6 +71,8 @@ function blocks(nodes: DocNode[], sceneGlyph: string): string {
         case 'sceneBreak':
           firstInScene = true
           return `<div class="scene">${esc(sceneGlyph) || '&nbsp;'}</div>`
+        case 'pageBreak':
+          return '<div class="pagebreak"></div>'
         case 'heading': {
           firstInScene = true
           const level = Math.min(Number(n.attrs?.level ?? 2) + 1, 4)
@@ -155,6 +157,7 @@ p.a-right { text-align: right; text-indent: 0; }
 h2, h3, h4 { font-size: 1.05em; margin: 1.2em 0 0.6em; text-align: left; break-after: avoid; }
 blockquote { margin: 0.8em 2em; }
 .chapter.newpage { break-before: page; }
+.pagebreak { break-after: page; height: 0; }
 .chapter-head { text-align: center; margin-bottom: ${manuscript ? '2em' : '2.6em'}; break-after: avoid; }
 .ch-label { font-size: ${manuscript ? '1em' : '2.4em'}; line-height: 1.1; ${manuscript ? 'text-transform: none;' : ''} }
 .ch-title { font-size: ${manuscript ? '1em' : '1.2em'}; font-weight: normal; font-style: ${manuscript ? 'normal' : 'italic'}; margin: ${manuscript ? '0' : '0.6em 0 0'}; line-height: 1.3; }

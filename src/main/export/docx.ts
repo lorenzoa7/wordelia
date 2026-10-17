@@ -7,6 +7,7 @@ import {
   Header,
   LineRuleType,
   Packer,
+  PageBreak,
   PageNumber,
   Paragraph,
   TextRun,
@@ -76,6 +77,9 @@ function bodyParagraphs(nodes: DocNode[], glyph: string): Paragraph[] {
         case 'sceneBreak':
           out.push(new Paragraph({ style: 'SceneBreak', children: [new TextRun(glyph)] }))
           first = true
+          break
+        case 'pageBreak':
+          out.push(new Paragraph({ children: [new PageBreak()] }))
           break
         case 'heading':
           out.push(new Paragraph({ style: 'Heading2', children: runs(n.content) }))

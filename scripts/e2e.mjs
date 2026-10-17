@@ -31,6 +31,7 @@ const scenarios = [
   ['selmenu', '--en'],
   ['zoom', '--en'],
   ['longtitle', '--en'],
+  ['ctrlenter', '--en'],
   ['graph', '--en'],
   ['graph', '--en', '--dark'],
   ['switchbook'],

@@ -788,3 +788,14 @@
     height: 0;
   }
 }
+
+/* A page break (Ctrl+Enter) has no height: the page gap after it shows the new page. */
+.page-break {
+  height: 0;
+  margin: 0;
+  overflow: hidden;
+}
+/* While the pages are measured, the gaps are hidden: the text flows free (pagination.ts). */
+.is-measuring .pm-page-gap {
+  display: none !important;
+}

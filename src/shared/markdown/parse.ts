@@ -189,6 +189,10 @@ function withParaAttrs(node: DocNode, attrs: Record<string, string>): DocNode {
   return node
 }
 
+/** The stored form of a page break (Ctrl+Enter) */
+export const PAGE_BREAK_MARKDOWN = '<!-- page break -->'
+const PAGE_BREAK_SOURCE = /^<!--\s*page\s*break\s*-->$/i
+
 const SCENE_BREAK_SOURCES = /^(\*\s*\*\s*\*|-\s*-\s*-|_\s*_\s*_|⁂|❦|#)\s*$/
 
 /** Parse Wordelia Markdown (no frontmatter) into a `doc` node. */
@@ -209,6 +213,12 @@ export function parseMarkdown(src: string): DocNode {
     switch (t.type) {
       case 'paragraph_open': {
         const inline = tokens[i + 1]
+        // A page break: `<!-- page break -->` alone in a paragraph.
+        if (PAGE_BREAK_SOURCE.test(inline.content.trim())) {
+          append({ type: 'pageBreak' })
+          i += 2
+          break
+        }
         const node = paragraphNode(inline)
         append(node)
         i += 2 // skip inline and paragraph_close

@@ -284,6 +284,8 @@ function serializeBlock(node: DocNode, indent: string, alt = false): string {
     case 'sceneBreak':
     case 'horizontalRule':
       return indent + '* * *'
+    case 'pageBreak':
+      return indent + '<!-- page break -->'
     case 'image':
       return indent + imageMarkdown(node)
     case 'blockquote': {

@@ -208,6 +208,7 @@ export function markdownToPlain(md: string): string {
     .replace(/(\*\*|__|\*|_|~~|`)/g, '')
     .replace(/\\([\\*_`[\]<>~{}&#+=|.-])/g, '$1')
     .replace(/^\* \* \*$/gm, '')
+    .replace(/^<!--\s*page\s*break\s*-->$/gim, '')
 }
 
 const WORD_RE = /[\p{L}\p{N}]+(?:['’\-][\p{L}\p{N}]+)*/gu

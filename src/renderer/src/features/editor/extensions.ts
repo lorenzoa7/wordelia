@@ -8,7 +8,7 @@ import { FontFamily, FontSize, TextStyle } from '@tiptap/extension-text-style'
 import TextAlign from '@tiptap/extension-text-align'
 import Image from '@tiptap/extension-image'
 import { Placeholder } from '@tiptap/extensions'
-import { ParagraphIndent, SceneBreak } from './nodes'
+import { PageBreak, ParagraphIndent, SceneBreak } from './nodes'
 import { SmartTyping, quotesFor } from './smart-typing'
 import { FindReplace } from './find'
 import { Review } from './review'
@@ -33,6 +33,7 @@ export function schemaExtensions(): AnyExtension[] {
     TextAlign.configure({ types: ['paragraph', 'heading'], alignments: ['left', 'center', 'right', 'justify'] }),
     Image.configure({ inline: false, allowBase64: false }),
     SceneBreak,
+    PageBreak,
     ParagraphIndent
   ]
 }

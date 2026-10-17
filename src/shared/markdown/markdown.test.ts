@@ -38,6 +38,13 @@ describe('parseMarkdown', () => {
     }
   })
 
+  it('parses and writes page breaks', () => {
+    const d = parseMarkdown('Antes.\n\n<!-- page break -->\n\nDepois.')
+    expect(d.content?.[1]).toEqual({ type: 'pageBreak' })
+    expect(roundTrip('Antes.\n\n<!-- page break -->\n\nDepois.\n')).toBe('Antes.\n\n<!-- page break -->\n\nDepois.\n')
+    expect(parseMarkdown('<!--PAGE BREAK-->').content?.[0]).toEqual({ type: 'pageBreak' })
+  })
+
   it('parses bracketed spans with font and size', () => {
     const d = parseMarkdown('Texto [grande *e itálico*]{font="EB Garamond" size=18} aqui.')
     const span = { type: 'textStyle', attrs: { fontFamily: 'EB Garamond', fontSize: '18pt' } }

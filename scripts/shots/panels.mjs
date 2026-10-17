@@ -46,8 +46,15 @@ export default async function ({ page, shot, openBook }) {
   await page.keyboard.press('Control+Backslash')
   await page.waitForTimeout(600)
   if ((await width('.book-sidebar')) > 4) throw new Error('Ctrl+\\ did not close the sidebar')
-  await page.locator('.titlebar-left .icon-btn').first().click()
+  // A hidden sidebar: the button at the top-left corner of the page shows it.
+  await page.locator('.sidebar-show .icon-btn').click()
   await page.waitForTimeout(600)
-  if ((await width('.book-sidebar')) < 200) throw new Error('The toggle button did not open the sidebar')
+  if ((await width('.book-sidebar')) < 200) throw new Error('The show button did not open the sidebar')
+  // The button in the sidebar header hides it.
+  await page.locator('.book-sidebar .sidebar-toggle').click()
+  await page.waitForTimeout(600)
+  if ((await width('.book-sidebar')) > 4) throw new Error('The hide button did not close the sidebar')
+  await page.locator('.sidebar-show .icon-btn').click()
+  await page.waitForTimeout(600)
   console.log(JSON.stringify({ wide, back, chat, ui: await ui() }))
 }

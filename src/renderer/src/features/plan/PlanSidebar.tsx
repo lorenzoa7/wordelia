@@ -18,6 +18,7 @@ import { IconButton, Tooltip } from '@/ui'
 import { askText } from '@/ui/prompt'
 import { categoryName, useT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
+import { HideSidebarButton } from '@/features/book/SidebarToggle'
 import { changedChapters, startPlanningSync } from './sync'
 import { importNotes } from './importNotes'
 
@@ -60,12 +61,31 @@ export function PlanSidebar(): React.JSX.Element {
     <div className="sidebar plan-sidebar">
       <div className="sidebar-head">
         <span className="caps">{t.plan.sidebar.planning}</span>
+        <span className="sidebar-head-tools">
+          <HideSidebarButton />
+        </span>
       </div>
 
-      <Tooltip label={pending ? t.plan.sidebar.changedChapters(pending) : t.plan.sidebar.upToDate} side="right">
-        <button className={clsx('sync-btn', pending > 0 && 'has-pending')} onClick={() => void startPlanningSync()}>
+      {/* The planning sync: the AI reads the changed chapters and proposes changes to the notes. */}
+      <Tooltip
+        side="right"
+        label={
+          <span className="sync-tip">
+            <span>{t.plan.sidebar.updateNotesHint}</span>
+            <b>{pending ? t.plan.sidebar.changedChapters(pending) : t.plan.sidebar.upToDate}</b>
+          </span>
+        }
+      >
+        <button
+          className={clsx('sync-btn', pending > 0 && 'has-pending')}
+          aria-label={`${t.plan.sidebar.updateNotes} ${t.plan.sidebar.updateNotesFrom}`}
+          onClick={() => void startPlanningSync()}
+        >
           <ArrowsClockwise size={15} />
-          <span>{t.plan.sidebar.syncWithManuscript}</span>
+          <span className="sync-text">
+            <span className="sync-label">{t.plan.sidebar.updateNotes}</span>
+            <span className="sync-sub">{t.plan.sidebar.updateNotesFrom}</span>
+          </span>
           {pending > 0 && <span className="sync-count">{pending}</span>}
         </button>
       </Tooltip>

@@ -15,10 +15,15 @@ export const plan = {
   },
   sidebar: {
     planning: 'Planning',
-    syncWithManuscript: 'Sync with manuscript',
-    /** Tooltip of the sync button. `count` is 1 or more. */
-    changedChapters: (count: number): string => `${count} chapter${count > 1 ? 's' : ''} changed since the last sync`,
-    upToDate: 'The planning is up to date',
+    /** The sync button, on two lines: "Update notes" / "from the chapters" */
+    updateNotes: 'Update notes',
+    updateNotesFrom: 'from the chapters',
+    /** Tooltip of the sync button: what it does */
+    updateNotesHint:
+      'The AI reads the chapters that changed since the last update and proposes changes to your planning notes. You accept or reject each change. The AI does not change the manuscript.',
+    /** Tooltip of the sync button, second line. `count` is 1 or more. */
+    changedChapters: (count: number): string => `${count} chapter${count > 1 ? 's' : ''} changed since the last update.`,
+    upToDate: 'No chapter changed since the last update.',
     overview: 'Overview',
     showEntries: (category: string): string => `${category}: show entries`,
     importNotesInto: (category: string): string => `Import notes into ${category}`,
@@ -106,6 +111,7 @@ export const plan = {
     upToDate: 'The planning is up to date with the manuscript.',
     done: 'Sync done. Review the proposals in the chat.',
     threadTitle: 'Planning sync',
+    /** Stored in sync threads: keep this English text as it is, or old threads show it untranslated. */
     threadBrief: 'Keeps the planning in step with the manuscript. Proposals come from the Sync button.',
     /** The user message in the sync thread. `chapters` is the list of chapter titles in quotes. */
     request: (bootstrap: boolean, count: number, chapters: string, part: number, parts: number): string =>

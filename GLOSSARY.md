@@ -21,7 +21,7 @@ This file is the ubiquitous language of Wordelia. Use these words in code, docs 
 | **Category** | A group of entries, for example Characters. One folder in `planning/`. | `Category` |
 | **Entry** | One planning note, for example one character. One Markdown file. | `Entry` |
 | **Alias** | Another name for an entry. The app uses aliases to find mentions in the manuscript. | `aliases` |
-| **Sync** | The AI compares the manuscript with the planning and proposes changes to the planning. | `planningSync` |
+| **Sync** | The AI compares the manuscript with the planning and proposes changes to the planning. The button is "Update notes from the chapters". | `planningSync` |
 
 ## AI
 

@@ -1,8 +1,9 @@
+import { useId } from 'react'
 import clsx from 'clsx'
-import type { PageSize, SceneBreakStyle, Typography } from '@shared/types'
+import type { ExportSettings, PageSize, SceneBreakStyle, Typography } from '@shared/types'
 import { PAGE_SIZES } from '@shared/export/model'
 import { quotesFor } from '@shared/text/quotes'
-import { Field, Select, Switch, TextInput } from '@/ui'
+import { Field, NumberInput, Select, Switch, TextInput } from '@/ui'
 import { useBook } from '@/stores/book'
 import { useT } from '@/lib/i18n'
 import { BOOK_FONTS, fontStack } from '@/lib/fonts'
@@ -57,15 +58,18 @@ export function BookTab(): React.JSX.Element | null {
       </Field>
 
       <h3 className="settings-h">{tr.textOnPage}</h3>
-      <Field label={tr.pageSize} hint={tr.pageSizeHint}>
-        <Select
-          value={m.export.pageSize}
-          onValueChange={(v) => update({ export: { ...m.export, pageSize: v as PageSize } })}
-          options={(Object.keys(PAGE_SIZES) as PageSize[]).map((k) => ({ value: k, label: tx.pageSizes[k] }))}
-          ariaLabel={tr.pageSize}
-          className="page-size"
-        />
-      </Field>
+      <div className="settings-grid page-setup">
+        <Field label={tr.pageSize} hint={tr.pageSizeHint}>
+          <Select
+            value={m.export.pageSize}
+            onValueChange={(v) => update({ export: { ...m.export, pageSize: v as PageSize } })}
+            options={(Object.keys(PAGE_SIZES) as PageSize[]).map((k) => ({ value: k, label: tx.pageSizes[k] }))}
+            ariaLabel={tr.pageSize}
+            className="page-size"
+          />
+        </Field>
+        <MarginsField settings={m.export} onChange={(margins) => update({ export: { ...m.export, margins } })} />
+      </div>
       <div className="typo-preview" style={{ ...font, lineHeight: t.lineHeight, textAlign: t.align }}>
         <p style={{ textIndent: t.indentFirstParagraph ? `${t.firstLineIndent}em` : 0 }}>{t.dialogueStyle === 'quotes' ? tr.previewQuoted : tr.previewDialogue(t.dialogueDash)}</p>
         <p style={{ textIndent: `${t.firstLineIndent}em` }}>{tr.previewNarration}</p>
@@ -187,6 +191,61 @@ export function BookTab(): React.JSX.Element | null {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+/** Millimeters in a centimeter */
+const CM = 10
+/** The text area keeps at least this much of the page in each direction, in millimeters. */
+const MIN_TEXT = 40
+/** The widest margin, in millimeters */
+const MAX_MARGIN = 100
+
+/**
+ * The page margins, like Google Docs: Top, Bottom, Left and Right in centimeters. The book keeps
+ * millimeters; Left is the inner margin and Right the outer margin. A margin cannot take more
+ * of the page than leaves MIN_TEXT for the text.
+ */
+function MarginsField({ settings, onChange }: { settings: ExportSettings; onChange: (margins: ExportSettings['margins']) => void }): React.JSX.Element {
+  const tr = useT().settings.book
+  const id = useId()
+  const mg = settings.margins
+  const size = PAGE_SIZES[settings.pageSize] ?? PAGE_SIZES.A5
+  const sides = [
+    { key: 'top', label: tr.marginTop, other: mg.bottom, page: size.h },
+    { key: 'bottom', label: tr.marginBottom, other: mg.top, page: size.h },
+    { key: 'inner', label: tr.marginLeft, other: mg.outer, page: size.w },
+    { key: 'outer', label: tr.marginRight, other: mg.inner, page: size.w }
+  ] as const
+  return (
+    <div className="field margins" role="group" aria-labelledby={`${id}label`}>
+      <span className="field-label" id={`${id}label`}>
+        {tr.margins}
+      </span>
+      <div className="margins-row">
+        {sides.map((s) => {
+          const maxMm = Math.max(0, Math.min(MAX_MARGIN, s.page - MIN_TEXT - s.other))
+          return (
+            <div key={s.key} className="margin-box">
+              <NumberInput
+                id={`${id}${s.key}`}
+                value={Math.round(mg[s.key]) / CM}
+                onCommit={(cm) => onChange({ ...mg, [s.key]: Math.round(cm * CM * 10) / 10 })}
+                min={0}
+                max={Math.floor(maxMm) / CM}
+                step={0.1}
+                decimals={1}
+                ariaLabel={tr.marginAria(s.label)}
+              />
+              <label className="margin-caption" htmlFor={`${id}${s.key}`}>
+                {s.label}
+              </label>
+            </div>
+          )
+        })}
+      </div>
+      <span className="field-hint">{tr.marginsHint}</span>
     </div>
   )
 }

@@ -315,15 +315,22 @@
   justify-content: space-between;
   gap: var(--s-4);
 }
+/* In a row, the hint goes under the label and stops before the control. */
 .field-inline .field-hint {
-  display: none;
+  max-width: 62%;
+  margin-top: -4px;
 }
+/* The label covers its text only, so a click beside the text or the control does nothing. */
 .field-label {
+  align-self: flex-start;
   font-size: var(--text-xs);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-3);
+}
+.field-inline .field-label {
+  align-self: center;
 }
 .field-hint {
   font-size: var(--text-xs);
@@ -353,6 +360,51 @@
 .input:focus {
   border-color: var(--ribbon);
   box-shadow: 0 0 0 3px var(--ribbon-wash);
+}
+/* Number box: the number, then its unit in lighter ink, in one bordered box */
+.number-input {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: 34px;
+  padding: 0 var(--s-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: var(--text-sm);
+  cursor: text;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+.number-input:hover:not(:focus-within) {
+  border-color: var(--ink-4);
+}
+.number-input:focus-within {
+  border-color: var(--ribbon);
+  box-shadow: 0 0 0 3px var(--ribbon-wash);
+}
+.number-input-box {
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-variant-numeric: tabular-nums;
+  user-select: text;
+}
+.number-input-box:focus-visible {
+  outline: none;
+}
+/* With a unit, the number ends next to it. */
+.number-input.has-unit .number-input-box {
+  text-align: right;
+}
+.number-input-unit {
+  color: var(--ink-3);
+  white-space: nowrap;
+  user-select: none;
 }
 .textarea {
   height: auto;
@@ -397,6 +449,9 @@
   rotate: 180deg;
 }
 .select-caret {
+  /* A box of its own: the caret centers on the line, not on the baseline. */
+  display: inline-flex;
+  translate: 0 var(--icon-lift);
   transition: rotate var(--dur-med) var(--ease-out);
 }
 .select > span:first-child {

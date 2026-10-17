@@ -120,6 +120,38 @@
   padding: 0 2px 0 10px;
   margin-bottom: var(--s-2);
 }
+/* The name of the sidebar moves down by the icon lift: the icons of its buttons center on
+   its capitals, and the buttons keep their place. */
+.sidebar-head > .caps {
+  translate: 0 calc(-1 * var(--icon-lift));
+}
+/* The buttons of the sidebar header: new chapter, hide the sidebar */
+.sidebar-head-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+/* A hidden sidebar: a small button at the top-left corner of the page area shows it again.
+   It has the look and the height of the editor toolbar. */
+.sidebar-show {
+  position: absolute;
+  top: var(--s-3);
+  left: var(--s-2);
+  z-index: 12;
+  padding: 4px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  box-shadow: var(--shadow-pop);
+  backdrop-filter: blur(10px);
+}
+/* The page area keeps clear of the button: the editor toolbar (it spans a narrow page area)
+   and the Plan pages. */
+.book-main.is-sidebar-closed .toolbar-wrap {
+  padding-inline: 56px;
+}
+.book-main.is-sidebar-closed .plan-scroll {
+  padding-left: max(var(--s-8), 64px);
+}
 .chapter-list {
   flex: 1;
   overflow-y: auto;

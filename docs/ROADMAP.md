@@ -193,6 +193,17 @@ This file is the source of truth for progress. Update it after each task. Mark a
 
 - [x] Planning map: a "Cards | Map" switch on the Plan overview. The map shows all entries as nodes: a color for each category, a size for the number of links. An entry links to another entry when its summary or its notes use the name or an alias of the other entry (whole words; accents count), or `[[Name]]`. Pan, zoom, fit to screen and drag nodes. Hover shows the neighbors and a card. A click opens the entry; its back link goes to the map. Category chips filter the map, the search box shows the matches (Enter opens the best match), and "Chapters" adds the chapters. Entries without links sit on rings around the others. Empty states for a book without entries and for entries without links (`src/shared/planning/graph.ts`, `features/graph/`, scenario `graph`)
 
+### Shell and settings
+
+- [x] No "Claude" badge in the title bar. A small warning shows only when the chat has no AI ("Connect an AI", "AI not connected", "AI login expired"); a click opens Settings → AI. The update badge stays
+- [x] A dropdown opens only from its own box: `Field` no longer wraps its control in the label, so a click beside a select or a switch does nothing (all settings tabs, the export dialog, the new book and import dialogs)
+- [x] Page margins in Settings → This book, next to the page size: Top, Bottom, Left, Right in centimeters (the book keeps millimeters; Left = inner, Right = outer)
+- [x] "Sync with manuscript" becomes "Update notes / from the chapters", with a tooltip: the AI reads the changed chapters and proposes changes to the notes; you accept or reject each change; the manuscript does not change. The count badge stays
+- [x] The wordmark at the far left of the title bar. The sidebar toggle is in the sidebar header; a hidden sidebar leaves a small button at the top-left corner of the page (Write and Plan views)
+- [x] Icons centered on the text: the lift is measured on the screen pixels for each display scale (scenario `icons`, 45 pairs); icons added to the settings tabs, theme cards, actions list, carets and links
+- [x] The daily goal is a number box with "words a day" (0 turns it off, saved on Enter or blur)
+- [x] The page zoom select has the steps of the zoom keys; the keyboard list shows the zoom keys
+
 ## Later (not in version 1)
 
 - Sync to a git remote from the app

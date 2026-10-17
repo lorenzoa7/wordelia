@@ -25,10 +25,11 @@ export const app: typeof en = {
   openHint: 'Arrastra o haz clic para mostrar',
   provider: {
     connect: 'Conectar una IA',
-    checking: 'Comprobando…',
-    notConnected: (name) => `${name}: no conectado`,
-    ready: (name) => `IA lista: ${name}`,
-    openSettings: 'Abrir ajustes de IA'
+    connectHint: 'No hay ninguna IA conectada. Abre Ajustes → IA para conectar una.',
+    notConnectedShort: 'IA no conectada',
+    notConnectedHint: (name) => `${name} no está conectado. Abre Ajustes → IA para conectarlo.`,
+    expired: 'La sesión de la IA expiró',
+    expiredHint: (name) => `La sesión de ${name} expiró. Abre Ajustes → IA para iniciar sesión de nuevo.`
   },
   aiErrors: {
     notInstalled: 'El proveedor de IA no está instalado.',

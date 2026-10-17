@@ -9,7 +9,6 @@ import {
   Gear,
   Notebook,
   PenNib,
-  SidebarSimple,
   Scroll,
   SignOut,
   SlidersHorizontal
@@ -46,18 +45,8 @@ export function TitleBar(): React.JSX.Element {
 
   return (
     <header className={clsx('titlebar', root && 'has-book')}>
+      {/* The wordmark at the far left; the sidebar toggle is in the sidebar header. */}
       <div className="titlebar-left">
-        {root && (
-          <IconButton
-            label={ui?.sidebarOpen ? t.app.hideSidebar : t.app.showSidebar}
-            shortcut="Ctrl+\"
-            active={ui?.sidebarOpen}
-            onClick={() => setUi({ sidebarOpen: !ui?.sidebarOpen })}
-            className="no-drag"
-          >
-            <SidebarSimple size={17} />
-          </IconButton>
-        )}
         {root ? (
           <Tooltip label={t.app.backToLibrary}>
             <button className="titlebar-logo no-drag" onClick={closeBook} aria-label={t.app.backToLibrary}>
@@ -75,7 +64,7 @@ export function TitleBar(): React.JSX.Element {
             <Menu
               trigger={
                 <button className="titlebar-book no-drag">
-                  <BookOpenText size={14} />
+                  <BookOpenText size={14} className="icon-book" />
                   <span className="titlebar-book-title">{title}</span>
                   <CaretDown size={11} />
                 </button>

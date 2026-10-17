@@ -33,7 +33,7 @@ You install Wordelia one time. After that, Wordelia updates itself: it downloads
 
 ### 🗺️ Plan the story
 - Keep entries for characters, places, the world and the plot.
-- Press **Sync with manuscript**. The AI adds new facts from your chapters.
+- Press **Update notes from the chapters**. The AI proposes new facts from your chapters. You accept or reject each change.
 
 ### More
 - A book is a folder of Markdown files on your computer.

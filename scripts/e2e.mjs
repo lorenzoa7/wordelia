@@ -33,7 +33,9 @@ const scenarios = [
   ['longtitle', '--en'],
   ['graph', '--en'],
   ['graph', '--en', '--dark'],
-  ['switchbook']
+  ['switchbook'],
+  ['icons'],
+  ['shell']
 ]
 
 function run(args) {

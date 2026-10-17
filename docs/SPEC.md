@@ -90,7 +90,7 @@ An action shows its result as an **inline diff** on the page: removed words in r
 - An entry is a rich-text note with an optional image (for example a portrait) and aliases.
 - A category page shows its entries as cards.
 - The links `[[Entry name]]` work, like Obsidian.
-- **Sync with manuscript:** a button. The AI reads the chapters that changed since the last sync. It proposes new entries (for example a new character) and updates to entries. The writer reviews each proposal as a diff.
+- **Update notes from the chapters** (the sync): a button in the Plan sidebar. The AI reads the chapters that changed since the last sync. It proposes new entries (for example a new character) and updates to entries. The writer reviews each proposal as a diff.
 - **Build planning from manuscript:** the same process for a full imported book.
 
 ### 4.8 AI providers

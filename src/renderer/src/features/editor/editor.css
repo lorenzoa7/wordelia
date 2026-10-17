@@ -59,8 +59,8 @@
 }
 .pm-page-band {
   position: absolute;
-  left: calc(-1 * var(--page-mx) - 28px);
-  right: calc(-1 * var(--page-mx) - 28px);
+  left: calc(-1 * var(--page-mx));
+  right: calc(-1 * var(--page-mx));
   background: var(--desk);
   box-shadow:
     inset 0 8px 7px -7px rgba(64, 48, 28, 0.16),

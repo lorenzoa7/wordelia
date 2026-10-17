@@ -331,7 +331,8 @@
   align-items: center;
   gap: 4px;
 }
-.scene-break {
+/* Scoped: the editor has its own .scene-break. */
+.scene-breaks .scene-break {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -347,14 +348,14 @@
   white-space: pre;
   transition: border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
 }
-.scene-break.is-text {
+.scene-breaks .scene-break.is-text {
   font-size: var(--text-xs);
   font-weight: 700;
 }
-.scene-break:hover {
+.scene-breaks .scene-break:hover {
   border-color: var(--ink-4);
 }
-.scene-break.is-active {
+.scene-breaks .scene-break.is-active {
   border-color: var(--ribbon);
   background: var(--ribbon-wash);
   color: var(--ink);

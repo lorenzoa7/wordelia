@@ -115,19 +115,27 @@ function decorations(state: EditorState, r: ReviewData): DecorationSet {
     decos.push(Decoration.inline(r.from, r.to, { class: r.phase === 'error' ? 'ai-error' : 'ai-pending' }))
     return DecorationSet.create(state.doc, decos)
   }
-  const { map } = textWithMap(state.doc, r.from, r.to)
+  decos.push(...diffDecorations(state.doc, r.from, r.to, r.ops, r.id))
+  decos.push(Decoration.inline(r.from, r.to, { class: 'ai-range' }))
+  return DecorationSet.create(state.doc, decos)
+}
+
+/** A word diff drawn in the text: deleted words struck through, new words as widgets. */
+export function diffDecorations(doc: PMNode, from: number, to: number, ops: DiffOp[], id: string): Decoration[] {
+  const decos: Decoration[] = []
+  const { map } = textWithMap(doc, from, to)
   let i = 0
-  r.ops.forEach((op, n) => {
+  ops.forEach((op, n) => {
     const len = op.text.length
     if (op.type === 'equal') {
       i += len
     } else if (op.type === 'delete') {
-      const a = map[i] ?? r.to
-      const b = (map[Math.min(i + len, map.length) - 1] ?? r.to - 1) + 1
+      const a = map[i] ?? to
+      const b = (map[Math.min(i + len, map.length) - 1] ?? to - 1) + 1
       if (b > a) decos.push(Decoration.inline(a, b, { class: 'ai-del' }))
       i += len
     } else {
-      const pos = i < map.length ? map[i] : r.to
+      const pos = i < map.length ? map[i] : to
       decos.push(
         Decoration.widget(
           pos,
@@ -146,13 +154,12 @@ function decorations(state: EditorState, r: ReviewData): DecorationSet {
             })
             return span
           },
-          { side: -1, key: `ins-${r.id}-${n}-${op.text.length}`, ignoreSelection: true }
+          { side: -1, key: `ins-${id}-${n}-${op.text.length}`, ignoreSelection: true }
         )
       )
     }
   })
-  decos.push(Decoration.inline(r.from, r.to, { class: 'ai-range' }))
-  return DecorationSet.create(state.doc, decos)
+  return decos
 }
 
 /** Build a slice from Markdown, open at both ends when the ends are paragraphs. */

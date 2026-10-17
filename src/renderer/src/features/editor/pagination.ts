@@ -101,8 +101,8 @@ function lineBoxes(el: HTMLElement): Array<{ top: number; bottom: number; left: 
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
   const range = document.createRange()
   for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-    // Text inside widgets (the AI diff, page gaps) is not part of the line flow measure.
-    if ((n.parentElement as HTMLElement | null)?.closest('[contenteditable="false"]')) continue
+    // Words that the AI proposes (widgets) take room in the lines; the page gaps do not count.
+    if ((n.parentElement as HTMLElement | null)?.closest('.pm-page-gap')) continue
     range.selectNodeContents(n)
     for (const r of range.getClientRects()) if (r.width > 0 || r.height > 0) rects.push(r)
   }

@@ -13,7 +13,7 @@ import { useBook } from '@/stores/book'
 import { typesetForBook } from '@/lib/typeset'
 import { toast } from '@/stores/ui'
 import { folderCategoryName, useT } from '@/lib/i18n'
-import { revealProposal } from '@/features/editor/registry'
+import { inlineProposalId, revealProposal } from '@/features/editor/inlineProposals'
 import { applyCreate, applyEditHunk, markAfter, resolveTarget, restoreSnapshot, setHunkStates, snapshotOf, type Snapshot } from './applyProposal'
 
 type EditSeg = Extract<Segment, { kind: 'edit' }>
@@ -161,15 +161,10 @@ function EditCard({ segment: raw, message, thread, streaming }: Props & { segmen
   }
 
   const Icon = target.kind === 'chapter' ? BookOpenText : Notebook
-  /** Take the user to the passage in the chapter and show the change there. The editor applies it on Accept. */
+  /** Take the user to the change in the chapter. Pending changes show in the text with Accept and Reject. */
   const reveal = (i: number): void => {
     if (target.kind !== 'chapter' || !thread || !message) return
-    const h = segment.hunks[i]
-    // A version from before the change, as for an Accept in the chat.
-    snapshotOf(segment.file)
-    const found = revealProposal(target.chapter.id, h.find, h.replace, (accepted) =>
-      setHunkState(thread, message.id, keys[i], accepted ? 'accepted' : 'rejected')
-    )
+    const found = revealProposal(target.chapter.id, segment.hunks[i].find, inlineProposalId(thread.id, message.id, keys[i]))
     if (!found) toast(t.chat.passageNotFound, { kind: 'error' })
   }
   const firstPending = segment.hunks.findIndex((h, i) => h.complete && pending.includes(keys[i]))

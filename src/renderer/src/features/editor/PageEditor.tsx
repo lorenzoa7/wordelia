@@ -23,6 +23,7 @@ import { ReviewBar } from './ReviewBar'
 import { FindBar } from './FindBar'
 import { useEditorStats } from './stats'
 import { usePageZoom } from './zoom'
+import { useInlineProposalSync } from './inlineProposals'
 import { typewriterSound } from './typewriter-sound'
 import { cleanPastedHtml } from './paste'
 import './editor.css'
@@ -136,6 +137,7 @@ export function PageEditor(): React.JSX.Element | null {
 
   useEditorStats(active?.editor ?? null)
   const zoomBadge = usePageZoom(deskRef)
+  useInlineProposalSync()
 
   if (!manifest || !typo || !geometry) return null
 
@@ -282,7 +284,8 @@ function SheetEditor({ chapterId, geometry, onTyping, sheetRef }: EditorProps): 
             if (!sheet || !root) return 0
             return root.getBoundingClientRect().top - sheet.getBoundingClientRect().top - geometryRef.current.marginTop
           }
-        }
+        },
+        proposals: { chapterId: () => chapterId }
       }),
     // Typing rules and the interface language change rarely; the editor is rebuilt when they do.
     // eslint-disable-next-line react-hooks/exhaustive-deps

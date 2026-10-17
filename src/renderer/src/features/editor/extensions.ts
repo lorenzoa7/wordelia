@@ -15,6 +15,7 @@ import { Review } from './review'
 import { WikiLinks } from './wiki-links'
 import { wikiLinkOptions } from '@/features/plan/links'
 import { Pagination, type PaginationOptions } from './pagination'
+import { InlineProposals, type InlineProposalsOptions } from './inlineProposals'
 
 /** Extensions that define the schema. Used by the editor and by HTML import. */
 export function schemaExtensions(): AnyExtension[] {
@@ -67,6 +68,8 @@ export interface EditorConfig {
   placeholder: string
   /** Pages on screen: geometry and the height of the chapter heading */
   pages?: PaginationOptions
+  /** Chat proposals in the text: the chapter of this editor */
+  proposals?: InlineProposalsOptions
 }
 
 export function editorExtensions(cfg: EditorConfig): AnyExtension[] {
@@ -86,6 +89,7 @@ export function editorExtensions(cfg: EditorConfig): AnyExtension[] {
     FocusBlock,
     Review,
     WikiLinks.configure(wikiLinkOptions(false)),
-    ...(cfg.pages ? [Pagination.configure(cfg.pages)] : [])
+    ...(cfg.pages ? [Pagination.configure(cfg.pages)] : []),
+    ...(cfg.proposals ? [InlineProposals.configure(cfg.proposals)] : [])
   ]
 }

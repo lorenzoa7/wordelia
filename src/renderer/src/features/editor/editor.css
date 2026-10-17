@@ -311,6 +311,76 @@
   opacity: 0.6;
   font-size: 0.85em;
 }
+
+/* Chat proposals in the text (inlineProposals.ts): the word diff, then Accept and Reject. */
+.pm-prop {
+  border-radius: 2px;
+  transition: background-color var(--dur-slow) var(--ease-out);
+}
+.pm-prop.is-focus {
+  background: var(--ribbon-wash);
+  animation: prop-focus 1.6s var(--ease-out) both;
+}
+@keyframes prop-focus {
+  0%,
+  60% {
+    box-shadow: 0 0 0 3px var(--ribbon-wash);
+  }
+  100% {
+    box-shadow: 0 0 0 3px transparent;
+  }
+}
+.pm-prop-actions {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: 0.3em;
+  vertical-align: text-bottom;
+  text-indent: 0;
+  user-select: none;
+  white-space: nowrap;
+}
+.pm-prop-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 1.25em;
+  height: 1.25em;
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink-3);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+.pm-prop-btn svg {
+  width: 0.62em;
+  height: 0.62em;
+  fill: currentColor;
+}
+.pm-prop-btn.is-accept {
+  border-color: color-mix(in srgb, var(--pen) 45%, var(--rule));
+  color: var(--pen);
+}
+.pm-prop-btn.is-accept:hover {
+  border-color: var(--pen);
+  background: var(--pen);
+  color: var(--paper);
+}
+.pm-prop-btn.is-reject:hover {
+  border-color: var(--strike);
+  background: var(--strike-soft);
+  color: var(--strike);
+}
+.pm-prop-btn:focus-visible {
+  outline: 2px solid var(--ribbon);
+  outline-offset: 1px;
+}
+.focus-mode .pm-prop-actions {
+  opacity: 1;
+}
 @keyframes ink-shimmer {
   from {
     background-position: 200% 0;

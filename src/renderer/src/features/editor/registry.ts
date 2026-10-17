@@ -7,10 +7,7 @@ import { applyHunk, findText } from '@shared/proposals/apply'
 import { markdownToPlain } from '@shared/book'
 import { useBook } from '@/stores/book'
 import { getT } from '@/lib/i18n'
-import { toast } from '@/stores/ui'
-import { typesetForBook } from '@/lib/typeset'
-import { snapshot } from '@/features/history/snapshots'
-import { onReviewEnd, reviewKey, sliceFromMarkdown, textWithMap } from './review'
+import { sliceFromMarkdown, textWithMap } from './review'
 
 export interface ChapterEditor {
   editor: Editor
@@ -130,76 +127,29 @@ export function scrollToPos(editor: Editor, pos: number, behavior: ScrollBehavio
   desk.scrollBy({ top: coords.top - target, behavior })
 }
 
-/* ------------------------------------------------------------------ */
-/* Chat proposals shown in the text                                     */
-/* ------------------------------------------------------------------ */
-
-const decisions = new Map<string, (accepted: boolean) => void>()
-let revealSeq = 0
-
-/** Called by the review plugin when a review ends: applied or not. */
-export function reviewEnded(id: string, accepted: boolean): void {
-  const fn = decisions.get(id)
-  if (!fn) return
-  decisions.delete(id)
-  fn(accepted)
+/** Find Markdown text in a chapter: the editor range, or null. For "Show in text". */
+export function locateInChapter(chapterId: string, find: string): { editor: ChapterEditor; from: number; to: number } | null {
+  const e = getChapterEditor(chapterId)
+  if (!e) return null
+  const r = locate(e.editor, find)
+  return 'reason' in r ? null : { editor: e, ...r }
 }
-onReviewEnd(reviewEnded)
 
+/** True when the Markdown text is in the chapter once, in its editor or in the book store. */
+export function chapterHasText(chapterId: string, find: string): boolean {
+  const live = getChapterEditor(chapterId)
+  if (live) return !('reason' in locate(live.editor, find))
+  const ch = useBook.getState().chapters.find((c) => c.id === chapterId)
+  const m = ch ? findText(markdownToPlain(ch.body), markdownToPlain(find).trim()) : null
+  return Boolean(m && m.count === 1)
+}
+
+/** Reviews of chat proposals are gone: chat proposals show in the text by themselves (inlineProposals.ts). */
 export function isChatReview(id: string | undefined): boolean {
   return Boolean(id?.startsWith('chat-'))
 }
 
-/**
- * Show a chat proposal in the text: open its chapter, scroll to the passage, and show the change
- * as an inline diff with Accept and Reject. `onDecision` gets true when the user accepts it there
- * (the change is then applied) and false when they reject it. Returns false when the passage is
- * not found in the chapter. A chapter that is not on screen yet opens first.
- */
-export function revealProposal(chapterId: string, find: string, replace: string, onDecision: (accepted: boolean) => void): boolean {
-  const book = useBook.getState()
-  const ch = book.chapters.find((c) => c.id === chapterId)
-  if (!ch) return false
-  // Quick check, so the chat can say "not found" at once.
-  const live = getChapterEditor(chapterId)
-  if (find.trim()) {
-    if (live ? 'reason' in locate(live.editor, find) : !findText(markdownToPlain(ch.body), markdownToPlain(find).trim())) return false
-  }
-  book.selectChapter(chapterId)
-  // Let the jump to the chapter finish before the review scrolls.
-  whenChapterEditor(chapterId, (e) => setTimeout(() => show(e), 120))
-  return true
-
-  function show(e: ChapterEditor): void {
-    const { editor } = e
-    if (editor.isDestroyed) return
-    if (reviewKey.getState(editor.state)) editor.commands.rejectReview()
-    let range: { from: number; to: number }
-    if (!find.trim()) {
-      const end = editor.state.doc.content.size
-      range = { from: end, to: end }
-    } else {
-      const r = locate(editor, find)
-      if ('reason' in r) {
-        toast(r.reason, { kind: 'error' })
-        return
-      }
-      range = r
-    }
-    // Keep the text before the change in the version history.
-    snapshot(chapterId, 'Before AI chat change')
-    const id = `chat-${++revealSeq}`
-    decisions.set(id, onDecision)
-    setActiveEditor(e)
-    editor.commands.startReview({ id, from: range.from, to: range.to, label: getT().editor.review.chatProposal })
-    editor.commands.updateReview(id, typesetForBook(replace), 'ready')
-    editor.commands.setTextSelection(range.to)
-    scrollToPos(editor, range.from)
-  }
-}
-
 // Test runs (WORDELIA_E2E) can call the reveal directly.
 if (typeof window !== 'undefined' && window.wordelia?.isE2E) {
-  ;(window as unknown as Record<string, unknown>).__reveal = revealProposal
   ;(window as unknown as Record<string, unknown>).__activeEditor = useActiveEditor
 }

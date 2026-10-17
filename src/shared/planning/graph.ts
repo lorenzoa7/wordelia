@@ -280,7 +280,7 @@ export function adjacency(map: PlanningMap): Map<string, Set<string>> {
 
 /**
  * Nodes whose name or alias contains the query, without case and accents.
- * The best match is first: a full name, then the start of a name, then any part.
+ * The best match is first: a full name, then the start of a name, then any part; a name before an alias.
  */
 export function searchMap(map: PlanningMap, query: string): string[] {
   const q = foldSearch(query)
@@ -288,11 +288,12 @@ export function searchMap(map: PlanningMap, query: string): string[] {
   const scored: { id: string; score: number; label: string }[] = []
   for (const n of map.nodes) {
     let score = 0
-    for (const name of n.names) {
+    n.names.forEach((name, i) => {
       const f = foldSearch(name)
       const s = f === q ? 3 : f.startsWith(q) ? 2 : f.includes(q) ? 1 : 0
-      score = Math.max(score, s)
-    }
+      // The name counts a little more than an alias
+      if (s) score = Math.max(score, s + (i === 0 ? 0.5 : 0))
+    })
     if (score) scored.push({ id: n.id, score, label: n.label })
   }
   scored.sort((a, b) => b.score - a.score || a.label.localeCompare(b.label))

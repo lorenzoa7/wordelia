@@ -169,6 +169,9 @@ describe('filterMap, adjacency and searchMap', () => {
     expect(searchMap(map, 'sao ines')).toEqual(['c'])
     expect(searchMap(map, 'a')).toEqual(['a', 'b', 'c'])
     expect(searchMap(map, 'i')).toEqual(['c', 'a'])
+    // A name before an alias with the same kind of match
+    const named = buildPlanningMap([entry('The Archive', '', { id: 'x' }), entry('Grey Market', '', { id: 'y', aliases: ['the market'] })])
+    expect(searchMap(named, 'the')).toEqual(['x', 'y'])
     expect(searchMap(map, '  ')).toEqual([])
     expect(foldSearch('  Inês  DE  São ')).toBe('ines de sao')
   })

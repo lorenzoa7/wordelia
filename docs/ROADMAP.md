@@ -204,6 +204,15 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] The daily goal is a number box with "words a day" (0 turns it off, saved on Enter or blur)
 - [x] The page zoom select has the steps of the zoom keys; the keyboard list shows the zoom keys
 
+## Version 0.6 — third feedback of the author
+
+### Chat
+
+- [x] "New thread" in the thread list has a soft tone of the panel, not the white of the paper. Its hover is one step darker (light and dark themes)
+- [x] A new thread exists only after its first message. "New thread" shows a blank thread that is not in the book and not on disk; the first message saves it with its title, purpose and model. The thread list, another thread and another book remove it. An empty thread never shows in the thread list or in the "@" list. When a book opens, the chat shows the most recent thread with messages, and the app deletes the empty threads that older versions saved (no messages, no purpose, the default title). The scenario `chatview` checks the thread files on disk
+- [x] Send goes to the very end of the thread, and the end stays in view when the layout changes after the first frame (a font that loads, a quote, the thinking line) and while the reply streams. A scroll up stops the follow; a scroll back to the end starts it again (`useFollowEnd`, `features/chat/follow.ts`). The scenario `chatview` sends a long message with a quote and two pills and measures scrollTop + clientHeight against scrollHeight in each resize step
+- [x] No row of the thread list looks selected: while the list shows, the user is in no thread. The row with the keyboard focus shows a focus ring
+
 ## Later (not in version 1)
 
 - Sync to a git remote from the app

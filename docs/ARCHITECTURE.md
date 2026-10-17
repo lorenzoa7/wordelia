@@ -267,11 +267,28 @@ The thread list shows a state for each thread (`src/renderer/src/features/chat/s
 `src/renderer/src/features/chat/ChatPanel.tsx` shows one of two views. `useChat.listOpen` selects the view.
 
 - **Thread view.** The header has a back button (←), the title and the options. The back button opens the thread list. It has a dot when another thread needs the user. A click on the title opens "Title and purpose". Under the header, the purpose strip shows the brief of the thread. It gets a shadow when messages scroll under it. Then the messages and the composer.
-- **Thread list.** All threads of the book, in the full height of the panel: the pinned threads first, then the most recent. Each row shows the state, the time, one line (the state, the brief or the digest) and an options menu. The search ignores accents. The arrow keys move through the list, Enter opens a thread, and Esc goes back to the open thread. A thread does not count as seen while the list shows.
+- **Thread list.** The threads of the book that have messages, in the full height of the panel: the pinned threads first, then the most recent. Each row shows the state, the time, one line (the state, the brief or the digest) and an options menu. No row looks selected: while the list shows, the user is in no thread. The row with the keyboard focus shows a focus ring. The search ignores accents. The arrow keys move through the list, Enter opens a thread, and Esc goes back to the open thread. A thread does not count as seen while the list shows.
 
-`setActiveThread` closes the list. A quote, a mention from outside the chat, and the planning sync also close it, so the composer or the thread shows. When the book opens, the chat shows the most recently changed thread.
+`setActiveThread` closes the list. A quote, a mention from outside the chat, and the planning sync also close it, so the composer or the thread shows.
 
-When the user sends a message, the chat goes to the end of the thread at once (also when the thread opens). While a reply streams, the chat follows it only when the user is near the end.
+#### New threads
+
+A thread exists only after its first message (`src/renderer/src/features/chat/threads.ts`).
+
+- "New thread" shows a blank thread (`useChat.blank`). The blank thread is not in the book, not in the thread list, not in the "@" list and not on disk. `activeThreadId` keeps the thread that was open before, so Esc in the thread list goes back to it.
+- The title, the purpose and the model of the blank thread stay in the chat store (`saveThreadChange`). The first message saves the thread with them (`sendMessage`).
+- The thread list, another thread and a book change remove the blank thread.
+- With no open thread (a book without threads, or after the open thread is deleted), the chat shows a blank thread.
+- When a book opens, the chat shows the most recently changed thread with messages. The app also deletes the empty threads that older versions saved: no messages, no purpose, the default title. An older empty thread with a purpose stays on disk, but it does not show.
+
+#### Scroll
+
+`useFollowEnd` (`src/renderer/src/features/chat/follow.ts`) keeps the end of the thread in view.
+
+- When the user sends a message, and when a thread opens, the chat goes to the end at once.
+- A `ResizeObserver` watches the messages and the scroll box. When their size changes, the chat goes to the end again before the browser paints. This covers a font that loads late, a quote, the thinking line, and the text of a reply while it streams.
+- The chat follows changes of the messages while a reply streams, and for 1.5 s after a jump or after a reply ends. At rest, a change of the messages (for example, the user opens the thinking of a reply) does not move the view. When the view is at the end, a change of the scroll box (for example, a taller composer) keeps the end in view.
+- A scroll up stops the follow. A scroll back to 40 px or less from the end starts it again.
 
 #### The composer and mentions
 

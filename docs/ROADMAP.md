@@ -4,8 +4,8 @@ This file is the source of truth for progress. Update it after each task. Mark a
 
 ## Current focus
 
-> **Milestone:** Version 0.5 — the second feedback of the author (21 items) is done
-> **Next task:** Collect feedback on 0.5.0: proposals in the text, the planning map, the thread list and inline mentions. Then fix what the author finds.
+> **Milestone:** Version 0.6 — the third feedback of the author (16 items) is done
+> **Next task:** Collect feedback on 0.6.0. Then fix what the author finds.
 > **Not verified:** Codex and the two API transports. The user has no Codex account, and no API keys are set. The scripted provider (`WORDELIA_MOCK_AI=1`) covers their UI flows.
 
 ## M0 — Foundation
@@ -203,6 +203,20 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] Icons centered on the text: the lift is measured on the screen pixels for each display scale (scenario `icons`, 45 pairs); icons added to the settings tabs, theme cards, actions list, carets and links
 - [x] The daily goal is a number box with "words a day" (0 turns it off, saved on Enter or blur)
 - [x] The page zoom select has the steps of the zoom keys; the keyboard list shows the zoom keys
+
+## Version 0.6 — third feedback of the author
+
+### Editor
+
+- [x] A new page grows in, and the desk glides down with the cursor
+- [x] Ctrl+Enter makes a page break, like a word processor (`<!-- page break -->`, also in PDF and DOCX); every page keeps the same height; line breaks count as lines (scenario `ctrlenter`)
+- [x] A break inside a paragraph can no longer keep itself in a wrong place (the measure hides the gaps); this made the word spaces of a justified line too wide after an accepted change
+- [x] Zoom: a zoom menu in the toolbar; the page gaps follow the zoom in the same frame; the view stays on the same text, also in a long book (scenario `zoom`)
+- [x] Typewriter mode works (it never followed the cursor while the author typed); it lives in Settings → General with an explanation (scenario `typewriter`)
+- [x] Ctrl+Z after an accepted chat change brings the proposal back into the text, also when the focus is in the chat; Ctrl+Y applies it again (scenario `reveal`)
+- [x] A new chat proposal scrolls into view by itself (the last one of the reply)
+- [x] The sync button says "Sync"; the Plan overview is "The world of the story" (no "story bible")
+
 
 ## Later (not in version 1)
 

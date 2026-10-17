@@ -121,6 +121,7 @@ A new scene starts here.
 | Underline | `<u>text</u>` |
 | Strikethrough | `~~text~~` |
 | Scene break | A line with `* * *` |
+| Page break (Ctrl+Enter) | A line with `<!-- page break -->` |
 | Heading (inside a chapter or entry) | `## Heading` |
 | Font or size of a span | `[text]{font="EB Garamond" size=14}` (Pandoc bracketed span) |
 | Paragraph alignment | A last line `{align=center}` after the paragraph text |
@@ -244,7 +245,8 @@ The AI writes changes as tags in its reply:
 The renderer parses the tags while the reply streams. It shows each tag as a diff card. A hunk applies to the live editor when the chapter is open (one undo step). Else it applies to the file text. The match is exact first, then with whitespace and quote normalization.
 
 - **Proposals in the text** (`src/renderer/src/features/editor/inlineProposals.ts`). Every pending chapter change of the open thread shows in its chapter as a word diff, with Accept (✓) and Reject (✕) after it. The card and the text show the same proposal: a decision in one place sets the hunk state, and the other place follows. A passage that is not in the chapter once (the user changed it, or it occurs two times) does not show in the text; the card still shows it.
-- "Show in text" on a change calls `revealProposal`: it scrolls from where the user is to the change and marks it for a moment. It never decides the proposal.
+- "Show in text" on a change calls `revealProposal`: it scrolls from where the user is to the change and marks it for a moment. It never decides the proposal. When a new reply of the open thread has chapter proposals, the text scrolls to the last new one by itself.
+- **Undo of an accepted change.** The app remembers the chapter changes that the author accepted in the session. When the text of the chapter shows the old words again (Ctrl+Z), the change is pending again and shows in the text; when the new words come back (Ctrl+Y), it is accepted again. Ctrl+Z with the focus outside a text (for example on the Accept button of the chat) undoes the last accepted change in its chapter.
 - A reply with two or more open proposals has a bar for all of them ("Apply all 3", "Reject all").
 - An accepted `<create>` that replaces an entry keeps the old entry file in the message (`ChatMessage.replaced`).
 
@@ -334,9 +336,14 @@ App data folder (`app.getPath('userData')`):
 The Write view shows the manuscript as pages, like a word processor (`src/renderer/src/features/editor/PageEditor.tsx`).
 
 - **Page geometry.** A page has the page size and the margins of the book's export settings (A5 by default), at the zoom of the screen. The screen shows a right-hand page: the inner margin is on the left, the outer margin on the right. A page has a fixed width: in a narrow window the desk scrolls sideways. The chapter heading also follows the zoom, so a page holds the same text at every zoom.
-- **Zoom** (`zoom.ts`). Ctrl+= and Ctrl++ zoom in, Ctrl+- zooms out, Ctrl+0 goes back to 100 %, Ctrl+wheel zooms. The text at the reading line (or under the mouse) stays in place.
+- **Zoom** (`zoom.ts`). Ctrl+= and Ctrl++ zoom in, Ctrl+- zooms out, Ctrl+0 goes back to 100 %, Ctrl+wheel zooms; the toolbar has a zoom menu. All sizes on the desk follow `--page-zoom`, so the app only scales the scroll position around the reading line (or the mouse). It reads the scroll position when the zoom changes, before the browser pulls it up for a shorter desk, and it turns scroll anchoring off for that frame. A chapter far from the screen keeps its height at zoom 1 (`sheetHeights`) and its estimate does not depend on the zoom.
+- **Typewriter mode** (Settings → General). The line of the cursor stays at 42 % of the desk height while the author types. The desk eases towards that height frame by frame; there is room after the last page for it.
 - **One scroll for the book.** Every chapter is a sheet that starts on a new page. The sheets follow one another. Each chapter has its own TipTap editor (its own undo history). A chapter far from the screen (more than about two screens) has no editor: it keeps its measured height. The chapter at 30% of the screen height is the active chapter in the sidebar. The toolbar and the actions stay on the chapter with the cursor. `selectChapter` scrolls to a chapter (`chapterJump`); `setActiveChapter` only marks it.
 - **Page breaks** (`pagination.ts`). After each layout, a plugin measures the line boxes of the chapter (from the rectangles of its text) and puts a page gap where a page is full. A gap between paragraphs is a block widget. A gap inside a paragraph is a full-width inline-block: it makes a soft line break, so the line before it stays justified. The plugin works in "flow" coordinates (the y of a line minus the gaps above it), so the result does not depend on the gaps on screen. A break never splits a word. The chapter heading takes the top of the first page. When a change makes the editor taller or shorter (a new line), the plugin measures in a microtask, before the browser paints, so a new page shows at once. Other typing measures after a pause of 120 ms.
+  - The measure hides the gaps (`.is-measuring`) and reads the free flow of the text. A gap inside a paragraph forces a line break: if it took part in the measure, a gap in a wrong place would keep itself there. The plugin keeps the scroll position of the desk during the measure, because the desk is shorter without the gaps.
+  - A line with only a line break (Shift+Enter) counts as a line. A page break node (`pageBreak`, Ctrl+Enter) has no height: the block after it starts a new page, and the rest of the page stays empty. Backspace at the start of the new page removes the page break.
+  - Gap heights are in CSS pixels at zoom 1 times `--page-zoom`, so a new zoom shows in one frame.
+  - A page that typing adds grows in (280 ms, not with reduced motion), and the desk glides down when the cursor would go under the screen.
 - **Registry** (`registry.ts`). The mounted editors, by chapter. The toolbar, the selection menu, the review bar, the find bar and the actions use the active editor (`useActiveEditor`). `applyToChapter` changes a chapter in its editor when it is mounted, else in the store. `locateInChapter` and `chapterHasText` find a passage for "Show in text".
 - **Find** searches the active chapter, scrolls to each match, and goes on into the next chapter that has a match.
 

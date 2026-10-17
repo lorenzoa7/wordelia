@@ -1,7 +1,11 @@
-// The chat changes of version 0.5: the thread list view, the proposal card header with a long title,
-// the scroll when the user sends, the purpose strip, and inline mentions in the composer.
+// The chat changes of versions 0.5 and 0.6: the thread list view, the proposal card header with a long title,
+// the scroll when the user sends, the purpose strip, inline mentions in the composer, the "New thread" button,
+// new threads that exist only after their first message, and a thread list with no selected row.
 // Usage: node scripts/shot.mjs chatview [--en] [--dark]
-export default async function ({ app, page, shot, openBook }) {
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+
+export default async function ({ app, page, shot, openBook, book }) {
   const fail = (what) => {
     throw new Error(`Chat view scenario: ${what}`)
   }
@@ -17,6 +21,23 @@ export default async function ({ app, page, shot, openBook }) {
   // A close view of one element, to check small details.
   const flags = `${pt ? '' : '-en'}${process.argv.includes('--dark') ? '-dark' : ''}`
   const crop = (name, sel) => page.locator(sel).last().screenshot({ path: `test-results/shots/chatview${flags}-zoom-${name}.png` })
+  // The thread files of the book on disk.
+  const threadDir = join(book, 'ai', 'threads')
+  const onDisk = async () => {
+    const names = (await readdir(threadDir).catch(() => [])).filter((n) => n.endsWith('.json'))
+    return Promise.all(names.map(async (n) => JSON.parse(await readFile(join(threadDir, n), 'utf8'))))
+  }
+  const emptyOnDisk = async () => (await onDisk()).filter((th) => th.messages.length === 0).map((th) => th.id)
+  // How far the chat is from its end, in pixels: scrollTop + clientHeight ≈ scrollHeight at the end.
+  const gapNow = () => page.locator('.chat-scroll').evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight)
+  const rowTitles = () => page.locator('.thread-item-title').allInnerTexts()
+
+  // Two empty threads that an older version saved: one blank, one with a purpose. Neither may show in the list.
+  // The blank one goes away when the book opens.
+  await mkdir(threadDir, { recursive: true })
+  const legacy = (id, brief) => ({ id, title: 'New thread', brief, digest: '', digestedCount: 0, createdAt: '2026-01-01T10:00:00.000Z', updatedAt: '2026-01-01T10:00:00.000Z', pinned: false, route: null, messages: [], readAt: '2026-01-01T10:00:00.000Z' })
+  await writeFile(join(threadDir, 'th_legacy_blank.json'), JSON.stringify(legacy('th_legacy_blank', '')))
+  await writeFile(join(threadDir, 'th_legacy_brief.json'), JSON.stringify(legacy('th_legacy_brief', 'A purpose without messages')))
 
   // The Portuguese book with the interface in Portuguese (Brazil), as the author uses it.
   if (pt) {
@@ -26,6 +47,10 @@ export default async function ({ app, page, shot, openBook }) {
   await openBook()
   await setChat(400)
   await page.waitForTimeout(300)
+  const atOpen = (await onDisk()).map((th) => th.id).sort()
+  console.log('thread files after open:', JSON.stringify(atOpen))
+  if (atOpen.includes('th_legacy_blank')) fail('the blank thread of an older version is still on disk')
+  if (await page.locator('.chat-brief').count()) fail('the chat opened on an empty thread of an older version')
 
   // A long chapter title, for the header of the proposal card.
   const long = pt ? 'A Tempestade que Chegou do Norte na Noite em que Elias Perdeu a Conta dos Barcos' : 'The Storm That Came from the North on the Night Elias Lost Count of the Boats'
@@ -63,24 +88,124 @@ export default async function ({ app, page, shot, openBook }) {
   await setChat(400)
   await page.waitForTimeout(300)
 
-  // 2. Send a long message: the chat goes to the end at once, before the reply starts.
-  await slow(400)
-  const longText = Array.from({ length: 14 }, (_, i) => (pt ? `Linha ${i + 1} de uma pergunta longa sobre o capítulo.` : `Line ${i + 1} of a long question about the chapter.`)).join('\n')
-  await page.locator('.composer-input').fill(longText)
+  // 2. Send a long message with a quote and two mention pills. The chat is at its very end at once, stays there
+  //    when the layout changes after the first frame, and follows the reply while it streams. A scroll up stops
+  //    the follow; a scroll back to the end starts it again.
+  await slow(150)
+  await page.evaluate((pt) => {
+    const s = window.__wordelia.book.getState()
+    const ch = s.chapters[0]
+    const text = pt
+      ? 'Elias acendeu a lâmpada do farol às seis em ponto, como fazia havia vinte e dois anos. Lá fora, o mar estava agitado, e as ondas batiam contra as pedras com uma raiva antiga, quase pessoal.'
+      : 'Elias lit the lamp of the lighthouse at six sharp, as he had for twenty-two years. Outside, the sea was rough, and the waves hit the rocks with an old, almost personal anger.'
+    window.__wordelia.chat.setState({ quotes: [{ id: 'q_shot', text, source: { kind: 'chapter', id: ch.id, label: ch.title } }] })
+  }, pt)
+  await page.waitForTimeout(200)
+  await page.locator('.composer-input').click()
+  await page.keyboard.type(pt ? 'Sobre este trecho, e a @Mar' : 'About this passage, and @Mar')
+  await page.waitForSelector('.mention-pop .mention-option', { timeout: 5000 })
   await page.keyboard.press('Enter')
-  await page.waitForTimeout(120)
-  const gap = await page.locator('.chat-scroll').evaluate((el) => Math.round(el.scrollHeight - el.scrollTop - el.clientHeight))
-  const streamed = await page.locator('.msg-ai.is-streaming .msg-ai-text').count()
-  console.log('after send: distance to the end', gap, 'reply text blocks so far', streamed)
-  if (gap > 4) fail(`the chat did not scroll to the end on send (${gap}px left)`)
+  await page.keyboard.type(pt ? 'com o @Eli' : 'with @Eli')
+  await page.waitForSelector('.mention-pop .mention-option', { timeout: 5000 })
+  await page.keyboard.press('Enter')
+  for (let i = 0; i < 12; i++) {
+    await page.keyboard.press('Shift+Enter')
+    await page.keyboard.type(pt ? `Linha ${i + 1} de uma pergunta longa sobre o ritmo do capítulo.` : `Line ${i + 1} of a long question about the pace of the chapter.`)
+  }
+  await page.waitForTimeout(200)
+  // The measure runs in each resize step of the browser, after the chat (its observer is older), so it sees what the screen shows.
+  await page.evaluate(() => {
+    const box = document.querySelector('.chat-scroll')
+    const list = document.querySelector('.chat-messages')
+    const w = (window.__scroll = { samples: [], t0: 0 })
+    w.measure = () =>
+      w.samples.push({
+        t: Math.round(performance.now() - w.t0),
+        gap: Math.round((box.scrollHeight - box.scrollTop - box.clientHeight) * 10) / 10,
+        think: Boolean(document.querySelector('.msg-ai.is-streaming .think')),
+        text: Boolean(document.querySelector('.msg-ai.is-streaming .msg-ai-text'))
+      })
+    w.ro = new ResizeObserver(w.measure)
+    w.ro.observe(box)
+    w.ro.observe(list)
+    w.t0 = performance.now()
+  })
+  await page.keyboard.press('Enter')
+  // The first frames after send.
+  await page.waitForTimeout(60)
+  const firstGap = await gapNow()
   await shot('sent-long-message')
-  await slow(12)
+  // A layout change after the first frame (as when a font loads late): the last message gets taller.
+  await page.evaluate(() => {
+    const last = [...document.querySelectorAll('.msg-user')].at(-1)
+    last.style.paddingBottom = '140px'
+  })
+  await page.waitForTimeout(120)
+  const afterLate = await gapNow()
+  await page.evaluate(() => ([...document.querySelectorAll('.msg-user')].at(-1).style.paddingBottom = ''))
+  await page.waitForSelector('.msg-ai.is-streaming .msg-ai-text', { timeout: 15000 })
+  await page.waitForTimeout(700)
+  const streamingGap = await gapNow()
+  await shot('sent-reply-streams')
+  const sent = await page.evaluate(() => {
+    const m = [...document.querySelectorAll('.msg-user')].at(-1)
+    return { pills: m.querySelectorAll('.mention-pill').length, quotes: m.querySelectorAll('.msg-quote').length, height: Math.round(m.getBoundingClientRect().height) }
+  })
+  console.log('scroll on send:', JSON.stringify({ firstGap, afterLate, streamingGap, sent }))
+  if (sent.pills !== 2 || sent.quotes !== 1) fail('the long message has no quote or no pills')
+  if (firstGap > 2) fail(`the chat is not at its end after send (${firstGap}px left)`)
+  if (afterLate > 2) fail(`the chat did not stay at its end after a late layout change (${afterLate}px left)`)
+  if (streamingGap > 2) fail(`the chat does not follow the reply (${streamingGap}px left)`)
+  // A scroll up (the mouse wheel) stops the follow while the reply streams.
+  const chatBox = await page.locator('.chat-scroll').boundingBox()
+  await page.mouse.move(chatBox.x + chatBox.width / 2, chatBox.y + chatBox.height / 2)
+  const mark = (key) => page.evaluate((k) => (window.__scroll[k] = performance.now() - window.__scroll.t0), key)
+  await mark('upAt')
+  await page.mouse.wheel(0, -500)
+  await page.waitForTimeout(400)
+  const upTop = await page.locator('.chat-scroll').evaluate((el) => el.scrollTop)
+  await page.waitForTimeout(1200)
+  const up = await page.locator('.chat-scroll').evaluate((el) => ({ top: el.scrollTop, gap: el.scrollHeight - el.scrollTop - el.clientHeight }))
+  const stillStreaming = await page.locator('.msg-ai.is-streaming').count()
+  console.log('after a scroll up:', JSON.stringify({ upTop, ...up, stillStreaming }))
+  if (!stillStreaming) fail('the reply ended before the scroll test (make the mock slower)')
+  if (Math.abs(up.top - upTop) > 1 || up.gap < 200) fail('the chat moved back to the end after the user scrolled up')
+  await shot('scrolled-up-while-streaming')
+  // Back to the end: the follow starts again.
+  await mark('downAt')
+  await page.mouse.wheel(0, 5000)
+  await page.waitForTimeout(900)
+  const again = await gapNow()
+  console.log('back at the end, while the reply streams:', again)
+  if (again > 2) fail(`the chat does not follow again after a scroll back to the end (${again}px left)`)
   await idle()
+  await page.waitForTimeout(500)
+  const endGap = await gapNow()
+  const rec = await page.evaluate(() => {
+    const w = window.__scroll
+    w.ro.disconnect()
+    return { samples: w.samples, upAt: w.upAt, downAt: w.downAt }
+  })
+  // Each resize step before the scroll up, and each one after the scroll back to the end, must be at the end.
+  const before = rec.samples.filter((s) => s.t < rec.upAt)
+  const after = rec.samples.filter((s) => s.t > rec.downAt + 500)
+  const worst = Math.max(...before.map((s) => s.gap))
+  const worstAfter = Math.max(0, ...after.map((s) => s.gap))
+  console.log(
+    `resize steps measured: ${rec.samples.length}; before the scroll up: ${before.length}, worst gap ${worst}px; after the scroll back: ${after.length}, worst gap ${worstAfter}px; ` +
+      `thinking line seen: ${rec.samples.some((s) => s.think)}; reply text seen: ${rec.samples.some((s) => s.text)}; at the end after the reply: ${endGap}px`
+  )
+  if (worst > 2) fail(`a frame after send was not at the end (${worst}px)`)
+  if (worstAfter > 2) fail(`a frame after the scroll back to the end was not at the end (${worstAfter}px)`)
+  if (!rec.samples.some((s) => s.think) || !rec.samples.some((s) => s.text)) fail('the measure did not see the thinking line and the reply')
+  if (endGap > 2) fail(`the chat is not at its end after the reply (${endGap}px left)`)
+  await shot('reply-done-at-end')
+  await slow(12)
 
   // 3. The purpose strip: at rest, and with messages under it.
   await page.evaluate((brief) => {
     const s = window.__wordelia.book.getState()
-    const th = s.threads[0]
+    const th = s.threads.find((x) => x.id === window.__wordelia.chat.getState().activeThreadId)
     s.saveThread({ ...th, brief })
   }, pt ? 'O arco de Marta na parte dois: as dúvidas dela e a lealdade a Elias.' : "Marta's arc in part two: her doubts and her loyalty to Elias.")
   await page.waitForSelector('.chat-brief', { timeout: 5000 })
@@ -97,7 +222,24 @@ export default async function ({ app, page, shot, openBook }) {
   await page.evaluate((pt) => {
     const s = window.__wordelia.book.getState()
     const at = (min) => new Date(Date.now() - min * 60000).toISOString()
-    const mk = (id, title, brief, min, extra = {}) => ({ id, title, brief, digest: '', digestedCount: 0, createdAt: at(min), updatedAt: at(min), pinned: false, route: null, messages: [], readAt: at(min), ...extra })
+    const talk = (min, q, a) => [
+      { id: `m_${min}_q`, role: 'user', content: q, createdAt: at(min + 1) },
+      { id: `m_${min}_a`, role: 'assistant', content: a, createdAt: at(min) }
+    ]
+    const mk = (id, title, brief, min, extra = {}) => ({
+      id,
+      title,
+      brief,
+      digest: '',
+      digestedCount: 0,
+      createdAt: at(min),
+      updatedAt: at(min),
+      pinned: false,
+      route: null,
+      messages: talk(min, title, pt ? 'Uma resposta curta.' : 'A short reply.'),
+      readAt: at(min),
+      ...extra
+    })
     s.saveThread(mk('th_shot1', pt ? 'Títulos para o capítulo dois' : 'Titles for chapter two', '', 90))
     s.saveThread(mk('th_shot2', pt ? 'O visitante do bote azul' : 'The visitor in the blue boat', pt ? 'Quem é ele, e o que ele quer na ilha.' : 'Who he is, and what he wants on the island.', 60 * 26, { pinned: true }))
     s.saveThread(mk('th_shot3', pt ? 'Ritmo da tempestade' : 'Pace of the storm', '', 60 * 24 * 9))
@@ -105,14 +247,59 @@ export default async function ({ app, page, shot, openBook }) {
   await page.waitForTimeout(300)
   await page.locator('.chat-back').click()
   await page.waitForSelector('.thread-view', { timeout: 5000 })
+  // The pointer leaves the panel, so no row has the hover color.
+  await page.mouse.move(700, 500)
   await page.waitForTimeout(400)
   const focused = await page.evaluate(() => document.activeElement?.classList.contains('thread-search'))
   if (!focused) fail('the search does not have the focus when the list opens')
+  // No row looks selected: the open thread has no other color, and no row is marked as current.
+  const look = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('.thread-row')]
+    return {
+      rows: rows.length,
+      colored: rows.filter((r) => getComputedStyle(r).backgroundColor !== 'rgba(0, 0, 0, 0)' || getComputedStyle(r.querySelector('.thread-item')).backgroundColor !== 'rgba(0, 0, 0, 0)').length,
+      current: document.querySelectorAll('.thread-view [aria-current], .thread-row.is-active').length
+    }
+  })
+  console.log('thread list rows:', JSON.stringify(look), JSON.stringify(await rowTitles()))
+  if (look.rows !== 4) fail(`the list shows ${look.rows} threads, not 4 (empty threads must not show)`)
+  if (look.colored || look.current) fail('a row of the thread list looks selected')
+  // The "New thread" button has a tone of the panel, not the white of the paper.
+  const btn = await page.evaluate(() => {
+    const b = document.querySelector('.thread-new')
+    const probe = document.createElement('div')
+    probe.style.background = 'var(--paper)'
+    document.body.append(probe)
+    const paper = getComputedStyle(probe).backgroundColor
+    probe.remove()
+    return { bg: getComputedStyle(b).backgroundColor, paper, panel: getComputedStyle(document.querySelector('.chat-panel')).backgroundColor }
+  })
+  console.log('New thread button:', JSON.stringify(btn))
+  if (btn.bg === btn.paper) fail('the New thread button is the white of the paper')
   await shot('thread-list')
+  await crop('list-head', '.thread-view .chat-head')
+  await page.locator('.thread-new').hover()
+  await page.waitForTimeout(250)
+  const hoverBg = await page.locator('.thread-new').evaluate((b) => getComputedStyle(b).backgroundColor)
+  if (hoverBg === btn.bg) fail('the New thread button has no hover color')
+  await crop('list-head-hover', '.thread-view .chat-head')
   // Hover a row: its options show in the place of the time.
   await page.locator('.thread-row').nth(1).hover()
   await page.waitForTimeout(300)
   await shot('thread-list-hover')
+  // The keyboard: a focus ring on the focused row, and still no row with the color of a selection.
+  await page.mouse.move(700, 500)
+  await page.locator('.thread-search').focus()
+  await page.keyboard.press('ArrowDown')
+  await page.waitForTimeout(200)
+  const ring = await page.evaluate(() => {
+    const el = document.activeElement
+    return { row: el?.classList.contains('thread-item'), outline: getComputedStyle(el).outlineStyle, bg: getComputedStyle(el.closest('.thread-row')).backgroundColor }
+  })
+  console.log('keyboard focus in the list:', JSON.stringify(ring))
+  if (!ring.row || ring.outline === 'none') fail('the focused row has no focus ring')
+  await shot('thread-list-keyboard')
+  await page.locator('.thread-search').focus()
   // Search, then open a thread with the keyboard.
   await page.keyboard.type(pt ? 'visitante' : 'visitor')
   await page.waitForTimeout(300)
@@ -132,7 +319,42 @@ export default async function ({ app, page, shot, openBook }) {
   await page.keyboard.press('Escape')
   await page.waitForSelector('.chat-thread', { timeout: 5000 })
 
-  // 5. A thread at work and a thread with a new reply: their states in the list.
+  // 5. "New thread" saves nothing until the first message. Back to the list: no new row, no new file.
+  await page.waitForTimeout(800)
+  const filesBefore = (await onDisk()).length
+  const storeBefore = (await threads()).length
+  await page.locator('.chat-back').click()
+  await page.waitForSelector('.thread-view', { timeout: 5000 })
+  const titlesBefore = await rowTitles()
+  await page.locator('.thread-new').click()
+  await page.waitForSelector('.chat-thread', { timeout: 5000 })
+  await page.waitForSelector('.chat-empty', { timeout: 5000 })
+  // A purpose for the new thread, before its first message: it stays in memory only.
+  await page.locator('.chat-title').click()
+  await page.waitForSelector('.dialog textarea', { timeout: 5000 })
+  await page.locator('.dialog textarea').fill(pt ? 'Um propósito antes da primeira mensagem.' : 'A purpose before the first message.')
+  await page.locator('.dialog-foot .btn-primary').click()
+  await page.waitForSelector('.chat-brief', { timeout: 5000 })
+  await page.waitForTimeout(800)
+  await shot('new-thread-blank')
+  let blank = { files: (await onDisk()).length, store: (await threads()).length, empty: await emptyOnDisk() }
+  console.log('a new thread, before its first message:', JSON.stringify(blank))
+  if (blank.files !== filesBefore || blank.store !== storeBefore) fail('"New thread" saved a thread before its first message')
+  await page.locator('.chat-back').click()
+  await page.waitForSelector('.thread-view', { timeout: 5000 })
+  await page.waitForTimeout(800)
+  const titlesAfter = await rowTitles()
+  blank = { files: (await onDisk()).length, store: (await threads()).length, empty: await emptyOnDisk() }
+  console.log('back in the list:', JSON.stringify(blank), JSON.stringify(titlesAfter))
+  if (JSON.stringify(titlesAfter) !== JSON.stringify(titlesBefore)) fail('the empty new thread shows in the list')
+  if (blank.files !== filesBefore || blank.store !== storeBefore) fail('the empty new thread was saved')
+  await shot('list-after-blank')
+  // Esc goes back to the thread that was open before "New thread".
+  await page.keyboard.press('Escape')
+  await page.waitForSelector('.chat-thread', { timeout: 5000 })
+  if (!/visitante|visitor/i.test(await page.locator('.chat-title').innerText())) fail('Esc did not go back to the open thread')
+
+  // 6. A thread at work and a thread with a new reply: their states in the list. The first message saves the new thread.
   await page.locator('.chat-back').click()
   await page.waitForSelector('.thread-view', { timeout: 5000 })
   await page.locator('.thread-new').click()
@@ -150,9 +372,12 @@ export default async function ({ app, page, shot, openBook }) {
   await page.waitForTimeout(300)
   await shot('thread-list-states')
   const list = await threads()
-  console.log('threads:', list.length)
+  const disk = await onDisk()
+  console.log('threads:', list.length, 'files:', disk.length)
+  if (disk.length !== filesBefore + 1) fail('the first message did not save the new thread')
+  if (!disk.some((th) => th.messages[0]?.content.startsWith(pt ? 'Sugira três' : 'Suggest three') && th.messages.length === 2)) fail('the new thread on disk does not have its messages')
 
-  // 6. Inline mentions: "@Mar" opens the list, Enter puts a pill in the text, and the sentence goes on.
+  // 7. Inline mentions: "@Mar" opens the list, Enter puts a pill in the text, and the sentence goes on.
   await page.keyboard.press('Escape')
   await page.waitForSelector('.chat-thread', { timeout: 5000 })
   await page.locator('.composer-input').click()
@@ -188,16 +413,16 @@ export default async function ({ app, page, shot, openBook }) {
   await shot('mention-two-lines')
   await page.keyboard.press('Enter')
   await page.waitForTimeout(300)
-  const sent = await page.evaluate(() => {
+  const sentMention = await page.evaluate(() => {
     const s = window.__wordelia.book.getState()
     const th = s.threads.slice().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]
     const m = th.messages.filter((x) => x.role === 'user').at(-1)
     return { content: m.content, mentions: m.mentions }
   })
-  console.log('sent message:', JSON.stringify(sent))
+  console.log('sent message:', JSON.stringify(sentMention))
   const want = pt ? 'O que você acha da @Marta neste capítulo?\nE do @Elias' : 'What do you think of @Marta in this chapter?\nAnd @Elias'
-  if (sent.content !== want) fail(`the sent text is "${sent.content}"`)
-  if (sent.mentions?.length !== 2 || sent.mentions.some((m) => m.kind !== 'entry' || !m.id)) fail('the sent message has the wrong mentions')
+  if (sentMention.content !== want) fail(`the sent text is "${sentMention.content}"`)
+  if (sentMention.mentions?.length !== 2 || sentMention.mentions.some((m) => m.kind !== 'entry' || !m.id)) fail('the sent message has the wrong mentions')
   const empty = await page.evaluate(() => document.querySelector('.composer-input').innerText.trim())
   if (empty) fail('the composer is not empty after send')
   await idle()
@@ -207,7 +432,7 @@ export default async function ({ app, page, shot, openBook }) {
   await shot('mention-sent')
   await crop('sent-pills', '.msg-user')
 
-  // 7. Edit the message: the pills are in the edit box too.
+  // 8. Edit the message: the pills are in the edit box too.
   await page.locator('.msg-user-wrap').last().hover()
   await page.locator('.msg-user-wrap').last().locator('.msg-edit-btn').click()
   await page.waitForSelector('.msg-edit-input .mention-pill', { timeout: 5000 })
@@ -216,7 +441,7 @@ export default async function ({ app, page, shot, openBook }) {
   await page.keyboard.press('Escape')
   await crop('chat-head', '.chat-head')
 
-  // 8. "Ask the chat about this entry" in the Plan view: a pill at the end of the draft, and the cursor after it.
+  // 9. "Ask the chat about this entry" in the Plan view: a pill at the end of the draft, and the cursor after it.
   await page.locator('.composer-input').click()
   await page.keyboard.type(pt ? 'Releia ' : 'Read ')
   await page.keyboard.press('Control+2')
@@ -239,7 +464,7 @@ export default async function ({ app, page, shot, openBook }) {
   await page.keyboard.press('Control+1')
   await page.waitForTimeout(600)
 
-  // 9. A narrow panel: the long placeholder makes the composer taller, and nothing is cut.
+  // 10. A narrow panel: the long placeholder makes the composer taller, and nothing is cut.
   await setChat(320)
   await page.locator('.chat-back').click()
   await page.locator('.thread-new').click()
@@ -253,4 +478,24 @@ export default async function ({ app, page, shot, openBook }) {
   console.log('narrow composer:', JSON.stringify(fits))
   if (fits.placeholderBottom > fits.rowTop + 1) fail('the placeholder goes under the composer buttons')
   await shot('composer-narrow')
+
+  // 11. Close the book while the new thread shows, and open it again: no empty thread on disk, and the chat
+  //     opens on the last thread with messages.
+  const newest = (await threads()).filter((th) => th.messages.length).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]
+  await page.evaluate(() => window.__wordelia.book.getState().close())
+  await page.waitForTimeout(800)
+  await openBook()
+  await page.waitForTimeout(400)
+  const reopened = {
+    title: await page.locator('.chat-title').innerText(),
+    active: await page.evaluate(() => window.__wordelia.chat.getState().activeThreadId),
+    blank: await page.evaluate(() => Boolean(window.__wordelia.chat.getState().blank)),
+    empty: (await emptyOnDisk()).filter((id) => id !== 'th_legacy_brief'),
+    files: (await onDisk()).length
+  }
+  console.log('after reopen:', JSON.stringify(reopened), 'newest thread with messages:', newest.id)
+  if (reopened.blank) fail('the chat opened on a new thread')
+  if (reopened.empty.length) fail(`empty threads on disk: ${reopened.empty.join(', ')}`)
+  if (reopened.active !== newest.id) fail(`the chat opened on "${reopened.title}", not on the last thread with messages`)
+  await shot('reopened')
 }

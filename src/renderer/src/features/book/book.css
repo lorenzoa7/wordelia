@@ -24,9 +24,20 @@
 .side-panel-right .side-panel-inner {
   right: 0;
 }
-/* The line between the sidebar and the page stays on the edge while the panel moves. */
+/* The line between a panel and the page stays on the edge while the panel moves. */
 .book-sidebar {
   box-shadow: inset -1px 0 0 var(--rule);
+}
+.book-chat::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
+  width: 1px;
+  background: var(--rule);
+  pointer-events: none;
 }
 
 /* The edge: drag to resize, past the minimum to close, from the window edge to open. */

@@ -494,11 +494,11 @@
 }
 .review-accept {
   background: var(--pen);
-  color: #f6fbf6;
+  color: var(--paper);
 }
 .review-accept:hover {
   background: var(--pen);
-  color: #fff;
+  color: var(--paper);
   filter: brightness(1.08);
 }
 .review-accept .kbd {

@@ -39,6 +39,11 @@ export function ChatPanel(): React.JSX.Element {
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
+    // An empty thread shows its welcome text from the top.
+    if (!count && !streaming) {
+      el.scrollTo({ top: 0 })
+      return
+    }
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 160
     if (nearBottom || !streaming) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
   }, [count, streaming?.text.length, streaming?.thinking?.length, activeId, streaming])

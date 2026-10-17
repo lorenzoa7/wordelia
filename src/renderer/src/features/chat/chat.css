@@ -2,7 +2,6 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  border-left: 1px solid var(--rule);
   background: var(--desk-2);
 }
 .chat-head {
@@ -1115,7 +1114,7 @@ button.proposal-file:hover span {
   border: 0;
   border-radius: 9px;
   background: var(--ribbon);
-  color: #fff8f2;
+  color: var(--on-ribbon);
   transition:
     transform var(--dur-fast) var(--ease-out),
     opacity var(--dur-fast) var(--ease-out);

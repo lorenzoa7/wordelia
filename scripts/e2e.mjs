@@ -24,7 +24,8 @@ const scenarios = [
   ['plannav'],
   ['chat', '--en'],
   ['pages', '--en'],
-  ['reveal']
+  ['reveal'],
+  ['reopen']
 ]
 
 function run(args) {

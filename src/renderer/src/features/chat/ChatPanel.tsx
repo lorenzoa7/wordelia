@@ -16,6 +16,7 @@ import { Composer } from './Composer'
 import { RewindHost } from './RewindDialog'
 import { lastReplyAt, markSeen, StatusDot, useChatAttention, useThreadStatuses } from './status'
 import { hasMessages, latestThread, saveThreadChange, startThread } from './threads'
+import { useFollowEnd } from './follow'
 import { isE2E } from '@/lib/api'
 import './chat.css'
 
@@ -34,7 +35,8 @@ export function ChatPanel(): React.JSX.Element {
   const chatOpen = useApp((s) => s.settings?.ui.chatOpen ?? true)
   const [editing, setEditing] = useState<Thread | null>(null)
   const [scrolled, setScrolled] = useState(false)
-  const scrollRef = useRef<HTMLDivElement>(null)
+  const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null)
+  const [messagesEl, setMessagesEl] = useState<HTMLDivElement | null>(null)
 
   // The views slide only when the user goes from one to the other, not when the panel first shows.
   const shownView = useRef(listOpen)
@@ -62,30 +64,28 @@ export function ChatPanel(): React.JSX.Element {
     for (let i = count - 1; i >= 0; i--) if (thread?.messages[i].role === 'user') return thread.messages[i].id
     return ''
   }, [thread, count])
+  const follow = useFollowEnd(scrollEl, messagesEl, Boolean(streaming))
   // The thread and the message of the user that the view last jumped to.
   const jumped = useRef('')
   useLayoutEffect(() => {
-    const el = scrollRef.current
-    if (!el) {
+    if (!scrollEl) {
       jumped.current = ''
       return
     }
     // An empty thread shows its welcome text from the top.
     if (!count && !streaming) {
-      el.scrollTo({ top: 0 })
+      scrollEl.scrollTop = 0
       jumped.current = ''
       return
     }
-    // A thread that opens, and a new message of the user: go to the end at once, so the whole message shows.
+    // A thread that opens, and a new message of the user: go to the end at once, and stay there while the
+    // layout settles and the reply streams, so the whole message and the start of the reply show.
     const key = `${thread?.id}|${lastUserId}`
     if (key !== jumped.current) {
       jumped.current = key
-      el.scrollTop = el.scrollHeight
-      return
+      follow()
     }
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 160
-    if (nearBottom || !streaming) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
-  }, [count, streaming?.text.length, streaming?.thinking?.length, thread?.id, Boolean(streaming), listOpen, lastUserId])
+  }, [scrollEl, count, Boolean(streaming), thread?.id, lastUserId, follow])
 
   // The user sees the thread when the chat is open, the thread shows and the window shows. Then its new reply is seen.
   const lastReply = thread ? lastReplyAt(thread) : ''
@@ -161,11 +161,11 @@ export function ChatPanel(): React.JSX.Element {
             </Tooltip>
           )}
 
-          <div className="chat-scroll" ref={scrollRef} onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 2)}>
+          <div className="chat-scroll" ref={setScrollEl} onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 2)}>
             {!thread || (thread.messages.length === 0 && !streaming) ? (
               <ChatEmpty />
             ) : (
-              <div className="chat-messages" role="log" aria-live="polite" aria-relevant="additions">
+              <div className="chat-messages" ref={setMessagesEl} role="log" aria-live="polite" aria-relevant="additions">
                 {thread.messages.map((m, i) => (
                   <MessageView key={m.id} message={m} thread={thread} index={i} after={thread.messages.length - 1 - i} canAct={canAct} />
                 ))}

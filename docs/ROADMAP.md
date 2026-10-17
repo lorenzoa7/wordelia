@@ -124,6 +124,16 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] Writing rules in the book menu and in Settings → This book
 - [x] Pasted Markdown in notes and writing rules becomes headings and lists
 
+## Design review: layout, title bar, Plan navigation
+
+- [x] Side panels: drag the edge of the sidebar or the chat to change its width. Drag it past the minimum and the panel closes. Drag or click the edge at the window side to open it again. The sidebar width is in `settings.ui.sidebarWidth` (scenario `panels`)
+- [x] A narrow window keeps 560 px for the page: the chat gives up width first, then the sidebar (scenario `narrow`)
+- [x] Plan pages: "← Overview" on a category page, "← Characters" on an entry page, Alt+← and the mouse back button. A category page has a header with the entry count, Import notes and New entry (scenario `plannav`)
+- [x] The writing rules leave the Plan view. The book menu opens Settings → Writing rules
+- [x] Title bar: a three-column grid (the tabs stay in the middle, a long title gets shorter), icons and wordmark on the line of the text, tooltips with shortcuts
+- [x] Shared controls: focus rings keep the shape of the control; hover, active and open states on all buttons, inputs, selects and switches; toasts with an error icon and a close button; dark text on the dark-theme ribbon color (`--on-ribbon`)
+- [x] Chat icon (not the reply arrow) for "Ask the chat about this entry" and "Mention in chat"
+
 ## Later (not in version 1)
 
 - Sync to a git remote from the app

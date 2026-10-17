@@ -11,6 +11,7 @@ import { toast, useUi } from '@/stores/ui'
 import { useChat } from '@/features/chat/chatStore'
 import { useApp } from '@/stores/app'
 import { useT } from '@/lib/i18n'
+import { HideSidebarButton } from '@/features/book/SidebarToggle'
 
 export function ChapterSidebar(): React.JSX.Element {
   const t = useT()
@@ -22,9 +23,12 @@ export function ChapterSidebar(): React.JSX.Element {
     <div className="sidebar">
       <div className="sidebar-head">
         <span className="caps">{t.write.chapters}</span>
-        <IconButton label={t.write.newChapter} onClick={() => void useBook.getState().addChapter(activeId)}>
-          <Plus size={15} />
-        </IconButton>
+        <span className="sidebar-head-tools">
+          <IconButton label={t.write.newChapter} onClick={() => void useBook.getState().addChapter(activeId)}>
+            <Plus size={15} />
+          </IconButton>
+          <HideSidebarButton />
+        </span>
       </div>
       <Reorder.Group
         axis="y"

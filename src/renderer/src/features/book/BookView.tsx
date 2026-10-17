@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
+import clsx from 'clsx'
 import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
 import { useUi } from '@/stores/ui'
@@ -15,6 +16,7 @@ import { useActionShortcuts } from '@/features/actions/useActionShortcuts'
 import { HistoryDialog } from '@/features/history/HistoryDialog'
 import { startAutoSnapshots } from '@/features/history/snapshots'
 import { SidePanel } from './SidePanel'
+import { ShowSidebarButton } from './SidebarToggle'
 import './book.css'
 
 const SIDEBAR = { min: 200, max: 420, default: 256 }
@@ -73,7 +75,8 @@ export function BookView(): React.JSX.Element {
         {view === 'write' ? <ChapterSidebar /> : <PlanSidebar />}
       </SidePanel>
 
-      <div className="book-main">
+      <div className={clsx('book-main', !sidebarOpen && 'is-sidebar-closed')}>
+        <ShowSidebarButton open={sidebarOpen} />
         <AnimatePresence mode="wait" initial={false}>
           {view === 'write' ? (
             <motion.div key="write" className="book-pane" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>

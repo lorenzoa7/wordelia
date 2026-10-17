@@ -55,6 +55,9 @@
   --sidebar-w: 256px;
   --chat-w: 400px;
   --page-w: 760px;
+  /* The column of the Plan pages: the cards, a category and the map use the same width,
+     so the title and the "Cards | Map" switch stay in place. */
+  --plan-w: 980px;
   --window-controls-w: 140px;
 
   /* Motion */

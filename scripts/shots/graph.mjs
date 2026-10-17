@@ -127,7 +127,7 @@ async function perf({ page, shot, book, work }) {
   await page.keyboard.press('Control+2')
   await page.waitForTimeout(500)
   const t0 = Date.now()
-  await mapButton().click()
+  await page.locator('.plan-switch-btn').nth(1).click()
   await page.locator('.map-node').first().waitFor()
   const open = Date.now() - t0
   const frames = await page.evaluate(
@@ -223,6 +223,48 @@ export default async function ({ page, shot, openBook, book, work }) {
   await page.waitForTimeout(900)
   await page.keyboard.press('Control+2')
   await page.waitForTimeout(500)
+
+  // No layout shift: the switch, its two buttons and the title keep their place and size on the cards
+  // and on the map. The cards of this book scroll; the map does not. With the chat open and closed,
+  // and with the sidebar closed.
+  const geometry = () =>
+    page.evaluate(() => {
+      const box = (el) => {
+        const b = el.getBoundingClientRect()
+        return [b.left, b.top, b.width, b.height]
+      }
+      const title = document.querySelector('.plan-hero-top h1, .map-title h1').getBoundingClientRect()
+      return {
+        switch: box(document.querySelector('.plan-switch')),
+        buttons: [...document.querySelectorAll('.plan-switch-btn')].map(box),
+        title: [title.left, title.top, title.height]
+      }
+    })
+  const same = (a, b) => a.every((v, i) => Math.abs(v - b[i]) <= 0.5)
+  const fmt = (a) => a.map((v) => v.toFixed(1)).join(', ')
+  for (const [name, ui] of [
+    ['chat open', {}],
+    ['chat closed', { chatOpen: false }],
+    ['sidebar closed', { sidebarOpen: false }]
+  ]) {
+    await page.evaluate((u) => window.__wordelia.app.getState().setUi(u), ui)
+    await page.locator('.plan-switch-btn').nth(0).click()
+    await page.waitForTimeout(500)
+    const cards = await geometry()
+    await mapButton().click()
+    await page.waitForTimeout(500)
+    const onMap = await geometry()
+    console.log(`switch (${name}): cards [${fmt(cards.switch)}], map [${fmt(onMap.switch)}]; buttons ${cards.buttons.map((b) => b[2].toFixed(1)).join(' + ')} px; title [${fmt(cards.title)}] / [${fmt(onMap.title)}]`)
+    if (!same(cards.switch, onMap.switch)) fail(`The switch moves (${name}): [${fmt(cards.switch)}] → [${fmt(onMap.switch)}]`)
+    cards.buttons.forEach((b, i) => {
+      if (!same(b, onMap.buttons[i])) fail(`Switch button ${i + 1} moves (${name})`)
+    })
+    if (Math.abs(cards.buttons[0][2] - cards.buttons[1][2]) > 0.5) fail(`The switch buttons have different widths (${name})`)
+    if (!same(cards.title, onMap.title)) fail(`The title moves (${name}): [${fmt(cards.title)}] → [${fmt(onMap.title)}]`)
+  }
+  await page.evaluate(() => window.__wordelia.app.getState().setUi({ chatOpen: true, sidebarOpen: true }))
+  await page.waitForTimeout(400)
+
   await mapButton().click()
   await settle()
   const richNodes = await page.locator('.map-node').count()

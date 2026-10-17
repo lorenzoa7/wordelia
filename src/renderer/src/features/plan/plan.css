@@ -1,13 +1,16 @@
 .plan-desk {
   height: 100%;
 }
+/* The gutter of the scrollbar is always there, so the column does not move when the page gets long.
+   The map page keeps the same gutter (`.map-wrap`). */
 .plan-scroll {
   height: 100%;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   padding: var(--s-6) var(--s-8) 96px;
 }
 .plan-inner {
-  max-width: 980px;
+  max-width: var(--plan-w);
   margin: 0 auto;
 }
 

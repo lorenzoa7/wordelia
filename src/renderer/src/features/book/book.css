@@ -120,6 +120,11 @@
   padding: 0 2px 0 10px;
   margin-bottom: var(--s-2);
 }
+/* The name of the sidebar moves down by the icon lift: the icons of its buttons center on
+   its capitals, and the buttons keep their place. */
+.sidebar-head > .caps {
+  translate: 0 calc(-1 * var(--icon-lift));
+}
 /* The buttons of the sidebar header: new chapter, hide the sidebar */
 .sidebar-head-tools {
   display: inline-flex;

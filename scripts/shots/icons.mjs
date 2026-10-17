@@ -133,7 +133,8 @@ export default async function ({ app, page, openBook }) {
   await openBook()
   await page.waitForTimeout(700)
   await away()
-  await measure('.titlebar-book', '.titlebar-book|last', '.view-tab:not(.is-active)', '.sidebar-add', '.status-btn', '.save-state', '.update-badge', '.provider-badge')
+  // The sidebar header: the caps name and its buttons (new chapter, hide the sidebar)
+  await measure('.titlebar-book', '.titlebar-book|last', '.sidebar-head', '.sidebar-head|last', '.view-tab:not(.is-active)', '.sidebar-add', '.status-btn', '.save-state', '.update-badge', '.provider-badge')
   await crop('titlebar-book', page.locator('.titlebar-book'))
   await crop('view-tab', page.locator('.view-switch'))
   await crop('sidebar-add', page.locator('.sidebar-add'))
@@ -152,7 +153,7 @@ export default async function ({ app, page, openBook }) {
   await page.keyboard.press('Control+2')
   await page.waitForTimeout(700)
   await away()
-  await measure('.view-tab:not(.is-active)', '.plan-item-top', '.plan-item-main')
+  await measure('.view-tab:not(.is-active)', '.sidebar-head', '.plan-item-top', '.plan-item-main')
   await crop('plan-sidebar', page.locator('.plan-nav'))
 
   // Settings

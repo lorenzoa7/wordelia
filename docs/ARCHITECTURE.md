@@ -57,6 +57,7 @@ src/
     markdown/        Wordelia Markdown <-> document JSON
     proposals/       Proposal protocol: parse and apply
     prompts/         Prompt builders
+    planning/        Planning map: the links between entries
     text/            Word diff, token estimate, helpers
   renderer/
     index.html
@@ -64,7 +65,7 @@ src/
       app/           App shell, view switch
       styles/        Design tokens and base CSS
       ui/            UI primitives
-      features/      library, editor, chapters, chat, planning, settings, export
+      features/      library, editor, chapters, chat, plan, graph (planning map), settings, export
       stores/        Zustand stores
 ```
 
@@ -305,6 +306,17 @@ The Write view shows the manuscript as pages, like a word processor (`src/render
 - **Page breaks** (`pagination.ts`). After each layout, a plugin measures the line boxes of the chapter (from the rectangles of its text) and puts a page gap where a page is full. A gap between paragraphs is a block widget. A gap inside a paragraph is a full-width inline-block: it makes a soft line break, so the line before it stays justified. The plugin works in "flow" coordinates (the y of a line minus the gaps above it), so the result does not depend on the gaps on screen. A break never splits a word. The chapter heading takes the top of the first page.
 - **Registry** (`registry.ts`). The mounted editors, by chapter. The toolbar, the selection menu, the review bar, the find bar and the actions use the active editor (`useActiveEditor`). `applyToChapter` changes a chapter in its editor when it is mounted, else in the store. `revealProposal` opens a chat proposal in the text as an inline diff (Accept applies it and tells the chat).
 - **Find** searches the active chapter, scrolls to each match, and goes on into the next chapter that has a match.
+
+## 7b. Planning map
+
+The Plan overview has a switch: "Cards | Map". The map shows the planning as a graph (`src/renderer/src/features/graph/`).
+
+- **Links** (`src/shared/planning/graph.ts`, pure, with tests). Entry A links to entry B when the summary or the notes of A use the name or an alias of B, or `[[B]]` (also `[[B|text]]` and `[[B#Heading]]`). The match is on whole words and ignores case. Accents count: "Pará" does not match "para". A name with fewer than 3 letters does not count, but a `[[link]]` to it does. When names overlap, the longest name wins. The weight of a link is the number of mentions in the two directions. With the "Chapters" chip, each chapter is a node too, and it links to the entries that it mentions.
+- **Layout** (`layout.ts`). d3-force with these forces: links, repulsion, a pull to the center (stronger up and down on a wide stage), collision, and a force that keeps the box of each node and its label away from the other boxes. Entries without links are not in the simulation: they sit on ellipses around the linked entries. The app runs one tick for each animation frame. With reduced motion, the layout runs to the end at once.
+- **Drawing** (`MapCanvas.tsx`). SVG. React draws the nodes, the edges and the labels once. Each frame sets their positions directly in the DOM. The labels are on a layer above the nodes and keep their size on the screen at all zoom levels. All labels show when the map is small or near; else only the labels of the 14 nodes with the most links show. With 300 entries, a frame takes about 15 ms while the map settles (`MAP_PERF=1 node scripts/shot.mjs graph --en`).
+- **Navigation** (`nav.ts`). The map is the Plan page `activeCategory = ':map'` in the book store. A folder name cannot have ":" on Windows. Thus the sidebar, Alt+← and the mouse back button work as on the other Plan pages. An entry that the user opens from the map has the back link "← Map".
+- The layout, the view and the filters of each book stay in memory for the session. The app does not save them.
+- The colors of the categories are the tokens `--map-1` to `--map-8`, in the order of the categories. The palette was checked for color vision deficiency (adjacent pairs) and for 3:1 contrast on the paper, in the two themes.
 
 ## 8. Saving
 

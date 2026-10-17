@@ -44,5 +44,6 @@ This file is the ubiquitous language of Wordelia. Use these words in code, docs 
 |---|---|
 | **Write view** | The main view. The chapter tabs, the page and the chat. |
 | **Plan view** | The view for planning entries. |
+| **Map** | A graph of all entries in the Plan view. A line links two entries when one mentions the other. |
 | **Desk** | The background of the app, around the page. |
 | **Page** | The paper surface where the user writes. |

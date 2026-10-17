@@ -167,6 +167,10 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] Model names with versions everywhere ("Opus 5.5"): the app reads the model of each claude alias from the first CLI event, once for each CLI version, with no request to the API
 - [x] Proposal cards: wider Accept button, "Show in text" on each change (`revealProposal`), a bar for all the proposals of a reply ("3 proposals in this reply", "Apply all 3")
 
+## Version 0.5
+
+- [x] Planning map: a "Cards | Map" switch on the Plan overview. The map shows all entries as nodes: a color for each category, a size for the number of links. An entry links to another entry when its summary or its notes use the name or an alias of the other entry (whole words; accents count), or `[[Name]]`. Pan, zoom, fit to screen and drag nodes. Hover shows the neighbors and a card. A click opens the entry; its back link goes to the map. Category chips filter the map, the search box shows the matches (Enter opens the best match), and "Chapters" adds the chapters. Entries without links sit on rings around the others. Empty states for a book without entries and for entries without links (`src/shared/planning/graph.ts`, `features/graph/`, scenario `graph`)
+
 ## Later (not in version 1)
 
 - Sync to a git remote from the app

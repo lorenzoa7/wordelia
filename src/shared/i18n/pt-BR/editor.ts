@@ -32,6 +32,7 @@ export const editor: typeof en = {
     chapter: 'Capítulo'
   },
   review: {
+    chatProposal: 'Proposta do chat',
     words: (n) => (n === 1 ? '1 palavra' : `${n} palavras`),
     stop: 'Parar'
   },

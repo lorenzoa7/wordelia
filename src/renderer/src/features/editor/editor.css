@@ -1,24 +1,78 @@
-/* ---------- Desk and page ---------- */
+/* ---------- Desk and pages ---------- */
+/* The toolbar and the find bar float over the desk; the desk scrolls in both directions,
+   because a page has the fixed width of the book page (like a word processor). */
+.write-frame {
+  position: relative;
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
 .desk {
   position: relative;
   height: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 0 var(--s-8) 120px;
+  overflow: auto;
+  overflow-anchor: auto;
   scroll-padding-top: 80px;
+}
+.desk-inner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: max-content;
+  min-width: 100%;
+  padding: 64px var(--s-8) 0;
 }
 
 .page {
-  --pad-x: calc(88px * var(--page-zoom));
   position: relative;
-  width: min(calc(var(--page-w) * var(--page-zoom)), 100%);
-  margin: var(--s-4) auto 0;
-  padding: calc(64px * var(--page-zoom)) var(--pad-x) calc(96px * var(--page-zoom));
-  min-height: calc(100% - 40px);
-  border-radius: 3px;
+  flex: none;
+  width: var(--page-w);
+  padding: var(--page-mt) var(--page-mx) var(--page-mb);
+  border-radius: 2px;
   background: var(--paper);
   box-shadow: var(--shadow-page);
   cursor: text;
+}
+/* Every chapter starts on a new sheet. */
+.page + .page {
+  margin-top: var(--page-gap);
+}
+/* A chapter far from the screen keeps its size but has no editor. */
+.page.is-asleep {
+  overflow: hidden;
+}
+
+/* The break between two pages of a chapter: the empty end of the page, the desk between
+   the sheets, and the top margin of the next page (see pagination.ts). */
+.pm-page-gap {
+  position: relative;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+}
+.pm-page-gap.is-inline {
+  display: inline-block;
+  width: 100%;
+  vertical-align: top;
+  text-indent: 0;
+}
+.pm-page-band {
+  position: absolute;
+  left: calc(-1 * var(--page-mx) - 28px);
+  right: calc(-1 * var(--page-mx) - 28px);
+  background: var(--desk);
+  box-shadow:
+    inset 0 8px 7px -7px rgba(64, 48, 28, 0.16),
+    inset 0 -8px 7px -7px rgba(64, 48, 28, 0.1);
+}
+:root[data-theme='dark'] .pm-page-band {
+  box-shadow:
+    inset 0 8px 7px -7px rgba(0, 0, 0, 0.6),
+    inset 0 -8px 7px -7px rgba(0, 0, 0, 0.45);
+}
+.pm-page-tail {
+  pointer-events: none;
 }
 
 /* ---------- Chapter heading ---------- */
@@ -96,6 +150,7 @@
 /* Book convention: no indent on the first paragraph of a chapter or a scene. */
 .manuscript > p:first-child,
 .manuscript > .scene-break + p,
+.manuscript > .scene-break + .pm-page-gap + p,
 .manuscript > h1 + p,
 .manuscript > h2 + p,
 .manuscript > h3 + p,
@@ -188,7 +243,9 @@
   opacity: 0.22;
   transition: opacity var(--dur-slow) var(--ease-out);
 }
-.focus-mode .manuscript > .is-focus {
+.focus-mode .manuscript > .is-focus,
+.focus-mode .manuscript > .pm-page-gap,
+.focus-mode .manuscript > .pm-page-tail {
   opacity: 1;
 }
 
@@ -254,12 +311,17 @@
 
 /* ---------- Toolbar ---------- */
 .toolbar-wrap {
-  position: sticky;
+  position: absolute;
   top: 0;
+  left: 0;
+  right: 14px;
   z-index: 10;
   display: flex;
-  justify-content: center;
-  padding: var(--s-3) 0 var(--s-2);
+  /* In a narrow window the toolbar scrolls sideways instead of covering the sidebars. */
+  justify-content: safe center;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: var(--s-3) var(--s-3) var(--s-2);
   pointer-events: none;
 }
 .toolbar {
@@ -447,12 +509,12 @@
 
 /* ---------- Find bar ---------- */
 .find-bar {
-  position: sticky;
+  position: absolute;
   top: 60px;
+  right: 28px;
   z-index: 12;
-  float: right;
   width: 360px;
-  margin-right: max(0px, calc((100% - var(--page-w)) / 2 - 380px));
+  max-width: calc(100% - 40px);
   padding: 6px;
   border-radius: var(--radius-md);
   background: var(--paper);
@@ -503,28 +565,53 @@
   font-size: var(--text-xs);
   color: var(--ink-3);
 }
-.find-opt {
-  width: 26px;
-  height: 26px;
+/* All the small buttons of the find bar: one size, one hover, centered content. */
+.find-opt,
+.find-row .icon-btn {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--ink-3);
+  line-height: 1;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.find-opt {
   font-size: var(--text-xs);
   font-weight: 700;
 }
-.find-opt.is-on {
+.find-opt:hover,
+.find-row .icon-btn:hover {
+  background: var(--desk-3);
+  color: var(--ink);
+}
+.find-opt.is-on,
+.find-opt.is-on:hover {
   background: var(--ribbon-wash);
   color: var(--ribbon);
 }
+.find-toggle:hover {
+  color: var(--ink);
+}
 .find-text-btn {
   height: 28px;
-  padding: 0 8px;
+  padding: 0 10px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--desk-2);
   font-size: var(--text-xs);
   font-weight: 700;
+  transition: background-color var(--dur-fast) var(--ease-out);
+}
+.find-text-btn:hover:not(:disabled) {
+  background: var(--desk-3);
 }
 .find-text-btn:disabled {
   opacity: 0.4;
@@ -558,7 +645,7 @@
 .page-end {
   display: flex;
   justify-content: center;
-  padding: var(--s-6) 0 var(--s-10);
+  padding: var(--s-6) 0 120px;
 }
 .page-end-btn {
   display: inline-flex;

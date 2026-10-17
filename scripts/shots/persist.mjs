@@ -4,7 +4,8 @@ import { join } from 'node:path'
 
 export default async function ({ app, page, openBook, book }) {
   await openBook()
-  await page.locator('.manuscript p').last().click()
+  // The last paragraph of the first chapter (each chapter has its own editor).
+  await page.locator('.manuscript').first().locator('p').last().click()
   await page.keyboard.press('End')
   await page.keyboard.type(' MARCADOR-FINAL-123')
   // Also type in a planning note.

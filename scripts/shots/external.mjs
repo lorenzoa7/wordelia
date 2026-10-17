@@ -9,7 +9,8 @@ export default async function ({ page, openBook, book }) {
   const src = await readFile(file, 'utf8')
   await writeFile(file, src.replace('Elias acendeu', 'Elias, cansado, acendeu'))
   await page.waitForTimeout(2000)
-  const text = await page.locator('.manuscript').innerText()
+  // Each chapter has its own editor; the first one is this chapter.
+  const text = await page.locator('.manuscript').first().innerText()
   console.log('reloaded:', text.includes('Elias, cansado, acendeu'))
   if (!text.includes('Elias, cansado, acendeu')) throw new Error('The open chapter did not reload')
   // The other chapter, closed: change it, then open it.
@@ -18,7 +19,7 @@ export default async function ({ page, openBook, book }) {
   await page.waitForTimeout(1500)
   await page.locator('.chapter-item').nth(1).click()
   await page.waitForTimeout(800)
-  const t2 = await page.locator('.manuscript').innerText()
+  const t2 = await page.locator('.manuscript').nth(1).innerText()
   console.log('closed chapter updated:', t2.includes('três dias'))
   if (!t2.includes('três dias')) throw new Error('The closed chapter did not update')
 }

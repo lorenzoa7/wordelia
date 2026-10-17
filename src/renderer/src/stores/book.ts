@@ -40,11 +40,16 @@ interface BookState {
   activeCategory: string | null
   /** Bumped when a file changes outside the app, so open editors reload */
   externalRev: Record<string, number>
+  /** A request to scroll the pages to a chapter (the sidebar, the history, the chat). `n` makes each request new. */
+  chapterJump: { id: string; n: number; focus?: boolean } | null
 
   open(snap: BookSnapshot): void
   close(): Promise<void>
   setView(view: BookView): void
+  /** Open a chapter: it becomes active and the pages scroll to it */
   selectChapter(id: string): void
+  /** The chapter on screen changed while scrolling: make it active without a jump */
+  setActiveChapter(id: string): void
   selectEntry(id: string | null): void
   selectCategory(folder: string | null): void
 
@@ -153,6 +158,7 @@ export const useBook = create<BookState>((set, get) => {
     activeEntryId: null,
     activeCategory: null,
     externalRev: {},
+    chapterJump: null,
 
     open(snap) {
       offExternal?.()
@@ -190,7 +196,10 @@ export const useBook = create<BookState>((set, get) => {
       set({ view })
     },
     selectChapter(id) {
-      set({ activeChapterId: id, view: 'write' })
+      set({ activeChapterId: id, view: 'write', chapterJump: { id, n: (get().chapterJump?.n ?? 0) + 1 } })
+    },
+    setActiveChapter(id) {
+      if (get().activeChapterId !== id) set({ activeChapterId: id })
     },
     selectEntry(id) {
       const e = get().entries.find((x) => x.id === id)
@@ -255,7 +264,7 @@ export const useBook = create<BookState>((set, get) => {
       const ch: Chapter = { id: newId('ch'), file, title: t, body, meta: {} }
       const idx = afterId ? chapters.findIndex((c) => c.id === afterId) + 1 : chapters.length
       const next = [...chapters.slice(0, idx), ch, ...chapters.slice(idx)]
-      set({ chapters: next, activeChapterId: ch.id, view: 'write' })
+      set({ chapters: next, activeChapterId: ch.id, view: 'write', chapterJump: { id: ch.id, n: (get().chapterJump?.n ?? 0) + 1, focus: true } })
       saver.write(root, chapterRel(ch), chapterToFile(ch), true)
       get().updateManifest({ chapters: next.map((c) => ({ id: c.id, file: c.file })) })
       return ch

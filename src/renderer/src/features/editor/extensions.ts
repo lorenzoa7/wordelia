@@ -14,6 +14,7 @@ import { FindReplace } from './find'
 import { Review } from './review'
 import { WikiLinks } from './wiki-links'
 import { wikiLinkOptions } from '@/features/plan/links'
+import { Pagination, type PaginationOptions } from './pagination'
 
 /** Extensions that define the schema. Used by the editor and by HTML import. */
 export function schemaExtensions(): AnyExtension[] {
@@ -64,6 +65,8 @@ export interface EditorConfig {
   smartEllipsis: boolean
   language: string
   placeholder: string
+  /** Pages on screen: geometry and the height of the chapter heading */
+  pages?: PaginationOptions
 }
 
 export function editorExtensions(cfg: EditorConfig): AnyExtension[] {
@@ -82,6 +85,7 @@ export function editorExtensions(cfg: EditorConfig): AnyExtension[] {
     FindReplace,
     FocusBlock,
     Review,
-    WikiLinks.configure(wikiLinkOptions(false))
+    WikiLinks.configure(wikiLinkOptions(false)),
+    ...(cfg.pages ? [Pagination.configure(cfg.pages)] : [])
   ]
 }

@@ -8,6 +8,7 @@ import { useBook } from '@/stores/book'
 import { useUi } from '@/stores/ui'
 import { useT } from '@/lib/i18n'
 import { findKey } from './find'
+import { scrollToPos, setActiveEditor, whenChapterEditor } from './registry'
 
 function countIn(text: string, q: string, cs: boolean, ww: boolean): number {
   if (!q) return 0
@@ -80,6 +81,48 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
     editor.commands.focus()
   }
 
+  /** Bring the current match into view. */
+  const showCurrent = (ed: Editor): void => {
+    const f = findKey.getState(ed.state)
+    const m = f && f.current >= 0 ? f.matches[f.current] : null
+    if (m) scrollToPos(ed, m.from)
+  }
+
+  // A new search: show the first match.
+  useEffect(() => {
+    if (!open || !query) return
+    const id = setTimeout(() => showCurrent(editor), 30)
+    return () => clearTimeout(id)
+  }, [open, query, cs, ww, editor])
+
+  /** Next or previous match; after the last match of the chapter, go on in the next chapter that has one. */
+  const go = (dir: 1 | -1): void => {
+    const f = findKey.getState(editor.state)
+    const count = f?.matches.length ?? 0
+    const atEdge = !count || (dir === 1 ? (f?.current ?? 0) >= count - 1 : (f?.current ?? 0) <= 0)
+    const book = useBook.getState()
+    const i = book.chapters.findIndex((c) => c.id === book.activeChapterId)
+    const order = dir === 1 ? book.chapters.slice(i + 1) : book.chapters.slice(0, Math.max(0, i)).reverse()
+    const target = atEdge ? order.find((c) => countIn(plain.get(c.id) ?? '', query, cs, ww) > 0) : undefined
+    if (!target) {
+      if (dir === 1) editor.commands.findNext()
+      else editor.commands.findPrev()
+      showCurrent(editor)
+      return
+    }
+    book.selectChapter(target.id)
+    whenChapterEditor(target.id, (e) =>
+      setTimeout(() => {
+        setActiveEditor(e)
+        e.editor.commands.setTextSelection(dir === 1 ? 0 : e.editor.state.doc.content.size)
+        e.editor.commands.setFind(query, { caseSensitive: cs, wholeWord: ww })
+        if (dir === 1) e.editor.commands.findNext()
+        else e.editor.commands.findPrev()
+        showCurrent(e.editor)
+      }, 60)
+    )
+  }
+
   return (
     <AnimatePresence>
       {open && (
@@ -105,8 +148,11 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault()
-                  if (e.shiftKey) editor.commands.findPrev()
-                  else editor.commands.findNext()
+                  go(e.shiftKey ? -1 : 1)
+                }
+                if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                  e.preventDefault()
+                  go(e.key === 'ArrowDown' ? 1 : -1)
                 }
                 if (e.key === 'Escape') close()
               }}
@@ -118,10 +164,10 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
             <button className={clsx('find-opt', ww && 'is-on')} onClick={() => setWw(!ww)} title={tf.wholeWord} aria-label={tf.wholeWord} aria-pressed={ww}>
               {tf.wholeWordShort}
             </button>
-            <button className="icon-btn" onClick={() => editor.commands.findPrev()} aria-label={tf.previous}>
+            <button className="icon-btn find-nav" onClick={() => go(-1)} aria-label={tf.previous} title={`${tf.previous} (Shift+Enter)`}>
               <ArrowUp size={14} />
             </button>
-            <button className="icon-btn" onClick={() => editor.commands.findNext()} aria-label={tf.next}>
+            <button className="icon-btn find-nav" onClick={() => go(1)} aria-label={tf.next} title={`${tf.next} (Enter)`}>
               <ArrowDown size={14} />
             </button>
             <button className="icon-btn" onClick={close} aria-label={t.common.close}>
@@ -157,7 +203,22 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
             <div className="find-others">
               <span className="caps">{tf.otherChapters}</span>
               {others.map((c) => (
-                <button key={c.id} className="find-other" onClick={() => useBook.getState().selectChapter(c.id)}>
+                <button
+                  key={c.id}
+                  className="find-other"
+                  onClick={() => {
+                    useBook.getState().selectChapter(c.id)
+                    whenChapterEditor(c.id, (e) =>
+                      setTimeout(() => {
+                        setActiveEditor(e)
+                        e.editor.commands.setTextSelection(0)
+                        e.editor.commands.setFind(query, { caseSensitive: cs, wholeWord: ww })
+                        e.editor.commands.findNext()
+                        showCurrent(e.editor)
+                      }, 60)
+                    )
+                  }}
+                >
                   <span>{c.title}</span>
                   <span className="find-other-n">{c.n}</span>
                 </button>

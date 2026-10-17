@@ -8,6 +8,7 @@ import { useApp } from '@/stores/app'
 import { actionName, useT } from '@/lib/i18n'
 import { cancelAction, retryAction, useActionRun } from '@/features/actions/runAction'
 import { reviewKey } from './review'
+import { isChatReview } from './registry'
 
 /** The floating bar under an inline AI review: Accept, Reject, Retry. */
 export function ReviewBar({ editor }: { editor: Editor }): React.JSX.Element {
@@ -32,11 +33,11 @@ export function ReviewBar({ editor }: { editor: Editor }): React.JSX.Element {
       const gap = editor.view.dom.querySelector('.review-spacer')
       if (gap) {
         const r = gap.getBoundingClientRect()
-        setPos({ top: r.top - box.top + desk.scrollTop + 6, left: page.left - box.left })
+        setPos({ top: r.top - box.top + desk.scrollTop + 6, left: page.left - box.left + desk.scrollLeft })
         return
       }
       const end = editor.view.coordsAtPos(Math.min(review.to, editor.state.doc.content.size))
-      setPos({ top: end.bottom - box.top + desk.scrollTop + 12, left: page.left - box.left })
+      setPos({ top: end.bottom - box.top + desk.scrollTop + 12, left: page.left - box.left + desk.scrollLeft })
     }
     place()
     const id = requestAnimationFrame(place)
@@ -52,7 +53,8 @@ export function ReviewBar({ editor }: { editor: Editor }): React.JSX.Element {
 
   const stats = review?.phase === 'ready' ? diffStats(review.ops) : null
   // The label is the name of the action. Show it in the interface language when it is a built-in name.
-  const label = review && action && action.name === review.label ? actionName(t, action) : review?.label
+  const chat = isChatReview(review?.id)
+  const label = !chat && review && action && action.name === review.label ? actionName(t, action) : review?.label
 
   return (
     <AnimatePresence>
@@ -96,9 +98,11 @@ export function ReviewBar({ editor }: { editor: Editor }): React.JSX.Element {
               <button className="review-btn" onClick={() => editor.chain().focus().rejectReview().run()}>
                 <X size={13} /> {t.common.reject} <Kbd>Esc</Kbd>
               </button>
-              <button className="review-btn review-icon" title={t.common.retry} aria-label={t.common.retry} onClick={() => void retryAction()}>
-                <ArrowsClockwise size={14} />
-              </button>
+              {!chat && (
+                <button className="review-btn review-icon" title={t.common.retry} aria-label={t.common.retry} onClick={() => void retryAction()}>
+                  <ArrowsClockwise size={14} />
+                </button>
+              )}
             </>
           )}
         </motion.div>

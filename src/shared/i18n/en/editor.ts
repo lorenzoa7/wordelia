@@ -37,6 +37,7 @@ export const editor = {
   },
   /** The bar under an inline AI review */
   review: {
+    chatProposal: 'Chat proposal',
     /** Words that the AI wrote so far */
     words: (n: number): string => `${n} words`,
     stop: 'Stop'

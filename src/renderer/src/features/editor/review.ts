@@ -30,6 +30,15 @@ type ReviewMeta =
 
 export const reviewKey = new PluginKey<ReviewData | null>('review')
 
+/** Reviews that ended with Accept. The view hook below reports each end once. */
+const applied = new Set<string>()
+let endListener: ((id: string, accepted: boolean) => void) | null = null
+
+/** Get told when a review ends (accepted or not). */
+export function onReviewEnd(fn: (id: string, accepted: boolean) => void): void {
+  endListener = fn
+}
+
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     review: {
@@ -167,6 +176,7 @@ export const Review = Extension.create({
           apply(tr: Transaction, prev: ReviewData | null, _old, next): ReviewData | null {
             const meta = tr.getMeta(reviewKey) as ReviewMeta | undefined
             if (meta?.type === 'start') return meta.data
+            if (meta?.type === 'apply' && prev) applied.add(prev.id)
             if (meta?.type === 'clear' || meta?.type === 'apply') return null
             if (!prev) return null
             if (meta?.type === 'update' && meta.id === prev.id) {
@@ -182,6 +192,16 @@ export const Review = Extension.create({
             return prev
           }
         },
+        view: () => ({
+          update(view, prevState) {
+            const prev = reviewKey.getState(prevState)
+            const cur = reviewKey.getState(view.state)
+            if (prev && (!cur || cur.id !== prev.id)) {
+              const accepted = applied.delete(prev.id)
+              endListener?.(prev.id, accepted)
+            }
+          }
+        }),
         props: {
           decorations(state) {
             const r = reviewKey.getState(state)

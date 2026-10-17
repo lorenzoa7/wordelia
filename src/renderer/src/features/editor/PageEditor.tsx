@@ -1,22 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
-import { EditorState } from '@tiptap/pm/state'
+import { EditorState, Selection, TextSelection } from '@tiptap/pm/state'
 import type { Node as PMNode } from '@tiptap/pm/model'
-import { motion } from 'motion/react'
 import { Plus } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { parseMarkdown } from '@shared/markdown/parse'
 import { serializeMarkdown } from '@shared/markdown/serialize'
-import { countWords } from '@shared/book'
-import { chapterWord } from '@shared/export/model'
-import type { DocNode } from '@shared/types'
+import { countMarkdownWords, countWords } from '@shared/book'
+import { chapterWord, PAGE_SIZES } from '@shared/export/model'
+import type { BookManifest, DocNode } from '@shared/types'
 import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
 import { useT } from '@/lib/i18n'
 import { fontStack } from '@/lib/fonts'
-import { editorExtensions } from './extensions'
-import { setActiveEditor } from './registry'
 import { registerFlusher } from '@/lib/flush'
+import { editorExtensions } from './extensions'
+import { getChapterEditor, registerChapterEditor, setActiveEditor, useActiveEditor, whenChapterEditor } from './registry'
+import { repaginate, type PageMetrics } from './pagination'
 import { Toolbar } from './Toolbar'
 import { SelectionMenu } from './SelectionMenu'
 import { ReviewBar } from './ReviewBar'
@@ -26,27 +26,231 @@ import { typewriterSound } from './typewriter-sound'
 import { cleanPastedHtml } from './paste'
 import './editor.css'
 
+const MM = 96 / 25.4
+/** Space between two sheets of paper, in pixels at zoom 1 */
+const SHEET_GAP = 18
+
+/** Page geometry of the book: the page size and margins of its export settings, at the zoom of the screen. */
+function pageGeometry(m: BookManifest, zoom: number): PageMetrics & { width: number; marginX: number } {
+  const size = PAGE_SIZES[m.export.pageSize] ?? PAGE_SIZES.A5
+  const mg = m.export.margins
+  const marginX = ((mg.inner + mg.outer) / 2) * MM * zoom
+  const marginTop = mg.top * MM * zoom
+  const marginBottom = mg.bottom * MM * zoom
+  const height = size.h * MM * zoom
+  return {
+    width: size.w * MM * zoom,
+    marginX,
+    marginTop,
+    marginBottom,
+    contentHeight: height - marginTop - marginBottom,
+    gap: SHEET_GAP * zoom
+  }
+}
+
+/** Measured heights of the chapter sheets, so a sheet that is not on screen keeps its size. */
+const sheetHeights = new Map<string, number>()
+
+/**
+ * The manuscript as pages, like a word processor: every chapter starts on a new page, the pages
+ * follow one another, and scrolling down goes on into the next chapter. Each chapter has its own
+ * editor (its own undo history); chapters far from the screen do not keep an editor.
+ */
 export function PageEditor(): React.JSX.Element | null {
   const manifest = useBook((s) => s.manifest)
-  const chapterId = useBook((s) => s.activeChapterId)
-  const chapterIndex = useBook((s) => s.chapters.findIndex((c) => c.id === s.activeChapterId))
-  const chapter = useBook((s) => s.chapters.find((c) => c.id === s.activeChapterId))
-  const externalRev = useBook((s) => (s.activeChapterId ? (s.externalRev[s.activeChapterId] ?? 0) : 0))
+  const chapterIds = useBook((s) => s.chapters.map((c) => c.id).join('|'))
+  const ids = useMemo(() => (chapterIds ? chapterIds.split('|') : []), [chapterIds])
+  const jump = useBook((s) => s.chapterJump)
   const ui = useApp((s) => s.settings?.ui)
+  const active = useActiveEditor((s) => s.active)
+  const typo = manifest?.typography
+  const deskRef = useRef<HTMLDivElement>(null)
+  const [typing, setTyping] = useState(false)
+  const typingTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const zoom = ui?.zoom ?? 1
+
+  const geometry = useMemo(() => (manifest ? pageGeometry(manifest, zoom) : null), [manifest, zoom])
+
+  const onTyping = useCallback((): void => {
+    setTyping(true)
+    clearTimeout(typingTimer.current)
+    typingTimer.current = setTimeout(() => setTyping(false), 1400)
+  }, [])
+
+  // Show the toolbar again when the mouse moves.
+  useEffect(() => {
+    const onMove = (): void => setTyping(false)
+    window.addEventListener('mousemove', onMove)
+    return () => window.removeEventListener('mousemove', onMove)
+  }, [])
+
+  // A jump to a chapter (the sidebar, the history, the chat): scroll its first page into view.
+  useEffect(() => {
+    if (!jump) return
+    const desk = deskRef.current
+    const sheet = desk?.querySelector<HTMLElement>(`[data-chapter="${jump.id}"]`)
+    if (!desk || !sheet) return
+    const top = sheet.getBoundingClientRect().top - desk.getBoundingClientRect().top + desk.scrollTop - 56
+    desk.scrollTo({ top: Math.max(0, top), behavior: 'auto' })
+    const editor = getChapterEditor(jump.id)
+    if (editor) setActiveEditor(editor)
+    if (jump.focus) whenChapterEditor(jump.id, (e) => setTimeout(() => e.editor.commands.focus('start'), 30))
+  }, [jump])
+
+  // While nothing has the cursor, the chapter on screen is the active one.
+  useEffect(() => {
+    const desk = deskRef.current
+    if (!desk) return
+    let frame = 0
+    const onScroll = (): void => {
+      if (frame) return
+      frame = requestAnimationFrame(() => {
+        frame = 0
+        if (desk.contains(document.activeElement) && document.activeElement?.closest('.manuscript')) return
+        const box = desk.getBoundingClientRect()
+        const line = box.top + box.height * 0.3
+        for (const el of desk.querySelectorAll<HTMLElement>('[data-chapter]')) {
+          const r = el.getBoundingClientRect()
+          if (r.top <= line && r.bottom >= line) {
+            const id = el.dataset.chapter!
+            useBook.getState().setActiveChapter(id)
+            const e = getChapterEditor(id)
+            if (e) setActiveEditor(e)
+            break
+          }
+        }
+      })
+    }
+    desk.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      desk.removeEventListener('scroll', onScroll)
+      if (frame) cancelAnimationFrame(frame)
+    }
+  }, [])
+
+  useEditorStats(active?.editor ?? null)
+
+  if (!manifest || !typo || !geometry) return null
+
+  const vars = {
+    '--book-font': fontStack(typo.fontFamily),
+    '--book-size': `${(typo.fontSize * 4) / 3}px`,
+    '--book-lh': String(typo.lineHeight),
+    '--book-indent': `${typo.firstLineIndent}em`,
+    '--book-para': `${typo.paragraphSpacing}em`,
+    '--book-align': typo.align,
+    '--page-zoom': String(zoom),
+    '--page-w': `${geometry.width}px`,
+    '--page-mx': `${geometry.marginX}px`,
+    '--page-mt': `${geometry.marginTop}px`,
+    '--page-mb': `${geometry.marginBottom}px`,
+    '--page-gap': `${geometry.gap}px`,
+    '--page-content-h': `${geometry.contentHeight}px`
+  } as React.CSSProperties
+
+  return (
+    <div className={clsx('write-frame', ui?.focusMode && 'focus-mode', typing && 'is-typing', typo.indentFirstParagraph && 'indent-first')}>
+      {active && <Toolbar editor={active.editor} />}
+      {active && <FindBar editor={active.editor} />}
+      <div ref={deskRef} className="desk">
+        <div className="desk-inner" style={vars}>
+          {ids.map((id, i) => (
+            <ChapterSheet key={id} chapterId={id} index={i} geometry={geometry} deskRef={deskRef} onTyping={onTyping} />
+          ))}
+          {ids.length ? <PageEnd /> : <EmptyManuscript />}
+          {active && <ReviewBar editor={active.editor} />}
+        </div>
+      </div>
+      {active && <SelectionMenu editor={active.editor} />}
+    </div>
+  )
+}
+
+interface SheetProps {
+  chapterId: string
+  index: number
+  geometry: PageMetrics & { width: number; marginX: number }
+  deskRef: React.RefObject<HTMLDivElement | null>
+  onTyping: () => void
+}
+
+/** One chapter: its heading and its pages. The editor mounts when the chapter comes near the screen. */
+function ChapterSheet({ chapterId, index, geometry, deskRef, onTyping }: SheetProps): React.JSX.Element | null {
+  const chapter = useBook((s) => s.chapters.find((c) => c.id === chapterId))
+  const isActive = useBook((s) => s.activeChapterId === chapterId)
+  const ref = useRef<HTMLElement>(null)
+  const [near, setNear] = useState(isActive)
+
+  useEffect(() => {
+    const el = ref.current
+    const root = deskRef.current
+    if (!el || !root) return
+    const io = new IntersectionObserver((entries) => setNear(entries.some((e) => e.isIntersecting)), { root, rootMargin: '1600px 0px' })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [deskRef])
+
+  // Remember the real height, for the time the editor is not mounted.
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const ro = new ResizeObserver(() => {
+      if (el.querySelector('.manuscript')) sheetHeights.set(chapterId, el.offsetHeight)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [chapterId])
+
+  if (!chapter) return null
+  const mounted = near || isActive
+  // An estimate from the word count, until the chapter is measured once.
+  const estimate = (): number => {
+    const known = sheetHeights.get(chapterId)
+    if (known) return known
+    const words = countMarkdownWords(chapter.body)
+    const lines = (words * 6.2 * 0.5 * parseFloat(getComputedStyle(document.documentElement).fontSize || '16')) / Math.max(200, geometry.width - 2 * geometry.marginX)
+    const linesPerPage = geometry.contentHeight / 26
+    const pages = Math.max(1, Math.ceil((lines + 6) / linesPerPage))
+    return pages * (geometry.contentHeight + geometry.marginTop + geometry.marginBottom) + (pages - 1) * geometry.gap
+  }
+
+  return (
+    <article ref={ref} data-chapter={chapterId} className={clsx('page grain', !mounted && 'is-asleep')} style={mounted ? undefined : { height: estimate() }}>
+      <ChapterHead index={index} title={chapter.title} id={chapterId} />
+      {mounted && <SheetEditor chapterId={chapterId} geometry={geometry} onTyping={onTyping} sheetRef={ref} />}
+    </article>
+  )
+}
+
+interface EditorProps {
+  chapterId: string
+  geometry: PageMetrics
+  onTyping: () => void
+  sheetRef: React.RefObject<HTMLElement | null>
+}
+
+function SheetEditor({ chapterId, geometry, onTyping, sheetRef }: EditorProps): React.JSX.Element {
+  const manifest = useBook((s) => s.manifest)
+  const externalRev = useBook((s) => s.externalRev[chapterId] ?? 0)
   const spellcheck = useApp((s) => s.settings?.editor.spellcheck ?? true)
+  const typewriterScroll = useApp((s) => s.settings?.ui.typewriterScroll ?? false)
+  const sounds = useApp((s) => s.settings?.editor.typewriterSounds ?? false)
   const typo = manifest?.typography
   const t = useT()
 
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const [typing, setTyping] = useState(false)
-  const typingTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
-
-  // Per-chapter editor states: each chapter keeps its own undo history and cursor.
-  const stateCache = useRef(new Map<string, { state: EditorState; body: string }>())
-  const currentId = useRef<string | null>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
-  /** The newest document that is not saved yet. It belongs to the chapter `currentId`. */
+  /** The newest document that is not saved yet */
   const dirtyDoc = useRef<PMNode | null>(null)
+  const geometryRef = useRef(geometry)
+  geometryRef.current = geometry
+
+  const flush = useCallback((): void => {
+    clearTimeout(saveTimer.current)
+    const doc = dirtyDoc.current
+    if (!doc) return
+    dirtyDoc.current = null
+    useBook.getState().setChapterBody(chapterId, serializeMarkdown(doc.toJSON() as DocNode))
+  }, [chapterId])
 
   const extensions = useMemo(
     () =>
@@ -55,29 +259,27 @@ export function PageEditor(): React.JSX.Element | null {
         smartQuotes: typo?.smartQuotes ?? true,
         smartEllipsis: typo?.smartEllipsis ?? true,
         language: manifest?.language ?? 'en',
-        placeholder: t.editor.page.placeholder
+        placeholder: t.editor.page.placeholder,
+        pages: {
+          metrics: () => geometryRef.current,
+          // The chapter heading takes the top of the first page.
+          firstPageOffset: () => {
+            const sheet = sheetRef.current
+            const root = sheet?.querySelector('.manuscript')
+            if (!sheet || !root) return 0
+            return root.getBoundingClientRect().top - sheet.getBoundingClientRect().top - geometryRef.current.marginTop
+          }
+        }
       }),
     // Typing rules and the interface language change rarely; the editor is rebuilt when they do.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [typo?.dialogueDash, typo?.smartQuotes, typo?.smartEllipsis, manifest?.language, t.editor.page.placeholder]
   )
-
-  const flush = useCallback((): void => {
-    clearTimeout(saveTimer.current)
-    const doc = dirtyDoc.current
-    const id = currentId.current
-    if (!doc || !id) return
-    dirtyDoc.current = null
-    // The saved document, not the editor: the editor may be gone (new typing rules).
-    const body = serializeMarkdown(doc.toJSON() as DocNode)
-    useBook.getState().setChapterBody(id, body)
-    const cached = stateCache.current.get(id)
-    if (cached) cached.body = body
-  }, [])
 
   const editor = useEditor(
     {
       extensions,
-      content: chapter ? (parseMarkdown(chapter.body) as object) : '',
+      content: parseMarkdown(useBook.getState().chapters.find((c) => c.id === chapterId)?.body ?? '') as object,
       // Prose, not Markdown: "- " or "* " at the start of a line must stay text (dialogue!).
       // Only the book's own typing rules run.
       enableInputRules: ['smartTyping', 'sceneBreak'],
@@ -91,6 +293,40 @@ export function PageEditor(): React.JSX.Element | null {
           spellcheck: String(spellcheck),
           lang: manifest?.language ?? 'en',
           'aria-label': t.editor.page.chapterText
+        },
+        // The book is one long text: the arrows go on into the next or the previous chapter.
+        handleKeyDown: (view, event) => {
+          // Ctrl+Home / Ctrl+End: the start or the end of the chapter. The browser cannot do it
+          // itself, because the empty end of the last page is not text.
+          if ((event.ctrlKey || event.metaKey) && !event.altKey && (event.key === 'Home' || event.key === 'End')) {
+            const { doc, selection } = view.state
+            const target = event.key === 'End' ? Selection.atEnd(doc) : Selection.atStart(doc)
+            const sel = event.shiftKey ? TextSelection.create(doc, selection.anchor, target.head) : target
+            view.dispatch(view.state.tr.setSelection(sel).scrollIntoView())
+            return true
+          }
+          if (event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return false
+          const { selection, doc } = view.state
+          if (!selection.empty) return false
+          const chapters = useBook.getState().chapters
+          const i = chapters.findIndex((c) => c.id === chapterId)
+          const atEnd = selection.from >= doc.content.size - 1
+          const atStart = selection.from <= 1
+          if ((event.key === 'ArrowDown' || event.key === 'ArrowRight') && atEnd && view.endOfTextblock(event.key === 'ArrowDown' ? 'down' : 'right')) {
+            const next = chapters[i + 1]
+            if (!next) return false
+            useBook.getState().selectChapter(next.id)
+            whenChapterEditor(next.id, (e) => e.editor.commands.focus('start'))
+            return true
+          }
+          if ((event.key === 'ArrowUp' || event.key === 'ArrowLeft') && atStart && view.endOfTextblock(event.key === 'ArrowUp' ? 'up' : 'left')) {
+            const prev = chapters[i - 1]
+            if (!prev) return false
+            useBook.getState().selectChapter(prev.id)
+            whenChapterEditor(prev.id, (e) => e.editor.commands.focus('end'))
+            return true
+          }
+          return false
         }
       },
       onUpdate: ({ transaction }) => {
@@ -98,91 +334,66 @@ export function PageEditor(): React.JSX.Element | null {
         dirtyDoc.current = transaction.doc
         clearTimeout(saveTimer.current)
         saveTimer.current = setTimeout(flush, 350)
-        setTyping(true)
-        clearTimeout(typingTimer.current)
-        typingTimer.current = setTimeout(() => setTyping(false), 1400)
+        onTyping()
+      },
+      onFocus: () => {
+        useBook.getState().setActiveChapter(chapterId)
       }
     },
     [extensions]
   )
 
-  // A new editor (new typing rules) cannot use states made for the old one.
-  // This runs after the cleanup below saved the typing of the old editor.
-  const lastEditor = useRef(editor)
+  // Register this chapter's editor; the focused one becomes the active one.
   useEffect(() => {
-    if (lastEditor.current === editor) return
-    lastEditor.current = editor
-    stateCache.current.clear()
-    currentId.current = null
-  }, [editor])
-
-  // Switch chapters: save the old state, load the new one.
-  useEffect(() => {
-    if (!editor || !chapterId) return
-    const prev = currentId.current
-    if (prev === chapterId) return
-    if (prev) {
+    if (!editor) return
+    const handle = { editor, chapterId, flush }
+    const unregister = registerChapterEditor(handle)
+    const unflush = registerFlusher(flush)
+    const onFocus = (): void => setActiveEditor(handle)
+    editor.on('focus', onFocus)
+    return () => {
+      editor.off('focus', onFocus)
       flush()
-      const body = useBook.getState().chapters.find((c) => c.id === prev)?.body ?? ''
-      stateCache.current.set(prev, { state: editor.state, body })
+      unflush()
+      unregister()
     }
-    currentId.current = chapterId
-    const ch = useBook.getState().chapters.find((c) => c.id === chapterId)
-    const cached = stateCache.current.get(chapterId)
-    let next: EditorState
-    if (cached && ch && cached.body === ch.body) {
-      next = cached.state
-    } else {
-      const doc = editor.schema.nodeFromJSON(parseMarkdown(ch?.body ?? ''))
-      next = EditorState.create({ doc, plugins: editor.state.plugins, schema: editor.schema })
-    }
-    editor.view.updateState(next)
-    setActiveEditor({ editor, chapterId, flush })
-    scrollRef.current?.scrollTo({ top: 0 })
   }, [editor, chapterId, flush])
 
-  // A file changed outside the app: reload it.
+  // A file changed outside the app, or a version was restored: reload the text.
+  const seenRev = useRef(externalRev)
   useEffect(() => {
-    if (!editor || !chapterId || externalRev === 0) return
+    if (!editor || externalRev === seenRev.current) return
+    seenRev.current = externalRev
     const ch = useBook.getState().chapters.find((c) => c.id === chapterId)
     if (!ch) return
     const doc = editor.schema.nodeFromJSON(parseMarkdown(ch.body))
     editor.view.updateState(EditorState.create({ doc, plugins: editor.state.plugins, schema: editor.schema }))
-    stateCache.current.delete(chapterId)
     dirtyDoc.current = null
   }, [editor, chapterId, externalRev])
 
+  // New page geometry (zoom, page size): measure the pages again.
   useEffect(() => {
-    if (!editor) return
-    setActiveEditor({ editor, chapterId: currentId.current ?? '', flush })
-    const unregister = registerFlusher(flush)
-    return () => {
-      unregister()
-      flush()
-      setActiveEditor(null)
-    }
-  }, [editor, flush])
+    if (editor) repaginate(editor.view)
+  }, [editor, geometry])
 
   // Typewriter scrolling: keep the line of the cursor near the middle of the screen.
   useEffect(() => {
-    if (!editor || !ui?.typewriterScroll) return
+    if (!editor || !typewriterScroll) return
     const onSel = (): void => {
-      const box = scrollRef.current
+      const box = editor.view.dom.closest('.desk') as HTMLElement | null
       if (!box || !editor.isFocused) return
       const coords = editor.view.coordsAtPos(editor.state.selection.head)
       const rect = box.getBoundingClientRect()
-      const target = rect.top + rect.height * 0.42
-      const delta = coords.top - target
+      const delta = coords.top - (rect.top + rect.height * 0.42)
       if (Math.abs(delta) > 24) box.scrollBy({ top: delta, behavior: 'smooth' })
     }
     editor.on('selectionUpdate', onSel)
     return () => {
       editor.off('selectionUpdate', onSel)
     }
-  }, [editor, ui?.typewriterScroll])
+  }, [editor, typewriterScroll])
 
   // Optional typewriter sounds.
-  const sounds = useApp((s) => s.settings?.editor.typewriterSounds ?? false)
   useEffect(() => {
     if (!editor || !sounds) return
     const dom = editor.view.dom
@@ -198,66 +409,10 @@ export function PageEditor(): React.JSX.Element | null {
     return () => dom.removeEventListener('keydown', onKey)
   }, [editor, sounds])
 
-  // Show the toolbar again when the mouse moves.
-  useEffect(() => {
-    const onMove = (): void => setTyping(false)
-    window.addEventListener('mousemove', onMove)
-    return () => window.removeEventListener('mousemove', onMove)
-  }, [])
-
-  useEditorStats(editor)
-
-  if (!manifest || !typo) return null
-
-  const pageStyle = {
-    '--book-font': fontStack(typo.fontFamily),
-    '--book-size': `${(typo.fontSize * 4) / 3}px`,
-    '--book-lh': String(typo.lineHeight),
-    '--book-indent': `${typo.firstLineIndent}em`,
-    '--book-para': `${typo.paragraphSpacing}em`,
-    '--book-align': typo.align,
-    '--page-zoom': String(ui?.zoom ?? 1)
-  } as React.CSSProperties
-
-  return (
-    <div
-      ref={scrollRef}
-      className={clsx('desk', ui?.focusMode && 'focus-mode', typing && 'is-typing', typo.indentFirstParagraph && 'indent-first')}
-    >
-      {editor && <Toolbar editor={editor} />}
-      {editor && <FindBar editor={editor} />}
-      {chapter ? (
-        <motion.article
-          key={chapter.id}
-          className="page grain"
-          // Hyphenation and spell check follow the language of the book, not the language of the interface.
-          lang={manifest?.language ?? 'en'}
-          style={pageStyle}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-          onMouseDown={(e) => {
-            // Click in the empty bottom area of the page: put the cursor at the end.
-            if (e.target === e.currentTarget && editor) {
-              e.preventDefault()
-              editor.commands.focus('end')
-            }
-          }}
-        >
-          <ChapterHead index={chapterIndex} title={chapter.title} id={chapter.id} onEnter={() => editor?.commands.focus('start')} />
-          <EditorContent editor={editor} />
-        </motion.article>
-      ) : (
-        <EmptyManuscript />
-      )}
-      {chapter && <PageEnd />}
-      {editor && <SelectionMenu editor={editor} />}
-      {editor && <ReviewBar editor={editor} />}
-    </div>
-  )
+  return <EditorContent editor={editor} />
 }
 
-function ChapterHead({ index, title, id, onEnter }: { index: number; title: string; id: string; onEnter: () => void }): React.JSX.Element {
+function ChapterHead({ index, title, id }: { index: number; title: string; id: string }): React.JSX.Element {
   const language = useBook((s) => s.manifest?.language ?? 'en')
   const t = useT()
   const [value, setValue] = useState(title)
@@ -277,11 +432,12 @@ function ChapterHead({ index, title, id, onEnter }: { index: number; title: stri
         spellCheck={false}
         onChange={(e) => setValue(e.target.value)}
         onBlur={commit}
+        onFocus={() => useBook.getState().setActiveChapter(id)}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
             e.preventDefault()
             commit()
-            onEnter()
+            whenChapterEditor(id, (ed) => ed.editor.commands.focus('start'))
           }
           if (e.key === 'Escape') {
             setValue(title)
@@ -297,16 +453,13 @@ function ChapterHead({ index, title, id, onEnter }: { index: number; title: stri
 }
 
 function PageEnd(): React.JSX.Element {
-  const chapterId = useBook((s) => s.activeChapterId)
-  const isLast = useBook((s) => s.chapters[s.chapters.length - 1]?.id === s.activeChapterId)
+  const lastId = useBook((s) => s.chapters[s.chapters.length - 1]?.id ?? null)
   const t = useT()
   return (
     <div className="page-end">
-      {isLast && (
-        <button className="page-end-btn" onClick={() => void useBook.getState().addChapter(chapterId)}>
-          <Plus size={13} /> {t.editor.page.nextChapter}
-        </button>
-      )}
+      <button className="page-end-btn" onClick={() => void useBook.getState().addChapter(lastId)}>
+        <Plus size={13} /> {t.editor.page.nextChapter}
+      </button>
     </div>
   )
 }

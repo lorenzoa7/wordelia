@@ -19,7 +19,10 @@ export function useEditorStats(editor: Editor | null): void {
   useEffect(() => {
     if (!editor) return
     let timer: ReturnType<typeof setTimeout> | undefined
+    let stopped = false
     const compute = (): void => {
+      // A late timer of an editor that is no longer the active one must not win.
+      if (stopped || editor.isDestroyed) return
       const chapterWords = countWords(editor.state.doc.textBetween(0, editor.state.doc.content.size, '\n', ' '))
       const { chapters, activeChapterId } = useBook.getState()
       const others = chapters.filter((c) => c.id !== activeChapterId).reduce((n, c) => n + countMarkdownWords(c.body), 0)
@@ -37,9 +40,13 @@ export function useEditorStats(editor: Editor | null): void {
     editor.on('update', onUpdate)
     editor.on('selectionUpdate', onSelection)
     const unsub = useBook.subscribe((s, p) => {
-      if (s.activeChapterId !== p.activeChapterId || s.chapters.length !== p.chapters.length) setTimeout(compute, 50)
+      if (s.activeChapterId !== p.activeChapterId || s.chapters.length !== p.chapters.length) {
+        clearTimeout(timer)
+        timer = setTimeout(compute, 50)
+      }
     })
     return () => {
+      stopped = true
       clearTimeout(timer)
       editor.off('update', onUpdate)
       editor.off('selectionUpdate', onSelection)

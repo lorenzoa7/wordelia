@@ -322,6 +322,8 @@ export interface AppSettings {
     typewriterScroll: boolean
     zoom: number
     chatWidth: number
+    /** Width of the left sidebar (chapters or planning), in pixels */
+    sidebarWidth: number
   }
   editor: {
     spellcheck: boolean

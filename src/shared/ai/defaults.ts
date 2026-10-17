@@ -8,6 +8,7 @@ export const DEFAULT_ACTIONS: AiAction[] = [
     name: 'Polish',
     icon: 'Sparkle',
     builtIn: true,
+    shortcut: 'Ctrl+J',
     route: null,
     contextChars: 2500,
     instructions: [
@@ -26,6 +27,7 @@ export const DEFAULT_ACTIONS: AiAction[] = [
     name: 'Tighten',
     icon: 'ArrowsInLineHorizontal',
     builtIn: true,
+    shortcut: 'Alt+2',
     route: null,
     contextChars: 1500,
     instructions: [
@@ -39,6 +41,7 @@ export const DEFAULT_ACTIONS: AiAction[] = [
     name: 'Fix grammar only',
     icon: 'Checks',
     builtIn: true,
+    shortcut: 'Alt+3',
     route: null,
     contextChars: 600,
     instructions: [
@@ -53,6 +56,7 @@ export const DEFAULT_ACTIONS: AiAction[] = [
     name: "Show, don't tell",
     icon: 'Eye',
     builtIn: true,
+    shortcut: 'Alt+4',
     route: null,
     contextChars: 2500,
     instructions: [
@@ -65,6 +69,7 @@ export const DEFAULT_ACTIONS: AiAction[] = [
     name: 'Expand',
     icon: 'ArrowsOutLineHorizontal',
     builtIn: true,
+    shortcut: 'Alt+5',
     route: null,
     contextChars: 3000,
     instructions: [

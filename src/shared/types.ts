@@ -248,6 +248,8 @@ export interface AiAction {
   contextChars: number
   icon: string
   builtIn: boolean
+  /** Keyboard shortcut, for example "Ctrl+J" or "Alt+2" (see src/shared/ai/shortcuts.ts). Undefined: none. */
+  shortcut?: string
 }
 
 /* ------------------------------------------------------------------ */
@@ -312,8 +314,8 @@ export interface ProviderSettings {
 export type Locale = 'en' | 'pt-BR' | 'es'
 
 export interface AppSettings {
-  /** 2: Claude Code routes have an explicit effort. 3: the chat effort default is medium. */
-  version: 3
+  /** 2: Claude Code routes have an explicit effort. 3: the chat effort default is medium. 4: each action has its own shortcut. */
+  version: 4
   /** Language of the interface */
   language: Locale
   theme: ThemeSetting

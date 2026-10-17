@@ -3,8 +3,9 @@
 import { app, safeStorage } from 'electron'
 import { join } from 'node:path'
 import { DEFAULT_ACTIONS, DEFAULT_ACTION_ID } from '@shared/ai/defaults'
-import type { AppSettings, ModelRoutes, ProviderId, TaskKind } from '@shared/types'
+import type { AiAction, AppSettings, ModelRoutes, ProviderId, TaskKind } from '@shared/types'
 import { TASK_EFFORT } from '@shared/ai/effort'
+import { withDefaultShortcuts } from '@shared/ai/shortcuts'
 import { atomicWrite, readJson } from './fsutil'
 
 const settingsFile = (): string => join(app.getPath('userData'), 'settings.json')
@@ -12,7 +13,7 @@ const secretsFile = (): string => join(app.getPath('userData'), 'secrets.json')
 
 export function defaultSettings(): AppSettings {
   return {
-    version: 3,
+    version: 4,
     language: 'en',
     autoUpdate: true,
     theme: 'light',
@@ -37,6 +38,7 @@ export async function getSettings(): Promise<AppSettings> {
   if (cache) return cache
   const raw = await readJson<Partial<AppSettings>>(settingsFile(), {})
   const d = defaultSettings()
+  const actions = Array.isArray(raw.actions) && raw.actions.length ? raw.actions : d.actions
   cache = {
     ...d,
     ...raw,
@@ -44,11 +46,21 @@ export async function getSettings(): Promise<AppSettings> {
     editor: { ...d.editor, ...(raw.editor ?? {}) },
     providers: { ...d.providers, ...(raw.providers ?? {}) },
     routes: migrateRoutes(raw.version, { ...d.routes, ...(raw.routes ?? {}) }),
-    actions: Array.isArray(raw.actions) && raw.actions.length ? raw.actions : d.actions,
+    actions: migrateActions(raw.version, actions, raw.defaultActionId ?? d.defaultActionId),
     language: raw.language === 'pt-BR' || raw.language === 'es' ? raw.language : 'en',
-    version: 3
+    version: 4
   }
   return cache
+}
+
+/**
+ * Version 4: each action has its own shortcut. Before, Ctrl+J ran the main action and Alt+1…9 ran the
+ * actions by position. Actions without a shortcut get these as their own. In version 4, an action
+ * without a shortcut is one that the user cleared.
+ */
+function migrateActions(version: number | undefined, actions: AiAction[], mainId: string): AiAction[] {
+  if (version && version >= 4) return actions
+  return withDefaultShortcuts(actions, mainId)
 }
 
 /**

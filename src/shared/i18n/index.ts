@@ -32,6 +32,15 @@ export function actionName(t: Messages, a: Pick<AiAction, 'id' | 'name' | 'built
   return a.name
 }
 
+/**
+ * The instructions of an action. Built-in actions whose instructions the user did not change show,
+ * and send to the AI, the instructions in the interface language. Changed instructions belong to the user.
+ */
+export function actionInstructions(t: Messages, a: Pick<AiAction, 'id' | 'instructions' | 'builtIn'>): string {
+  if (a.builtIn && en.common.builtinActionInstructions[a.id] === a.instructions) return t.common.builtinActionInstructions[a.id] ?? a.instructions
+  return a.instructions
+}
+
 /** The name of a planning category. Default categories that the user did not rename show the name in the interface language. */
 export function categoryName(t: Messages, c: Pick<CategoryDef, 'id' | 'name'>): string {
   if (en.common.categories[c.id] === c.name) return t.common.categories[c.id] ?? c.name

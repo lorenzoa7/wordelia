@@ -2,6 +2,7 @@
 
 import { create } from 'zustand'
 
+/** 'book' and 'rules' belong to the open book: without a book, the dialog shows 'general'. */
 export type SettingsTab = 'general' | 'book' | 'ai' | 'actions' | 'rules'
 
 export interface Toast {
@@ -43,7 +44,8 @@ export const useUi = create<UiState>((set, get) => ({
   historyChapterId: null,
   toasts: [],
   openSettings(tab) {
-    set({ settingsOpen: true, settingsTab: tab ?? get().settingsTab })
+    // No tab (the gear, Ctrl+,): always the first tab, not the last one.
+    set({ settingsOpen: true, settingsTab: tab ?? 'general' })
   },
   closeSettings() {
     set({ settingsOpen: false })

@@ -1,17 +1,18 @@
 // Texts of one part of the app. See src/shared/i18n/README.md.
 
-const n = (v: number): string => v.toLocaleString('en')
-
 export const settings = {
   /** The dialog and its tabs */
   dialog: {
     sections: 'Settings sections',
-    general: 'Appearance',
-    book: 'This book',
+    general: 'General',
     ai: 'AI',
-    actions: 'Actions'
+    actions: 'Actions',
+    /** The group of tabs for the open book. The title of the book shows above them. */
+    bookGroup: (title: string): string => `Settings of the book “${title}”`,
+    book: 'This book',
+    rules: 'Writing rules'
   },
-  /** The Appearance tab */
+  /** The General tab */
   general: {
     updates: 'Updates',
     version: (v: string): string => `Version ${v}`,
@@ -44,10 +45,10 @@ export const settings = {
     typewriterSounds: 'Typewriter sounds',
     typewriterScrolling: 'Typewriter scrolling',
     keyboard: 'Keyboard',
+    /** Shown under the list of shortcuts */
+    actionKeysHint: 'Change the shortcuts of the actions in “Actions”.',
     /** Names of the keyboard shortcuts */
     shortcuts: {
-      polish: 'Polish the selection',
-      otherActions: 'Other actions',
       acceptReject: 'Accept or reject an AI change',
       dialogueDash: 'Dialogue dash',
       sceneBreak: 'Scene break',
@@ -59,9 +60,6 @@ export const settings = {
   },
   /** The This book tab */
   book: {
-    writingRules: 'Writing rules',
-    writingRulesHint: 'Your rules for the AI: style, voice, dialogue, words to avoid. Every action and the chat follow them.',
-    editWritingRules: 'Edit writing rules',
     book: 'Book',
     title: 'Title',
     author: 'Author',
@@ -82,8 +80,11 @@ export const settings = {
       it: 'Italiano'
     } as Record<string, string>,
     textOnPage: 'Text on the page',
+    pageSize: 'Page size',
+    pageSizeHint: 'The pages on screen and the exported book use this size.',
     /** Sample text in the typography preview */
     previewDialogue: (dash: string): string => `${dash} Did you feel that? ${dash} asked the old man, and the candles bent toward the door.`,
+    previewQuoted: '“Did you feel that?” asked the old man, and the candles bent toward the door.',
     previewNarration: 'Elias did not answer. Outside, the wind kept its own counsel.',
     font: 'Font',
     size: 'Size (pt)',
@@ -99,31 +100,32 @@ export const settings = {
     noSpace: 'None (book style)',
     indentFirst: 'Indent the first paragraph of a chapter or scene',
     typing: 'Typing',
+    typingNote: 'Wordelia changes these as you type. The AI follows the same style.',
     dialogueStyle: 'Dialogue',
-    dialogueStyleDash: 'A dash at the start of the line',
+    dialogueStyleDash: 'Dash',
     dialogueStyleQuotes: 'Quotation marks',
-    dialogueStyleHint: 'The AI writes dialogue in this style.',
-    previewQuoted: '“Did you feel that?” asked the old man, and the candles bent toward the door.',
-    dialogueDash: 'Dialogue dash (type --)',
-    dialogueDashAria: 'Dialogue dash',
-    emDash: '— em dash (U+2014)',
-    horizontalBar: '― horizontal bar (U+2015)',
-    smartQuotes: 'Smart quotes',
-    smartEllipsis: 'Three dots become an ellipsis (…)',
+    /** Examples of the two dialogue styles, with the dash and the quotes of the book */
+    dashExample: (dash: string): string => `${dash} Hello, he said.`,
+    quotesExample: (open: string, close: string): string => `${open}Hello,${close} he said.`,
+    dialogueDash: 'Dialogue dash',
+    emDash: 'Em dash',
+    horizontalBar: 'Horizontal bar',
+    smartQuotes: 'Curly quotes',
+    /** The word inside the quotes of the example: "word" → “word” */
+    quotesWord: 'text',
+    smartEllipsis: 'Ellipsis',
     sceneBreak: 'Scene break in exports',
-    sceneBreakAria: 'Scene break',
     blankLine: 'Blank line'
+  },
+  /** The Writing rules tab */
+  rules: {
+    intro: 'Your rules for the AI in this book: voice, point of view, tense, dialogue, words to avoid. Every action and the chat follow them.',
+    placeholder: 'Write your rules…'
   },
   /** The AI tab */
   ai: {
     connections: 'Connections',
     free: 'Wordelia is free. Connect the AI you already pay for.',
-    modelsForTasks: 'Models for each task',
-    modelsNote: 'Pick a model for each kind of work. Fast models feel better for actions; the strongest models give the best chat and planning.',
-    /** Shown in bold before effortNote */
-    effortTerm: 'Effort',
-    effortNote:
-      'is how long the model thinks before it answers. More effort gives better answers, but they take longer and use more of your plan. Each action can have its own model and effort (Settings → Actions).',
     /** How to connect each provider. Text in `backticks` shows as code. */
     help: {
       'claude-code':
@@ -132,37 +134,45 @@ export const settings = {
       anthropic: 'Pay per use with an API key from console.anthropic.com. The key is encrypted on this computer.',
       openai: 'Pay per use with an API key from platform.openai.com. The key is encrypted on this computer.'
     },
+    /** The status line of a provider */
     connected: 'Connected',
     notInstalled: 'Not installed',
     notConnected: 'Not connected',
+    expired: 'Login expired',
+    off: 'Off',
+    checking: 'Checking…',
+    updateAvailable: (version: string): string => `version ${version} is out`,
+    /** The one button of a provider */
+    logIn: 'Log in…',
+    update: 'Update…',
+    install: 'Install…',
+    addKey: 'Add key',
+    turnOn: 'Turn on',
+    details: 'Details',
     checkAgain: 'Check again',
     use: (provider: string): string => `Use ${provider}`,
     providerConnected: (provider: string): string => `${provider} connected.`,
     keyFailed: (detail: string): string => `The key did not work: ${detail}`,
     allTasksUse: (provider: string): string => `All tasks now use ${provider}.`,
-    found: (version?: string, account?: string): string =>
-      `Found on this computer${version ? ` (version ${version})` : ''}${account ? `, logged in as ${account}` : ''}. Wordelia uses this login; it does not store it.`,
-    keySaved: 'The key is saved in the key store of the system.',
-    update: 'Update…',
+    version: (version: string): string => `Version ${version}.`,
     newVersion: (version: string): string => `Version ${version} is out. New models often need the newest version.`,
-    updateClaude: 'The button runs “claude update” in a terminal.',
     updateCodex: 'Update Codex with the tool that installed it.',
     apiKey: 'API key',
     keyPlaceholderSaved: 'A key is saved. Paste a new one to replace it.',
     keyPlaceholder: 'Paste your API key',
     saveKey: 'Save key',
-    logIn: 'Log in…',
-    logInHint: 'Opens a terminal window. Come back here and press the check button when you are done.',
     programPath: 'Program path',
-    programPathPlaceholder: (program: string): string => `Full path to the ${program} program (leave empty to find it automatically)`,
-    setProgramPath: 'Set the program path',
-    modelsAvailable: (v: number): string => `${v} ${v === 1 ? 'model' : 'models'} available`,
+    programPathPlaceholder: (program: string): string => `Empty: find ${program} automatically`,
     useForAll: 'Use for all tasks',
-    connectFirst: 'Connect a provider above to choose models.',
-    cliDefault: 'CLI default',
-    lastAnswer: (model: string): string => `Last answer: ${model}`,
+    modelsForTasks: 'Models for each task',
+    routesNote: 'Fast models suit actions. Strong models suit the chat and planning.',
+    task: 'Task',
     provider: 'Provider',
     model: 'Model',
+    effort: 'Effort',
+    effortHelp: 'How long the model thinks. More effort gives better answers, but they are slower and use more of your plan.',
+    connectFirst: 'Connect a provider above to choose models.',
+    cliDefault: 'CLI default',
     providerAria: (task: string): string => `${task} provider`,
     modelAria: (task: string): string => `${task} model`,
     effortAria: (task: string): string => `${task} effort`,
@@ -173,9 +183,6 @@ export const settings = {
   },
   /** The Actions tab */
   actions: {
-    notePrefix: 'Actions run on selected text from the menu above the selection. Each action follows the',
-    noteRules: 'writing rules of the book',
-    noteSuffix: 'and reads the text around the selection.',
     /** Name of an action that the user just added */
     newAction: 'New action',
     deleteTitle: (name: string): string => `Delete “${name}”?`,
@@ -184,33 +191,60 @@ export const settings = {
     resetMessage: 'Your changes to the built-in actions will be lost. Your own actions stay.',
     restore: 'Restore',
     new: 'New',
-    restoreBuiltIn: 'Restore the built-in actions',
-    restoreDefaults: 'Restore defaults',
+    restoreDefaults: 'Restore the built-in actions',
     name: 'Name',
     nameAria: 'Action name',
-    icon: 'Icon',
+    changeIcon: 'Change the icon',
     instructions: 'Instructions',
-    instructionsHint: 'What the AI must do with the selected text. Your writing rules are added automatically.',
+    /** "The AI also follows the <writing rules>." The middle part is a link when a book is open. */
+    rulesNotePrefix: 'The AI also follows the',
+    rulesNoteLink: 'writing rules',
+    rulesNoteSuffix: 'of the book.',
     model: 'Model',
+    modelAria: 'Model and effort',
     sameAsActions: 'Same as Actions',
     effort: 'Effort',
-    sameAsModel: 'Same as the model',
-    noEffort: 'This model has no effort setting.',
-    /** "Runs on <model>(why).<tail>" */
-    runsOn: 'Runs on',
-    noModelYet: 'no model yet',
+    noModelYet: 'No model yet',
     defaultModel: 'Default model',
-    cliChooses: ' (the CLI chooses the effort)',
-    modelChooses: ' (the model chooses the effort)',
-    runsOnTail: '. More effort is slower and uses more of your plan.',
-    context: 'Context around the selection',
-    contextAria: 'Context',
-    contextLittle: 'A little (300 characters)',
-    contextSome: 'Some (1,500)',
-    contextLot: 'A lot (3,000)',
-    contextMost: 'Most of the chapter (8,000)',
-    characters: (v: number): string => `${n(v)} characters`,
-    isMain: 'Main action (Ctrl+J)',
-    makeMain: 'Make main action'
+    shortcut: 'Shortcut',
+    noShortcut: 'None',
+    recordShortcut: 'Change the shortcut',
+    pressKeys: 'Press the keys…',
+    escCancels: 'Esc cancels',
+    clearShortcut: 'Remove the shortcut',
+    /** `what` is the name of an action in quotes, or a name from reservedKeys */
+    shortcutTaken: (keys: string, what: string): string => `${keys} is already the shortcut for ${what}.`,
+    shortcutNeedsModifier: 'Use Ctrl or Alt with a letter or a number.',
+    /** What the app and the editor do with the shortcuts that actions cannot use */
+    reservedKeys: {
+      bold: 'Bold',
+      italic: 'Italic',
+      underline: 'Underline',
+      strike: 'Strikethrough',
+      code: 'Code',
+      undo: 'Undo',
+      redo: 'Redo',
+      selectAll: 'Select all',
+      copy: 'Copy',
+      cut: 'Cut',
+      paste: 'Paste',
+      pastePlain: 'Paste as plain text',
+      save: 'Save',
+      find: 'Find',
+      replace: 'Find and replace',
+      chat: 'Show or hide the chat',
+      write: 'Write',
+      plan: 'Plan',
+      export: 'Export',
+      align: 'Alignment',
+      quote: 'Quote',
+      list: 'Lists',
+      heading: 'Headings',
+      rename: 'Rename a chapter',
+      closeWindow: 'Close the window'
+    },
+    isMain: 'Main action',
+    makeMain: 'Make it the main action',
+    mainHint: 'The main action is the first button above the selected text.'
   }
 }

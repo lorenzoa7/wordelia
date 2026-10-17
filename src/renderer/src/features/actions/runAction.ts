@@ -13,7 +13,7 @@ import { proposedPlain, reviewKey, textWithMap } from '@/features/editor/review'
 import { create } from 'zustand'
 import { normalizeRange } from './range'
 import { SNAPSHOT_EN, snapshot } from '@/features/history/snapshots'
-import { getT } from '@/lib/i18n'
+import { actionInstructions, getT } from '@/lib/i18n'
 import { typesetForBook } from '@/lib/typeset'
 import { nearestEffort } from '@shared/ai/effort'
 
@@ -81,7 +81,8 @@ export async function runAction(action: AiAction, range?: { from: number; to: nu
   if (!book.manifest) return
   const input = {
     book: { manifest: book.manifest, writingRules: book.writingRules, entries: book.entries },
-    action,
+    // Built-in instructions that the user did not change go in the interface language, as the settings show them.
+    action: { ...action, instructions: actionInstructions(t, action) },
     before: ctx.before,
     selection,
     after: ctx.after,

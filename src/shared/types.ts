@@ -280,6 +280,11 @@ export interface ChatMessage {
   mentions?: Mention[]
   /** Proposal hunk key to state */
   hunks?: Record<string, HunkState>
+  /**
+   * For accepted `<create>` proposals that replaced an entry: the entry file from before, by hunk key.
+   * A rewind of the thread uses it to put the old entry back.
+   */
+  replaced?: Record<string, string>
   model?: string
   error?: string
 }
@@ -296,6 +301,11 @@ export interface Thread {
   pinned: boolean
   route: ModelChoice | null
   messages: ChatMessage[]
+  /**
+   * When the user last saw the thread. A reply after this time is new to the user.
+   * Threads from before this field have none: they count as seen.
+   */
+  readAt?: string
 }
 
 /* ------------------------------------------------------------------ */

@@ -44,10 +44,15 @@ export function parseEfforts(text: string): Effort[] {
 
 /** "claude-opus-5-5" → "Claude Opus 5.5". Other ids come back unchanged. */
 export function friendlyModelName(id: string): string {
-  const m = /^claude-([a-z]+)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?$/.exec(id)
+  const m = /^claude-([a-z]+)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?(?:\[[a-z0-9]+\])?$/.exec(id)
   if (!m) return id
   const family = m[1].charAt(0).toUpperCase() + m[1].slice(1)
   return `Claude ${family} ${m[2]}${m[3] ? `.${m[3]}` : ''}`
+}
+
+/** The name to show in model lists: "claude-opus-5-5" or "Claude Opus 5.5" → "Opus 5.5". Other names come back unchanged. */
+export function modelLabel(idOrName: string): string {
+  return friendlyModelName(idOrName.trim()).replace(/^Claude\s+(?=\S)/, '')
 }
 
 /** The levels to offer for a model. Null: the model has no effort setting. Unknown models get the common three. */

@@ -65,22 +65,34 @@ export function applyEditHunk(file: string, hunk: Hunk): ApplyResult {
   return { ok: false, reason: getT().chat.fileMissing(t.label) }
 }
 
-export async function applyCreate(file: string, content: string): Promise<ApplyResult> {
+/** `previous`: the entry file that the new text replaced, so a rewind can put it back. */
+export async function applyCreate(file: string, content: string): Promise<ApplyResult & { previous?: string }> {
   const t = resolveTarget(file)
   if (t.kind === 'chapter' || t.kind === 'unknown') {
     return { ok: false, reason: getT().chat.createOnlyEntries }
   }
   if (t.kind === 'entry') {
     // The entry exists already: keep its id, replace its text.
+    const previous = entryToFile(t.entry)
     const merged = content.startsWith('---') ? content : entryToFile({ ...t.entry, body: content })
     await useBook.getState().writeRaw(`${PLANNING_DIR}/${t.entry.file}`, merged)
-    return { ok: true }
+    return { ok: true, previous }
   }
-  // File names from the AI can hold characters that Windows does not allow, for example ":".
+  await useBook.getState().writeRaw(createdPath(file), content.endsWith('\n') ? content : content + '\n')
+  return { ok: true }
+}
+
+/**
+ * The path where a `<create>` proposal for a new entry goes. File names from the AI can hold
+ * characters that Windows does not allow, for example ":".
+ */
+export function createdPath(file: string): string {
+  const t = resolveTarget(file)
+  if (t.kind === 'entry') return `${PLANNING_DIR}/${t.entry.file}`
+  if (t.kind !== 'new-entry') return norm(file)
   const segs = t.rel.slice(PLANNING_DIR.length + 1).split('/')
   const safe = segs.map((s, i) => (i === segs.length - 1 ? fileNameFromTitle(s.replace(/\.md$/i, '')) : fileNameFromTitle(s, '')))
-  await useBook.getState().writeRaw([PLANNING_DIR, ...safe].join('/'), content.endsWith('\n') ? content : content + '\n')
-  return { ok: true }
+  return [PLANNING_DIR, ...safe].join('/')
 }
 
 /* ------------------------------------------------------------------ */
@@ -130,10 +142,23 @@ export function restoreSnapshot(s: Snapshot): boolean {
 /* Proposal states                                                      */
 /* ------------------------------------------------------------------ */
 
-/** Save the state of one or more proposals of a message in its thread. */
-export function setHunkStates(thread: Thread, messageId: string, updates: Record<string, HunkState>): void {
-  const latest = useBook.getState().threads.find((t) => t.id === thread.id) ?? thread
-  const messages = latest.messages.map((m) => (m.id === messageId ? { ...m, hunks: { ...(m.hunks ?? {}), ...updates } } : m))
+/**
+ * Save the state of one or more proposals of a message in its thread.
+ * `replaced`: the entry files that accepted `<create>` proposals replaced, by hunk key.
+ */
+export function setHunkStates(thread: Thread, messageId: string, updates: Record<string, HunkState>, replaced?: Record<string, string>): void {
+  const latest = useBook.getState().threads.find((t) => t.id === thread.id)
+  // The thread was deleted meanwhile: do not bring it back.
+  if (!latest) return
+  const messages = latest.messages.map((m) =>
+    m.id === messageId
+      ? {
+          ...m,
+          hunks: { ...(m.hunks ?? {}), ...updates },
+          ...(replaced && Object.keys(replaced).length ? { replaced: { ...(m.replaced ?? {}), ...replaced } } : {})
+        }
+      : m
+  )
   useBook.getState().saveThread({ ...latest, messages })
 }
 
@@ -152,14 +177,20 @@ export function pendingKeys(segments: Segment[], states: Record<string, HunkStat
  * so an entry that the message creates exists before the message edits it.
  * Chapters get a version in the history before the first change.
  */
-export async function acceptPending(segments: Segment[], states: Record<string, HunkState> = {}): Promise<Record<string, HunkState>> {
+export async function acceptPending(
+  segments: Segment[],
+  states: Record<string, HunkState> = {}
+): Promise<{ states: Record<string, HunkState>; replaced: Record<string, string> }> {
   const todo = new Set(pendingKeys(segments, states))
   const out: Record<string, HunkState> = {}
+  const replaced: Record<string, string> = {}
   for (const s of segments) {
     if (s.kind === 'create') {
       const key = hunkKey(s.index, 0)
       if (!todo.has(key)) continue
-      out[key] = (await applyCreate(s.file, s.content)).ok ? 'accepted' : 'failed'
+      const res = await applyCreate(s.file, s.content)
+      out[key] = res.ok ? 'accepted' : 'failed'
+      if (res.ok && res.previous) replaced[key] = res.previous
     } else if (s.kind === 'edit') {
       const keys = s.hunks.map((_, i) => hunkKey(s.index, i))
       if (!keys.some((k) => todo.has(k))) continue
@@ -170,5 +201,5 @@ export async function acceptPending(segments: Segment[], states: Record<string, 
       }
     }
   }
-  return out
+  return { states: out, replaced }
 }

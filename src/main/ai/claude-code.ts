@@ -129,6 +129,14 @@ async function runOnce(
   const t = (await mainT()).main.ai
   let text = ''
   let streamedText = false
+  // Thinking summaries come as deltas (with partial messages) or as whole blocks in the assistant message.
+  let streamedThinking = false
+  let thinkingSent = false
+  const sendThinking = (delta: string): void => {
+    if (!delta) return
+    thinkingSent = true
+    onEvent({ type: 'thinking', delta })
+  }
   let model: string | undefined
   let final: { isError: boolean; result?: string; usage?: CompletionResult['usage'] } | null = null
   let assistantError: string | undefined
@@ -150,15 +158,33 @@ async function runOnce(
       } else if (ev.type === 'system' && ev.subtype === 'api_retry') {
         onEvent({ type: 'status', message: t.retrying })
       } else if (ev.type === 'stream_event') {
-        const e = ev.event as { type?: string; delta?: { type?: string; text?: string } }
+        const e = ev.event as {
+          type?: string
+          delta?: { type?: string; text?: string; thinking?: string }
+          content_block?: { type?: string }
+        }
         if (e?.type === 'content_block_delta' && e.delta?.type === 'text_delta' && e.delta.text) {
           streamedText = true
           text += e.delta.text
           onEvent({ type: 'text', delta: e.delta.text })
+        } else if (e?.type === 'content_block_delta' && e.delta?.type === 'thinking_delta' && e.delta.thinking) {
+          streamedThinking = true
+          sendThinking(e.delta.thinking)
+        } else if (e?.type === 'content_block_start' && e.content_block?.type === 'thinking' && thinkingSent) {
+          // A new thinking block: keep it apart from the one before.
+          sendThinking('\n\n')
         }
       } else if (ev.type === 'assistant') {
-        const msg = ev.message as { content?: Array<{ type: string; text?: string }> } | undefined
+        const msg = ev.message as { content?: Array<{ type: string; text?: string; thinking?: string }> } | undefined
         if (typeof ev.error === 'string') assistantError = ev.error
+        if (!streamedThinking && msg?.content) {
+          const thinking = msg.content
+            .filter((c) => c.type === 'thinking')
+            .map((c) => c.thinking ?? '')
+            .filter((s) => s.trim())
+            .join('\n\n')
+          if (thinking) sendThinking(thinkingSent ? `\n\n${thinking}` : thinking)
+        }
         if (!streamedText && msg?.content) {
           const t = msg.content.filter((c) => c.type === 'text').map((c) => c.text ?? '').join('')
           if (t) {

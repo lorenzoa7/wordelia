@@ -2,13 +2,19 @@
 
 import Anthropic from '@anthropic-ai/sdk'
 import type { CompletionRequest, CompletionResult, ModelInfo, ProviderStatus, StreamEvent } from '@shared/types'
-import { EFFORT_ORDER } from '@shared/ai/effort'
+import { EFFORT_ORDER, modelLabel } from '@shared/ai/effort'
 import { mainT } from '../i18n'
 import { getSecret } from '../settings'
 import { classifyError, type ProviderTransport } from './transport'
 
 /** Models that support the server-side refusal fallback chain. */
 const FALLBACK_MODELS = /^claude-(opus-5-5|opus-5|sonnet-5-5|fable-5-1)$/
+
+/**
+ * Models that always think (adaptive thinking is on by default). Their thinking text is omitted by
+ * default; "summarized" only shows it, so the chat can stream what the model thinks about at no extra cost.
+ */
+const THINKING_MODELS = /^claude-(fable|mythos|opus|sonnet|haiku)-5(-\d{1,2})?$/
 
 let modelCache: { at: number; models: ModelInfo[] } | null = null
 
@@ -55,7 +61,8 @@ export const anthropicApi: ProviderTransport = {
           : undefined
         out.push({
           id: m.id,
-          label: m.display_name ?? m.id,
+          // "Claude Opus 5.5" → "Opus 5.5"
+          label: modelLabel(m.display_name ?? m.id),
           tier: tierOf(m.id),
           contextWindow: (m as unknown as { max_input_tokens?: number }).max_input_tokens,
           ...(efforts ? { efforts: (effortCaps as { supported?: boolean }).supported === false ? [] : efforts } : {})
@@ -80,12 +87,23 @@ export const anthropicApi: ProviderTransport = {
         max_tokens: req.maxTokens ?? 32000,
         system: [{ type: 'text' as const, text: req.system, cache_control: { type: 'ephemeral' as const } }],
         messages: req.messages.map((m) => ({ role: m.role, content: m.content })),
-        ...(req.route.effort ? { output_config: { effort: req.route.effort === 'minimal' ? ('low' as const) : req.route.effort } } : {})
+        ...(req.route.effort ? { output_config: { effort: req.route.effort === 'minimal' ? ('low' as const) : req.route.effort } } : {}),
+        ...(THINKING_MODELS.test(model) ? { thinking: { type: 'adaptive' as const, display: 'summarized' as const } } : {})
       }
       onEvent({ type: 'start', model })
       const onText = (delta: string): void => {
         text += delta
         onEvent({ type: 'text', delta })
+      }
+      let thinkingSent = false
+      const onThinking = (delta: string): void => {
+        if (!delta) return
+        thinkingSent = true
+        onEvent({ type: 'thinking', delta })
+      }
+      // A new thinking block starts a new paragraph.
+      const onBlock = (ev: { type: string; content_block?: { type: string } }): void => {
+        if (ev.type === 'content_block_start' && ev.content_block?.type === 'thinking' && thinkingSent) onEvent({ type: 'thinking', delta: '\n\n' })
       }
       let final: { model: string; stop_reason: string | null; usage: Anthropic.Usage | Anthropic.Beta.BetaUsage }
       if (FALLBACK_MODELS.test(model)) {
@@ -95,10 +113,14 @@ export const anthropicApi: ProviderTransport = {
           { signal }
         )
         stream.on('text', onText)
+        stream.on('thinking', onThinking)
+        stream.on('streamEvent', onBlock)
         final = await stream.finalMessage()
       } else {
         const stream = c.messages.stream(params, { signal })
         stream.on('text', onText)
+        stream.on('thinking', onThinking)
+        stream.on('streamEvent', onBlock)
         final = await stream.finalMessage()
       }
       const usage = {

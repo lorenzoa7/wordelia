@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowUp, At, Quotes, Stop, X } from '@phosphor-icons/react'
+import { DropdownMenu } from 'radix-ui'
+import { ArrowUp, At, CaretDown, CaretRight, Check, Quotes, Stop, X } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { effortChoices, nearestEffort } from '@shared/ai/effort'
-import type { Mention, ModelChoice, ModelInfo, Thread } from '@shared/types'
+import { PROVIDER_LABELS } from '@shared/ai/routes'
+import type { Messages } from '@shared/i18n'
+import type { Mention, ModelChoice, ModelInfo, ProviderId, Thread } from '@shared/types'
 import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
-import { folderCategoryName, routeText, useT } from '@/lib/i18n'
-import { Menu, MenuItem, MenuLabel, MenuSeparator } from '@/ui'
+import { folderCategoryName, useT } from '@/lib/i18n'
 import { useChat } from './chatStore'
 import { mentionLabel, sendMessage, stopReply } from './send'
 import { MentionIcon } from './MessageView'
@@ -197,16 +199,40 @@ export function Composer({ thread }: { thread: Thread | null }): React.JSX.Eleme
   )
 }
 
+const PER_PROVIDER = 8
+
+/** "Opus 5.5 · Medium": the model and the effort of a route, without the provider. */
+function shortRoute(t: Messages, route: ModelChoice, list: ModelInfo[] | undefined): string {
+  const m = list?.find((x) => x.id === route.model)
+  const effort = route.effort ?? m?.defaultEffort
+  return [m?.label ?? (route.model || t.chat.defaultModel), effort ? t.common.efforts[effort] : ''].filter(Boolean).join(' · ')
+}
+
+/**
+ * The model of the thread, like the model menu of the Claude app: the models with their versions
+ * and a check on the current one, number keys 1–9 to pick, and an Effort item with a submenu.
+ */
 function ModelPicker({ thread }: { thread: Thread | null }): React.JSX.Element {
   const t = useT()
-  const label = (r: ModelChoice | null, list?: ModelInfo[]): string => routeText(t, r, list, t.chat.notSet, t.chat.defaultModel)
   const settings = useApp((s) => s.settings)
   const models = useApp((s) => s.models)
   const status = useApp((s) => s.status)
+  const [open, setOpen] = useState(false)
   const route = thread?.route ?? settings?.routes.chat ?? null
-  const ready = (Object.keys(models) as Array<keyof typeof models>).filter((p) => status[p]?.installed && status[p]?.loggedIn !== false)
+  const ready = (Object.keys(models) as ProviderId[]).filter((p) => status[p]?.installed && status[p]?.loggedIn !== false && models[p]?.length)
   const current = route ? models[route.provider]?.find((m) => m.id === route.model) : undefined
   const efforts = route ? effortChoices(current, route.effort) : null
+  const effort = route?.effort ?? current?.defaultEffort
+
+  // Each provider shows its first models, and always the current one.
+  const groups = ready.map((p) => {
+    const all = models[p] ?? []
+    const shown = all.slice(0, PER_PROVIDER)
+    const cur = route?.provider === p ? all.find((m) => m.id === route.model) : undefined
+    if (cur && !shown.includes(cur)) shown.push(cur)
+    return { provider: p, models: shown }
+  })
+  const flat = groups.flatMap((g) => g.models.map((m) => ({ provider: g.provider, model: m })))
 
   const choose = (choice: ModelChoice | null): void => {
     if (!thread) {
@@ -215,60 +241,103 @@ function ModelPicker({ thread }: { thread: Thread | null }): React.JSX.Element {
     }
     useBook.getState().saveThread({ ...thread, route: choice })
   }
+  const pick = (p: ProviderId, m: ModelInfo): void => {
+    const e = route?.effort ? nearestEffort(route.effort, m) : undefined
+    choose({ provider: p, model: m.id, ...(e ? { effort: e } : {}) })
+  }
 
+  const defaultRoute = settings?.routes.chat ?? null
   return (
-    <Menu
-      side="top"
-      trigger={
+    <DropdownMenu.Root open={open} onOpenChange={setOpen}>
+      <DropdownMenu.Trigger asChild>
         <button className="composer-model" title={t.chat.modelForThread}>
-          {label(route, route ? models[route.provider] : undefined)}
+          <span>{route ? shortRoute(t, route, models[route.provider]) : t.chat.notSet}</span>
+          <CaretDown size={10} weight="bold" />
         </button>
-      }
-    >
-      {thread && (
-        <>
-          <MenuItem checked={!thread.route} onSelect={() => choose(null)}>
-            {t.chat.defaultRoute(label(settings?.routes.chat ?? null, settings?.routes.chat ? models[settings.routes.chat.provider] : undefined))}
-          </MenuItem>
-          <MenuSeparator />
-        </>
-      )}
-      {ready.map((p) => (
-        <div key={p}>
-          <MenuLabel>{label({ provider: p, model: '' }).split(' · ')[0]}</MenuLabel>
-          {(models[p] ?? []).slice(0, 8).map((m) => (
-            <MenuItem
-              key={m.id}
-              shortcut={m.resolvedLabel}
-              checked={route?.provider === p && route.model === m.id}
-              onSelect={() => {
-                const effort = route?.effort ? nearestEffort(route.effort, m) : undefined
-                choose({ provider: p, model: m.id, ...(effort ? { effort } : {}) })
-              }}
-            >
-              {m.label}
-            </MenuItem>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          side="top"
+          align="start"
+          sideOffset={6}
+          className="menu model-menu"
+          aria-label={t.chat.modelForThread}
+          onKeyDown={(e) => {
+            // 1–9 picks a model, as in the Claude app.
+            const n = Number(e.key)
+            if (!Number.isInteger(n) || n < 1 || n > 9 || e.ctrlKey || e.altKey || e.metaKey) return
+            const item = flat[n - 1]
+            if (!item) return
+            e.preventDefault()
+            pick(item.provider, item.model)
+            setOpen(false)
+          }}
+        >
+          {groups.map((g) => (
+            <DropdownMenu.Group key={g.provider}>
+              {ready.length > 1 && <DropdownMenu.Label className="menu-label caps model-provider">{PROVIDER_LABELS[g.provider].name}</DropdownMenu.Label>}
+              {g.models.map((m) => {
+                const n = flat.findIndex((x) => x.provider === g.provider && x.model.id === m.id) + 1
+                const checked = route?.provider === g.provider && route.model === m.id
+                return (
+                  <DropdownMenu.Item
+                    key={m.id}
+                    className={clsx('menu-item model-item', checked && 'is-current')}
+                    role="menuitemradio"
+                    aria-checked={checked}
+                    onSelect={() => pick(g.provider, m)}
+                  >
+                    <span className="model-item-name">{m.label}</span>
+                    <span className="model-item-check">{checked && <Check size={14} weight="bold" />}</span>
+                    <span className="model-item-key">{n <= 9 ? n : ''}</span>
+                  </DropdownMenu.Item>
+                )
+              })}
+            </DropdownMenu.Group>
           ))}
-        </div>
-      ))}
-      {ready.length === 0 && <MenuItem disabled>{t.chat.noAi}</MenuItem>}
-      {route && efforts && (
-        <>
-          <MenuSeparator />
-          <MenuLabel>{t.chat.effort}</MenuLabel>
-          <MenuItem checked={!route.effort} onSelect={() => choose({ provider: route.provider, model: route.model })}>
-            {t.chat.defaultEffort(
-              current?.defaultEffort ? t.common.efforts[current.defaultEffort] : undefined,
-              route.provider === 'claude-code' || route.provider === 'codex'
-            )}
-          </MenuItem>
-          {efforts.map((e) => (
-            <MenuItem key={e} checked={route.effort === e} onSelect={() => choose({ provider: route.provider, model: route.model, effort: e })}>
-              {t.common.efforts[e]}
-            </MenuItem>
-          ))}
-        </>
-      )}
-    </Menu>
+          {ready.length === 0 && (
+            <DropdownMenu.Item className="menu-item" disabled>
+              {t.chat.noAi}
+            </DropdownMenu.Item>
+          )}
+          {route && efforts && (
+            <>
+              <DropdownMenu.Separator className="menu-sep" />
+              <DropdownMenu.Sub>
+                <DropdownMenu.SubTrigger className="menu-item model-item model-sub">
+                  <span className="model-item-name">{t.chat.effort}</span>
+                  <span className="model-sub-value">{effort ? t.common.efforts[effort] : t.chat.defaultEffort(undefined, route.provider === 'claude-code' || route.provider === 'codex')}</span>
+                  <CaretRight size={11} className="model-sub-caret" />
+                </DropdownMenu.SubTrigger>
+                <DropdownMenu.Portal>
+                  <DropdownMenu.SubContent className="menu model-menu" sideOffset={6} alignOffset={-5}>
+                    {efforts.map((e) => (
+                      <DropdownMenu.Item
+                        key={e}
+                        className={clsx('menu-item model-item', route.effort === e && 'is-current')}
+                        role="menuitemradio"
+                        aria-checked={route.effort === e}
+                        onSelect={() => choose({ provider: route.provider, model: route.model, effort: e })}
+                      >
+                        <span className="model-item-name">{t.common.efforts[e]}</span>
+                        <span className="model-item-check">{route.effort === e && <Check size={14} weight="bold" />}</span>
+                      </DropdownMenu.Item>
+                    ))}
+                  </DropdownMenu.SubContent>
+                </DropdownMenu.Portal>
+              </DropdownMenu.Sub>
+            </>
+          )}
+          {thread?.route && defaultRoute && (
+            <>
+              <DropdownMenu.Separator className="menu-sep" />
+              <DropdownMenu.Item className="menu-item model-item model-default" onSelect={() => choose(null)}>
+                <span className="model-item-name">{t.chat.defaultRoute(shortRoute(t, defaultRoute, models[defaultRoute.provider]))}</span>
+              </DropdownMenu.Item>
+            </>
+          )}
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   )
 }

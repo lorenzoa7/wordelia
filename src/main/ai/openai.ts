@@ -7,6 +7,8 @@ import { getSecret } from '../settings'
 import { classifyError, type ProviderTransport } from './transport'
 
 let modelCache: { at: number; models: ModelInfo[] } | null = null
+/** False after the API refused reasoning summaries for this key (the organization is not verified). */
+let summaryAllowed = true
 
 async function client(): Promise<OpenAI | null> {
   const key = await getSecret('openai')
@@ -66,22 +68,39 @@ export const openaiApi: ProviderTransport = {
     const model = req.route.model
     let text = ''
     try {
-      const stream = await c.responses.create(
-        {
-          model,
-          instructions: req.system,
-          input: req.messages.map((m) => ({ role: m.role, content: m.content })),
-          stream: true,
-          ...(req.route.effort ? { reasoning: { effort: req.route.effort } } : {})
-        },
-        { signal }
-      )
+      const create = (summary: boolean) =>
+        c.responses.create(
+          {
+            model,
+            instructions: req.system,
+            input: req.messages.map((m) => ({ role: m.role, content: m.content })),
+            stream: true,
+            // Reasoning summaries show what the model thinks about while it works.
+            ...(req.route.effort ? { reasoning: { effort: req.route.effort, ...(summary ? { summary: 'auto' as const } : {}) } } : {})
+          },
+          { signal }
+        )
+      let stream: Awaited<ReturnType<typeof create>>
+      try {
+        stream = await create(summaryAllowed && Boolean(req.route.effort))
+      } catch (err) {
+        // Some organizations must be verified before they get reasoning summaries. Then ask without them.
+        if (!(err instanceof OpenAI.BadRequestError) || !/summar|verif/i.test(err.message) || !req.route.effort) throw err
+        summaryAllowed = false
+        stream = await create(false)
+      }
       onEvent({ type: 'start', model })
       let usage: CompletionResult['usage']
+      let thinkingSent = false
       for await (const ev of stream) {
         if (ev.type === 'response.output_text.delta') {
           text += ev.delta
           onEvent({ type: 'text', delta: ev.delta })
+        } else if (ev.type === 'response.reasoning_summary_text.delta') {
+          onEvent({ type: 'thinking', delta: ev.delta })
+          thinkingSent = true
+        } else if (ev.type === 'response.reasoning_summary_part.added') {
+          if (thinkingSent) onEvent({ type: 'thinking', delta: '\n\n' })
         } else if (ev.type === 'response.completed') {
           const u = ev.response.usage
           if (u) {

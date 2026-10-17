@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defaultEffortLabel, effortChoices, friendlyModelName, nearestEffort, parseClaudeHelp, parseEfforts } from './effort'
+import { defaultEffortLabel, effortChoices, friendlyModelName, modelLabel, nearestEffort, parseClaudeHelp, parseEfforts } from './effort'
 import { suggestRoutes } from './routes'
 
 const HELP = `
@@ -39,6 +39,14 @@ describe('effort', () => {
     expect(friendlyModelName('claude-opus-5-5')).toBe('Claude Opus 5.5')
     expect(friendlyModelName('claude-haiku-4-5-20251001')).toBe('Claude Haiku 4.5')
     expect(friendlyModelName('gpt-5.5')).toBe('gpt-5.5')
+    expect(friendlyModelName('claude-opus-5-5[1m]')).toBe('Claude Opus 5.5')
+  })
+  it('makes short model labels with the version', () => {
+    expect(modelLabel('claude-opus-5-5')).toBe('Opus 5.5')
+    expect(modelLabel('claude-fable-5-1')).toBe('Fable 5.1')
+    expect(modelLabel('claude-opus-5')).toBe('Opus 5')
+    expect(modelLabel('Claude Sonnet 5.5')).toBe('Sonnet 5.5')
+    expect(modelLabel('GPT-5.5')).toBe('GPT-5.5')
   })
   it('suggests an explicit effort for each Claude Code task', () => {
     const r = suggestRoutes('claude-code', [{ id: 'opus', label: 'Opus', efforts: ['low', 'medium', 'high'] }])

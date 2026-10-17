@@ -54,13 +54,58 @@ export const chat: typeof en = {
     `${ok} de ${total} propostas aplicadas. ${failed === 1 ? '1 não pôde ser aplicada' : `${failed} não puderam ser aplicadas`}: o texto mudou.`,
   bulkApplied: (ok, chapters) =>
     `${ok} propostas aplicadas.${chapters ? ' As versões de antes da mudança estão no histórico do capítulo.' : ''}`,
-  toReview: (v) => `${v} propostas para revisar`,
   copyFailed: 'Não foi possível copiar.',
   openChapterFirst: 'Abra um capítulo primeiro.',
   copyReply: 'Copiar a resposta',
-  insertHint: 'Inserir a resposta no cursor, no capítulo aberto (Ctrl+Z desfaz)',
-  insert: 'Inserir no capítulo',
+  insertHint: 'Coloca esta resposta no capítulo aberto, onde está o cursor. Ctrl+Z desfaz.',
+  insert: 'Inserir no cursor',
   thinking: 'O editor está pensando',
+  retry: 'Tentar de novo',
+  retryHint: 'Remover esta resposta e perguntar de novo',
+  editMessage: 'Editar',
+  editHint: 'Editar esta mensagem e enviar de novo',
+  rewind: 'Voltar',
+  rewindHint: 'Voltar até aqui: remover as mensagens depois desta',
+  copyMessage: 'Copiar a mensagem',
+  editAfter: (v) =>
+    v === 0
+      ? 'A IA responde de novo.'
+      : v === 1
+        ? 'Ao enviar, a mensagem depois desta sai da conversa. A IA responde de novo.'
+        : `Ao enviar, as ${v} mensagens depois desta saem da conversa. A IA responde de novo.`,
+  noReply: 'Ainda sem resposta.',
+  getReply: 'Pedir uma resposta',
+
+  thoughtProcess: 'Raciocínio',
+  showThinking: 'Mostrar o raciocínio',
+  hideThinking: 'Ocultar o raciocínio',
+  phaseReading: 'Lendo o capítulo e o planejamento…',
+  phaseEdit: (label) => `Escrevendo uma mudança em “${label}”…`,
+  phaseCreate: 'Escrevendo uma nota do planejamento…',
+
+  rewindTitle: 'Voltar a conversa até aqui?',
+  rewindText: (v) => (v === 1 ? 'A mensagem depois desta sai da conversa.' : `As ${v} mensagens depois desta saem da conversa.`),
+  rewindConfirm: 'Voltar',
+  editTitle: 'Enviar a mensagem editada?',
+  editMessageText: (v) =>
+    `A mensagem editada substitui a antiga${v === 1 ? ', e a mensagem depois dela sai da conversa' : v ? `, e as ${v} mensagens depois dela saem da conversa` : ''}. A IA responde de novo.`,
+  retryTitle: 'Pedir uma nova resposta?',
+  retryText: 'A última resposta sai da conversa, e a IA responde de novo.',
+  rewindBookChanged: 'Você aceitou mudanças destas respostas:',
+  changeCount: (v) => (v === 1 ? '1 mudança' : `${v} mudanças`),
+  noteToTrash: 'nota nova, vai para a lixeira',
+  noteComesBack: 'nota substituída, o texto antigo volta',
+  rewindUndo: 'Desfazer estas mudanças no livro',
+  rewindUndoHint: 'Antes, o Wordelia salva uma versão de cada capítulo. O texto que você mudou depois da mudança da IA fica como está.',
+  rewindKeepHint: 'O livro fica como está. Só a conversa muda.',
+  undoneAll: (v) => (v === 1 ? '1 mudança desfeita no livro.' : `${v} mudanças desfeitas no livro.`),
+  undonePartial: (ok, total) =>
+    `${ok} de ${total} mudanças desfeitas no livro. As outras mudaram depois da mudança da IA, então ficam. O histórico de versões tem o texto de antes.`,
+
+  statusWorking: 'Trabalhando…',
+  statusNeedsYou: (v) => (v === 1 ? '1 proposta para revisar' : `${v} propostas para revisar`),
+  statusNeedsYouShort: 'Precisa de você',
+  statusUnseen: 'Resposta nova',
 
   undoUnsafe: 'O texto foi editado depois da mudança da IA, então Desfazer poderia apagar as suas palavras novas. Use Ctrl+Z ou o histórico de versões.',
   changeApplied: (label) => `Mudança aplicada em “${label}”.`,
@@ -83,6 +128,12 @@ export const chat: typeof en = {
   showAll: 'Mostrar tudo',
   fileMissing: (label) => `O arquivo "${label}" não existe.`,
   createOnlyEntries: 'A IA só pode criar notas do planejamento.',
+  showInText: 'Mostrar no texto',
+  showInTextHint: 'Abrir o capítulo neste trecho e mostrar a mudança ali',
+  passageNotFound: 'O trecho não foi encontrado no capítulo. Talvez ele tenha mudado.',
+  replyProposals: (v) => (v === 1 ? '1 proposta nesta resposta' : `${v} propostas nesta resposta`),
+  applyAll: (v) => `Aplicar todas as ${v}`,
+  applyAllHint: 'Aplicar cada mudança e cada nota desta resposta. Antes, cada capítulo ganha uma versão no histórico.',
 
   connectFirst: 'Conecte uma IA primeiro.',
   openSettings: 'Abrir configurações'

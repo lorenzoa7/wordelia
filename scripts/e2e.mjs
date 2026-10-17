@@ -21,7 +21,10 @@ const scenarios = [
   ['reorder'],
   ['external'],
   ['panels'],
-  ['plannav']
+  ['plannav'],
+  ['chat', '--en'],
+  ['pages', '--en'],
+  ['reveal']
 ]
 
 function run(args) {

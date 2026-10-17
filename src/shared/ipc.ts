@@ -125,6 +125,8 @@ export interface IpcEventMap {
   /** The window wants to close: save everything, then call app:flushDone */
   'app:flushRequest': Record<string, never>
   'app:update': UpdateState
+  /** The model list of a provider changed, for example when the real models of the claude aliases are known */
+  'ai:modelsChanged': { provider: ProviderId }
 }
 
 export type InvokeChannel = keyof IpcInvokeMap
@@ -179,7 +181,7 @@ export const INVOKE_CHANNELS: InvokeChannel[] = [
   'window:setSpellLanguage'
 ]
 
-export const EVENT_CHANNELS: EventChannel[] = ['book:externalChange', 'ai:event', 'app:flushRequest', 'app:update']
+export const EVENT_CHANNELS: EventChannel[] = ['book:externalChange', 'ai:event', 'app:flushRequest', 'app:update', 'ai:modelsChanged']
 
 export interface WordeliaBridge {
   platform: string

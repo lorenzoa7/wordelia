@@ -158,6 +158,15 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] Shared controls: focus rings keep the shape of the control; hover, active and open states on all buttons, inputs, selects and switches; toasts with an error icon and a close button; dark text on the dark-theme ribbon color (`--on-ribbon`)
 - [x] Chat icon (not the reply arrow) for "Ask the chat about this entry" and "Mention in chat"
 
+### Chat
+
+- [x] Message actions: Edit and Rewind on messages of the user; Copy, Retry and "Insert at cursor" on replies; "Get a reply" under a message without a reply. A rewind can undo the accepted book changes of the removed replies (a version first, only where the AI text is unchanged)
+- [x] Thinking line while the AI works: thinking summaries from Claude Code, Codex, the Anthropic API and the OpenAI API (`thinking` stream events), else phase texts ("Reading the chapter and the planning…", "Writing a change to …"). Thinking is never saved or sent to the AI
+- [x] Thread list with states: proposals wait (red dot), new reply not seen (green dot, `Thread.readAt`), at work (spinner); a dot on the chat button when the chat is closed
+- [x] Model menu like the Claude app: models with versions, a check, number keys 1–9, an Effort submenu, provider labels when several providers are connected
+- [x] Model names with versions everywhere ("Opus 5.5"): the app reads the model of each claude alias from the first CLI event, once for each CLI version, with no request to the API
+- [x] Proposal cards: wider Accept button, "Show in text" on each change (`revealProposal`), a bar for all the proposals of a reply ("3 proposals in this reply", "Apply all 3")
+
 ## Later (not in version 1)
 
 - Sync to a git remote from the app

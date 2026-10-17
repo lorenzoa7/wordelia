@@ -2,6 +2,35 @@
 
 Each version has its Windows installer in GitHub Releases. The release workflow copies the section of the version from this file to the release notes.
 
+## 0.4.0 (2026-10-17)
+
+### New
+- Pages, like a word processor. The text is cut into pages of the book's page size (Settings → This book → Page size). The page has a fixed width; a narrow window scrolls sideways.
+- The book is one long scroll. Every chapter starts on a new page, and scrolling down goes on into the next chapter. The arrow keys also go on into the next or the previous chapter.
+- "Show in text" on a chat proposal: the chapter opens, the passage scrolls into view, and the change shows in the text with Accept and Reject.
+- Chat: edit a message, rewind to a message, retry a reply, copy. A rewind can also undo the book changes of the removed replies.
+- Chat: a thinking line shows what the AI does now. "Thought process" opens its full thinking.
+- Chat: the thread list shows states. A red dot: proposals wait for you. A green dot: a new reply that you did not see. The chat button gets a dot when the chat is closed.
+- A shortcut for each action. Settings → Actions has a key recorder. Ctrl+J stays on the main action.
+- Drag the edge of the sidebar or the chat to change its width. Drag it to the window edge to close it, and drag it out again to open it.
+- Plan pages have a back link ("← Overview", "← Characters"). Alt+← also goes back.
+
+### Changed
+- The model menu looks like the Claude app: model names with versions ("Opus 5.5"), a check on the current model, keys 1–9 and an Effort submenu.
+- Settings open on General. The tabs of the open book ("This book" and "Writing rules") are under a line, below the other tabs.
+- The writing rules moved from the Plan view to Settings → Writing rules.
+- The AI connections are simpler: one row for each provider, with one status and one button. The rest is under "Details".
+- The Actions tab is simpler. The built-in instructions show in the language of the interface until you change them.
+- The typing options have examples (for example, "texto" → “texto” for smart quotes).
+- Effort names (Low, Medium, High…) stay in English in all languages.
+- The proposal buttons are larger. "Apply all" is a bar for all the proposals of a reply.
+- "Insert into chapter" is now "Insert at cursor".
+- A design review of all screens: aligned icons in the title bar, hover and focus states on all controls, better contrast in the dark theme.
+
+### Fixed
+- Find (Ctrl+F) scrolls to each match, also in other chapters. The case and whole-word buttons have hover states and aligned icons.
+- "Ask the chat about this entry" has a chat icon, not a return arrow.
+
 ## 0.3.1 (2026-10-17)
 
 ### Changed

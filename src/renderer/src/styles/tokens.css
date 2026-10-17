@@ -85,6 +85,17 @@
   --pen-soft: #dfeadf;
   --pen-wash: rgba(47, 106, 82, 0.12);
 
+  /* Planning map: one color for each category, in the order of the categories.
+     Checked for color vision deficiency (adjacent pairs) and 3:1 contrast on the paper. */
+  --map-1: #c4462f;
+  --map-2: #2f6fb8;
+  --map-3: #b8730f;
+  --map-4: #1d876e;
+  --map-5: #7a5cc7;
+  --map-6: #c4508a;
+  --map-7: #9a5a28;
+  --map-8: #00929a;
+
   --strike: #a83a2b;
   --strike-soft: #f5e3dc;
 
@@ -132,6 +143,15 @@
   --pen: #8cc3a4;
   --pen-soft: #22352b;
   --pen-wash: rgba(140, 195, 164, 0.14);
+
+  --map-1: #d9634a;
+  --map-2: #4f8bd6;
+  --map-3: #c47f22;
+  --map-4: #3f9e74;
+  --map-5: #8a80e0;
+  --map-6: #d8609a;
+  --map-7: #b06f3c;
+  --map-8: #14a6ae;
 
   --strike: #e58d76;
   --strike-soft: #3a231d;

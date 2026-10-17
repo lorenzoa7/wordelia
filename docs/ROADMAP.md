@@ -189,6 +189,10 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] Purpose strip: its own tone between the panel and the paper, a target icon, a hairline under it, and a soft shadow when messages scroll under it. A click opens "Title and purpose"
 - [x] Inline mentions: the composer is a small TipTap editor. "@" and some letters open the list (chapters, entries, threads); the choice becomes a pill in the text, and the sentence goes on after it. Backspace removes a pill as one unit. Enter sends, Shift+Enter starts a new line, a paste is plain text. The sent message keeps "@Label" in its text and the ids in `mentions`; the message and the edit box show the pills in the text. Messages from before keep their mentions above the text
 
+### Planning
+
+- [x] Planning map: a "Cards | Map" switch on the Plan overview. The map shows all entries as nodes: a color for each category, a size for the number of links. An entry links to another entry when its summary or its notes use the name or an alias of the other entry (whole words; accents count), or `[[Name]]`. Pan, zoom, fit to screen and drag nodes. Hover shows the neighbors and a card. A click opens the entry; its back link goes to the map. Category chips filter the map, the search box shows the matches (Enter opens the best match), and "Chapters" adds the chapters. Entries without links sit on rings around the others. Empty states for a book without entries and for entries without links (`src/shared/planning/graph.ts`, `features/graph/`, scenario `graph`)
+
 ## Later (not in version 1)
 
 - Sync to a git remote from the app

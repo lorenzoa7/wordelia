@@ -30,7 +30,9 @@ const scenarios = [
   ['pagebreak', '--en'],
   ['selmenu', '--en'],
   ['zoom', '--en'],
-  ['longtitle', '--en']
+  ['longtitle', '--en'],
+  ['graph', '--en'],
+  ['graph', '--en', '--dark']
 ]
 
 function run(args) {

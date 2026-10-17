@@ -1,8 +1,8 @@
-import type { SceneBreakStyle, Typography } from '@shared/types'
-import { Scroll } from '@phosphor-icons/react'
-import { Button, Field, Select, Switch, TextInput } from '@/ui'
-import { useUi } from '@/stores/ui'
-import { RULES_CATEGORY } from '@/features/plan/PlanSidebar'
+import clsx from 'clsx'
+import type { PageSize, SceneBreakStyle, Typography } from '@shared/types'
+import { PAGE_SIZES } from '@shared/export/model'
+import { quotesFor } from '@shared/text/quotes'
+import { Field, Select, Switch, TextInput } from '@/ui'
 import { useBook } from '@/stores/book'
 import { useT } from '@/lib/i18n'
 import { BOOK_FONTS, fontStack } from '@/lib/fonts'
@@ -20,10 +20,15 @@ const SCENE_BREAKS: Array<{ value: SceneBreakStyle; label: string | null }> = [
 export function BookTab(): React.JSX.Element | null {
   const m = useBook((s) => s.manifest)
   const update = useBook((s) => s.updateManifest)
-  const tr = useT().settings.book
+  const msg = useT()
+  const tr = msg.settings.book
+  // The page size names of the export dialog
+  const tx = msg.exportDialog
   if (!m) return null
   const t = m.typography
   const setT = (patch: Partial<Typography>): void => update({ typography: { ...t, ...patch } })
+  const font = { fontFamily: fontStack(t.fontFamily) }
+  const q = quotesFor(m.language)
 
   return (
     <div>
@@ -50,21 +55,18 @@ export function BookTab(): React.JSX.Element | null {
           ariaLabel={tr.language}
         />
       </Field>
-      <Field label={tr.writingRules} hint={tr.writingRulesHint}>
-        <Button
-          size="sm"
-          icon={<Scroll size={14} />}
-          onClick={() => {
-            useUi.getState().closeSettings()
-            useBook.getState().selectCategory(RULES_CATEGORY)
-          }}
-        >
-          {tr.editWritingRules}
-        </Button>
-      </Field>
 
       <h3 className="settings-h">{tr.textOnPage}</h3>
-      <div className="typo-preview" style={{ fontFamily: fontStack(t.fontFamily), lineHeight: t.lineHeight, textAlign: t.align }}>
+      <Field label={tr.pageSize} hint={tr.pageSizeHint}>
+        <Select
+          value={m.export.pageSize}
+          onValueChange={(v) => update({ export: { ...m.export, pageSize: v as PageSize } })}
+          options={(Object.keys(PAGE_SIZES) as PageSize[]).map((k) => ({ value: k, label: tx.pageSizes[k] }))}
+          ariaLabel={tr.pageSize}
+          className="page-size"
+        />
+      </Field>
+      <div className="typo-preview" style={{ ...font, lineHeight: t.lineHeight, textAlign: t.align }}>
         <p style={{ textIndent: t.indentFirstParagraph ? `${t.firstLineIndent}em` : 0 }}>{t.dialogueStyle === 'quotes' ? tr.previewQuoted : tr.previewDialogue(t.dialogueDash)}</p>
         <p style={{ textIndent: `${t.firstLineIndent}em` }}>{tr.previewNarration}</p>
       </div>
@@ -126,42 +128,96 @@ export function BookTab(): React.JSX.Element | null {
       </Field>
 
       <h3 className="settings-h">{tr.typing}</h3>
-      <Field label={tr.dialogueStyle} hint={tr.dialogueStyleHint}>
-        <Select
-          value={t.dialogueStyle}
-          onValueChange={(v) => setT({ dialogueStyle: v as Typography['dialogueStyle'] })}
-          options={[
-            { value: 'dash', label: tr.dialogueStyleDash },
-            { value: 'quotes', label: tr.dialogueStyleQuotes }
-          ]}
-          ariaLabel={tr.dialogueStyle}
-        />
-      </Field>
-      <Field label={tr.dialogueDash} inline>
-        <Select
-          value={t.dialogueDash}
-          onValueChange={(v) => setT({ dialogueDash: v as Typography['dialogueDash'] })}
-          options={[
-            { value: '—', label: tr.emDash },
-            { value: '―', label: tr.horizontalBar }
-          ]}
-          ariaLabel={tr.dialogueDashAria}
-        />
-      </Field>
-      <Field label={tr.smartQuotes} inline>
-        <Switch checked={t.smartQuotes} onCheckedChange={(v) => setT({ smartQuotes: v })} />
-      </Field>
-      <Field label={tr.smartEllipsis} inline>
-        <Switch checked={t.smartEllipsis} onCheckedChange={(v) => setT({ smartEllipsis: v })} />
-      </Field>
-      <Field label={tr.sceneBreak} inline>
-        <Select
-          value={t.sceneBreak}
-          onValueChange={(v) => setT({ sceneBreak: v as SceneBreakStyle })}
-          options={SCENE_BREAKS.map((b) => ({ value: b.value, label: b.label ?? tr.blankLine }))}
-          ariaLabel={tr.sceneBreakAria}
-        />
-      </Field>
+      <p className="settings-note">{tr.typingNote}</p>
+      <div className="typing-label" id="dialogue-style-label">
+        {tr.dialogueStyle}
+      </div>
+      <div className="dialogue-styles" role="radiogroup" aria-labelledby="dialogue-style-label">
+        {(['dash', 'quotes'] as const).map((style) => (
+          <button
+            key={style}
+            role="radio"
+            aria-checked={t.dialogueStyle === style}
+            className={clsx('dialogue-style', t.dialogueStyle === style && 'is-active')}
+            onClick={() => setT({ dialogueStyle: style })}
+          >
+            <span className="dialogue-style-name">{style === 'dash' ? tr.dialogueStyleDash : tr.dialogueStyleQuotes}</span>
+            <span className="dialogue-style-example" style={font}>
+              {style === 'dash' ? tr.dashExample(t.dialogueDash) : tr.quotesExample(q.doubleOpen, q.doubleClose)}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <div className="typing-rows">
+        <TypingRow label={tr.dialogueDash} before="--" after={t.dialogueDash} font={font}>
+          <Select
+            value={t.dialogueDash}
+            onValueChange={(v) => setT({ dialogueDash: v as Typography['dialogueDash'] })}
+            options={[
+              { value: '—', label: `—  ${tr.emDash}` },
+              { value: '―', label: `―  ${tr.horizontalBar}` }
+            ]}
+            ariaLabel={tr.dialogueDash}
+          />
+        </TypingRow>
+        <TypingRow label={tr.smartQuotes} before={`"${tr.quotesWord}"`} after={`${q.doubleOpen}${tr.quotesWord}${q.doubleClose}`} font={font} off={!t.smartQuotes}>
+          <Switch checked={t.smartQuotes} onCheckedChange={(v) => setT({ smartQuotes: v })} label={tr.smartQuotes} />
+        </TypingRow>
+        <TypingRow label={tr.smartEllipsis} before="..." after="…" font={font} off={!t.smartEllipsis}>
+          <Switch checked={t.smartEllipsis} onCheckedChange={(v) => setT({ smartEllipsis: v })} label={tr.smartEllipsis} />
+        </TypingRow>
+        <div className="typing-row">
+          <span className="typing-name" id="scene-break-label">
+            {tr.sceneBreak}
+          </span>
+          <div className="scene-breaks" role="radiogroup" aria-labelledby="scene-break-label">
+            {SCENE_BREAKS.map((b) => (
+              <button
+                key={b.value}
+                role="radio"
+                aria-checked={t.sceneBreak === b.value}
+                className={clsx('scene-break', t.sceneBreak === b.value && 'is-active', !b.label && 'is-text')}
+                style={b.label ? font : undefined}
+                onClick={() => setT({ sceneBreak: b.value })}
+              >
+                {b.label ?? tr.blankLine}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** One typing option: its name, an example of what it does, and its control. */
+function TypingRow({
+  label,
+  before,
+  after,
+  font,
+  off,
+  children
+}: {
+  label: string
+  before: string
+  after: string
+  font: React.CSSProperties
+  off?: boolean
+  children: React.ReactNode
+}): React.JSX.Element {
+  return (
+    <div className={clsx('typing-row', off && 'is-off')}>
+      <span className="typing-name">{label}</span>
+      <span className="typing-example" aria-hidden>
+        <code>{before}</code>
+        <span className="typing-arrow">→</span>
+        <span className="typing-after" style={font}>
+          {after}
+        </span>
+      </span>
+      <span className="typing-control">{children}</span>
     </div>
   )
 }

@@ -6,7 +6,8 @@ import { Button, Field, Select, Switch } from '@/ui'
 import { invoke } from '@/lib/api'
 import { checkForUpdate, installUpdate, useUpdate } from '@/lib/update'
 import { useApp } from '@/stores/app'
-import { LOCALES, useT } from '@/lib/i18n'
+import { useUi } from '@/stores/ui'
+import { LOCALES, actionName, useT } from '@/lib/i18n'
 import { typewriterSound } from '@/features/editor/typewriter-sound'
 
 const THEMES: Array<{ id: ThemeSetting; icon: React.ReactNode }> = [
@@ -89,8 +90,7 @@ export function GeneralTab(): React.JSX.Element | null {
       <h3 className="settings-h">{g.keyboard}</h3>
       <dl className="shortcuts">
         {[
-          [g.shortcuts.polish, 'Ctrl+J'],
-          [g.shortcuts.otherActions, 'Alt+1 … 9'],
+          ...settings.actions.filter((a) => a.shortcut).map((a) => [actionName(t, a), a.shortcut!]),
           [g.shortcuts.acceptReject, 'Enter / Esc'],
           [g.shortcuts.dialogueDash, '--'],
           [g.shortcuts.sceneBreak, 'Ctrl+Shift+Enter'],
@@ -100,8 +100,8 @@ export function GeneralTab(): React.JSX.Element | null {
           [g.shortcuts.writePlan, 'Ctrl+1 / Ctrl+2'],
           [t.common.export, 'Ctrl+Shift+E'],
           [t.common.settings, 'Ctrl+,']
-        ].map(([label, key]) => (
-          <div key={label} className="shortcut-row">
+        ].map(([label, key], i) => (
+          <div key={`${i}-${label}`} className="shortcut-row">
             <dt>{label}</dt>
             <dd>
               <kbd className="kbd">{key}</kbd>
@@ -109,6 +109,11 @@ export function GeneralTab(): React.JSX.Element | null {
           </div>
         ))}
       </dl>
+      <p className="shortcuts-hint">
+        <button className="link-btn" onClick={() => useUi.getState().openSettings('actions')}>
+          {g.actionKeysHint}
+        </button>
+      </p>
     </div>
   )
 }

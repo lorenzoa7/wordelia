@@ -218,6 +218,8 @@ The renderer parses the tags while the reply streams. It shows each tag as a dif
 
 An action sends: the writing rules, the action instructions, N characters before the selection, the selection, and N characters after. The AI returns `<rewrite>...</rewrite>`. The editor shows a word diff as decorations on the page. Accept replaces the range in one transaction.
 
+Each action has its own keyboard shortcut (`AiAction.shortcut`, for example "Ctrl+J"). `src/shared/ai/shortcuts.ts` reads key presses, keeps one text form and finds conflicts with other actions and with the keys of the app and the editor (`RESERVED_SHORTCUTS`). `useActionShortcuts` runs the action of a shortcut in the Write view. Settings version 4 gave the actions of old settings the keys that they had by position: Ctrl+J for the main action, Alt+2, Alt+3… for the others. See `docs/decisions/0003-action-shortcuts-and-builtin-instructions.md`.
+
 ### 5.5 Thread digests
 
 After each AI reply, a background job (Background route) updates the digest of the thread: the old digest plus the last exchange gives the new digest (12 bullets or fewer).
@@ -233,7 +235,7 @@ After each AI reply, a background job (Background route) updates the digest of t
 
 The interface is in English (the default), Portuguese (Brazil) and Spanish (`AppSettings.language`). The texts are in `src/shared/i18n/<locale>/<namespace>.ts`. The translations have the type of the English texts, so a missing key is a type error. React code uses `useT()`, other renderer code `getT()`, and the main process `mainT()`. Rules and a terms table: `src/shared/i18n/README.md`.
 
-Some texts are stored in English and translated only when the app shows them, so that a book looks the same in every language: the title "New thread" (it also tells the app to make a title), the title and the purpose of the planning sync thread, and the labels of chapter versions ("Opened", "Before Polish"). Built-in actions and default categories show translated names until the user renames them (`actionName`, `categoryName`).
+Some texts are stored in English and translated only when the app shows them, so that a book looks the same in every language: the title "New thread" (it also tells the app to make a title), the title and the purpose of the planning sync thread, and the labels of chapter versions ("Opened", "Before Polish"). Built-in actions and default categories show translated names until the user renames them (`actionName`, `categoryName`). The instructions of built-in actions also show in the interface language until the user changes them, and the AI gets that same text (`actionInstructions`). Effort names (Low, Medium, High…) stay in English in every language.
 
 The language of a book is a different setting. It controls the AI output, the dialogue style, the chapter word ("Capítulo Um"), spell check, hyphenation (the page has `lang` = book language) and export. AI prompts stay in English.
 

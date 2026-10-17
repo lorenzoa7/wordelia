@@ -32,10 +32,35 @@ export default async function ({ page, shot, openBook }) {
   await page.keyboard.press('Control+,')
   await page.waitForTimeout(600)
   await shot(`${lang}-settings-general`)
-  for (const tab of [1, 2, 3]) {
+  // Tabs: General, AI, Actions, then This book and Writing rules.
+  for (const tab of [1, 2, 3, 4]) {
     await page.locator('.settings-tab').nth(tab).click()
     await page.waitForTimeout(500)
     await shot(`${lang}-settings-${tab}`)
+    if (tab === 1) {
+      await page.locator('.provider-more').first().click()
+      await page.waitForTimeout(300)
+      await shot(`${lang}-settings-ai-details`)
+      await page.locator('.settings-panes').evaluate((el) => el.scrollTo({ top: 5000 }))
+      await page.waitForTimeout(300)
+      await shot(`${lang}-settings-ai-routes`)
+    }
+    if (tab === 2) {
+      await page.locator('.model-pick').click()
+      await page.waitForTimeout(350)
+      await shot(`${lang}-settings-actions-model`)
+      await page.keyboard.press('Escape')
+      await page.locator('.shortcut-box').click()
+      await page.keyboard.press('Control+b')
+      await page.waitForTimeout(250)
+      await shot(`${lang}-settings-actions-shortcut`)
+      await page.keyboard.press('Escape')
+    }
+    if (tab === 3) {
+      await page.locator('.settings-panes').evaluate((el) => el.scrollTo({ top: 5000 }))
+      await page.waitForTimeout(300)
+      await shot(`${lang}-settings-book-typing`)
+    }
   }
   await page.keyboard.press('Escape')
   await page.waitForTimeout(300)

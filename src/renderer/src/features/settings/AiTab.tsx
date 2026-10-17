@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
-import { ArrowCircleUp, ArrowsClockwise, CheckCircle, Info, Key, SignIn, Sparkle, Terminal, WarningCircle } from '@phosphor-icons/react'
+import { ArrowsClockwise, CaretDown, Info, Key, Sparkle, Terminal } from '@phosphor-icons/react'
 import { PROVIDER_LABELS, suggestRoutes } from '@shared/ai/routes'
 import { isOlderVersion } from '@shared/version'
 import { effortChoices, nearestEffort } from '@shared/ai/effort'
-import type { Effort, ModelChoice, ProviderId, TaskKind } from '@shared/types'
+import type { Effort, ModelChoice, ProviderId, ProviderStatus, TaskKind } from '@shared/types'
 import { Button, Select, Spinner, Switch, TextInput, Tooltip } from '@/ui'
 import { invoke } from '@/lib/api'
 import { useT } from '@/lib/i18n'
@@ -13,6 +13,11 @@ import { toast } from '@/stores/ui'
 
 const PROVIDERS: ProviderId[] = ['claude-code', 'codex', 'anthropic', 'openai']
 const TASKS: TaskKind[] = ['chat', 'action', 'sync', 'background']
+/** Where to get each CLI (the same pages as the welcome screen) */
+const INSTALL_URL: Partial<Record<ProviderId, string>> = {
+  'claude-code': 'https://claude.com/claude-code',
+  codex: 'https://developers.openai.com/codex'
+}
 
 /** Text with `backticks` around program commands: those parts show as code. */
 function withCode(text: string): React.ReactNode {
@@ -30,136 +35,209 @@ export function AiTab(): React.JSX.Element | null {
       <p className="settings-note">{a.free}</p>
       <div className="provider-list">
         {PROVIDERS.map((p) => (
-          <ProviderCard key={p} id={p} />
+          <ProviderRow key={p} id={p} />
         ))}
       </div>
       <h3 className="settings-h">{a.modelsForTasks}</h3>
-      <p className="settings-note">{a.modelsNote}</p>
-      <p className="settings-note">
-        <strong>{a.effortTerm}</strong> {a.effortNote}
-      </p>
+      <p className="settings-note">{a.routesNote}</p>
       <RoutesTable />
     </div>
   )
 }
 
-function ProviderCard({ id }: { id: ProviderId }): React.JSX.Element {
+type RowState = 'checking' | 'off' | 'unknown' | 'notInstalled' | 'loggedOut' | 'noKey' | 'ok'
+
+function rowState(isApi: boolean, enabled: boolean, checking: boolean | undefined, status: ProviderStatus | undefined): RowState {
+  if (!enabled) return 'off'
+  if (checking) return 'checking'
+  if (!status) return 'unknown'
+  if (!status.installed) return 'notInstalled'
+  if (status.loggedIn === false) return isApi ? 'noKey' : 'loggedOut'
+  return 'ok'
+}
+
+/** One provider: its name, one status line and one button. The rest is under "Details". */
+function ProviderRow({ id }: { id: ProviderId }): React.JSX.Element {
   const status = useApp((s) => s.status[id])
   const checking = useApp((s) => s.checking[id])
   const settings = useApp((s) => s.settings!)
   const models = useApp((s) => s.models[id])
   const check = useApp((s) => s.checkProvider)
   const update = useApp((s) => s.updateSettings)
+  const [open, setOpen] = useState(false)
   const [key, setKey] = useState('')
-  const [showPath, setShowPath] = useState(false)
+  /** The user went to a terminal or a web page: check again when the window gets the focus back. */
+  const [waiting, setWaiting] = useState(false)
+  const keyInput = useRef<HTMLInputElement>(null)
   const t = useT()
   const a = t.settings.ai
+  const name = PROVIDER_LABELS[id].name
   const isApi = id === 'anthropic' || id === 'openai'
   const enabled = settings.providers[id]?.enabled !== false
-  const ok = status?.installed && status.loggedIn !== false
+  const state = rowState(isApi, enabled, checking, status)
+  const outdated = !isApi && state === 'ok' && isOlderVersion(status?.version, status?.latestVersion)
+  // An API that is off can still have a saved key: then it only needs "Turn on".
+  const [hasKey, setHasKey] = useState(false)
+  useEffect(() => {
+    if (isApi && !enabled) void invoke('ai:hasKey', id).then(setHasKey)
+  }, [isApi, enabled, id])
 
+  useEffect(() => {
+    if (!waiting) return
+    const onFocus = (): void => {
+      setWaiting(false)
+      void check(id)
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [waiting, check, id])
+
+  const setEnabled = async (v: boolean): Promise<void> => {
+    await update({ providers: { ...settings.providers, [id]: { ...settings.providers[id], enabled: v } } })
+    if (v) await check(id)
+  }
   const saveKey = async (): Promise<void> => {
     await invoke('ai:setKey', id, key.trim() || null)
     setKey('')
     await update({ providers: { ...settings.providers, [id]: { ...settings.providers[id], enabled: true } } })
     const st = await check(id)
-    toast(st.loggedIn ? a.providerConnected(PROVIDER_LABELS[id].name) : a.keyFailed(st.detail ?? ''), { kind: st.loggedIn ? 'info' : 'error' })
+    toast(st.loggedIn ? a.providerConnected(name) : a.keyFailed(st.detail ?? ''), { kind: st.loggedIn ? 'info' : 'error' })
   }
-
+  const showKey = (): void => {
+    setOpen(true)
+    setTimeout(() => keyInput.current?.focus(), 50)
+  }
   const useSuggested = async (): Promise<void> => {
     await update({ routes: suggestRoutes(id, models ?? []) })
-    toast(a.allTasksUse(PROVIDER_LABELS[id].name))
+    toast(a.allTasksUse(name))
   }
 
+  // The one button: what to do next.
+  const primary: { label: string; run: () => void } | null =
+    state === 'off'
+      ? isApi && !hasKey
+        ? { label: a.addKey, run: showKey }
+        : { label: a.turnOn, run: () => void setEnabled(true) }
+      : state === 'notInstalled' && INSTALL_URL[id]
+        ? {
+            label: a.install,
+            run: () => {
+              void invoke('window:openExternal', INSTALL_URL[id]!)
+              setWaiting(true)
+            }
+          }
+        : state === 'loggedOut'
+          ? {
+              label: a.logIn,
+              run: () => {
+                void invoke('ai:openLogin', id)
+                setWaiting(true)
+              }
+            }
+          : state === 'noKey'
+            ? { label: a.addKey, run: showKey }
+            : outdated && id === 'claude-code'
+              ? {
+                  label: a.update,
+                  run: () => {
+                    void invoke('ai:openUpdate', id)
+                    setWaiting(true)
+                  }
+                }
+              : null
+
+  const line =
+    state === 'off'
+      ? a.off
+      : state === 'checking' || state === 'unknown'
+        ? a.checking
+        : state === 'notInstalled'
+          ? a.notInstalled
+          : state === 'loggedOut' || state === 'noKey'
+            ? status?.reason === 'expired'
+              ? a.expired
+              : a.notConnected
+            : [a.connected, status?.account, outdated ? a.updateAvailable(status?.latestVersion ?? '') : ''].filter(Boolean).join(' · ')
+
   return (
-    <div className={clsx('provider-card', ok && enabled && 'is-ok', !enabled && 'is-off')}>
-      <div className="provider-top">
-        <span className="provider-icon">{isApi ? <Key size={16} /> : <Terminal size={16} />}</span>
-        <div className="provider-title">
-          <strong>{PROVIDER_LABELS[id].name}</strong>
-          <span>{t.common.providerKind[id]}</span>
-        </div>
-        <span className="provider-state">
-          {checking ? (
-            <Spinner size={13} />
-          ) : !status ? null : ok ? (
-            <span className="state-ok">
-              <CheckCircle size={14} weight="fill" /> {a.connected}
-            </span>
-          ) : (
-            <span className="state-bad">
-              <WarningCircle size={14} weight="fill" /> {!status.installed ? a.notInstalled : a.notConnected}
-            </span>
-          )}
-        </span>
-        <Tooltip label={a.checkAgain}>
-          <button className="icon-btn" onClick={() => void check(id)} aria-label={a.checkAgain}>
-            <ArrowsClockwise size={15} />
-          </button>
-        </Tooltip>
-        <Switch
-          checked={enabled}
-          onCheckedChange={(v) => void update({ providers: { ...settings.providers, [id]: { ...settings.providers[id], enabled: v } } })}
-          label={a.use(PROVIDER_LABELS[id].name)}
-        />
-      </div>
-      <p className="provider-help">
-        <Info size={13} /> <span>{withCode(a.help[id])}</span>
-      </p>
-      {status?.detail && !ok && <p className="provider-detail">{status.detail}</p>}
-      {ok && !isApi && <p className="provider-detail">{a.found(status?.version, status?.account)}</p>}
-      {ok && isApi && <p className="provider-detail">{a.keySaved}</p>}
-      {!isApi && status?.installed && isOlderVersion(status.version, status.latestVersion) && (
-        <div className="provider-login">
-          {id === 'claude-code' && (
-            <Button size="sm" icon={<ArrowCircleUp size={13} />} onClick={() => void invoke('ai:openUpdate', id)}>
-              {a.update}
-            </Button>
-          )}
-          <span className="muted">
-            {a.newVersion(status.latestVersion ?? '')} {id === 'claude-code' ? a.updateClaude : a.updateCodex}
+    <div className={clsx('provider-row', `is-${state}`, open && 'is-open')}>
+      <div className="provider-main">
+        <span className="provider-icon">{isApi ? <Key size={15} /> : <Terminal size={15} />}</span>
+        <div className="provider-text">
+          <strong>{name}</strong>
+          <span className="provider-line">
+            {state === 'checking' ? <Spinner size={10} /> : <span className="provider-dot" aria-hidden />}
+            <span className="provider-line-text">{line}</span>
           </span>
         </div>
-      )}
-      {isApi && (
-        <div className="provider-key">
-          <TextInput type="password" aria-label={a.apiKey} spellCheck={false} placeholder={ok ? a.keyPlaceholderSaved : a.keyPlaceholder} value={key} onChange={(e) => setKey(e.target.value)} />
-          <Button size="sm" onClick={() => void saveKey()} disabled={!key.trim()}>
-            {a.saveKey}
+        {primary && (
+          <Button size="sm" variant={state === 'loggedOut' || state === 'noKey' || state === 'notInstalled' ? 'primary' : 'secondary'} onClick={primary.run}>
+            {primary.label}
           </Button>
-        </div>
-      )}
-      {!isApi && status?.installed && status.loggedIn === false && (
-        <div className="provider-login">
-          <Button size="sm" icon={<SignIn size={13} />} onClick={() => void invoke('ai:openLogin', id)}>
-            {a.logIn}
-          </Button>
-          <span className="muted">{a.logInHint}</span>
-        </div>
-      )}
-      {!isApi && (
-        <div className="provider-extra">
-          {showPath ? (
-            <TextInput
-              spellCheck={false}
-              aria-label={a.programPath}
-              placeholder={a.programPathPlaceholder(id === 'codex' ? 'codex' : 'claude')}
-              defaultValue={settings.providers[id]?.binPath ?? ''}
-              onBlur={(e) => void update({ providers: { ...settings.providers, [id]: { ...settings.providers[id], binPath: e.target.value.trim() || undefined } } }).then(() => check(id))}
-            />
-          ) : (
-            <button className="link-btn" onClick={() => setShowPath(true)}>
-              {a.setProgramPath}
-            </button>
+        )}
+        <button className="provider-more" aria-expanded={open} onClick={() => setOpen(!open)}>
+          {a.details}
+          <CaretDown size={11} className="provider-more-caret" />
+        </button>
+      </div>
+      {open && (
+        <div className="provider-details">
+          <p className="provider-help">
+            <Info size={13} /> <span>{withCode(a.help[id])}</span>
+          </p>
+          {status?.detail && state !== 'ok' && <p className="provider-detail">{status.detail}</p>}
+          {!isApi && status?.version && (
+            <p className="provider-detail">
+              {outdated ? a.newVersion(status.latestVersion ?? '') : a.version(status.version)}
+              {outdated && id === 'codex' ? ` ${a.updateCodex}` : ''}
+            </p>
           )}
-        </div>
-      )}
-      {ok && enabled && (
-        <div className="provider-foot">
-          <span className="muted">{a.modelsAvailable(models?.length ?? 0)}</span>
-          <button className="link-btn" onClick={() => void useSuggested()}>
-            <Sparkle size={12} /> {a.useForAll}
-          </button>
+          {isApi && (
+            <div className="provider-key">
+              <TextInput
+                ref={keyInput}
+                type="password"
+                aria-label={a.apiKey}
+                spellCheck={false}
+                placeholder={state === 'ok' ? a.keyPlaceholderSaved : a.keyPlaceholder}
+                value={key}
+                onChange={(e) => setKey(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && key.trim() && void saveKey()}
+              />
+              <Button size="sm" onClick={() => void saveKey()} disabled={!key.trim()}>
+                {a.saveKey}
+              </Button>
+            </div>
+          )}
+          {!isApi && (
+            <label className="provider-path">
+              <span>{a.programPath}</span>
+              <TextInput
+                spellCheck={false}
+                placeholder={a.programPathPlaceholder(id === 'codex' ? 'codex' : 'claude')}
+                defaultValue={settings.providers[id]?.binPath ?? ''}
+                onBlur={(e) => {
+                  const binPath = e.target.value.trim() || undefined
+                  if (binPath === settings.providers[id]?.binPath) return
+                  void update({ providers: { ...settings.providers, [id]: { ...settings.providers[id], binPath } } }).then(() => check(id))
+                }}
+              />
+            </label>
+          )}
+          <div className="provider-foot">
+            <label className="provider-switch">
+              <Switch checked={enabled} onCheckedChange={(v) => void setEnabled(v)} label={a.use(name)} />
+              <span>{a.use(name)}</span>
+            </label>
+            {state === 'ok' && (
+              <button className="link-btn" onClick={() => void useSuggested()}>
+                <Sparkle size={12} /> {a.useForAll}
+              </button>
+            )}
+            <Button size="sm" variant="ghost" icon={<ArrowsClockwise size={13} />} onClick={() => void check(id)} disabled={!enabled || checking}>
+              {a.checkAgain}
+            </Button>
+          </div>
         </div>
       )}
     </div>
@@ -185,6 +263,19 @@ function RoutesTable(): React.JSX.Element {
 
   return (
     <div className="routes">
+      <div className="route-row route-head">
+        <span>{a.task}</span>
+        <span>{a.provider}</span>
+        <span>{a.model}</span>
+        <span className="route-head-effort">
+          {a.effort}
+          <Tooltip label={a.effortHelp}>
+            <span className="route-help" tabIndex={0} aria-label={a.effortHelp}>
+              <Info size={12} />
+            </span>
+          </Tooltip>
+        </span>
+      </div>
       {TASKS.map((task) => {
         const r = settings.routes[task]
         const providerModels = r ? (models[r.provider] ?? []) : []
@@ -198,8 +289,7 @@ function RoutesTable(): React.JSX.Element {
           <div key={task} className="route-row">
             <div className="route-label">
               <strong>{name}</strong>
-              <span>{t.common.tasks[task].hint}</span>
-              {current?.resolvedLabel && <span className="route-now">{a.lastAnswer(current.resolvedLabel)}</span>}
+              <span title={t.common.tasks[task].hint}>{t.common.tasks[task].hint}</span>
             </div>
             <Select
               value={r?.provider ?? ''}
@@ -213,7 +303,7 @@ function RoutesTable(): React.JSX.Element {
               className="route-provider"
             />
             <Select
-              value={r ? (r.model || '__default') : ''}
+              value={r ? r.model || '__default' : ''}
               placeholder={a.model}
               onValueChange={(v) => {
                 if (!r) return

@@ -124,6 +124,18 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] Writing rules in the book menu and in Settings → This book
 - [x] Pasted Markdown in notes and writing rules becomes headings and lists
 
+## Version 0.4 — feedback of the author
+
+- [x] Settings in a new order: General, AI, Actions; then, under a rule and the book title, the tabs of the open book: "This book" and "Writing rules". The gear and Ctrl+, open General
+- [x] Writing rules in Settings, in the note editor of the Plan view; the "writing rules" link in Actions opens them
+- [x] Actions tab: the list with shortcuts; for the selected action, the name with one icon button (small icon picker), the instructions, one model-and-effort control, the shortcut. No "context around the selection" control (the data stays)
+- [x] A shortcut for each action (`AiAction.shortcut`): recorder, Esc cancels, remove button, conflicts with other actions and with the keys of the app and the editor. Settings version 4 keeps Ctrl+J for the main action and Alt+2, Alt+3… for the others
+- [x] Built-in action instructions in the interface language until the user changes them; the AI gets the same text
+- [x] AI tab: one row for each provider with one status line and one button (Log in, Update, Install, Add key, Turn on); the rest under "Details". Tidy routes table with column names
+- [x] Typing options with live examples (dialogue style cards, `--` → —, "text" → “text”, ... → …, scene break glyphs)
+- [x] Effort names in English in all interface languages
+- [x] Page size of the book in Settings → This book
+
 ## Later (not in version 1)
 
 - Sync to a git remote from the app

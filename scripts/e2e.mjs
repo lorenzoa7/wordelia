@@ -9,6 +9,8 @@ const scenarios = [
   ['persist'],
   ['history'],
   ['settings'],
+  ['settings-shortcuts'],
+  ['settings-rules'],
   ['dark', '--dark'],
   ['library'],
   ['newbook'],

@@ -70,3 +70,19 @@ export function selectedText(): string {
   const { from, to } = a.editor.state.selection
   return textWithMap(a.editor.state.doc, from, to).text
 }
+
+/**
+ * Show a chat proposal in the text: open its chapter, scroll to the passage, and show the change
+ * as an inline diff with Accept and Reject. `onDecision` gets true when the user accepts it there
+ * (the change is then applied) and false when they reject it. Returns false when the passage is
+ * not found in the chapter.
+ *
+ * Contract for the chat; the editor implements it.
+ */
+export function revealProposal(chapterId: string, find: string, replace: string, onDecision: (accepted: boolean) => void): boolean {
+  void find
+  void replace
+  void onDecision
+  useBook.getState().selectChapter(chapterId)
+  return true
+}

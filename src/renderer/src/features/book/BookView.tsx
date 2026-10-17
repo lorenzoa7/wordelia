@@ -11,7 +11,7 @@ import { ChatPanel } from '@/features/chat/ChatPanel'
 import { PlanView } from '@/features/plan/PlanView'
 import { PlanSidebar } from '@/features/plan/PlanSidebar'
 import { ExportDialog } from '@/features/export/ExportDialog'
-import { runAction } from '@/features/actions/runAction'
+import { useActionShortcuts } from '@/features/actions/useActionShortcuts'
 import { HistoryDialog } from '@/features/history/HistoryDialog'
 import { startAutoSnapshots } from '@/features/history/snapshots'
 import './book.css'
@@ -55,27 +55,7 @@ export function BookView(): React.JSX.Element {
 
   useEffect(() => startAutoSnapshots(), [])
 
-  // Action shortcuts: Ctrl+J for the default action, Alt+1…9 for the others.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if (useBook.getState().view !== 'write') return
-      const s = useApp.getState().settings
-      if (!s) return
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'j') {
-        e.preventDefault()
-        const a = s.actions.find((x) => x.id === s.defaultActionId) ?? s.actions[0]
-        if (a) void runAction(a)
-      } else if (e.altKey && /^[1-9]$/.test(e.key)) {
-        const a = s.actions[Number(e.key) - 1]
-        if (a) {
-          e.preventDefault()
-          void runAction(a)
-        }
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  useActionShortcuts()
 
   return (
     <div className="book">

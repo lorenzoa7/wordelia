@@ -222,6 +222,8 @@ export type StreamEvent =
   | { type: 'start'; model?: string }
   | { type: 'text'; delta: string }
   | { type: 'status'; message: string }
+  /** A piece of the model's thinking (a summary), when the provider streams it */
+  | { type: 'thinking'; delta: string }
   | { type: 'usage'; inputTokens?: number; outputTokens?: number; costUsd?: number }
 
 export interface CompletionResult {

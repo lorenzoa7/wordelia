@@ -12,10 +12,13 @@ export const plan: typeof en = {
   },
   sidebar: {
     planning: 'Planejamento',
-    syncWithManuscript: 'Sincronizar manuscrito',
+    updateNotes: 'Atualizar notas',
+    updateNotesFrom: 'pelos capítulos',
+    updateNotesHint:
+      'A IA lê os capítulos que mudaram desde a última atualização e propõe mudanças nas notas do planejamento. Você aceita ou rejeita cada mudança. A IA não muda o manuscrito.',
     changedChapters: (count) =>
-      count === 1 ? '1 capítulo alterado desde a última sincronização' : `${count} capítulos alterados desde a última sincronização`,
-    upToDate: 'O planejamento está em dia',
+      count === 1 ? '1 capítulo mudou desde a última atualização.' : `${count} capítulos mudaram desde a última atualização.`,
+    upToDate: 'Nenhum capítulo mudou desde a última atualização.',
     overview: 'Visão geral',
     showEntries: (category) => `${category}: mostrar notas`,
     importNotesInto: (category) => `Importar notas para ${category}`,
@@ -67,7 +70,7 @@ export const plan: typeof en = {
     upToDate: 'O planejamento está em dia com o manuscrito.',
     done: 'Sincronização concluída. Revise as propostas no chat.',
     threadTitle: 'Sincronização do planejamento',
-    threadBrief: 'Mantém o planejamento em dia com o manuscrito. As propostas vêm do botão Sincronizar.',
+    threadBrief: 'Mantém o planejamento em dia com o manuscrito. As propostas vêm do botão Atualizar notas.',
     request: (bootstrap, count, chapters, part, parts) => {
       const what = bootstrap
         ? count === 1

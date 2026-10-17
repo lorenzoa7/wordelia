@@ -135,6 +135,56 @@ class AppServer {
   }
 }
 
+/**
+ * Sends the reasoning of Codex as thinking events. Each reasoning item and each summary part
+ * starts a new paragraph. An item that streamed no deltas sends its text when it completes.
+ */
+class Thinking {
+  private items = new Map<string, { streamed: boolean; summary: boolean; part: number }>()
+  private sent = false
+
+  constructor(private readonly onEvent: (e: StreamEvent) => void) {}
+
+  private item(id: string): { streamed: boolean; summary: boolean; part: number } {
+    let it = this.items.get(id)
+    if (!it) {
+      it = { streamed: false, summary: false, part: 0 }
+      this.items.set(id, it)
+    }
+    return it
+  }
+
+  private emit(delta: string, paragraph: boolean): void {
+    if (!delta) return
+    this.onEvent({ type: 'thinking', delta: paragraph && this.sent ? `\n\n${delta}` : delta })
+    this.sent = true
+  }
+
+  summary(itemId: string, part: number, delta: string): void {
+    const it = this.item(itemId)
+    const paragraph = !it.streamed || (it.summary && part !== it.part)
+    it.streamed = true
+    it.summary = true
+    it.part = part
+    this.emit(delta, paragraph)
+  }
+
+  raw(itemId: string, delta: string): void {
+    const it = this.item(itemId)
+    if (it.summary) return
+    const paragraph = !it.streamed
+    it.streamed = true
+    this.emit(delta, paragraph)
+  }
+
+  whole(itemId: string, text: string): void {
+    const it = this.item(itemId)
+    if (it.streamed || !text.trim()) return
+    it.streamed = true
+    this.emit(text.trim(), true)
+  }
+}
+
 let modelCache: { at: number; models: ModelInfo[] } | null = null
 
 /** The account of the Codex login, false when the login does not work, or null when the app cannot tell. */
@@ -265,11 +315,17 @@ async function completeWithAppServer(
       if (signal.aborted) return { ok: false, text: '', error: t.cancelled, errorKind: 'cancelled' }
       return null // app-server is missing in this version: use exec
     }
-    const done = new Promise<{ ok: boolean; error?: string }>((resolve) => {
+    // Reasoning summaries stream as deltas. Raw reasoning text counts only when a model gives no summary.
+  const thinking = new Thinking(onEvent)
+  const done = new Promise<{ ok: boolean; error?: string }>((resolve) => {
       server.onNotification = (method, params) => {
         if (method === 'item/agentMessage/delta' && typeof params.delta === 'string') {
           text += params.delta
           onEvent({ type: 'text', delta: params.delta })
+        } else if (method === 'item/reasoning/summaryTextDelta' && typeof params.delta === 'string') {
+          thinking.summary(String(params.itemId ?? ''), Number(params.summaryIndex ?? 0), params.delta)
+        } else if (method === 'item/reasoning/textDelta' && typeof params.delta === 'string') {
+          thinking.raw(String(params.itemId ?? ''), params.delta)
         } else if (method === 'thread/tokenUsage/updated') {
           const tu = (params.tokenUsage as Json | undefined)?.total as Json | undefined
           if (tu) {
@@ -281,6 +337,9 @@ async function completeWithAppServer(
           if (item?.type === 'agentMessage' && typeof item.text === 'string' && !text) {
             text = item.text
             onEvent({ type: 'text', delta: item.text })
+          } else if (item?.type === 'reasoning') {
+            const parts = (Array.isArray(item.summary) ? item.summary : Array.isArray(item.content) ? item.content : []) as unknown[]
+            thinking.whole(String(item.id ?? ''), parts.map(String).join('\n\n'))
           }
         } else if (method === 'error') {
           const err = (params.error as Json | undefined)?.message
@@ -350,6 +409,7 @@ async function completeWithExec(
   let text = ''
   let error = ''
   let usage: CompletionResult['usage']
+  const thinking = new Thinking(onEvent)
   const res = await runCli(b, args, {
     input: prompt,
     cwd,
@@ -366,6 +426,8 @@ async function completeWithExec(
         if (item?.type === 'agent_message' && typeof item.text === 'string') {
           text += item.text
           onEvent({ type: 'text', delta: item.text })
+        } else if (item?.type === 'reasoning' && typeof item.text === 'string') {
+          thinking.whole(String(item.id ?? ''), item.text)
         }
       } else if (ev.type === 'turn.completed') {
         const u = ev.usage as Json | undefined

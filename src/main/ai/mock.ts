@@ -83,7 +83,24 @@ function reply(req: CompletionRequest): string {
   const paras = chapter?.[2].split(/\n\n/).filter((p) => p.trim().length > 40) ?? []
   const improvable = (p: string): boolean => SWAPS.slice(0, -1).some(([re]) => new RegExp(re.source, re.flags.replace('g', '')).test(p))
   const firstPara = paras.find(improvable) ?? paras[0]
-  if (chapter && firstPara && /edit|change|improve|rewrite|melhor|mude|reescrev/i.test(last)) {
+  const wantsEdit = /edit|change|improve|rewrite|melhor|mude|reescrev/i.test(last)
+  // "Improve the first two paragraphs": several proposals in one reply, for the bar that applies them all.
+  if (chapter && wantsEdit && /\b(two|both|several|dois|duas|ambos)\b/i.test(last)) {
+    const picked = [...paras.filter(improvable), ...paras].filter((p, i, all) => all.indexOf(p) === i).slice(0, 2)
+    return [
+      english ? 'Here are tighter versions of two paragraphs, and a note for the planning.' : 'Aqui estão versões mais enxutas de dois parágrafos, e uma nota para o planejamento.',
+      '',
+      ...picked.flatMap((p) => [`<edit file="${chapter[1]}">`, `<find>${p.trim()}</find>`, `<replace>${polish(p.trim())}</replace>`, '</edit>', '']),
+      english ? '<create file="planning/Places/The Harbor.md">' : '<create file="planning/Places/O Porto.md">',
+      '---',
+      english ? 'summary: The harbor below the lighthouse, where Elias counts the boats each night.' : 'summary: O porto embaixo do farol, onde Elias conta os barcos todas as noites.',
+      '---',
+      english ? '## Description' : '## Descrição',
+      english ? 'A small harbor of gray stone. The boats come back before dark.' : 'Um porto pequeno de pedra cinza. Os barcos voltam antes de escurecer.',
+      '</create>'
+    ].join('\n')
+  }
+  if (chapter && firstPara && wantsEdit) {
     return [
       'Here is a tighter version of this paragraph. It keeps the facts and the voice.',
       '',
@@ -106,6 +123,22 @@ function reply(req: CompletionRequest): string {
   ].join('\n')
 }
 
+/** A short thinking summary for chat replies, so the chat can show what the AI thinks about. */
+function thinking(req: CompletionRequest): string {
+  if (req.purpose !== 'chat') return ''
+  const last = req.messages[req.messages.length - 1]?.content ?? ''
+  const edit = /edit|change|improve|rewrite|melhor|mude|reescrev/i.test(last)
+  return [
+    'Reading the request against the current chapter and the planning notes.',
+    edit
+      ? 'The opening paragraph carries the tone. Some verbs are soft, so a tighter version can keep the facts and the voice.'
+      : 'Three things stand out: the opening image, the visitor, and the pace of the reaction.',
+    edit ? 'I will propose one change and keep the rest as it is.' : 'I will name them in order of weight.'
+  ].join('\n\n')
+}
+
+const EFFORTS: ModelInfo['efforts'] = ['low', 'medium', 'high', 'xhigh', 'max']
+
 export function mockProvider(id: ProviderId): ProviderTransport {
   return {
     id,
@@ -113,23 +146,34 @@ export function mockProvider(id: ProviderId): ProviderTransport {
       return { provider: id, installed: true, loggedIn: true, version: 'mock', detail: 'Scripted test provider', account: 'test@example.com' }
     },
     async listModels(): Promise<ModelInfo[]> {
+      // Labels with versions, like the real claude CLI after the app reads its aliases.
       return [
-        { id: 'opus', label: 'Opus', tier: 'best' },
-        { id: 'sonnet', label: 'Sonnet', tier: 'balanced' },
-        { id: 'haiku', label: 'Haiku', tier: 'fast' }
+        { id: 'fable', label: 'Fable 5.1', tier: 'best', efforts: EFFORTS },
+        { id: 'opus', label: 'Opus 5.5', tier: 'best', efforts: EFFORTS },
+        { id: 'sonnet', label: 'Sonnet 5.5', tier: 'balanced', efforts: EFFORTS },
+        { id: 'haiku', label: 'Haiku 5.5', tier: 'fast', efforts: EFFORTS }
       ]
     },
     async complete(req: CompletionRequest, onEvent: (e: StreamEvent) => void, signal: AbortSignal): Promise<CompletionResult> {
       const text = reply(req)
+      // Screenshot scenarios can slow the reply down (milliseconds for each piece).
+      const delay = Number(process.env['WORDELIA_MOCK_DELAY'] ?? '') || 12
       onEvent({ type: 'start', model: req.route.model })
+      const cancelled = (sent: string): CompletionResult => ({ ok: false, text: sent, error: 'Cancelled.', errorKind: 'cancelled' })
+      const thought = thinking(req)
+      for (const word of thought.split(/(?<=\s)/)) {
+        if (signal.aborted) return cancelled('')
+        onEvent({ type: 'thinking', delta: word })
+        await sleep(Math.max(4, delay / 3))
+      }
       let sent = ''
       const step = Math.max(4, Math.ceil(text.length / 60))
       for (let i = 0; i < text.length; i += step) {
-        if (signal.aborted) return { ok: false, text: sent, error: 'Cancelled.', errorKind: 'cancelled' }
+        if (signal.aborted) return cancelled(sent)
         const delta = text.slice(i, i + step)
         sent += delta
         onEvent({ type: 'text', delta })
-        await sleep(12)
+        await sleep(delay)
       }
       return { ok: true, text, model: req.route.model, usage: { inputTokens: 1200, outputTokens: 180 } }
     }

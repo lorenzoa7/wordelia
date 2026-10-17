@@ -7,6 +7,16 @@ import { getT } from './i18n'
 
 let counter = 0
 
+// The main process learns the real models of the claude aliases in the background ("opus" → "Opus 5.5").
+// Then it asks for a new model list, so the model pickers show the versions.
+if (typeof window !== 'undefined' && window.wordelia) {
+  on('ai:modelsChanged', ({ provider }) => {
+    void invoke('ai:models', provider).then((models) => {
+      if (models.length) useApp.setState((s) => ({ models: { ...s.models, [provider]: models } }))
+    })
+  })
+}
+
 export interface RunHandle {
   id: string
   done: Promise<CompletionResult>

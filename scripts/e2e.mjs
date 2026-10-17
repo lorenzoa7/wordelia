@@ -29,7 +29,8 @@ const scenarios = [
   ['reopen'],
   ['pagebreak', '--en'],
   ['selmenu', '--en'],
-  ['zoom', '--en']
+  ['zoom', '--en'],
+  ['longtitle', '--en']
 ]
 
 function run(args) {

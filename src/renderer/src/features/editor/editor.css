@@ -127,7 +127,12 @@
   font-family: var(--book-font);
   font-size: calc(var(--book-size) * 1.15 * var(--page-zoom));
   font-style: italic;
+  line-height: 1.3;
   text-align: center;
+  /* A long title wraps and the box grows with it. */
+  field-sizing: content;
+  resize: none;
+  overflow: hidden;
   user-select: text;
   transition: background-color var(--dur-fast) var(--ease-out);
 }

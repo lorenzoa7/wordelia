@@ -433,20 +433,37 @@ function ChapterHead({ index, title, id }: { index: number; title: string; id: s
   const t = useT()
   const [value, setValue] = useState(title)
   useEffect(() => setValue(title), [title, id])
+  const headRef = useRef<HTMLElement>(null)
   const commit = (): void => {
     if (value.trim() && value !== title) void useBook.getState().renameChapter(id, value)
     else setValue(title)
   }
+  // A long title takes two lines: the text of the first page then starts lower.
+  useEffect(() => {
+    const el = headRef.current
+    if (!el) return
+    let last = el.offsetHeight
+    const ro = new ResizeObserver(() => {
+      if (el.offsetHeight === last) return
+      last = el.offsetHeight
+      const e = getChapterEditor(id)
+      if (e) repaginate(e.editor.view)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [id])
   return (
-    <header className="chapter-head">
+    <header ref={headRef} className="chapter-head">
       <div className="chapter-label caps">{chapterWord(language, index + 1)}</div>
       <div className="chapter-number">{index + 1}</div>
-      <input
+      <textarea
         className="chapter-title"
+        rows={1}
         value={value}
         aria-label={t.editor.page.chapterTitle}
         spellCheck={false}
-        onChange={(e) => setValue(e.target.value)}
+        // A title is one line of text, even when it wraps.
+        onChange={(e) => setValue(e.target.value.replace(/\s*\n\s*/g, ' '))}
         onBlur={commit}
         onFocus={() => useBook.getState().setActiveChapter(id)}
         onKeyDown={(e) => {
@@ -457,7 +474,7 @@ function ChapterHead({ index, title, id }: { index: number; title: string; id: s
           }
           if (e.key === 'Escape') {
             setValue(title)
-            ;(e.target as HTMLInputElement).blur()
+            ;(e.target as HTMLTextAreaElement).blur()
           }
         }}
       />

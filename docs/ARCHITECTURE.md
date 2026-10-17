@@ -306,6 +306,16 @@ The Write view shows the manuscript as pages, like a word processor (`src/render
 - **Registry** (`registry.ts`). The mounted editors, by chapter. The toolbar, the selection menu, the review bar, the find bar and the actions use the active editor (`useActiveEditor`). `applyToChapter` changes a chapter in its editor when it is mounted, else in the store. `revealProposal` opens a chat proposal in the text as an inline diff (Accept applies it and tells the chat).
 - **Find** searches the active chapter, scrolls to each match, and goes on into the next chapter that has a match.
 
+## 7b. Shell and controls
+
+- **Title bar.** The wordmark is at the far left, then the book menu. The view tabs stay in the middle. On the right: the update badge, the AI warning, the chat button and the settings button.
+- **AI warning** (`app/ProviderBadge.tsx`). It shows only when the chat has no AI: no chat route, or the chat provider is not installed or not logged in (an expired login has its own text). A problem must stay for 1.5 s before the warning shows, so the start-up checks do not make it flash. A click opens Settings → AI.
+- **Sidebar toggle** (`features/book/SidebarToggle.tsx`). The sidebar header has the hide button. A hidden sidebar leaves a small button at the top-left corner of the page area (`.sidebar-show` in `BookView`), over the Write and the Plan views. The shortcut and the window edge also work. When the sidebar is hidden, `.book-main` has the class `is-sidebar-closed`: the editor toolbar and the Plan pages get more space at the left. A view that puts controls at the top-left corner must keep 56 px clear in this state.
+- **Fields** (`ui/index.tsx`). `Field` does not wrap its control in the label. The label covers its text only. A click on the label focuses a text box or flips a switch; it never opens a dropdown. A click beside a control does nothing. The controls get their `id` and `aria-labelledby` from the field (`FieldContext`).
+- **Number boxes** (`NumberInput`). Typing stays in the box. Enter or a blur saves the value, clamped to its minimum and maximum. The arrow keys step it (Shift: ten steps). The box accepts a comma or a point for decimals and shows the number in the interface language. The daily goal and the page margins use it.
+- **Page margins** (Settings → This book). Top, Bottom, Left and Right, in centimeters with one decimal. The book keeps millimeters in `export.margins`: Left is `inner` and Right is `outer`. A margin always leaves 40 mm of the page for the text.
+- **Icons beside text.** An icon moves up by `--icon-lift` (`styles/tokens.css`), so that its middle meets the middle of the capitals of the text (or of the x-height, for text in small letters only). The text rounds to whole pixels, so the token has one value for each display scale (100 %, 125 %, 150 % and more). The open book icon draws low in its box and uses `--icon-lift-book`. The `icons` scenario reads the screen pixels of 45 icon and text pairs and fails when an icon is more than 0.75 px from the middle (1.4 px on a 100 % screen).
+
 ## 8. Saving
 
 - Each chapter editor keeps up to 350 ms of typing in memory, then writes Markdown to the book store. An editor that unmounts (its chapter scrolled far away) writes first.

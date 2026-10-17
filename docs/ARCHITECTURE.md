@@ -174,9 +174,26 @@ The model lists come from the providers, so new models appear without an app upd
 | Anthropic API | `models.list`. | `capabilities.effort` of each model (Haiku 4.5 has none). |
 | OpenAI API | `models.list`. | Low, medium and high for reasoning models. |
 
-`src/main/ai/claude-models.ts` reads the help text again when the `claude` program changes (path, size, time). It also keeps the model that answered for each alias (`claude-models.json` in the app data folder), so the settings can show "Opus — Claude Opus 5.5".
+`src/main/ai/claude-models.ts` reads the help text again when the `claude` program changes (path, size, time). Model lists show the version of each model ("Opus 5.5", `modelLabel` in `src/shared/ai/effort.ts`):
+
+- **Claude Code:** an alias has no version. So, once for each version of the CLI and in the background, the app starts `claude -p --output-format stream-json` for each alias, reads the first event (`system`/`init` names the real model) and stops the CLI at once. The API address of that run is a closed local port, so no request can reach the API and no tokens are used. The result goes to `claude-models.json` in the app data folder, together with the model that answered each real request. When the labels change, the main process sends `ai:modelsChanged` and the renderer reads the model list again.
+- **Anthropic API:** the display name without "Claude ".
+- **Codex and OpenAI API:** their names have the version already.
 
 Each task route (`ModelChoice`) has an explicit effort. Settings version 2 gave old Claude Code routes the suggested effort of their task (`TASK_EFFORT` in `src/shared/ai/effort.ts`: chat medium, actions medium, sync high, background low; settings version 3 moved Claude Code chat routes from high to medium). An action can override the effort of its route (`AiAction.effort`). When the model does not support an effort, the app uses the nearest lower level (`nearestEffort`).
+
+#### Thinking
+
+A transport sends `{ type: 'thinking', delta }` events when the provider streams a summary of what the model thinks:
+
+| Provider | Source |
+|---|---|
+| Claude Code | `stream_event` → `content_block_delta` with `thinking_delta`; else the `thinking` blocks of the `assistant` message |
+| Codex | `item/reasoning/summaryTextDelta` (and `item/reasoning/textDelta` when a model gives no summary); `exec --json`: completed `reasoning` items |
+| Anthropic API | Thinking deltas. The app asks for `display: "summarized"` on the models that always think (generation 5), so it costs nothing more |
+| OpenAI API | `response.reasoning_summary_text.delta`, with `reasoning.summary: "auto"`. When the organization cannot get summaries, the app asks again without them |
+
+The chat shows the thinking in one line while the reply streams, and keeps it in memory for the session. It never goes into the message or back to the AI.
 
 #### Provider status
 
@@ -213,6 +230,24 @@ The AI writes changes as tags in its reply:
 ```
 
 The renderer parses the tags while the reply streams. It shows each tag as a diff card. A hunk applies to the live editor when the chapter is open (one undo step). Else it applies to the file text. The match is exact first, then with whitespace and quote normalization.
+
+- "Show in text" on a change calls `revealProposal` (`src/renderer/src/features/editor/registry.ts`): the editor shows the change at its place in the chapter. When the user accepts or rejects it there, the card gets the same state.
+- A reply with two or more open proposals has a bar for all of them ("Apply all 3", "Reject all").
+- An accepted `<create>` that replaces an entry keeps the old entry file in the message (`ChatMessage.replaced`).
+
+#### Rewind, Edit and Retry
+
+`src/renderer/src/features/chat/rewind.ts`. A rewind removes the messages after a message of the user. Edit removes the message and the messages after it, and sends the new text. Retry removes the last reply and asks again. When removed replies had accepted proposals, the app asks first and can undo them:
+
+1. It saves a version of each changed chapter ("Before restore").
+2. It undoes each change from the newest to the oldest (`revertChanges` in `src/shared/proposals/revert.ts`): the old text goes back only where the text of the AI is still there, once and unchanged. Other words of the user stay.
+3. A new entry from the AI goes to the trash of the book. A replaced entry gets its old file back. In both cases only when the entry still has the text of the AI.
+
+The digest of the thread starts again when it covered removed messages.
+
+#### Thread states
+
+The thread list shows a state for each thread (`src/renderer/src/features/chat/status.tsx`): proposals wait for a decision, a reply that the user did not see (`Thread.readAt`, set when the thread shows in the open chat), or a reply in progress. The chat button in the title bar has a dot when the chat is closed and a thread needs the user.
 
 ### 5.4 Actions
 
@@ -279,7 +314,8 @@ The app reads these environment variables. Users never set them.
 | Variable | Effect |
 |---|---|
 | `WORDELIA_E2E=1` | Exposes `window.__wordelia` (open a book, run an action, import a file). |
-| `WORDELIA_MOCK_AI=1` | All providers use the scripted provider in `src/main/ai/mock.ts`. |
+| `WORDELIA_MOCK_AI=1` | All providers use the scripted provider in `src/main/ai/mock.ts`. It streams a short thinking before chat replies. |
+| `WORDELIA_MOCK_DELAY` | Milliseconds between the pieces of a scripted reply (default 12). The `chat` scenario sets it in the main process to show the thinking line. |
 | `WORDELIA_USER_DATA` | App data folder (settings, library, secrets). |
 | `WORDELIA_BOOKS_DIR` | Default folder for new and imported books, instead of Documents. |
 | `WORDELIA_EXPORT_DIR` | Exports go here without a save dialog. |
@@ -293,7 +329,7 @@ These scenarios use the AI that is connected on this computer (`--real-ai`). The
 
 | Scenario | Environment | What it does |
 |---|---|---|
-| `live-import` | `IMPORT_FILE`, `LIVE_OUT` | Imports a DOCX, waits for the planning sync, accepts all proposals with the "Accept all" bar, copies the book to `LIVE_OUT/book`. |
+| `live-import` | `IMPORT_FILE`, `LIVE_OUT` | Imports a DOCX, waits for the planning sync, accepts all proposals with the "Apply all" bar of the reply, copies the book to `LIVE_OUT/book`. |
 | `live-polish` | `LIVE_BOOK`, `LIVE_OUT`, optional `LIVE_CASES` | Runs actions on paragraphs (`action:chapter:paragraph:count`) and writes `polish-report.json` with the text before and after. |
 | `live-chat` | `LIVE_BOOK`, `LIVE_OUT`, optional `LIVE_PROMPTS` | Sends chat messages in a new thread, accepts the proposals, and writes `chat-report.json`. |
 | `live-sync` | `LIVE_BOOK`, `LIVE_OUT`, optional `LIVE_CHAPTER`, `LIVE_TEXT` | Adds a paragraph to a chapter, presses Sync, accepts the proposals, and writes `sync-report.json`. |
@@ -304,7 +340,7 @@ Set `WORDELIA_CLAUDE_BIN` to run any scenario with another copy of the `claude` 
 
 ### AI text and the book typography
 
-The AI often writes straight quotes and three dots. `typesetForBook` (`src/renderer/src/lib/typeset.ts`) changes them to the quotes and the ellipsis of the book, when the book settings ask for smart quotes and smart ellipsis. It runs on action rewrites, on chat edits to chapters (the diff card shows the same text that is applied), and on "Insert into chapter". Attribute blocks such as `{font="X"}` and HTML tags keep their straight quotes.
+The AI often writes straight quotes and three dots. `typesetForBook` (`src/renderer/src/lib/typeset.ts`) changes them to the quotes and the ellipsis of the book, when the book settings ask for smart quotes and smart ellipsis. It runs on action rewrites, on chat edits to chapters (the diff card shows the same text that is applied), and on "Insert at cursor". Attribute blocks such as `{font="X"}` and HTML tags keep their straight quotes.
 
 ### Frontmatter from the AI
 

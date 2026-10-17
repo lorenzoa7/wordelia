@@ -108,8 +108,17 @@ export default async function ({ page, shot, openBook }) {
 </edit>`
     book.saveThread({ ...t, updatedAt: now, messages: [...t.messages, { id: 'm_u2', role: 'user', content: 'More?', createdAt: now }, { id: 'm_ai2', role: 'assistant', content, createdAt: now }] })
   }, ids.chapterId)
-  await page.waitForTimeout(1500)
-  const auto = await page.evaluate(() => ({ top: Math.round(document.querySelector('.desk').scrollTop), focus: !!document.querySelector('.pm-prop.is-focus') }))
+  // Poll: on a busy machine the scroll and the short highlight can come late.
+  const auto = await page.evaluate(async () => {
+    let focus = false
+    let top = 0
+    for (let i = 0; i < 50 && !(focus && top >= 200); i++) {
+      await new Promise((r) => setTimeout(r, 100))
+      focus = focus || !!document.querySelector('.pm-prop.is-focus')
+      top = Math.round(document.querySelector('.desk').scrollTop)
+    }
+    return { top, focus }
+  })
   console.log('new proposal:', JSON.stringify(auto))
   if (auto.top < 200 || !auto.focus) throw new Error('A new proposal did not show in the text by itself')
   await shot('auto-reveal')

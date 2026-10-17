@@ -40,7 +40,8 @@ export const settings: typeof en = {
     spellcheck: 'Revisión ortográfica',
     focusMode: 'Modo concentración (atenúa los demás párrafos)',
     typewriterSounds: 'Sonidos de máquina de escribir',
-    typewriterScrolling: 'Mantener la línea escrita en el centro',
+    typewriterScrolling: 'Modo máquina de escribir',
+    typewriterHint: 'Mientras escribes, la línea queda a la misma altura en la pantalla y la página sube, como en una máquina de escribir. Sin él, el cursor baja por la pantalla hasta que la página se desplaza.',
     keyboard: 'Teclado',
     actionKeysHint: 'Cambia los atajos de las acciones en “Acciones”.',
     shortcuts: {

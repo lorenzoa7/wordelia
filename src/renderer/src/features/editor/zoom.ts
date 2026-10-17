@@ -1,7 +1,11 @@
-// Page zoom from the keyboard and the mouse wheel, like a word processor:
+// Page zoom from the keyboard, the mouse wheel and the toolbar, like a word processor:
 // Ctrl+= and Ctrl++ zoom in, Ctrl+- zooms out, Ctrl+0 goes back to 100 %, Ctrl+wheel zooms.
+//
+// Everything on the desk follows the zoom in CSS (`--page-zoom`): page sizes, fonts, the chapter
+// heading and the page gaps. So a new zoom shows in one frame, a page holds the same text at every
+// zoom, and the scroll position only has to scale.
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import { useApp } from '@/stores/app'
 
 export const ZOOM_STEPS = [0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.2, 1.35, 1.5, 1.75, 2]
@@ -21,35 +25,48 @@ export function zoomKey(e: Pick<KeyboardEvent, 'key' | 'code' | 'ctrlKey' | 'met
   return null
 }
 
-/**
- * Zoom shortcuts for the desk. The text at the reading line (or under the mouse) stays in place.
- * Returns the zoom to show in a short badge after a change, or null.
- */
+/** The desk of the Write view, while it is on screen */
+let desk: HTMLElement | null = null
+/** The point to keep in place (desk coordinates), the scroll position and the zoom before the change */
+let anchor: { x: number; y: number; top: number; left: number; from: number } | null = null
+
+function currentZoom(): number {
+  return useApp.getState().settings?.ui.zoom ?? 1
+}
+
+/** Set the page zoom. The text at `point` (client coordinates), or at the reading line, stays in place. */
+export function setPageZoom(to: number, point?: { x: number; y: number }): void {
+  const cur = currentZoom()
+  if (Math.abs(to - cur) < 0.001) return
+  if (desk) {
+    // The browser keeps an element in place when sizes change (scroll anchoring). Here the app
+    // scales the scroll position itself, so the browser must not move it too.
+    desk.style.overflowAnchor = 'none'
+    const box = desk.getBoundingClientRect()
+    anchor = {
+      y: point ? point.y - box.top : desk.clientHeight * 0.3,
+      x: point ? point.x - box.left : desk.clientWidth / 2,
+      // Read now: a smaller zoom makes the desk shorter, and the browser then pulls the scroll up.
+      top: desk.scrollTop,
+      left: desk.scrollLeft,
+      from: cur
+    }
+  }
+  useApp.getState().setUi({ zoom: to })
+}
+
+/** Zoom shortcuts for the desk. Returns the zoom to show in a short badge after a change, or null. */
 export function usePageZoom(deskRef: React.RefObject<HTMLDivElement | null>): number | null {
   const zoom = useApp((s) => s.settings?.ui.zoom ?? 1)
   const [badge, setBadge] = useState<number | null>(null)
-  /** The point to keep in place, in desk coordinates, and the zoom before the change */
-  const anchor = useRef<{ y: number; x: number; from: number } | null>(null)
 
   useEffect(() => {
-    const set = (to: number, point?: { x: number; y: number }): void => {
-      const desk = deskRef.current
-      const cur = useApp.getState().settings?.ui.zoom ?? 1
-      if (!desk || Math.abs(to - cur) < 0.001) return
-      const box = desk.getBoundingClientRect()
-      anchor.current = {
-        y: point ? point.y - box.top : desk.clientHeight * 0.3,
-        x: point ? point.x - box.left : desk.clientWidth / 2,
-        from: cur
-      }
-      useApp.getState().setUi({ zoom: to })
-    }
+    desk = deskRef.current
     const onKey = (e: KeyboardEvent): void => {
       const k = zoomKey(e)
       if (!k) return
       e.preventDefault()
-      const cur = useApp.getState().settings?.ui.zoom ?? 1
-      set(k === 'reset' ? 1 : nextZoom(cur, k === 'in' ? 1 : -1))
+      setPageZoom(k === 'reset' ? 1 : nextZoom(currentZoom(), k === 'in' ? 1 : -1))
     }
     let wheel = 0
     const onWheel = (e: WheelEvent): void => {
@@ -60,29 +77,41 @@ export function usePageZoom(deskRef: React.RefObject<HTMLDivElement | null>): nu
       if (Math.abs(wheel) < 60) return
       const dir = wheel < 0 ? 1 : -1
       wheel = 0
-      set(nextZoom(useApp.getState().settings?.ui.zoom ?? 1, dir), { x: e.clientX, y: e.clientY })
+      setPageZoom(nextZoom(currentZoom(), dir), { x: e.clientX, y: e.clientY })
     }
-    const desk = deskRef.current
+    const el = deskRef.current
     window.addEventListener('keydown', onKey)
-    desk?.addEventListener('wheel', onWheel, { passive: false })
+    el?.addEventListener('wheel', onWheel, { passive: false })
     return () => {
+      if (desk === el) desk = null
       window.removeEventListener('keydown', onKey)
-      desk?.removeEventListener('wheel', onWheel)
+      el?.removeEventListener('wheel', onWheel)
     }
   }, [deskRef])
 
-  // After the pages get their new size, scroll so the anchor point shows the same text.
+  // The new sizes are on the page now: scale the scroll position around the anchor point. The top
+  // padding of the desk does not follow the zoom.
   useLayoutEffect(() => {
-    const a = anchor.current
-    const desk = deskRef.current
-    if (!a || !desk) return
-    anchor.current = null
+    const a = anchor
+    const el = deskRef.current
+    if (!a || !el) return
+    anchor = null
     const ratio = zoom / a.from
-    desk.scrollTop = (desk.scrollTop + a.y) * ratio - a.y
-    desk.scrollLeft = Math.max(0, (desk.scrollLeft + a.x) * ratio - a.x)
+    const inner = el.firstElementChild as HTMLElement | null
+    const pad = inner ? parseFloat(getComputedStyle(inner).paddingTop) || 0 : 0
+    el.scrollTop = (a.top + a.y - pad) * ratio + pad - a.y
+    el.scrollLeft = Math.max(0, (a.left + a.x) * ratio - a.x)
+    // Scroll anchoring again from the next frame: when a chapter far away gets its editor and its
+    // real height, the browser keeps the text on screen in place.
+    const restore = requestAnimationFrame(() => {
+      if (!anchor) el.style.overflowAnchor = ''
+    })
     setBadge(zoom)
     const timer = setTimeout(() => setBadge(null), 1100)
-    return () => clearTimeout(timer)
+    return () => {
+      clearTimeout(timer)
+      cancelAnimationFrame(restore)
+    }
   }, [zoom, deskRef])
 
   return badge

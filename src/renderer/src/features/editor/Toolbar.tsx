@@ -13,8 +13,7 @@ import {
   TextB,
   TextIndent,
   TextItalic,
-  TextUnderline,
-  AlignCenterVerticalSimple
+  TextUnderline
 } from '@phosphor-icons/react'
 import { BOOK_FONTS, FONT_SIZES, fontStack } from '@/lib/fonts'
 import { IconButton, Menu, MenuItem, MenuLabel, MenuSeparator } from '@/ui'
@@ -22,6 +21,7 @@ import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
 import { useUi } from '@/stores/ui'
 import { useT } from '@/lib/i18n'
+import { ZOOM_STEPS, setPageZoom } from './zoom'
 
 const ALIGN_ICONS = {
   left: <TextAlignLeft size={17} />,
@@ -38,6 +38,7 @@ export function Toolbar({ editor }: { editor: Editor }): React.JSX.Element {
   const openSettings = useUi((s) => s.openSettings)
   const t = useT()
   const tb = t.editor.toolbar
+  const zoom = ui?.zoom ?? 1
 
   const st = useEditorState({
     editor,
@@ -163,13 +164,27 @@ export function Toolbar({ editor }: { editor: Editor }): React.JSX.Element {
         <IconButton label={tb.focusMode} active={ui?.focusMode} onClick={() => setUi({ focusMode: !ui?.focusMode })}>
           <CrosshairSimple size={17} />
         </IconButton>
-        <IconButton
-          label={tb.typewriterScrolling}
-          active={ui?.typewriterScroll}
-          onClick={() => setUi({ typewriterScroll: !ui?.typewriterScroll })}
+        <span className="toolbar-sep" />
+        <Menu
+          align="end"
+          trigger={
+            <button className="toolbar-select toolbar-zoom" aria-label={tb.zoom}>
+              <span>{Math.round(zoom * 100)}%</span>
+              <CaretDown size={10} />
+            </button>
+          }
         >
-          <AlignCenterVerticalSimple size={17} />
-        </IconButton>
+          <MenuLabel>{tb.zoom}</MenuLabel>
+          {ZOOM_STEPS.map((z) => (
+            <MenuItem key={z} checked={Math.abs(z - zoom) < 0.001} onSelect={() => setPageZoom(z)}>
+              {Math.round(z * 100)}%
+            </MenuItem>
+          ))}
+          <MenuSeparator />
+          <MenuItem onSelect={() => setPageZoom(1)} shortcut="Ctrl+0">
+            {tb.zoomReset}
+          </MenuItem>
+        </Menu>
       </div>
     </div>
   )

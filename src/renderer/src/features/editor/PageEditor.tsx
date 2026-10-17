@@ -51,11 +51,12 @@ function pageGeometry(m: BookManifest, zoom: number): Geometry {
     marginTop,
     marginBottom,
     contentHeight: height - marginTop - marginBottom,
-    gap: SHEET_GAP * zoom
+    gap: SHEET_GAP * zoom,
+    zoom
   }
 }
 
-/** Measured heights of the chapter sheets, so a sheet that is not on screen keeps its size. */
+/** Measured heights of the chapter sheets at zoom 1, so a sheet that is not on screen keeps its size at any zoom. */
 const sheetHeights = new Map<string, number>()
 
 /**
@@ -159,7 +160,9 @@ export function PageEditor(): React.JSX.Element | null {
   } as React.CSSProperties
 
   return (
-    <div className={clsx('write-frame', ui?.focusMode && 'focus-mode', typing && 'is-typing', typo.indentFirstParagraph && 'indent-first')}>
+    <div
+      className={clsx('write-frame', ui?.focusMode && 'focus-mode', typing && 'is-typing', ui?.typewriterScroll && 'typewriter', typo.indentFirstParagraph && 'indent-first')}
+    >
       {active && <Toolbar editor={active.editor} />}
       {active && <FindBar editor={active.editor} />}
       <div ref={deskRef} className="desk">
@@ -195,6 +198,8 @@ function ChapterSheet({ chapterId, index, geometry, deskRef, onTyping }: SheetPr
   const isActive = useBook((s) => s.activeChapterId === chapterId)
   const ref = useRef<HTMLElement>(null)
   const [near, setNear] = useState(isActive)
+  const zoomRef = useRef(geometry.zoom)
+  zoomRef.current = geometry.zoom
 
   useEffect(() => {
     const el = ref.current
@@ -210,7 +215,7 @@ function ChapterSheet({ chapterId, index, geometry, deskRef, onTyping }: SheetPr
     const el = ref.current
     if (!el) return
     const ro = new ResizeObserver(() => {
-      if (el.querySelector('.manuscript')) sheetHeights.set(chapterId, el.offsetHeight)
+      if (el.querySelector('.manuscript')) sheetHeights.set(chapterId, el.offsetHeight / zoomRef.current)
     })
     ro.observe(el)
     return () => ro.disconnect()
@@ -221,10 +226,12 @@ function ChapterSheet({ chapterId, index, geometry, deskRef, onTyping }: SheetPr
   // An estimate from the word count, until the chapter is measured once.
   const estimate = (): number => {
     const known = sheetHeights.get(chapterId)
-    if (known) return known
+    if (known) return known * geometry.zoom
+    // Lines and pages at zoom 1: the number of pages does not change with the zoom.
+    const z = geometry.zoom
     const words = countMarkdownWords(chapter.body)
-    const lines = (words * 6.2 * 0.5 * parseFloat(getComputedStyle(document.documentElement).fontSize || '16')) / Math.max(200, geometry.width - geometry.marginLeft - geometry.marginRight)
-    const linesPerPage = geometry.contentHeight / 26
+    const lines = (words * 6.2 * 0.5 * parseFloat(getComputedStyle(document.documentElement).fontSize || '16')) / Math.max(200, (geometry.width - geometry.marginLeft - geometry.marginRight) / z)
+    const linesPerPage = geometry.contentHeight / z / 26
     const pages = Math.max(1, Math.ceil((lines + 6) / linesPerPage))
     return pages * (geometry.contentHeight + geometry.marginTop + geometry.marginBottom) + (pages - 1) * geometry.gap
   }
@@ -392,20 +399,34 @@ function SheetEditor({ chapterId, geometry, onTyping, sheetRef }: EditorProps): 
     if (editor) repaginate(editor.view)
   }, [editor, geometry])
 
-  // Typewriter scrolling: keep the line of the cursor near the middle of the screen.
+  // Typewriter mode: the line of the cursor stays at the same height on the screen, and the page
+  // moves up. The desk eases towards that height frame by frame; a new key press does not restart
+  // the movement (a smooth scrollBy for each key never got anywhere while the author typed).
   useEffect(() => {
     if (!editor || !typewriterScroll) return
-    const onSel = (): void => {
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+    let frame = 0
+    const step = (): void => {
+      frame = 0
       const box = editor.view.dom.closest('.desk') as HTMLElement | null
-      if (!box || !editor.isFocused) return
+      if (!box || editor.isDestroyed || !editor.isFocused) return
       const coords = editor.view.coordsAtPos(editor.state.selection.head)
       const rect = box.getBoundingClientRect()
       const delta = coords.top - (rect.top + rect.height * 0.42)
-      if (Math.abs(delta) > 24) box.scrollBy({ top: delta, behavior: 'smooth' })
+      if (Math.abs(delta) < 1) return
+      const before = box.scrollTop
+      box.scrollTop = before + (reduced ? delta : delta * 0.25)
+      // The start or the end of the desk: it cannot move further.
+      if (box.scrollTop === before) return
+      frame = requestAnimationFrame(step)
+    }
+    const onSel = (): void => {
+      if (!frame) frame = requestAnimationFrame(step)
     }
     editor.on('selectionUpdate', onSel)
     return () => {
       editor.off('selectionUpdate', onSel)
+      if (frame) cancelAnimationFrame(frame)
     }
   }, [editor, typewriterScroll])
 

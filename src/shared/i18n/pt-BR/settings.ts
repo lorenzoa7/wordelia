@@ -40,7 +40,8 @@ export const settings: typeof en = {
     spellcheck: 'Verificação ortográfica',
     focusMode: 'Modo foco (atenua os outros parágrafos)',
     typewriterSounds: 'Sons de máquina de escrever',
-    typewriterScrolling: 'Manter a linha digitada no meio da tela',
+    typewriterScrolling: 'Modo máquina de escrever',
+    typewriterHint: 'Enquanto você digita, a linha fica sempre na mesma altura da tela e a página sobe, como numa máquina de escrever. Sem ele, o cursor desce pela tela até a página rolar.',
     keyboard: 'Teclado',
     actionKeysHint: 'Mude os atalhos das ações em “Ações”.',
     shortcuts: {

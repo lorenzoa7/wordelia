@@ -799,3 +799,39 @@
 .is-measuring .pm-page-gap {
   display: none !important;
 }
+
+/* A new page grows in from the end of the page before it, and its band fades in (pagination.ts). */
+.pm-page-gap.is-new {
+  animation: pm-gap-grow 280ms var(--ease-out) both;
+}
+.pm-page-gap.is-new .pm-page-band {
+  animation: pm-band-in 280ms var(--ease-out) both;
+}
+@keyframes pm-gap-grow {
+  from {
+    height: var(--gap-from);
+  }
+}
+@keyframes pm-band-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pm-page-gap.is-new,
+  .pm-page-gap.is-new .pm-page-band {
+    animation: none;
+  }
+}
+
+/* The zoom of the page in the toolbar: a fixed width, so the toolbar does not move */
+.toolbar-zoom {
+  min-width: 66px;
+  justify-content: space-between;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Typewriter mode: room after the last page, so the last line can also stay at the same height */
+.typewriter .page-end {
+  padding-bottom: 55vh;
+}

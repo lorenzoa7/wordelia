@@ -32,6 +32,7 @@ const scenarios = [
   ['zoom', '--en'],
   ['longtitle', '--en'],
   ['ctrlenter', '--en'],
+  ['typewriter', '--en'],
   ['graph', '--en'],
   ['graph', '--en', '--dark'],
   ['switchbook'],

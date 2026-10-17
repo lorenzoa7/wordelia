@@ -94,7 +94,7 @@ export function GeneralTab(): React.JSX.Element | null {
           }}
         />
       </Field>
-      <Field label={g.typewriterScrolling} inline>
+      <Field label={g.typewriterScrolling} hint={g.typewriterHint} inline>
         <Switch checked={settings.ui.typewriterScroll} onCheckedChange={(v) => setUi({ typewriterScroll: v })} />
       </Field>
 

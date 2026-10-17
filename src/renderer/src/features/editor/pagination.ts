@@ -21,6 +21,8 @@ export interface PageMetrics {
   marginBottom: number
   /** Space between two sheets */
   gap: number
+  /** The zoom of these numbers. Gap heights follow the zoom in CSS, so a new zoom shows at once. */
+  zoom: number
 }
 
 interface Break {
@@ -41,41 +43,49 @@ export const paginationKey = new PluginKey<PageState>('pagination')
 
 const EPS = 0.75
 
-function gapElement(b: Break, m: PageMetrics, index: number): HTMLElement {
+/** A length that follows the zoom: the pixels at zoom 1 times `--page-zoom`. */
+function zoomed(px: number, m: PageMetrics): string {
+  return `calc(${(px / m.zoom).toFixed(3)}px * var(--page-zoom))`
+}
+
+function gapElement(b: Break, m: PageMetrics, index: number, fresh: boolean): HTMLElement {
   const el = document.createElement(b.inline ? 'span' : 'div')
-  el.className = `pm-page-gap${b.inline ? ' is-inline' : ''}`
+  el.className = `pm-page-gap${b.inline ? ' is-inline' : ''}${fresh ? ' is-new' : ''}`
   el.setAttribute('contenteditable', 'false')
   el.setAttribute('aria-hidden', 'true')
   el.dataset.page = String(index + 1)
-  el.style.height = `${b.rest + m.marginBottom + m.gap + m.marginTop}px`
+  el.style.height = zoomed(b.rest + m.marginBottom + m.gap + m.marginTop, m)
+  // A new page grows from the end of the page before it (editor.css).
+  el.style.setProperty('--gap-from', zoomed(b.rest + m.marginBottom, m))
   const band = document.createElement('span')
   band.className = 'pm-page-band'
-  band.style.top = `${b.rest + m.marginBottom}px`
-  band.style.height = `${m.gap}px`
+  band.style.top = zoomed(b.rest + m.marginBottom, m)
+  band.style.height = zoomed(m.gap, m)
   el.appendChild(band)
   return el
 }
 
-function tailElement(height: number): HTMLElement {
+function tailElement(height: number, m: PageMetrics): HTMLElement {
   const el = document.createElement('div')
   el.className = 'pm-page-tail'
   el.setAttribute('contenteditable', 'false')
   el.setAttribute('aria-hidden', 'true')
-  el.style.height = `${height}px`
+  el.style.height = zoomed(height, m)
   return el
 }
 
-function build(state: EditorState, breaks: Break[], tail: number, m: PageMetrics): DecorationSet {
+/** `fresh`: breaks from this index on are new pages that typing made; they grow in. */
+function build(state: EditorState, breaks: Break[], tail: number, m: PageMetrics, fresh = Infinity): DecorationSet {
   const decos = breaks.map((b, i) =>
-    Decoration.widget(b.pos, () => gapElement(b, m, i), {
+    Decoration.widget(b.pos, () => gapElement(b, m, i, i >= fresh), {
       side: -1,
       ignoreSelection: true,
-      key: `gap-${b.inline ? 'i' : 'b'}-${Math.round(b.rest)}-${m.contentHeight}`
+      key: `gap-${b.inline ? 'i' : 'b'}-${Math.round(b.rest)}-${m.contentHeight}${i >= fresh ? '-new' : ''}`
     })
   )
   if (tail > 0) {
     decos.push(
-      Decoration.widget(state.doc.content.size, () => tailElement(tail), { side: 1, ignoreSelection: true, key: `tail-${Math.round(tail)}` })
+      Decoration.widget(state.doc.content.size, () => tailElement(tail, m), { side: 1, ignoreSelection: true, key: `tail-${Math.round(tail)}-${m.zoom}` })
     )
   }
   return DecorationSet.create(state.doc, decos)
@@ -143,11 +153,20 @@ function measure(view: EditorView, m: PageMetrics, firstOffset: number): { break
   // Measure the free flow of the text, with the gaps hidden. A gap inside a paragraph forces a line
   // break; if it took part in the measure, a gap in a wrong place (from a moment when the AI diff
   // showed, for example) would keep itself there. The gaps show again before the browser paints.
+  // Without the gaps the desk is shorter, and the browser would pull the scroll position up to fit:
+  // keep it and put it back.
+  const desk = root.closest('.desk') as HTMLElement | null
+  const top = desk?.scrollTop ?? 0
+  const left = desk?.scrollLeft ?? 0
   root.classList.add('is-measuring')
   try {
     return measureFlow(view, root, m, firstOffset)
   } finally {
     root.classList.remove('is-measuring')
+    if (desk && (desk.scrollTop !== top || desk.scrollLeft !== left)) {
+      desk.scrollTop = top
+      desk.scrollLeft = left
+    }
   }
 }
 
@@ -254,8 +273,11 @@ export const Pagination = Extension.create<PaginationOptions>({
         state: {
           init: () => ({ breaks: [], tail: 0, decorations: DecorationSet.empty }),
           apply(tr, prev, _old, next) {
-            const meta = tr.getMeta(paginationKey) as { breaks: Break[]; tail: number; metrics: PageMetrics } | undefined
-            if (meta) return { breaks: meta.breaks, tail: meta.tail, decorations: build(next, meta.breaks, meta.tail, meta.metrics) }
+            const meta = tr.getMeta(paginationKey) as { breaks: Break[]; tail: number; metrics: PageMetrics; animate?: boolean } | undefined
+            if (meta) {
+              const fresh = meta.animate ? prev.breaks.length : Infinity
+              return { breaks: meta.breaks, tail: meta.tail, decorations: build(next, meta.breaks, meta.tail, meta.metrics, fresh) }
+            }
             if (!tr.docChanged) return prev
             // Keep the gaps near their place while the user types; the next measure fixes them.
             const breaks = prev.breaks.map((b) => ({ ...b, pos: tr.mapping.map(b.pos, -1) }))
@@ -286,11 +308,16 @@ export const Pagination = Extension.create<PaginationOptions>({
             }
             // Never loop: a layout that does not settle stops after a few rounds.
             if (++rounds > 4) return
-            const tr = view.state.tr.setMeta(paginationKey, { ...result, metrics: m }).setMeta('addToHistory', false).setMeta('allowDuringReview', true)
+            const added = fromEdit && cur ? result.breaks.length - cur.breaks.length : 0
+            const tr = view.state.tr
+              .setMeta(paginationKey, { ...result, metrics: m, animate: added > 0 && !reducedMotion() })
+              .setMeta('addToHistory', false)
+              .setMeta('allowDuringReview', true)
             // Typing moved the cursor onto a new page: keep it on screen.
             if (fromEdit && view.hasFocus()) tr.scrollIntoView()
             view.dispatch(tr)
             height = (view.dom as HTMLElement).offsetHeight
+            if (added > 0 && view.hasFocus()) followNewPage(view, m)
           }
           const schedule = (delay: number): void => {
             clearTimeout(timer)
@@ -338,6 +365,24 @@ export const Pagination = Extension.create<PaginationOptions>({
     ]
   }
 })
+
+function reducedMotion(): boolean {
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+}
+
+/**
+ * A new page grows in (editor.css), so the cursor goes down while it grows. When the cursor would
+ * end under the visible part of the desk, glide the desk down with it.
+ */
+function followNewPage(view: EditorView, m: PageMetrics): void {
+  const desk = view.dom.closest('.desk') as HTMLElement | null
+  if (!desk) return
+  const caret = view.coordsAtPos(view.state.selection.head)
+  const grow = reducedMotion() ? 0 : m.gap + m.marginTop
+  const bottom = desk.getBoundingClientRect().bottom - 90
+  const over = caret.bottom + grow - bottom
+  if (over > 0) desk.scrollBy({ top: over, behavior: reducedMotion() ? 'auto' : 'smooth' })
+}
 
 const triggers = new WeakMap<EditorView, () => void>()
 

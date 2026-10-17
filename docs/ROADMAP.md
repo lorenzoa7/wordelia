@@ -167,6 +167,17 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] Model names with versions everywhere ("Opus 5.5"): the app reads the model of each claude alias from the first CLI event, once for each CLI version, with no request to the API
 - [x] Proposal cards: wider Accept button, "Show in text" on each change (`revealProposal`), a bar for all the proposals of a reply ("3 proposals in this reply", "Apply all 3")
 
+## Version 0.5 — feedback of the author on 0.4
+
+### Chat
+
+- [x] Thread list as a full view in the chat panel: the ← button left of the thread title opens it (with a dot when another thread needs the user). Search (accents do not matter), pinned threads first, then the most recent; each thread shows its state (red dot, green dot, spinner), its time and one line; "New thread"; an options menu on each row (title and purpose, pin, delete). Up and Down move through the list, Enter opens a thread, Esc goes back. The dropdown is gone; a click on the title opens "Title and purpose". The app still opens on the last thread (scenario `chatview`)
+- [x] Proposal card header: the icon, the title (with "…"), the counts and the buttons never overlap. When they do not fit on one line, the buttons go to a second line (checked at 320, 400 and 680 px with a long chapter title)
+- [x] The chat goes to the end at once when the user sends a message, so the whole message shows before the reply starts
+- [x] Shorter, more direct replies: the chat prompt asks for the answer first, no preamble, no closing offers, lists only for separate points, a few sentences unless the author asks for more. Proposals are not limited (`docs/ARCHITECTURE.md` §5.2, "Reply style")
+- [x] Purpose strip: its own tone between the panel and the paper, a target icon, a hairline under it, and a soft shadow when messages scroll under it. A click opens "Title and purpose"
+- [x] Inline mentions: the composer is a small TipTap editor. "@" and some letters open the list (chapters, entries, threads); the choice becomes a pill in the text, and the sentence goes on after it. Backspace removes a pill as one unit. Enter sends, Shift+Enter starts a new line, a paste is plain text. The sent message keeps "@Label" in its text and the ids in `mentions`; the message and the edit box show the pills in the text. Messages from before keep their mentions above the text
+
 ## Later (not in version 1)
 
 - Sync to a git remote from the app

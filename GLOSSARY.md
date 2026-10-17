@@ -37,12 +37,14 @@ This file is the ubiquitous language of Wordelia. Use these words in code, docs 
 | **Proposal** | A change that the AI proposes. The user must accept or reject it. | `Proposal` |
 | **Hunk** | One part of a proposal: one find-and-replace on one file. | `Hunk` |
 | **Reply** | To quote selected text into the chat composer. | `reply` |
+| **Mention** | A chapter, an entry or a thread that the user names in a chat message with "@". It shows as a pill in the text. | `Mention` |
 
 ## Views
 
 | Term | Meaning |
 |---|---|
 | **Write view** | The main view. The chapter tabs, the page and the chat. |
+| **Thread list** | The view of the chat panel with all the threads of the book. |
 | **Plan view** | The view for planning entries. |
 | **Desk** | The background of the app, around the page. |
 | **Page** | The paper surface where the user writes. |

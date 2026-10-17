@@ -73,4 +73,44 @@ export default async function ({ page, shot, openBook }) {
     throw new Error('Accept or Reject in the text did not work')
   }
   await shot('decided')
+
+  // Ctrl+Z with the focus outside the text: the accepted change goes back, and the proposal shows again.
+  await page.evaluate(() => document.activeElement?.blur())
+  await page.keyboard.press('Control+z')
+  await page.waitForTimeout(700)
+  const undone = await page.evaluate((id) => {
+    const t = window.__wordelia.book.getState().threads.find((x) => x.id === 'th_reveal')
+    const sheet = document.querySelector(`.page[data-chapter="${id}"]`)
+    return { state: t.messages[1].hunks['0:0'], shown: sheet.querySelectorAll('.pm-prop-actions').length, text: sheet.querySelector('.manuscript').innerText.includes('por dois dias') }
+  }, ids.chapterId)
+  console.log('after Ctrl+Z:', JSON.stringify(undone))
+  if (undone.state !== 'pending' || undone.shown !== 1 || !undone.text) throw new Error('Ctrl+Z did not bring the proposal back')
+  await shot('undone')
+  await page.keyboard.press('Control+y')
+  await page.waitForTimeout(700)
+  const redone = await page.evaluate(() => window.__wordelia.book.getState().threads.find((x) => x.id === 'th_reveal').messages[1].hunks['0:0'])
+  console.log('after Ctrl+Y:', redone)
+  if (redone !== 'accepted') throw new Error('Ctrl+Y did not apply the change again')
+
+  // A new reply with a proposal in the same thread: the text scrolls to it by itself.
+  await page.evaluate(() => document.querySelector('.desk').scrollTo({ top: 0 }))
+  await page.waitForTimeout(400)
+  await page.evaluate((id) => {
+    const book = window.__wordelia.book.getState()
+    const ch = book.chapters.find((c) => c.id === id)
+    const t = book.threads.find((x) => x.id === 'th_reveal')
+    const now = new Date().toISOString()
+    const content = `One more.
+
+<edit file="manuscript/${ch.file}">
+<find>um anel de prata</find>
+<replace>um anel de prata antiga</replace>
+</edit>`
+    book.saveThread({ ...t, updatedAt: now, messages: [...t.messages, { id: 'm_u2', role: 'user', content: 'More?', createdAt: now }, { id: 'm_ai2', role: 'assistant', content, createdAt: now }] })
+  }, ids.chapterId)
+  await page.waitForTimeout(1500)
+  const auto = await page.evaluate(() => ({ top: Math.round(document.querySelector('.desk').scrollTop), focus: !!document.querySelector('.pm-prop.is-focus') }))
+  console.log('new proposal:', JSON.stringify(auto))
+  if (auto.top < 200 || !auto.focus) throw new Error('A new proposal did not show in the text by itself')
+  await shot('auto-reveal')
 }

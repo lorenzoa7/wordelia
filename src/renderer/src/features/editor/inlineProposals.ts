@@ -3,7 +3,7 @@
 // suggestion in a word processor. The chat card and the text show the same proposal: a decision in
 // one place updates the other.
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey, type EditorState } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
@@ -82,16 +82,114 @@ function sameList(a: InlineProposal[], b: InlineProposal[]): boolean {
   return a.length === b.length && a.every((p, i) => p.id === b[i].id && p.find === b[i].find && p.replace === b[i].replace && p.chapterId === b[i].chapterId)
 }
 
+/* ------------------------------------------------------------------ */
+/* Accepted changes and Ctrl+Z                                          */
+/* ------------------------------------------------------------------ */
+
+/** Chapter changes that the author accepted in this session, newest last. Ctrl+Z can undo them. */
+const accepted: InlineProposal[] = []
+/** Accepted changes that Ctrl+Z took back: they are pending again. Ctrl+Y can bring them back. */
+const undone: InlineProposal[] = []
+/** Every proposal that showed in the text once: only a new one scrolls into view by itself */
+const seen = new Set<string>()
+
+function stateOf(p: InlineProposal): string | undefined {
+  const m = threadOf(p)?.messages.find((x) => x.id === p.messageId)
+  return m?.hunks?.[p.key]
+}
+
+function remember(list: InlineProposal[], p: InlineProposal): void {
+  const i = list.findIndex((x) => x.id === p.id)
+  if (i >= 0) list.splice(i, 1)
+  list.push(p)
+  if (list.length > 30) list.shift()
+}
+
+/** Count of a passage in a document, in plain text: 0, 1 or 2 (two or more). */
+function countIn(text: string, markdown: string): number {
+  const needle = markdownToPlain(markdown).trim()
+  if (!needle) return 0
+  const m = findText(text, needle)
+  return m ? Math.min(2, m.count) : 0
+}
+
+/**
+ * The text of a chapter changed. An accepted change whose old words are back (and its new words
+ * gone) was undone: it is pending again and shows in the text. An undone change whose new words are
+ * back was done again: it is accepted again.
+ */
+function checkUndo(chapterId: string, doc: EditorState['doc']): void {
+  const mine = [...accepted, ...undone].filter((p) => p.chapterId === chapterId)
+  if (!mine.length) return
+  const { text } = textWithMap(doc, 0, doc.content.size)
+  for (const p of mine) {
+    const thread = threadOf(p)
+    if (!thread) continue
+    const oldBack = countIn(text, p.find) === 1
+    const newThere = countIn(text, typesetForBook(p.replace)) >= 1
+    if (accepted.includes(p) && oldBack && !newThere) {
+      accepted.splice(accepted.indexOf(p), 1)
+      remember(undone, p)
+      setHunkStates(thread, p.messageId, { [p.key]: 'pending' })
+    } else if (undone.includes(p) && !oldBack && newThere && stateOf(p) !== 'accepted') {
+      undone.splice(undone.indexOf(p), 1)
+      remember(accepted, p)
+      setHunkStates(thread, p.messageId, { [p.key]: 'accepted' })
+    }
+  }
+}
+
+/**
+ * Ctrl+Z when the cursor is not in a text (for example right after Accept in the chat): undo the
+ * last accepted change in its chapter. Ctrl+Y or Ctrl+Shift+Z does it again.
+ */
+export function useProposalUndoKeys(): void {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.defaultPrevented || !(e.ctrlKey || e.metaKey) || e.altKey) return
+      const key = e.key.toLowerCase()
+      const isUndo = key === 'z' && !e.shiftKey
+      const isRedo = key === 'y' || (key === 'z' && e.shiftKey)
+      if (!isUndo && !isRedo) return
+      const target = e.target as HTMLElement | null
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return
+      const p = isUndo ? accepted[accepted.length - 1] : undone[undone.length - 1]
+      const ed = p && getChapterEditor(p.chapterId)
+      if (!ed) return
+      e.preventDefault()
+      ed.editor.commands.focus()
+      if (isUndo) ed.editor.commands.undo()
+      else ed.editor.commands.redo()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+}
+
 /** Keep the list of proposals in the text up to date with the open chat thread. */
 export function useInlineProposalSync(): void {
   const threads = useBook((s) => s.threads)
   const files = useBook((s) => s.chapters.map((c) => `${c.id}=${c.file}`).join('|'))
   const activeId = useChat((s) => s.activeThreadId)
+  const lastThread = useRef<string | null>(null)
   useEffect(() => {
     // The open thread; with no open thread, the thread with the newest activity.
     const thread = threads.find((t) => t.id === activeId) ?? [...threads].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]
     const list = thread ? pendingChapterProposals(thread) : []
-    if (!sameList(useInlineProposals.getState().list, list)) useInlineProposals.setState({ list })
+    const prev = useInlineProposals.getState().list
+    if (sameList(prev, list)) return
+    // Proposals that left the list because the author accepted them: Ctrl+Z can bring them back.
+    for (const p of prev) if (!list.some((x) => x.id === p.id) && stateOf(p) === 'accepted') remember(accepted, p)
+    useInlineProposals.setState({ list })
+    // A new reply with proposals in the same thread: show the last new one in the text.
+    const sameThread = thread?.id === lastThread.current
+    const fresh = list.filter((p) => !seen.has(p.id))
+    for (const p of list) seen.add(p.id)
+    lastThread.current = thread?.id ?? null
+    if (sameThread && fresh.length) {
+      const p = fresh[fresh.length - 1]
+      setTimeout(() => revealProposal(p.chapterId, p.find, p.id), 200)
+    }
   }, [threads, files, activeId])
 }
 
@@ -292,8 +390,9 @@ export const InlineProposals = Extension.create<InlineProposalsOptions>({
           let timer: ReturnType<typeof setTimeout> | undefined
           const rebuild = (): void => {
             if (view.isDestroyed) return
-            const { list, focus } = useInlineProposals.getState()
             const id = opts.chapterId()
+            checkUndo(id, view.state.doc)
+            const { list, focus } = useInlineProposals.getState()
             const mine = list.filter((p) => p.chapterId === id)
             // Nothing to show and nothing shown: no transaction.
             if (!mine.length && inlineProposalsKey.getState(view.state) === DecorationSet.empty) return

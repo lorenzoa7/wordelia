@@ -9,6 +9,7 @@ import { useApp } from '@/stores/app'
 import { useUi } from '@/stores/ui'
 import { LOCALES, actionName, useT } from '@/lib/i18n'
 import { typewriterSound } from '@/features/editor/typewriter-sound'
+import { ZOOM_STEPS } from '@/features/editor/zoom'
 
 const THEMES: Array<{ id: ThemeSetting; icon: React.ReactNode }> = [
   { id: 'light', icon: <Sun size={16} /> },
@@ -17,7 +18,6 @@ const THEMES: Array<{ id: ThemeSetting; icon: React.ReactNode }> = [
 ]
 
 /** The zoom steps of the page: the same steps as the zoom keys of the editor (Ctrl+= and Ctrl+-). */
-const ZOOM_STEPS = [0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.2, 1.35, 1.5, 1.75, 2]
 /** The highest daily goal, in words */
 const MAX_GOAL = 100000
 

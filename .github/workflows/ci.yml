@@ -54,6 +54,11 @@ jobs:
 
       - run: npx electron-vite build
 
+      # The runner screen is 1024 × 768; the scenarios need a 1440 × 900 window.
+      - name: Make the screen larger
+        shell: pwsh
+        run: Set-DisplayResolution -Width 1920 -Height 1080 -Force
+
       - name: Run the scenarios of this part
         run: node scripts/e2e.mjs --shard ${{ matrix.shard }}/3 --workers 2
 

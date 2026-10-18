@@ -50,7 +50,8 @@ const SCENARIOS = [
   { args: ['graph', '--en'], areas: ['plan'], s: 34 },
   { args: ['graph', '--en', '--dark'], areas: ['plan'], s: 33 },
   { args: ['switchbook'], areas: ['shell', 'store'], s: 12 },
-  { args: ['icons'], areas: ['shell'], s: 8 },
+  // Pixel positions of the font on screen: they depend on the machine, so not in CI.
+  { args: ['icons'], areas: ['shell'], s: 8, local: true },
   { args: ['shell'], areas: ['shell', 'settings', 'plan'], s: 15 }
 ]
 
@@ -113,7 +114,7 @@ function forChanged(files) {
   return { all: false, list: SCENARIOS.filter((sc) => named.has(sc.args[0]) || sc.areas.some((a) => areas.has(a))) }
 }
 
-let list = SCENARIOS
+let list = process.env.CI ? SCENARIOS.filter((sc) => !sc.local) : SCENARIOS
 if (names.length) {
   list = SCENARIOS.filter((sc) => names.includes(sc.args[0]))
   const unknown = names.filter((n) => !SCENARIOS.some((sc) => sc.args[0] === n))
@@ -171,8 +172,17 @@ const errorLines = (out) =>
 const started = Date.now()
 const failed = []
 const queue = [...list]
+/** Two apps that start at the same moment can fail to launch: start them some time apart. */
+let nextLaunch = 0
+async function launchSlot() {
+  const now = Date.now()
+  const wait = Math.max(0, nextLaunch - now)
+  nextLaunch = Math.max(now, nextLaunch) + 1200
+  if (wait) await new Promise((r) => setTimeout(r, wait))
+}
 async function worker() {
   for (let sc = queue.shift(); sc; sc = queue.shift()) {
+    await launchSlot()
     const t = Date.now()
     const { code, out } = await run(sc.args)
     const bad = isBad(code, out)

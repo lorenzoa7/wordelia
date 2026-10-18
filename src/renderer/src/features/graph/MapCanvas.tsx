@@ -6,11 +6,16 @@
 // icon of the category. The icons are symbols in one sprite (`<defs>`), and each node has a `<use>`:
 // React does not draw an icon component for each node. A chapter is a small closed book with a
 // ribbon. Behind the map, a dot grid moves and zooms with it.
+//
+// Hover: the map goes pale and the node and its neighbors stay. A hover does not restyle each node.
+// The pale map is three groups (edges, nodes, labels) that fade as one, and a focus layer above them
+// draws the node, its neighbors and their edges again. There are two focus layers: one fades out
+// while the next fades in. React draws the map itself once; a hover draws only the focus layer.
 
 import { createElement, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ArrowsIn, Minus, Plus } from '@phosphor-icons/react'
 import clsx from 'clsx'
-import { adjacency, type MapNode, type PlanningMap } from '@shared/planning/graph'
+import { adjacency, type MapEdge, type MapNode, type PlanningMap } from '@shared/planning/graph'
 import { IconButton } from '@/ui'
 import { categoryIcon } from '@/features/plan/PlanSidebar'
 import { MapLayout, clamp, dotGrid, edgeKey, fitView, nodeRadius, toWorld, zoomAt, type Point, type View } from './layout'
@@ -101,6 +106,39 @@ function ChapterBook({ r, n }: { r: number; n: number }): React.JSX.Element {
   )
 }
 
+/** The shapes of a node: a token, or a book for a chapter */
+function NodeBody({ n, icon }: { n: MapNode; icon: string }): React.JSX.Element {
+  const r = nodeRadius(n)
+  const s = iconSize(r)
+  return (
+    <>
+      <circle className="map-hit" r={r + 7} />
+      {n.kind === 'chapter' ? (
+        <ChapterBook r={r} n={n.order + 1} />
+      ) : (
+        <>
+          <circle className="map-shade" cy={r * 0.3} r={r * 1.4} fill="url(#map-shade)" />
+          <circle className="map-dot" r={r} />
+          <circle className="map-rim" r={r - 2.6} />
+          <use className="map-icon" href={`#${iconId(icon)}`} x={-s / 2} y={-s / 2} width={s} height={s} />
+        </>
+      )}
+    </>
+  )
+}
+
+/** The text of a label */
+const labelText = (label: string): string => (label.length > 32 ? `${label.slice(0, 30)}…` : label)
+
+/** Milliseconds after the fade before a focus layer that is off drops its copies */
+const FOCUS_CLEAR_MS = 400
+
+/** The two focus layers: the node of each layer (or null), and the layer of the hover */
+interface Focus {
+  ids: [string | null, string | null]
+  active: 0 | 1
+}
+
 export interface MapCanvasProps {
   map: PlanningMap
   /** The book root: each book keeps its own layout */
@@ -130,6 +168,8 @@ export function MapCanvas({ map, memoryKey, colorOf, labelOf, iconOf, matches, a
   const nodeEls = useRef(new Map<string, SVGGElement>())
   const edgeEls = useRef(new Map<string, SVGLineElement>())
   const tagEls = useRef(new Map<string, SVGGElement>())
+  /** The copies in the two focus layers, by node id and by edge key */
+  const copies = useRef([0, 1].map(() => ({ nodes: new Map<string, SVGGElement>(), edges: new Map<string, SVGLineElement>(), tags: new Map<string, SVGGElement>() })))
   const layoutRef = useRef<MapLayout | null>(null)
   const viewRef = useRef<View>({ x: 0, y: 0, k: 1 })
   const sizeRef = useRef({ w: 0, h: 0 })
@@ -141,6 +181,7 @@ export function MapCanvas({ map, memoryKey, colorOf, labelOf, iconOf, matches, a
   const hoverRef = useRef<string | null>(null)
   const drag = useRef<{ id: string | null; start: Point; view: View; moved: boolean; pointer: number } | null>(null)
   const [hover, setHover] = useState<string | null>(null)
+  const [focus, setFocus] = useState<Focus>({ ids: [null, null], active: 0 })
   const [grabbing, setGrabbing] = useState<'pan' | 'node' | null>(null)
 
   const nodeById = useMemo(() => new Map(map.nodes.map((n) => [n.id, n])), [map])
@@ -154,7 +195,32 @@ export function MapCanvas({ map, memoryKey, colorOf, labelOf, iconOf, matches, a
   useEffect(() => {
     if (hover && !nodeById.has(hover)) setHover(null)
   }, [hover, nodeById])
-  const near = useMemo(() => (hover ? new Set([hover, ...(adj.get(hover) ?? [])]) : null), [hover, adj])
+
+  // A new node under the pointer goes to the other focus layer: the old layer fades out, the new one in.
+  useLayoutEffect(() => {
+    if (!hover) return
+    setFocus((f) => {
+      if (f.ids[f.active] === hover) return f
+      const next = f.active === 0 ? 1 : 0
+      const ids: Focus['ids'] = [...f.ids]
+      ids[next] = hover
+      return { ids, active: next }
+    })
+  }, [hover])
+  /** The focus layer shows: it has the node under the pointer */
+  const isOn = (i: number): boolean => hover !== null && focus.active === i && focus.ids[i] === hover
+  // After its fade, a layer that is off drops its copies.
+  useEffect(() => {
+    const off = ([0, 1] as const).filter((i) => focus.ids[i] && !(hover !== null && focus.active === i && focus.ids[i] === hover))
+    if (!off.length) return
+    const timer = setTimeout(() => setFocus((f) => ({ ...f, ids: f.ids.map((id, i) => (off.includes(i as 0 | 1) ? null : id)) as Focus['ids'] })), FOCUS_CLEAR_MS)
+    return () => clearTimeout(timer)
+  }, [focus, hover])
+  /** The node of each focus layer and its neighbors */
+  const focusSets = useMemo(
+    () => focus.ids.map((id) => (id && nodeById.has(id) ? { id, near: [id, ...(adj.get(id) ?? [])].filter((x) => nodeById.has(x)) } : null)),
+    [focus.ids, nodeById, adj]
+  )
 
   /* ---------- Drawing (only refs: also safe from old closures) ---------- */
 
@@ -189,24 +255,33 @@ export function MapCanvas({ map, memoryKey, colorOf, labelOf, iconOf, matches, a
       el.setAttribute(name, value)
       done.set(el, key)
     }
+    const [c0, c1] = copies.current
     for (const n of layout.nodes) {
       const x = n.x ?? 0
       const y = n.y ?? 0
-      set(nodeEls.current.get(n.id), 'transform', `translate(${x.toFixed(1)},${y.toFixed(1)})`)
+      const at = `translate(${x.toFixed(1)},${y.toFixed(1)})`
+      set(nodeEls.current.get(n.id), 'transform', at)
+      set(c0.nodes.get(n.id), 'transform', at)
+      set(c1.nodes.get(n.id), 'transform', at)
       // The labels are in screen units, under the node: they keep their size at every zoom.
-      set(tagEls.current.get(n.id), 'transform', `translate(${(x * v.k + v.x).toFixed(1)},${((y + n.r) * v.k + v.y).toFixed(1)})`)
+      const tag = `translate(${(x * v.k + v.x).toFixed(1)},${((y + n.r) * v.k + v.y).toFixed(1)})`
+      set(tagEls.current.get(n.id), 'transform', tag)
+      set(c0.tags.get(n.id), 'transform', tag)
+      set(c1.tags.get(n.id), 'transform', tag)
     }
     for (const e of layout.edges) {
-      const el = edgeEls.current.get(e.key)
-      if (!el) continue
-      const key = `${(e.a.x ?? 0).toFixed(1)} ${(e.a.y ?? 0).toFixed(1)} ${(e.b.x ?? 0).toFixed(1)} ${(e.b.y ?? 0).toFixed(1)}`
-      if (done.get(el) === key) continue
-      done.set(el, key)
-      const [x1, y1, x2, y2] = key.split(' ')
-      el.setAttribute('x1', x1)
-      el.setAttribute('y1', y1)
-      el.setAttribute('x2', x2)
-      el.setAttribute('y2', y2)
+      let key = ''
+      for (const el of [edgeEls.current.get(e.key), c0.edges.get(e.key), c1.edges.get(e.key)]) {
+        if (!el) continue
+        key ||= `${(e.a.x ?? 0).toFixed(1)} ${(e.a.y ?? 0).toFixed(1)} ${(e.b.x ?? 0).toFixed(1)} ${(e.b.y ?? 0).toFixed(1)}`
+        if (done.get(el) === key) continue
+        done.set(el, key)
+        const [x1, y1, x2, y2] = key.split(' ')
+        el.setAttribute('x1', x1)
+        el.setAttribute('y1', y1)
+        el.setAttribute('x2', x2)
+        el.setAttribute('y2', y2)
+      }
     }
     worldRef.current?.setAttribute('transform', `translate(${v.x.toFixed(2)},${v.y.toFixed(2)}) scale(${v.k.toFixed(4)})`)
     const last = written.current
@@ -374,6 +449,10 @@ export function MapCanvas({ map, memoryKey, colorOf, labelOf, iconOf, matches, a
     placeCard()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hover])
+  // New copies in a focus layer get their places before the browser paints them.
+  useLayoutEffect(() => {
+    latest.current.paint()
+  }, [focusSets])
 
   /* ---------- Input ---------- */
 
@@ -481,18 +560,146 @@ export function MapCanvas({ map, memoryKey, colorOf, labelOf, iconOf, matches, a
 
   const hovered = hover ? nodeById.get(hover) : undefined
   const best = matches[0]
-  // One symbol for each icon on the map
-  const icons = [...new Set(map.nodes.filter((n) => n.kind === 'entry').map(iconOf))].sort()
   /** The classes of a node, and of its label */
   const states = (n: MapNode): string =>
     clsx(
       n.kind === 'chapter' ? 'is-chapter' : `slot-${((colorOf(n) % 8) + 8) % 8}`,
       major.has(n.id) && 'is-major',
-      near?.has(n.id) && 'is-near',
-      hover === n.id && 'is-hover',
       matchSet.has(n.id) && 'is-match',
       best === n.id && 'is-best'
     )
+  const edgeClass = (e: MapEdge): string =>
+    clsx('map-edge', (nodeById.get(e.source)?.kind === 'chapter' || nodeById.get(e.target)?.kind === 'chapter') && 'is-chapter', e.explicit && 'is-explicit')
+  const edgeWidth = (e: MapEdge): React.CSSProperties => ({ '--w': (1 + Math.min(Math.log2(e.weight), 3) * 0.5).toFixed(2) }) as React.CSSProperties
+
+  // The map itself. A hover does not change it, so React does not draw it again for a hover.
+  const base = useMemo(() => {
+    // One symbol for each icon on the map
+    const icons = [...new Set(map.nodes.filter((n) => n.kind === 'entry').map(iconOf))].sort()
+    const defs = (
+      <defs>
+        {/* The dot grid: the tile, its place and the opacity of the small dots change with the view (paintGrid) */}
+        <pattern id="map-grid" ref={gridRef} patternUnits="userSpaceOnUse" width={48} height={48}>
+          <circle className="map-grid-dot" cx={12} cy={12} r={1} />
+          <g>
+            <circle className="map-grid-dot" cx={36} cy={12} r={1} />
+            <circle className="map-grid-dot" cx={12} cy={36} r={1} />
+            <circle className="map-grid-dot" cx={36} cy={36} r={1} />
+          </g>
+        </pattern>
+        {/* The soft shadow under a node */}
+        <radialGradient id="map-shade">
+          <stop className="map-shade-stop" offset="0" />
+          <stop className="map-shade-stop" offset="0.6" stopOpacity={0.45} />
+          <stop className="map-shade-stop" offset="1" stopOpacity={0} />
+        </radialGradient>
+        {icons.map((name) => (
+          <symbol key={name} id={iconId(name)} viewBox="0 0 256 256" overflow="visible">
+            {createElement(categoryIcon(name), { size: 256, weight: 'bold', overflow: 'visible' })}
+          </symbol>
+        ))}
+      </defs>
+    )
+    const edges = (
+      <g className="map-edges">
+        {map.edges.map((e) => {
+          const key = edgeKey(e)
+          return (
+            <line
+              key={key}
+              ref={(el) => {
+                if (el) edgeEls.current.set(key, el)
+                else edgeEls.current.delete(key)
+              }}
+              className={edgeClass(e)}
+              style={edgeWidth(e)}
+            />
+          )
+        })}
+      </g>
+    )
+    const nodes = (
+      <g className="map-nodes">
+        {map.nodes.map((n) => (
+          <g
+            key={n.id}
+            data-node={n.id}
+            data-size={sizeGroup(nodeRadius(n))}
+            data-label={labelOf(n)}
+            ref={(el) => {
+              if (el) nodeEls.current.set(n.id, el)
+              else nodeEls.current.delete(n.id)
+            }}
+            className={clsx('map-node', states(n))}
+            onPointerEnter={() => !drag.current && setHover(n.id)}
+            onPointerLeave={() => !drag.current && setHover((h) => (h === n.id ? null : h))}
+          >
+            <NodeBody n={n} icon={iconOf(n)} />
+          </g>
+        ))}
+      </g>
+    )
+    // The labels: a layer of their own above all the nodes, in screen units (paint)
+    const tags = (
+      <g className="map-tags">
+        {map.nodes.map((n) => (
+          <g
+            key={n.id}
+            ref={(el) => {
+              if (el) tagEls.current.set(n.id, el)
+              else tagEls.current.delete(n.id)
+            }}
+            className={clsx('map-tag', states(n))}
+          >
+            <text className="map-label" y={3}>
+              {labelText(labelOf(n))}
+            </text>
+          </g>
+        ))}
+      </g>
+    )
+    return { defs, edges, nodes, tags }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, matchSet, best, major, colorOf, labelOf, iconOf, nodeById])
+
+  /** A ref callback that keeps a copy in its map, for `paint` */
+  const keep =
+    <T extends Element>(m: Map<string, T>, key: string) =>
+    (el: T | null): void => {
+      if (el) m.set(key, el)
+      else m.delete(key)
+    }
+  // The focus layers: the node under the pointer, its neighbors and its edges, drawn again above the pale map.
+  const focusWorld = focusSets.map((f, i) => (
+    <g key={i} className={clsx('map-focus', isOn(i) && 'is-on')} aria-hidden>
+      {f &&
+        map.edges
+          .filter((e) => e.source === f.id || e.target === f.id)
+          .map((e) => <line key={edgeKey(e)} ref={keep(copies.current[i].edges, edgeKey(e))} className={clsx(edgeClass(e), 'is-near')} style={edgeWidth(e)} />)}
+      {f?.near.map((id) => {
+        const n = nodeById.get(id)!
+        return (
+          <g key={id} ref={keep(copies.current[i].nodes, id)} data-size={sizeGroup(nodeRadius(n))} className={clsx('map-node', states(n), 'is-near', id === f.id && 'is-hover')}>
+            <NodeBody n={n} icon={iconOf(n)} />
+          </g>
+        )
+      })}
+    </g>
+  ))
+  const focusTags = focusSets.map((f, i) => (
+    <g key={i} className={clsx('map-focus map-focus-tags', isOn(i) && 'is-on')} aria-hidden>
+      {f?.near.map((id) => {
+        const n = nodeById.get(id)!
+        return (
+          <g key={id} ref={keep(copies.current[i].tags, id)} className={clsx('map-tag', states(n), 'is-near', id === f.id && 'is-hover')}>
+            <text className="map-label" y={3}>
+              {labelText(labelOf(n))}
+            </text>
+          </g>
+        )
+      })}
+    </g>
+  ))
 
   return (
     <div className="map-stage" ref={stageRef}>
@@ -508,101 +715,15 @@ export function MapCanvas({ map, memoryKey, colorOf, labelOf, iconOf, matches, a
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
       >
-        <defs>
-          {/* The dot grid: the tile, its place and the opacity of the small dots change with the view (paintGrid) */}
-          <pattern id="map-grid" ref={gridRef} patternUnits="userSpaceOnUse" width={48} height={48}>
-            <circle className="map-grid-dot" cx={12} cy={12} r={1} />
-            <g>
-              <circle className="map-grid-dot" cx={36} cy={12} r={1} />
-              <circle className="map-grid-dot" cx={12} cy={36} r={1} />
-              <circle className="map-grid-dot" cx={36} cy={36} r={1} />
-            </g>
-          </pattern>
-          {/* The soft shadow under a node */}
-          <radialGradient id="map-shade">
-            <stop className="map-shade-stop" offset="0" />
-            <stop className="map-shade-stop" offset="0.6" stopOpacity={0.45} />
-            <stop className="map-shade-stop" offset="1" stopOpacity={0} />
-          </radialGradient>
-          {icons.map((name) => (
-            <symbol key={name} id={iconId(name)} viewBox="0 0 256 256" overflow="visible">
-              {createElement(categoryIcon(name), { size: 256, weight: 'bold', overflow: 'visible' })}
-            </symbol>
-          ))}
-        </defs>
+        {base.defs}
         <rect className="map-grid" width="100%" height="100%" fill="url(#map-grid)" />
         <g ref={worldRef} className="map-world">
-          <g className="map-edges">
-            {map.edges.map((e) => {
-              const key = edgeKey(e)
-              const chapter = nodeById.get(e.source)?.kind === 'chapter' || nodeById.get(e.target)?.kind === 'chapter'
-              return (
-                <line
-                  key={key}
-                  ref={(el) => {
-                    if (el) edgeEls.current.set(key, el)
-                    else edgeEls.current.delete(key)
-                  }}
-                  className={clsx('map-edge', chapter && 'is-chapter', e.explicit && 'is-explicit', hover && (e.source === hover || e.target === hover) && 'is-near')}
-                  style={{ '--w': (1 + Math.min(Math.log2(e.weight), 3) * 0.5).toFixed(2) } as React.CSSProperties}
-                />
-              )
-            })}
-          </g>
-          <g className="map-nodes">
-            {map.nodes.map((n) => {
-              const r = nodeRadius(n)
-              const s = iconSize(r)
-              return (
-                <g
-                  key={n.id}
-                  data-node={n.id}
-                  data-size={sizeGroup(r)}
-                  data-label={labelOf(n)}
-                  ref={(el) => {
-                    if (el) nodeEls.current.set(n.id, el)
-                    else nodeEls.current.delete(n.id)
-                  }}
-                  className={clsx('map-node', states(n))}
-                  onPointerEnter={() => !drag.current && setHover(n.id)}
-                  onPointerLeave={() => !drag.current && setHover((h) => (h === n.id ? null : h))}
-                >
-                  <circle className="map-hit" r={r + 7} />
-                  {n.kind === 'chapter' ? (
-                    <ChapterBook r={r} n={n.order + 1} />
-                  ) : (
-                    <>
-                      <circle className="map-shade" cy={r * 0.3} r={r * 1.4} fill="url(#map-shade)" />
-                      <circle className="map-dot" r={r} />
-                      <circle className="map-rim" r={r - 2.6} />
-                      <use className="map-icon" href={`#${iconId(iconOf(n))}`} x={-s / 2} y={-s / 2} width={s} height={s} />
-                    </>
-                  )}
-                </g>
-              )
-            })}
-          </g>
+          {base.edges}
+          {base.nodes}
+          {focusWorld}
         </g>
-        {/* The labels: a layer of their own above all the nodes, in screen units (paint) */}
-        <g className="map-tags">
-          {map.nodes.map((n) => {
-            const label = labelOf(n)
-            return (
-              <g
-                key={n.id}
-                ref={(el) => {
-                  if (el) tagEls.current.set(n.id, el)
-                  else tagEls.current.delete(n.id)
-                }}
-                className={clsx('map-tag', states(n))}
-              >
-                <text className="map-label" y={3}>
-                  {label.length > 32 ? `${label.slice(0, 30)}…` : label}
-                </text>
-              </g>
-            )
-          })}
-        </g>
+        {base.tags}
+        {focusTags}
       </svg>
 
       <div className="map-zoom">

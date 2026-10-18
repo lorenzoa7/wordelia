@@ -441,20 +441,35 @@
 .map-svg[data-labels='all'] .map-label,
 .map-tag.is-major .map-label,
 .map-tag.is-match .map-label,
-.map-tag.is-hover .map-label,
-.map-svg.has-focus .map-tag.is-near .map-label {
+.map-focus .map-label {
   opacity: 1;
 }
 
-/* Hover: the node and its neighbors; the rest goes pale */
-.map-svg.has-focus .map-node:not(.is-near),
-.map-svg.has-focus .map-tag:not(.is-near) {
+/* Hover: the map goes pale and the node and its neighbors stay. The pale map is three groups that
+   fade as one; the focus layer above them has copies of the node, its neighbors and its edges
+   (MapCanvas.tsx). So a hover fades a few elements, not each node, and a frame stays fast. Two focus
+   layers: one fades out while the next fades in. Reduced motion: no fade (base.css). */
+.map-edges,
+.map-nodes,
+.map-tags,
+.map-focus {
+  transition: opacity var(--map-fade) var(--ease-out);
+}
+.map-svg.has-focus .map-nodes,
+.map-svg.has-focus .map-tags {
   opacity: 0.16;
 }
-.map-svg.has-focus .map-edge:not(.is-near) {
+.map-svg.has-focus .map-edges {
   opacity: 0.1;
 }
-.map-svg.has-focus .map-edge.is-near {
+.map-focus {
+  opacity: 0;
+  pointer-events: none;
+}
+.map-focus.is-on {
+  opacity: 1;
+}
+.map-focus .map-edge {
   stroke: var(--ink-2);
   stroke-opacity: 0.75;
 }
@@ -475,11 +490,11 @@
 }
 
 /* Search: the matches; the rest goes pale. The best match has an ink ring. */
-.map-svg.has-search .map-node:not(.is-match),
-.map-svg.has-search .map-tag:not(.is-match) {
+.map-svg.has-search .map-nodes > .map-node:not(.is-match),
+.map-svg.has-search .map-tags > .map-tag:not(.is-match) {
   opacity: 0.2;
 }
-.map-svg.has-search .map-edge {
+.map-svg.has-search .map-edges > .map-edge {
   opacity: 0.25;
 }
 .map-node.is-match .map-hit {

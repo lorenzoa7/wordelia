@@ -60,7 +60,14 @@ function reply(req: CompletionRequest): string {
       '## Appearance',
       '- Hands of someone who never worked at sea.',
       '- A silver ring with a lighthouse engraved on it.',
-      '</create>'
+      '</create>',
+      '',
+      'Elias reacts to the visitor in the new chapter.',
+      '',
+      '<edit file="planning/Characters/Elias.md">',
+      '<find>Speaks little; watches a lot.</find>',
+      '<replace>Speaks little; watches a lot. He does not trust the man from the blue boat.</replace>',
+      '</edit>'
     ].join('\n')
   }
   if (req.purpose === 'sync') {
@@ -74,7 +81,14 @@ function reply(req: CompletionRequest): string {
       '---',
       '## Papel',
       'Um mistério que chega com a tempestade.',
-      '</create>'
+      '</create>',
+      '',
+      'Elias reage ao visitante no capítulo novo.',
+      '',
+      '<edit file="planning/Characters/Elias.md">',
+      '<find>Fala pouco; observa muito.</find>',
+      '<replace>Fala pouco; observa muito. Desconfia do homem do bote azul.</replace>',
+      '</edit>'
     ].join('\n')
   }
   // Chat: propose an edit to the first paragraph of the current chapter.

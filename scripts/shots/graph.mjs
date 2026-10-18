@@ -145,9 +145,39 @@ async function perf({ page, shot, book, work }) {
   )
   frames.sort((a, b) => a - b)
   const avg = frames.reduce((s, x) => s + x, 0) / frames.length
-  console.log(`perf: ${await page.locator('.map-node').count()} nodes, ${await page.locator('.map-edge').count()} edges; open ${open} ms; frames ${frames.length}, average ${avg.toFixed(1)} ms, p95 ${frames[Math.floor(frames.length * 0.95)].toFixed(1)} ms, max ${frames[frames.length - 1].toFixed(1)} ms`)
+  console.log(`perf: ${await page.locator('.map-nodes > .map-node').count()} nodes, ${await page.locator('.map-edges > .map-edge').count()} edges; open ${open} ms; frames ${frames.length}, average ${avg.toFixed(1)} ms, p95 ${frames[Math.floor(frames.length * 0.95)].toFixed(1)} ms, max ${frames[frames.length - 1].toFixed(1)} ms`)
   await shot('perf')
-  await page.locator('.map-node.is-major').first().locator('.map-dot').hover()
+  // Hover at rest: the pointer goes on and off 8 nodes, one each 250 ms. Run with --motion to measure the fade.
+  await page.waitForSelector('.map-stage[data-rest]', { timeout: 20000 })
+  const dots = page.locator('.map-nodes > .map-node.is-major .map-dot')
+  const targets = []
+  for (let i = 0; i < Math.min(8, await dots.count()); i++) targets.push(await dots.nth(i).boundingBox())
+  await page.evaluate(() => {
+    const w = window
+    w.__frames = []
+    w.__recording = true
+    const step = (t) => {
+      w.__frames.push(t)
+      if (w.__recording) requestAnimationFrame(step)
+    }
+    requestAnimationFrame(step)
+  })
+  const sheet = await page.locator('.map-sheet').boundingBox()
+  for (const b of targets) {
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2)
+    await page.waitForTimeout(250)
+    await page.mouse.move(sheet.x + 6, sheet.y + 6)
+    await page.waitForTimeout(250)
+  }
+  const hover = await page.evaluate(() => {
+    window.__recording = false
+    const t = window.__frames
+    return t.slice(1).map((x, i) => x - t[i])
+  })
+  hover.sort((a, b) => a - b)
+  const hoverAvg = hover.reduce((s, x) => s + x, 0) / hover.length
+  console.log(`perf hover: ${targets.length} nodes on and off; frames ${hover.length}, average ${hoverAvg.toFixed(1)} ms, p95 ${hover[Math.floor(hover.length * 0.95)].toFixed(1)} ms, max ${hover[hover.length - 1].toFixed(1)} ms`)
+  await page.locator('.map-nodes > .map-node.is-major').first().locator('.map-dot').hover()
   await page.waitForTimeout(400)
   await shot('perf-hover')
 }
@@ -182,8 +212,8 @@ export default async function ({ page, shot, openBook, book, work }) {
   await settle()
   if ((await state()).category !== ':map') fail('The Map button did not open the map')
   const mapWord = (await mapButton().textContent()) ?? 'Map'
-  const sampleNodes = await page.locator('.map-node').count()
-  const sampleEdges = await page.locator('.map-edge').count()
+  const sampleNodes = await page.locator('.map-nodes > .map-node').count()
+  const sampleEdges = await page.locator('.map-edges > .map-edge').count()
   if (sampleNodes !== 3 || sampleEdges !== 2) fail(`Sample map: ${sampleNodes} nodes, ${sampleEdges} edges (want 3 and 2)`)
   if (!process.env.I18N_LANG && !(await page.locator('.map-stats').textContent())?.includes('3 entries · 2 links')) fail('Wrong map stats')
   await shot('sample')
@@ -271,26 +301,65 @@ export default async function ({ page, shot, openBook, book, work }) {
 
   await mapButton().click()
   await settle()
-  const richNodes = await page.locator('.map-node').count()
+  const richNodes = await page.locator('.map-nodes > .map-node').count()
   if (richNodes !== 34) fail(`Rich map: ${richNodes} nodes (want 34)`)
   // Entries without links sit on a ring, outside the linked nodes.
   await shot('rich')
 
-  // Hover: the node and its neighbors stay, the rest goes pale.
+  // Hover: the node and its neighbors stay, the rest goes pale. The pale map is three groups that fade;
+  // the focus layer above them has copies of the node, its neighbors and its edges.
   const hugo = page.locator('.map-node[data-label="Hugo Marsh"]').locator('.map-dot')
   await hugo.hover()
   await page.waitForTimeout(500)
   if (!(await page.locator('.map-svg.has-focus').count())) fail('Hover did not highlight')
-  const near = await page.locator('.map-node.is-near').count()
+  const near = await page.locator('.map-focus.is-on .map-node.is-near').count()
   if (near < 4) fail(`Hover: only ${near} nodes near Hugo Marsh`)
+  if ((await page.locator('.map-focus.is-on .map-node.is-hover').count()) !== 1) fail('Hover: the focus layer has no copy of the hovered node')
+  if ((await page.locator('.map-focus.is-on .map-edge').count()) !== near - 1) fail('Hover: the focus layer does not have the edges of the hovered node')
+  if (await page.locator('.map-nodes .is-near, .map-edges .is-near, .map-tags .is-near').count()) fail('Hover restyled the nodes of the map')
   if (!(await page.locator('.map-card.is-open').textContent())?.includes('Hugo Marsh')) fail('No hover card')
+  // The copies are on the nodes: the same place on the screen.
+  const copyAt = await page.locator('.map-focus.is-on .map-node.is-hover').getAttribute('transform')
+  if (copyAt !== (await page.locator('.map-node[data-label="Hugo Marsh"]').getAttribute('transform'))) fail('The copy of the hovered node is not on the node')
   await shot('hover')
+  // The fade: 180 ms, ease-out, on the groups and the focus layers only. The screenshots turn transitions
+  // off; read the style without that rule for a moment. With reduced motion, there is no fade.
+  const fade = () =>
+    page.evaluate(() => {
+      const off = [...document.querySelectorAll('style')].find((el) => el.textContent.includes('transition-duration: 0s !important'))
+      if (off) off.sheet.disabled = true
+      const read = (sel) => {
+        const cs = getComputedStyle(document.querySelector(sel))
+        return `${cs.transitionProperty} ${cs.transitionDuration} ${cs.transitionTimingFunction}`
+      }
+      const out = { nodes: read('.map-nodes'), edges: read('.map-edges'), tags: read('.map-tags'), focus: read('.map-focus') }
+      if (off) off.sheet.disabled = false
+      return out
+    })
+  const motion = await fade()
+  for (const [part, value] of Object.entries(motion)) {
+    if (value !== 'opacity 0.18s cubic-bezier(0.22, 1, 0.36, 1)') fail(`The hover fade of the ${part} is "${value}"`)
+  }
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  const noFade = (await fade()).nodes
+  if (!/opacity 0\.001s/.test(noFade)) fail(`With reduced motion, the hover fade is "${noFade}"`)
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  // From a node to its neighbor: the old focus layer fades out while the new one fades in.
+  await page.locator('.map-node[data-label="Ada Vance"]').locator('.map-dot').hover()
+  await page.waitForTimeout(150)
+  if ((await page.locator('.map-focus.is-on').count()) !== 2) fail('Hover on a neighbor: not one focus layer for the world and one for the labels')
+  if ((await page.locator('.map-focus.is-on .map-node.is-hover').getAttribute('transform')) !== (await page.locator('.map-node[data-label="Ada Vance"]').getAttribute('transform'))) fail('Hover on a neighbor: the focus is not on it')
+  // Off the map: no focus, and the copies go away after the fade.
   await page.mouse.move(5, 5)
+  await page.waitForTimeout(100)
+  if (await page.locator('.map-svg.has-focus, .map-focus.is-on').count()) fail('The focus stays after the hover')
+  await page.waitForFunction(() => !document.querySelector('.map-focus .map-node'), null, { timeout: 2000 })
+  console.log(`hover ok: ${near} nodes in the focus layer; fade ${motion.nodes}`)
 
   // Search: the matches stay, Enter opens the best match.
   await page.locator('.map-search input').fill('the')
   await page.waitForTimeout(500)
-  const matches = await page.locator('.map-node.is-match').count()
+  const matches = await page.locator('.map-nodes > .map-node.is-match').count()
   if (matches < 5) fail(`Search "the": ${matches} matches`)
   await shot('search')
   await page.locator('.map-search input').fill('marsh')
@@ -308,13 +377,13 @@ export default async function ({ page, shot, openBook, book, work }) {
   // Filters: hide Places; then show the chapters.
   await page.locator('.map-chip').nth(1).click()
   await settle()
-  const withoutPlaces = await page.locator('.map-node').count()
+  const withoutPlaces = await page.locator('.map-nodes > .map-node').count()
   if (withoutPlaces !== richNodes - 8) fail(`Without Places: ${withoutPlaces} nodes`)
   await shot('filter')
   await page.locator('.map-chip').nth(1).click()
   await page.locator('.map-chip-chapters').click()
   await settle()
-  const chapterNodes = await page.locator('.map-node.is-chapter').count()
+  const chapterNodes = await page.locator('.map-nodes > .map-node.is-chapter').count()
   if (chapterNodes !== 3) fail(`Chapters on the map: ${chapterNodes}`)
   await shot('chapters')
   await page.locator('.map-chip-chapters').click()
@@ -383,7 +452,7 @@ export default async function ({ page, shot, openBook, book, work }) {
     s.selectCategory(':map')
   })
   await page.waitForTimeout(1200)
-  if ((await page.locator('.map-node').count()) !== 3) fail('Entries without links are not on the map')
+  if ((await page.locator('.map-nodes > .map-node').count()) !== 3) fail('Entries without links are not on the map')
   if (!(await page.locator('.map-hint').count())) fail('No hint for a map without links')
   await shot('no-links')
   console.log('graph ok')

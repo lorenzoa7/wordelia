@@ -271,7 +271,7 @@ The thread list shows a state for each thread (`src/renderer/src/features/chat/s
 - **Thread view.** The header has a back button (←), the title and the options. The back button opens the thread list. It has a dot when another thread needs the user. A click on the title opens "Title and purpose". Under the header, the purpose strip shows the brief of the thread. It gets a shadow when messages scroll under it. Then the messages and the composer.
 - **Thread list.** The threads of the book that have messages, in the full height of the panel: the pinned threads first, then the most recent. Each row shows the state, the time, one line (the state, the brief or the digest) and an options menu. No row looks selected: while the list shows, the user is in no thread. The row with the keyboard focus shows a focus ring. The search ignores accents. The arrow keys move through the list, Enter opens a thread, and Esc goes back to the open thread. A thread does not count as seen while the list shows.
 
-`setActiveThread` closes the list. A quote, a mention from outside the chat, and the planning sync also close it, so the composer or the thread shows.
+`setActiveThread` closes the list. A quote, a mention from outside the chat, and Review of the planning sync also close it, so the composer or the thread shows.
 
 #### New threads
 
@@ -313,10 +313,23 @@ After each AI reply, a background job (Background route) updates the digest of t
 
 ### 5.6 Planning sync
 
+`src/renderer/src/features/plan/sync.ts` has the job. `SyncPanel.tsx` has the controls of the Plan view.
+
 1. Find the chapters whose content hash changed since the last sync.
-2. Send them with the planning index and the related entries.
+2. Send them with the planning index and the related entries, in parts of 60,000 tokens or fewer.
 3. The AI returns `<create>` and `<edit>` proposals for planning files only.
-4. The user reviews them. Accepted proposals update the files and `ai/sync-state.json`.
+4. After each part, `ai/sync-state.json` gets the hashes of the chapter texts that the AI read. A chapter that the author changes while the sync runs still waits for the next sync.
+5. The user reviews the proposals. Accepted proposals update the files.
+
+The sync is a background job. `useSyncJob` keeps its state: idle, running, done or failed.
+
+- **Start.** The Sync button in the Plan sidebar starts it. "Build the planning from the manuscript" (on the overview and on the empty map, when the planning has no entries) and the import dialog start a sync of all chapters. The chat does not open, and it keeps its thread.
+- **Progress.** The Sync button shows a spinner, "Syncing…" and one line: "Reading 3 chapters…" until the reply starts, then the count of complete changes ("2 changes so far…"). With more than one part, the line starts with "Part 1 of 2". The × button cancels. A cancel keeps the complete changes of the replies, and the chapters of the stopped part still wait.
+- **Result.** A card under the Sync button shows the result: "8 changes proposed to the notes", the names of the notes, Review, Accept all and Reject all. The toast of Reject all has Undo. The card goes away when no change waits for a decision (in the card or in the chat), or with its × button. Without changes, the card says that the notes agree with the chapters. An error shows in the card, with Try again, or with Open settings when no AI is connected.
+- **Away from the Plan view.** When the Plan sidebar is not on screen (another view, or a hidden sidebar), a toast tells the start of a sync (for example after an import) and its result. The Review action of the result toast opens the changes.
+- **Review.** The proposals stay in the "Planning sync" thread. Thus the proposal cards, Apply all and the inline diffs work on them as on other proposals. Review opens the chat on that thread. Review does not open the first changed note, because the thread shows all changes in one place, also new notes that have no page yet. Also, the sync thread becomes the open thread, so the notes show its changes inline.
+- **Up to date.** When no chapter changed, the Sync button looks off and its tooltip says "Up to date". The button has `aria-disabled`, not `disabled`, so it stays focusable and its tooltip shows. A sync of all chapters is only "Build the planning from the manuscript", for a planning without entries.
+- Another book stops the sync and clears its result.
 
 ### 5.7 Interface languages
 
@@ -373,6 +386,7 @@ The Plan overview has a switch: "Cards | Map". The map shows the planning as a g
 - **Links** (`src/shared/planning/graph.ts`, pure, with tests). Entry A links to entry B when the summary or the notes of A use the name or an alias of B, or `[[B]]` (also `[[B|text]]` and `[[B#Heading]]`). The match is on whole words and ignores case. Accents count: "Pará" does not match "para". A name with fewer than 3 letters does not count, but a `[[link]]` to it does. When names overlap, the longest name wins. The weight of a link is the number of mentions in the two directions. With the "Chapters" chip, each chapter is a node too, and it links to the entries that it mentions.
 - **Layout** (`layout.ts`). d3-force with these forces: links, repulsion, a pull to the center (stronger up and down on a wide stage), collision, and a force that keeps the box of each node and its label away from the other boxes. A label keeps its size on the screen, so at a zoom below 1 it takes more room in the world. When all labels show, the canvas sets `labelScale` (1 to 1.5) from the zoom of the fit, and the label force uses it. Entries without links are not in the simulation: they sit on ellipses around the linked entries. The app runs one tick for each animation frame. With reduced motion, the layout runs to the end at once.
 - **Drawing** (`MapCanvas.tsx`). SVG. React draws the nodes, the edges and the labels once. Each frame sets their positions directly in the DOM, and it writes an attribute only when its value changes. The labels are on a layer above the nodes, in screen units: each frame puts each label under its node, so the labels keep their size at all zoom levels. Do not use a CSS variable that changes on each frame (for example the zoom): it restyles all the elements of the map, and the frames get slow. All labels show when the map has 40 nodes or fewer (at zoom 0.45 or more), or at zoom 1.1 or more; else only the labels of the 14 nodes with the most links show. With 300 entries, a frame takes about 12 to 16 ms on average while the map settles, p95 17 to 22 ms (`MAP_PERF=1 node scripts/shot.mjs graph --en`; version 0.5 took 15 to 21 ms, p95 22 to 28 ms, on the same computer).
+- **Hover.** The node under the pointer and its neighbors stay; the rest of the map goes pale. A hover does not restyle each node. The pale map is three groups (`.map-edges`, `.map-nodes`, `.map-tags`), and their opacity fades in `--map-fade` (180 ms, ease-out). Above them, a focus layer has copies of the node, its neighbors and its edges, with the highlight. The copies do not catch the pointer, and `paint` moves them with their nodes. There are two focus layers: when the pointer goes to another node, the old layer fades out while the new layer fades in. A layer that is off drops its copies after 400 ms. React draws the map itself once (`useMemo`); a hover draws only the focus layer. With reduced motion, there is no fade (`base.css`). With 300 entries at rest, a hover frame takes 6.8 ms on average, p95 7.5 ms (`MAP_PERF=1 node scripts/shot.mjs graph --en --motion`). Version 0.6 took 27 ms, p95 60 ms and up to 195 ms, because each hover drew all nodes again and faded each node.
 - **Nodes.** An entry is a paper token: a soft shadow (one radial gradient), a disc of paper with a little of the category color (`--map-tint`), a ring in the category color with some ink (`--map-deep`), and the Phosphor icon of the category (`CategoryDef.icon`, bold). The icons are `<symbol>` elements in one sprite in `<defs>`, one for each icon on the map. Each node has one `<use>`, not an icon component. Near the map (zoom 1 or more), an inner ring shows too, like the rim of a seal. A chapter is a small closed book: a cover (`--map-book`), a spine, a red ribbon and its number. The radius grows with the number of links: 9 to 21 for an entry, 11 to 16 for a chapter (half the height of the book).
 - **Level of detail.** The SVG has `data-lod` (`near`, `mid`, `ml`, `far`, `tiny`) from the zoom, and each node has `data-size` (`s`, `m`, `l`). An icon shows only when its token has a radius of 6 px or more on the screen. The shadows show from zoom 0.5. A token without its icon gets more of its category color. The attribute changes only when the zoom goes past a limit, so a frame does not restyle the nodes.
 - **Stage.** The sheet has the paper color (`--map-ground`), a soft light in the middle (`--map-glow`), darker edges (`--map-vignette`) and the paper grain (`.grain`). The dot grid (`--map-dot`) is an SVG `<pattern>` in screen units (`dotGrid` in `layout.ts`, with tests). It moves and zooms with the map, but its dots keep a radius of 1 px. The step is 24 world units at zoom 1. It doubles or halves to stay between 14 and 28 px on the screen, and before it doubles, every second dot fades out. Thus the grid stays sharp at all zoom levels and never jumps. The pattern changes only when the view moves.
@@ -389,6 +403,14 @@ The Plan overview has a switch: "Cards | Map". The map shows the planning as a g
 - **Number boxes** (`NumberInput`). Typing stays in the box. Enter or a blur saves the value, clamped to its minimum and maximum. The arrow keys step it (Shift: ten steps). The box accepts a comma or a point for decimals and shows the number in the interface language. The daily goal and the page margins use it.
 - **Page margins** (Settings → This book). Top, Bottom, Left and Right, in centimeters with one decimal. The book keeps millimeters in `export.margins`: Left is `inner` and Right is `outer`. A margin always leaves 40 mm of the page for the text.
 - **Icons beside text.** An icon moves up by `--icon-lift` (`styles/tokens.css`), so that its middle meets the middle of the capitals of the text (or of the x-height, for text in small letters only). The text rounds to whole pixels, so the token has one value for each display scale (100 %, 125 %, 150 % and more). The open book icon draws low in its box and uses `--icon-lift-book`. The `icons` scenario reads the screen pixels of 45 icon and text pairs and fails when an icon is more than 0.75 px from the middle (1.4 px on a 100 % screen).
+
+## 7d. Plan sidebar
+
+`src/renderer/src/features/plan/PlanSidebar.tsx`.
+
+- The Sync button and the result card of the planning sync (5.6) are at the top.
+- **Category rows.** A click anywhere on a category row shows the category page and unfolds its entries. The hover buttons of the row (Import notes, New) are not part of this. On the page that shows, a click on the row folds or unfolds the entries. The caret only folds and unfolds: the page stays. On the keyboard, Enter is a click, → unfolds and ← folds. The caret is not a tab stop. Thus one click on a row always does a thing that the author sees, and the caret is the only control that does not change the page. The section titles of the overview also open the category pages.
+- **Caret.** The box of the caret has the height of the category icon (15 px) and the same lift (`--icon-lift`). Thus the two boxes round to the same pixels, and the caret, the icon and the name share one middle at every display scale. The `icons` scenario measures the caret of each row.
 
 ## 8. Saving
 
@@ -425,10 +447,10 @@ These scenarios use the AI that is connected on this computer (`--real-ai`). The
 
 | Scenario | Environment | What it does |
 |---|---|---|
-| `live-import` | `IMPORT_FILE`, `LIVE_OUT` | Imports a DOCX, waits for the planning sync, accepts all proposals with the "Apply all" bar of the reply, copies the book to `LIVE_OUT/book`. |
+| `live-import` | `IMPORT_FILE`, `LIVE_OUT` | Imports a DOCX, waits for the planning sync, opens its thread with Review, accepts all proposals with the "Apply all" bar of the reply, copies the book to `LIVE_OUT/book`. |
 | `live-polish` | `LIVE_BOOK`, `LIVE_OUT`, optional `LIVE_CASES` | Runs actions on paragraphs (`action:chapter:paragraph:count`) and writes `polish-report.json` with the text before and after. |
 | `live-chat` | `LIVE_BOOK`, `LIVE_OUT`, optional `LIVE_PROMPTS` | Sends chat messages in a new thread, accepts the proposals, and writes `chat-report.json`. |
-| `live-sync` | `LIVE_BOOK`, `LIVE_OUT`, optional `LIVE_CHAPTER`, `LIVE_TEXT` | Adds a paragraph to a chapter, presses Sync, accepts the proposals, and writes `sync-report.json`. |
+| `live-sync` | `LIVE_BOOK`, `LIVE_OUT`, optional `LIVE_CHAPTER`, `LIVE_TEXT` | Adds a paragraph to a chapter, presses Sync, opens the thread with Review, accepts the proposals, and writes `sync-report.json`. |
 | `live-settings` | — | Screenshot of Settings → AI with the real provider status. |
 | `debug` | optional `WORDELIA_DEBUG_PROVIDER`, `WORDELIA_DEBUG_MODEL`, `WORDELIA_DEBUG_BIN` | One small completion. Prints the status, the models and the result. |
 

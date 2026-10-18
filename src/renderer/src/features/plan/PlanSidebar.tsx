@@ -1,6 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import {
-  ArrowsClockwise,
   CaretRight,
   DownloadSimple,
   Folder,
@@ -14,12 +13,12 @@ import {
   type IconProps
 } from '@phosphor-icons/react'
 import clsx from 'clsx'
-import { IconButton, Tooltip } from '@/ui'
+import { IconButton } from '@/ui'
 import { askText } from '@/ui/prompt'
 import { categoryName, useT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
 import { HideSidebarButton } from '@/features/book/SidebarToggle'
-import { changedChapters, startPlanningSync } from './sync'
+import { SyncButton, SyncResultCard } from './SyncPanel'
 import { importNotes } from './importNotes'
 
 const CATEGORY_ICONS: Record<string, React.ComponentType<IconProps>> = {
@@ -47,10 +46,7 @@ export function PlanSidebar(): React.JSX.Element {
   const entries = useBook((s) => s.entries)
   const activeCategory = useBook((s) => s.activeCategory)
   const activeEntry = useBook((s) => s.activeEntryId)
-  const chapters = useBook((s) => s.chapters)
-  const syncState = useBook((s) => s.syncState)
   const [open, setOpen] = useState<Record<string, boolean>>({})
-  const pending = useMemo(() => changedChapters().length, [chapters, syncState]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const categories = manifest?.planning.categories ?? []
   const isOverview = !activeEntry && !categories.some((c) => c.folder === activeCategory)
@@ -72,27 +68,8 @@ export function PlanSidebar(): React.JSX.Element {
       </div>
 
       {/* The planning sync: the AI reads the changed chapters and proposes changes to the notes. */}
-      <Tooltip
-        side="right"
-        label={
-          <span className="sync-tip">
-            <span>{t.plan.sidebar.updateNotesHint}</span>
-            <b>{pending ? t.plan.sidebar.changedChapters(pending) : t.plan.sidebar.upToDate}</b>
-          </span>
-        }
-      >
-        <button
-          className={clsx('sync-btn', pending > 0 && 'has-pending')}
-          aria-label={t.plan.sidebar.sync}
-          onClick={() => void startPlanningSync()}
-        >
-          <ArrowsClockwise size={15} />
-          <span className="sync-text">
-            <span className="sync-label">{t.plan.sidebar.sync}</span>
-          </span>
-          {pending > 0 && <span className="sync-count">{pending}</span>}
-        </button>
-      </Tooltip>
+      <SyncButton />
+      <SyncResultCard />
 
       <nav className="plan-nav">
         <button
@@ -107,28 +84,47 @@ export function PlanSidebar(): React.JSX.Element {
         {categories.map((c) => {
           const list = entries.filter((e) => e.category === c.folder).sort((a, b) => a.name.localeCompare(b.name))
           const isOpen = open[c.folder] ?? (activeCategory === c.folder || list.some((e) => e.id === activeEntry))
+          const isPage = activeCategory === c.folder && !activeEntry
           const label = categoryName(t, c)
+          const fold = (to: boolean): void => setOpen((o) => ({ ...o, [c.folder]: to }))
+          // A click on the row shows the category page and its entries. On the page that shows, it folds or unfolds the list.
+          const onRow = (): void => {
+            if (isPage) return fold(!isOpen)
+            useBook.getState().selectCategory(c.folder)
+            fold(true)
+          }
           return (
             <div key={c.id} className="plan-group">
-              <div className={clsx('plan-item', activeCategory === c.folder && !activeEntry && 'is-active')}>
+              <div className={clsx('plan-item plan-cat', isPage && 'is-active')} onClick={onRow}>
+                {/* The caret only folds and unfolds; the page stays. */}
                 <button
                   className="plan-caret"
-                  onClick={() => setOpen((o) => ({ ...o, [c.folder]: !isOpen }))}
-                  aria-label={t.plan.sidebar.showEntries(label)}
+                  tabIndex={-1}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    fold(!isOpen)
+                  }}
+                  aria-label={isOpen ? t.plan.sidebar.hideEntries(label) : t.plan.sidebar.showEntries(label)}
                   aria-expanded={isOpen}
                 >
-                  <CaretRight size={10} className={clsx(isOpen && 'is-open')} />
+                  <CaretRight size={10} weight="bold" className={clsx(isOpen && 'is-open')} />
                 </button>
                 <button
                   className="plan-item-main"
-                  aria-current={activeCategory === c.folder && !activeEntry ? 'page' : undefined}
-                  onClick={() => useBook.getState().selectCategory(c.folder)}
+                  aria-current={isPage ? 'page' : undefined}
+                  aria-expanded={isOpen}
+                  onKeyDown={(e) => {
+                    if (e.key === 'ArrowRight' && !isOpen) fold(true)
+                    else if (e.key === 'ArrowLeft' && isOpen) fold(false)
+                    else return
+                    e.preventDefault()
+                  }}
                 >
                   <CategoryIcon name={c.icon} />
                   <span className="plan-item-label">{label}</span>
                   <span className="plan-item-count">{list.length || ''}</span>
                 </button>
-                <span className="plan-item-add">
+                <span className="plan-item-add" onClick={(e) => e.stopPropagation()}>
                   <IconButton label={t.plan.sidebar.importNotesInto(label)} onClick={() => void importNotes(c.folder)}>
                     <DownloadSimple size={13} />
                   </IconButton>

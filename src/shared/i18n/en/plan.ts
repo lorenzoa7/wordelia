@@ -22,9 +22,10 @@ export const plan = {
       'The AI reads the chapters that changed since the last update and proposes changes to your planning notes. You accept or reject each change. The AI does not change the manuscript.',
     /** Tooltip of the sync button, second line. `count` is 1 or more. */
     changedChapters: (count: number): string => `${count} chapter${count > 1 ? 's' : ''} changed since the last update.`,
-    upToDate: 'No chapter changed since the last update.',
+    upToDate: 'Up to date: no chapter changed since the last update.',
     overview: 'Overview',
     showEntries: (category: string): string => `${category}: show entries`,
+    hideEntries: (category: string): string => `${category}: hide entries`,
     importNotesInto: (category: string): string => `Import notes into ${category}`,
     newIn: (category: string): string => `New in ${category}`,
     empty: 'Empty',
@@ -108,7 +109,27 @@ export const plan = {
     connectAiFirst: 'Connect an AI first.',
     openSettings: 'Open settings',
     upToDate: 'The planning is up to date with the manuscript.',
-    done: 'Sync done. Review the proposals in the chat.',
+    /** The sync button while the sync runs */
+    syncing: 'Syncing…',
+    /** A toast when a sync starts away from the Plan sidebar (for example after an import) */
+    started: 'The notes update in the background. The Plan view shows the progress.',
+    /** Under "Syncing…": the AI reads the chapters */
+    reading: (n: number): string => (n === 1 ? 'Reading 1 chapter…' : `Reading ${n} chapters…`),
+    /** Under "Syncing…": the AI writes its reply. `found`: the complete changes so far. */
+    writing: (found: number): string => (found === 0 ? 'Writing the changes…' : found === 1 ? '1 change so far…' : `${found} changes so far…`),
+    /** Before the progress when the chapters go to the AI in more than one part */
+    part: (part: number, parts: number): string => `Part ${part} of ${parts}`,
+    cancel: 'Cancel the sync',
+    /** The result card in the Plan sidebar, and the toast */
+    proposed: (n: number): string => (n === 1 ? '1 change proposed to the notes' : `${n} changes proposed to the notes`),
+    noChanges: 'No changes. The notes agree with the chapters.',
+    review: 'Review',
+    reviewHint: 'Open the changes in the chat. There you accept or reject each change.',
+    accepted: (n: number): string => (n === 1 ? 'Applied 1 change to the notes.' : `Applied ${n} changes to the notes.`),
+    rejected: (n: number): string => (n === 1 ? 'Rejected 1 change.' : `Rejected ${n} changes.`),
+    /** The title of the card when the sync stops with an error */
+    failed: 'The sync stopped.',
+    result: 'Result of the sync',
     threadTitle: 'Planning sync',
     /** Stored in sync threads: keep this English text as it is, or old threads show it untranslated. */
     threadBrief: 'Keeps the planning in step with the manuscript. Proposals come from the Sync button.',

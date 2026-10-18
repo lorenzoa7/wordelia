@@ -1,5 +1,14 @@
 // Plan pages: a back link on every page below the overview, Alt+← goes back too.
 // I18N_LANG=pt-BR (or es) shows the pages in another interface language.
+// Then the category rows of the sidebar: the caret on the middle of the icon, a click anywhere on the row.
+import { resolve } from 'node:path'
+
+/** A screenshot of a part of the window, with the interface language in its name */
+const shotPath = (name) => {
+  const flags = `${process.argv.includes('--en') ? '-en' : ''}${process.argv.includes('--dark') ? '-dark' : ''}${process.env.I18N_LANG ? `-${process.env.I18N_LANG}` : ''}`
+  return resolve('test-results/shots', `plannav${flags}-${name}.png`)
+}
+
 export default async function ({ page, shot, openBook }) {
   if (process.env.I18N_LANG) {
     await page.evaluate((l) => window.__wordelia.app.getState().updateSettings({ language: l }), process.env.I18N_LANG)
@@ -39,5 +48,77 @@ export default async function ({ page, shot, openBook }) {
   // The Writing rules are no longer a Plan page.
   if (await page.locator('.plan-item', { hasText: /Writing rules|Regras de escrita|Reglas de escritura/ }).count()) throw new Error('Writing rules still in the Plan sidebar')
   await shot('overview')
+
+  // Category rows in the sidebar. The caret, the icon and the name share one middle.
+  const fail = (msg) => {
+    throw new Error(`Category rows: ${msg}`)
+  }
+  const offsets = await page.evaluate(() =>
+    [...document.querySelectorAll('.plan-cat')].map((row) => {
+      const mid = (el) => {
+        const b = el.getBoundingClientRect()
+        return b.top + b.height / 2
+      }
+      return mid(row.querySelector('.plan-caret svg')) - mid(row.querySelector('.plan-item-main svg'))
+    })
+  )
+  if (!offsets.length || offsets.some((d) => Math.abs(d) > 0.5)) fail(`the caret is not on the middle of the icon: ${offsets.map((d) => d.toFixed(2)).join(', ')} px`)
+  const row = (i) => page.locator('.plan-cat').nth(i)
+  const expanded = async (i) => (await row(i).locator('.plan-item-main').getAttribute('aria-expanded')) === 'true'
+  const at = async (i, fx) => {
+    const box = await row(i).boundingBox()
+    await page.mouse.click(box.x + box.width * fx, box.y + box.height / 2)
+    await page.waitForTimeout(250)
+  }
+  const caret = async (i) => {
+    await row(i).locator('.plan-caret').click()
+    await page.waitForTimeout(250)
+  }
+  if (await expanded(0)) fail('the first category is open on the overview')
+  // A click beside the name (the gap after the caret) shows the category page and its entries.
+  const caretBox = await row(0).locator('.plan-caret').boundingBox()
+  const rowBox = await row(0).boundingBox()
+  await page.mouse.click(caretBox.x + caretBox.width + 4, rowBox.y + rowBox.height / 2)
+  await page.waitForTimeout(250)
+  const first = await where()
+  if (!first.category || first.entry || !(await expanded(0))) fail(`a click beside the name did not open the category: ${JSON.stringify(first)}`)
+  // On the page that shows, a click on the row folds the list, and a click in the empty middle of the row unfolds it.
+  await row(0).locator('.plan-item-label').click()
+  await page.waitForTimeout(250)
+  if (await expanded(0)) fail('a click on the name of the open category did not fold it')
+  await at(0, 0.62)
+  if (!(await expanded(0))) fail('a click in the middle of the row did not unfold it')
+  if ((await where()).category !== first.category) fail('a click on the open category changed the page')
+  // The caret only folds and unfolds: the page stays.
+  await caret(1)
+  if (!(await expanded(1)) || (await where()).category !== first.category) fail('the caret of the second category did not only unfold it')
+  await caret(1)
+  if (await expanded(1)) fail('the caret did not fold the second category')
+  // The keyboard: Enter is a click, the arrows unfold and fold. The caret is not a tab stop.
+  if ((await row(0).locator('.plan-caret').getAttribute('tabindex')) !== '-1') fail('the caret is a tab stop')
+  await row(0).locator('.plan-item-main').focus()
+  await page.keyboard.press('ArrowLeft')
+  await page.waitForTimeout(200)
+  if (await expanded(0)) fail('ArrowLeft did not fold the category')
+  await page.keyboard.press('ArrowRight')
+  await page.waitForTimeout(200)
+  if (!(await expanded(0))) fail('ArrowRight did not unfold the category')
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(200)
+  if (await expanded(0)) fail('Enter on the open category did not fold it')
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(200)
+  // From another page, a click on a category row shows its page and unfolds it.
+  await at(2, 0.5)
+  const third = await where()
+  if (third.category === first.category || !(await expanded(2))) fail(`a click on the third category did not show its page: ${JSON.stringify(third)}`)
+  await page.mouse.move(700, 880)
+  await page.waitForTimeout(300)
+  const nav = await page.locator('.plan-sidebar').boundingBox()
+  await shot('category-rows')
+  await row(2).hover()
+  await page.waitForTimeout(300)
+  await page.screenshot({ path: shotPath('category-rows-zoom'), clip: { x: nav.x, y: nav.y, width: nav.width, height: Math.min(nav.height, 420) } })
+  console.log(`category rows ok (caret offsets ${offsets.map((d) => d.toFixed(2)).join(', ')} px)`)
   console.log('plan navigation ok')
 }

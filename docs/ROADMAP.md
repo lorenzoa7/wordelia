@@ -4,8 +4,8 @@ This file is the source of truth for progress. Update it after each task. Mark a
 
 ## Current focus
 
-> **Milestone:** Version 0.6 — the third feedback of the author (16 items) is done
-> **Next task:** Collect feedback on 0.6.0. Then fix what the author finds.
+> **Milestone:** Version 0.7 — the fourth feedback of the author (18 items) is done
+> **Next task:** Collect feedback on 0.7.0. Then fix what the author finds.
 > **Not verified:** Codex and the two API transports. The user has no Codex account, and no API keys are set. The scripted provider (`WORDELIA_MOCK_AI=1`) covers their UI flows.
 
 ## M0 — Foundation

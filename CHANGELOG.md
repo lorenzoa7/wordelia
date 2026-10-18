@@ -2,6 +2,31 @@
 
 Each version has its Windows installer in GitHub Releases. The release workflow copies the section of the version from this file to the release notes.
 
+## 0.7.0 (2026-10-18)
+
+### New
+- Chat proposals for planning notes show in the note as a diff, like in the chapters.
+- Sync runs in the background: the button shows its progress, and a card shows the result with Review, Accept all and Reject all. The chat does not change. Sync is off when no chapter changed.
+- The library card shows about how many pages the book has.
+- A zoom slider in the toolbar. A double click on it goes back to 100 %.
+- In the version history, the view goes to the first change of the version.
+
+### Changed
+- Zoom changes smoothly.
+- A new page grows in quickly and smoothly.
+- Accept and Reject in the text are larger, with words.
+- The Polish button is no longer red.
+- The loading bar of an action stays above the selection.
+- The first Backspace after a page break shows the page break as selected; the next Backspace removes it. A selected scene break shows a ring.
+- Four built-in actions instead of five: Polish, Tighten, Fix grammar only and Show, don't tell. Expand is removed when you did not change it.
+- A click anywhere on a category row in the Plan sidebar opens it and shows its notes. The arrow lines up with the icon.
+- The planning map fades softly when you point at an entry.
+
+### Fixed
+- A new page no longer flickers while you type.
+- The bar for many proposals no longer cuts its buttons.
+- Writing rules have space under the text.
+
 ## 0.6.0 (2026-10-17)
 
 ### New

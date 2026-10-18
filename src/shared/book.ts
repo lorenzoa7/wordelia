@@ -10,6 +10,8 @@ export const AI_DIR = 'ai'
 export const THREADS_DIR = 'ai/threads'
 export const WRITING_RULES_FILE = 'ai/writing-rules.md'
 export const SYNC_STATE_FILE = 'ai/sync-state.json'
+/** The actions of this book (Settings → Actions → This book). The app settings keep the actions for all books. */
+export const ACTIONS_FILE = 'ai/actions.json'
 export const ASSETS_DIR = 'planning/_assets'
 
 const ALPHABET = '0123456789abcdefghijkmnopqrstuvwxyz'

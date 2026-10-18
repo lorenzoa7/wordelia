@@ -15,6 +15,7 @@ import { useT } from '@/lib/i18n'
 import { WikiLinks } from '@/features/editor/wiki-links'
 import { wikiLinkOptions } from './links'
 import { sliceFromMarkdown } from '@/features/editor/review'
+import { InlineProposals } from '@/features/editor/inlineProposals'
 
 /** A rich-text editor for notes (planning entries, writing rules). Markdown in, Markdown out. */
 export function NoteEditor({
@@ -23,7 +24,8 @@ export function NoteEditor({
   onChange,
   placeholder,
   rev = 0,
-  quoteLabel
+  quoteLabel,
+  inlineProposals = false
 }: {
   /** Changes when another note opens */
   docKey: string
@@ -34,6 +36,8 @@ export function NoteEditor({
   rev?: number
   /** Label for quotes sent to the chat (the entry name). No label: no Reply button. */
   quoteLabel?: string
+  /** A planning entry: chat proposals for it show in the text, with Accept and Reject (`docKey` is its id) */
+  inlineProposals?: boolean
 }): React.JSX.Element {
   const t = useT()
   const hint = placeholder ?? t.plan.noteEditor.placeholder
@@ -54,9 +58,10 @@ export function NoteEditor({
       ...schemaExtensions(),
       SmartTyping.configure({ dash, quotes: true, ellipsis: true, ...quotesFor(language) }),
       WikiLinks.configure(wikiLinkOptions(true)),
-      Placeholder.configure({ placeholder: hint })
+      Placeholder.configure({ placeholder: hint }),
+      ...(inlineProposals ? [InlineProposals.configure({ docId: () => docKey })] : [])
     ],
-    [dash, language, hint]
+    [dash, language, hint, inlineProposals, docKey]
   )
 
   const editor = useEditor(

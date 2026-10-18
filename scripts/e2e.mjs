@@ -47,6 +47,7 @@ const SCENARIOS = [
   { args: ['longtitle', '--en'], areas: ['editor'], s: 5 },
   { args: ['ctrlenter', '--en'], areas: ['editor'], s: 9 },
   { args: ['newpage', '--en', '--motion'], areas: ['editor'], s: 8 },
+  { args: ['notediff'], areas: ['editor', 'plan', 'chat'], s: 6 },
   { args: ['typewriter', '--en'], areas: ['editor'], s: 10 },
   { args: ['graph', '--en'], areas: ['plan'], s: 34 },
   { args: ['graph', '--en', '--dark'], areas: ['plan'], s: 33 },

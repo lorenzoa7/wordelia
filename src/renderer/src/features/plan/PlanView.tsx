@@ -372,6 +372,7 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
             value={entry.body}
             onChange={(md) => update(entry.id, { body: md })}
             quoteLabel={entry.name}
+            inlineProposals
             placeholder={t.plan.entry.notesPlaceholder}
           />
         </div>

@@ -288,7 +288,7 @@ A thread exists only after its first message (`src/renderer/src/features/chat/th
 - When the user sends a message, and when a thread opens, the chat goes to the end at once.
 - A `ResizeObserver` watches the messages and the scroll box. When their size changes, the chat goes to the end again before the browser paints. This covers a font that loads late, a quote, the thinking line, and the text of a reply while it streams.
 - The chat follows changes of the messages while a reply streams, and for 1.5 s after a jump or after a reply ends. At rest, a change of the messages (for example, the user opens the thinking of a reply) does not move the view. When the view is at the end, a change of the scroll box (for example, a taller composer) keeps the end in view.
-- A scroll up stops the follow. A scroll back to 40 px or less from the end starts it again.
+- A scroll up stops the follow: the wheel and the keys (Up, Page Up, Home) stop it before the scroll starts, so a change of size cannot pull the view back in the middle of the scroll. A scroll down to 40 px or less from the end starts it again.
 
 #### The composer and mentions
 

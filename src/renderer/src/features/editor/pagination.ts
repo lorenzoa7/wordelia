@@ -12,6 +12,7 @@
 import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey, type EditorState } from '@tiptap/pm/state'
 import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view'
+import { scaleOf } from './zoom'
 
 /** Page geometry in CSS pixels, at the zoom of the page. */
 export interface PageMetrics {
@@ -120,8 +121,9 @@ interface Unit {
 }
 
 /** Line boxes of a paragraph, from the rectangles of its text, in client coordinates. */
-function lineBoxes(el: HTMLElement): Array<{ top: number; bottom: number; left: number }> {
-  const lh = parseFloat(getComputedStyle(el).lineHeight) || 0
+/** `scale`: the zoom of the desk; the rectangles are on screen, the line height is at 100 %. */
+function lineBoxes(el: HTMLElement, scale: number): Array<{ top: number; bottom: number; left: number }> {
+  const lh = (parseFloat(getComputedStyle(el).lineHeight) || 0) * scale
   const rects: DOMRect[] = []
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
   const range = document.createRange()
@@ -185,6 +187,9 @@ function measure(view: EditorView, m: PageMetrics, firstOffset: number): { break
 
 function measureFlow(view: EditorView, root: HTMLElement, m: PageMetrics, firstOffset: number): { breaks: Break[]; tail: number } {
   const rootTop = root.getBoundingClientRect().top
+  // The zoom scales the desk (zoom.ts): positions on screen, divided by the scale, are at 100 %.
+  const z = scaleOf(root)
+  const at100 = (y: number): number => (y - rootTop) / z
   const units: Unit[] = []
   /** The block after a page break starts a new page */
   let forced = false
@@ -199,17 +204,17 @@ function measureFlow(view: EditorView, root: HTMLElement, m: PageMetrics, firstO
     const force = forced
     forced = false
     if (node.isTextblock && node.content.size > 0) {
-      const lines = lineBoxes(dom)
+      const lines = lineBoxes(dom, z)
       if (lines.length) {
         lines.forEach((l, i) => {
-          units.push({ top: l.top - rootTop, bottom: l.bottom - rootTop, blockPos: offset, first: i === 0, force: force && i === 0, x: l.left + 1, y: (l.top + l.bottom) / 2 })
+          units.push({ top: at100(l.top), bottom: at100(l.bottom), blockPos: offset, first: i === 0, force: force && i === 0, x: l.left + 1, y: (l.top + l.bottom) / 2 })
         })
         return
       }
     }
     const r = dom.getBoundingClientRect()
-    const top = r.top - rootTop - (parseFloat(style.marginTop) || 0)
-    const bottom = r.bottom - rootTop + (parseFloat(style.marginBottom) || 0)
+    const top = at100(r.top) - (parseFloat(style.marginTop) || 0)
+    const bottom = at100(r.bottom) + (parseFloat(style.marginBottom) || 0)
     units.push({ top, bottom, blockPos: offset, first: true, force, x: r.left + 1, y: r.top + 1 })
   })
   if (!units.length) return { breaks: [], tail: Math.max(0, m.contentHeight - firstOffset) }
@@ -391,7 +396,7 @@ function followNewPage(view: EditorView, m: PageMetrics): void {
   const desk = view.dom.closest('.desk') as HTMLElement | null
   if (!desk) return
   const caret = view.coordsAtPos(view.state.selection.head)
-  const grow = reducedMotion() ? 0 : m.gap + m.marginTop
+  const grow = reducedMotion() ? 0 : (m.gap + m.marginTop) * scaleOf(view.dom as HTMLElement)
   const bottom = desk.getBoundingClientRect().bottom - 90
   const over = caret.bottom + grow - bottom
   if (over > 0) desk.scrollBy({ top: over, behavior: reducedMotion() ? 'auto' : 'smooth' })

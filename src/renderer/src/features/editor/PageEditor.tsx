@@ -22,7 +22,7 @@ import { SelectionMenu } from './SelectionMenu'
 import { ReviewBar } from './ReviewBar'
 import { FindBar } from './FindBar'
 import { useEditorStats } from './stats'
-import { usePageZoom } from './zoom'
+import { scaleOf, useDeskZoom } from './zoom'
 import { useProposalUndoKeys } from './inlineProposals'
 import { typewriterSound } from './typewriter-sound'
 import { cleanPastedHtml } from './paste'
@@ -73,11 +73,13 @@ export function PageEditor(): React.JSX.Element | null {
   const active = useActiveEditor((s) => s.active)
   const typo = manifest?.typography
   const deskRef = useRef<HTMLDivElement>(null)
+  const sizerRef = useRef<HTMLDivElement>(null)
+  const innerRef = useRef<HTMLDivElement>(null)
   const [typing, setTyping] = useState(false)
   const typingTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
-  const zoom = ui?.zoom ?? 1
 
-  const geometry = useMemo(() => (manifest ? pageGeometry(manifest, zoom) : null), [manifest, zoom])
+  // The pages are laid out at 100 %; the zoom is a scale of the whole desk (zoom.ts).
+  const geometry = useMemo(() => (manifest ? pageGeometry(manifest, 1) : null), [manifest])
 
   const onTyping = useCallback((): void => {
     setTyping(true)
@@ -137,7 +139,7 @@ export function PageEditor(): React.JSX.Element | null {
   }, [])
 
   useEditorStats(active?.editor ?? null)
-  const zoomBadge = usePageZoom(deskRef)
+  const zoomBadge = useDeskZoom(deskRef, sizerRef, innerRef)
   useProposalUndoKeys()
 
   if (!manifest || !typo || !geometry) return null
@@ -149,7 +151,7 @@ export function PageEditor(): React.JSX.Element | null {
     '--book-indent': `${typo.firstLineIndent}em`,
     '--book-para': `${typo.paragraphSpacing}em`,
     '--book-align': typo.align,
-    '--page-zoom': String(zoom),
+    '--page-zoom': '1',
     '--page-w': `${geometry.width}px`,
     '--page-ml': `${geometry.marginLeft}px`,
     '--page-mr': `${geometry.marginRight}px`,
@@ -166,11 +168,14 @@ export function PageEditor(): React.JSX.Element | null {
       {active && <Toolbar editor={active.editor} />}
       {active && <FindBar editor={active.editor} />}
       <div ref={deskRef} className="desk">
-        <div className="desk-inner" style={vars}>
-          {ids.map((id, i) => (
-            <ChapterSheet key={id} chapterId={id} index={i} geometry={geometry} deskRef={deskRef} onTyping={onTyping} />
-          ))}
-          {ids.length ? <PageEnd /> : <EmptyManuscript />}
+        <div ref={sizerRef} className="desk-zoom">
+          <div ref={innerRef} className="desk-inner" style={vars}>
+            {ids.map((id, i) => (
+              <ChapterSheet key={id} chapterId={id} index={i} geometry={geometry} deskRef={deskRef} onTyping={onTyping} />
+            ))}
+            {ids.length ? <PageEnd /> : <EmptyManuscript />}
+          </div>
+          {/* Outside the scaled pages: the bar keeps its size at every zoom. */}
           {active && <ReviewBar editor={active.editor} />}
         </div>
       </div>
@@ -289,7 +294,8 @@ function SheetEditor({ chapterId, geometry, onTyping, sheetRef }: EditorProps): 
             const sheet = sheetRef.current
             const root = sheet?.querySelector('.manuscript')
             if (!sheet || !root) return 0
-            return root.getBoundingClientRect().top - sheet.getBoundingClientRect().top - geometryRef.current.marginTop
+            // On screen the pages are scaled by the zoom; the measure works at 100 %.
+            return (root.getBoundingClientRect().top - sheet.getBoundingClientRect().top) / scaleOf(root as HTMLElement) - geometryRef.current.marginTop
           }
         },
         proposals: { docId: () => chapterId }

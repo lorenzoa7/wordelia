@@ -14,14 +14,21 @@
   overflow-anchor: auto;
   scroll-padding-top: 80px;
 }
-.desk-inner {
+/* The zoom (zoom.ts): the pages are laid out at 100 % in .desk-inner, which is scaled with a
+   transform; .desk-zoom has the scaled size, so the desk scrolls over the scaled pages. */
+.desk-zoom {
   position: relative;
+}
+.desk-inner {
+  position: absolute;
+  top: 0;
+  left: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   width: max-content;
-  min-width: 100%;
   padding: 64px var(--s-8) 0;
+  transform-origin: 0 0;
 }
 
 .page {

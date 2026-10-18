@@ -1,14 +1,17 @@
 // Page zoom from the keyboard, the mouse wheel and the toolbar, like a word processor:
 // Ctrl+= and Ctrl++ zoom in, Ctrl+- zooms out, Ctrl+0 goes back to 100 %, Ctrl+wheel zooms.
 //
-// Everything on the desk follows the zoom in CSS (`--page-zoom`): page sizes, fonts, the chapter
-// heading and the page gaps. So a new zoom shows in one frame, a page holds the same text at every
-// zoom, and the scroll position only has to scale.
+// The pages are always laid out at 100 %. The zoom is a scale (a CSS transform) of the whole desk
+// content, so a change of zoom never moves a word or a page break, and it can be a smooth animation.
+// A "sizer" element around the scaled content has the scaled size, so the desk scrolls correctly.
 
-import { useEffect, useLayoutEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useApp } from '@/stores/app'
 
 export const ZOOM_STEPS = [0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.2, 1.35, 1.5, 1.75, 2]
+
+/** Duration of a zoom change */
+const ZOOM_MS = 260
 
 /** The next zoom step up (dir 1) or down (dir -1) from a zoom that may be between two steps. */
 export function nextZoom(zoom: number, dir: 1 | -1): number {
@@ -25,10 +28,8 @@ export function zoomKey(e: Pick<KeyboardEvent, 'key' | 'code' | 'ctrlKey' | 'met
   return null
 }
 
-/** The desk of the Write view, while it is on screen */
-let desk: HTMLElement | null = null
-/** The point to keep in place (desk coordinates), the scroll position and the zoom before the change */
-let anchor: { x: number; y: number; top: number; left: number; from: number; animate: boolean } | null = null
+/** How the next change of zoom happens: the point to keep in place (client coordinates), and an animation or not */
+let request: { point?: { x: number; y: number }; animate: boolean } | null = null
 
 function reducedMotion(): boolean {
   return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
@@ -40,36 +41,127 @@ function currentZoom(): number {
 
 /**
  * Set the page zoom. The text at `point` (client coordinates), or at the reading line, stays in place.
- * `animate`: a short, smooth change of size (not while the author drags the zoom slider).
+ * `animate`: a smooth change (not while the author drags the zoom slider).
  */
 export function setPageZoom(to: number, point?: { x: number; y: number }, animate = true): void {
-  const cur = currentZoom()
-  if (Math.abs(to - cur) < 0.001) return
-  if (desk) {
-    // The browser keeps an element in place when sizes change (scroll anchoring). Here the app
-    // scales the scroll position itself, so the browser must not move it too.
-    desk.style.overflowAnchor = 'none'
-    const box = desk.getBoundingClientRect()
-    anchor = {
-      y: point ? point.y - box.top : desk.clientHeight * 0.3,
-      x: point ? point.x - box.left : desk.clientWidth / 2,
-      // Read now: a smaller zoom makes the desk shorter, and the browser then pulls the scroll up.
-      top: desk.scrollTop,
-      left: desk.scrollLeft,
-      from: cur,
-      animate
-    }
-  }
+  if (Math.abs(to - currentZoom()) < 0.0005) return
+  request = { point, animate }
   useApp.getState().setUi({ zoom: to })
 }
 
-/** Zoom shortcuts for the desk. Returns the zoom to show in a short badge after a change, or null. */
-export function usePageZoom(deskRef: React.RefObject<HTMLDivElement | null>): number | null {
-  const zoom = useApp((s) => s.settings?.ui.zoom ?? 1)
-  const [badge, setBadge] = useState<number | null>(null)
+/** Ease in and out */
+const ease = (t: number): number => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
 
+/**
+ * The zoom of the desk. `inner` has the pages, laid out at 100 %; `sizer` holds it and has its scaled
+ * size. Returns the zoom to show in a short badge after a change, or null.
+ */
+export function useDeskZoom(
+  deskRef: React.RefObject<HTMLDivElement | null>,
+  sizerRef: React.RefObject<HTMLDivElement | null>,
+  innerRef: React.RefObject<HTMLDivElement | null>
+): number | null {
+  const target = useApp((s) => s.settings?.ui.zoom ?? 1)
+  const [badge, setBadge] = useState<number | null>(null)
+  /** The scale on screen now (it moves to `target` during an animation) */
+  const shown = useRef(target)
+  /** The horizontal offset of the scaled pages (they are centered when narrower than the desk) */
+  const offset = useRef(0)
+  const frame = useRef(0)
+
+  /** Put the scale on the pages and give the sizer the scaled size. */
+  const apply = (s: number): void => {
+    const desk = deskRef.current
+    const sizer = sizerRef.current
+    const inner = innerRef.current
+    if (!desk || !sizer || !inner) return
+    const w = inner.offsetWidth * s
+    const h = inner.offsetHeight * s
+    const room = desk.clientWidth
+    offset.current = w < room ? (room - w) / 2 : 0
+    sizer.style.width = `${Math.max(room, w)}px`
+    sizer.style.height = `${h}px`
+    inner.style.transform = `translate(${offset.current}px, 0) scale(${s})`
+    sizer.style.setProperty('--desk-scale', String(s))
+  }
+
+  // The size of the pages or of the desk changes (typing, a window resize): the same scale, new sizes.
+  useLayoutEffect(() => {
+    const desk = deskRef.current
+    const inner = innerRef.current
+    if (!desk || !inner) return
+    apply(shown.current)
+    const ro = new ResizeObserver(() => apply(shown.current))
+    ro.observe(inner)
+    ro.observe(desk)
+    return () => ro.disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deskRef, innerRef, sizerRef])
+
+  // A new zoom: scale from the zoom on screen to the new one, around the anchor point.
+  useLayoutEffect(() => {
+    const desk = deskRef.current
+    if (!desk) return
+    // A new target stops the animation to the old one, also when the scale on screen is already
+    // near the new target.
+    cancelAnimationFrame(frame.current)
+    frame.current = 0
+    const from = shown.current
+    const req = request ?? { animate: false }
+    request = null
+    if (Math.abs(from - target) < 0.0005) {
+      if (from !== target) {
+        shown.current = target
+        apply(target)
+      }
+      return
+    }
+    const box = desk.getBoundingClientRect()
+    const ay = req.point ? req.point.y - box.top : desk.clientHeight * 0.3
+    const ax = req.point ? req.point.x - box.left : desk.clientWidth / 2
+    // The anchor point in the coordinates of the pages at 100 %
+    const cy = (desk.scrollTop + ay) / from
+    const cx = (desk.scrollLeft + ax - offset.current) / from
+    const inner = innerRef.current
+    const step = (s: number): void => {
+      shown.current = s
+      apply(s)
+      desk.scrollTop = cy * s - ay
+      desk.scrollLeft = Math.max(0, cx * s + offset.current - ax)
+    }
+    desk.style.overflowAnchor = 'none'
+    const done = (): void => {
+      if (inner) inner.style.willChange = ''
+      desk.style.overflowAnchor = ''
+    }
+    if (!req.animate || reducedMotion()) {
+      step(target)
+      done()
+    } else {
+      // Scale on a log curve: each part of the animation zooms by the same factor, so it feels even.
+      if (inner) inner.style.willChange = 'transform'
+      const t0 = performance.now()
+      const tick = (now: number): void => {
+        const t = Math.min(1, (now - t0) / ZOOM_MS)
+        step(from * Math.pow(target / from, ease(t)))
+        if (t < 1) frame.current = requestAnimationFrame(tick)
+        else {
+          frame.current = 0
+          done()
+        }
+      }
+      frame.current = requestAnimationFrame(tick)
+    }
+    setBadge(target)
+    const timer = setTimeout(() => setBadge(null), 1100)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target])
+
+  useEffect(() => () => cancelAnimationFrame(frame.current), [])
+
+  // Keys and the mouse wheel
   useEffect(() => {
-    desk = deskRef.current
     const onKey = (e: KeyboardEvent): void => {
       const k = zoomKey(e)
       if (!k) return
@@ -91,53 +183,16 @@ export function usePageZoom(deskRef: React.RefObject<HTMLDivElement | null>): nu
     window.addEventListener('keydown', onKey)
     el?.addEventListener('wheel', onWheel, { passive: false })
     return () => {
-      if (desk === el) desk = null
       window.removeEventListener('keydown', onKey)
       el?.removeEventListener('wheel', onWheel)
     }
   }, [deskRef])
 
-  // The new sizes are on the page now: scale the scroll position around the anchor point. The top
-  // padding of the desk does not follow the zoom.
-  useLayoutEffect(() => {
-    const a = anchor
-    const el = deskRef.current
-    if (!a || !el) return
-    anchor = null
-    const ratio = zoom / a.from
-    const inner = el.firstElementChild as HTMLElement | null
-    const pad = inner ? parseFloat(getComputedStyle(inner).paddingTop) || 0 : 0
-    el.scrollTop = (a.top + a.y - pad) * ratio + pad - a.y
-    el.scrollLeft = Math.max(0, (a.left + a.x) * ratio - a.x)
-    // A smooth change, like a word processor: the pages have their new size already; show them at the
-    // old size around the anchor point, and let them grow or shrink to the new size. Only a transform
-    // moves: the text is laid out one time.
-    if (inner && a.animate && !reducedMotion()) {
-      inner.style.transition = 'none'
-      inner.style.transformOrigin = `${el.scrollLeft + a.x}px ${el.scrollTop + a.y}px`
-      inner.style.transform = `scale(${1 / ratio})`
-      void inner.offsetWidth
-      inner.style.transition = 'transform 160ms var(--ease-out)'
-      inner.style.transform = ''
-      const clear = (): void => {
-        inner.style.transition = ''
-        inner.style.transformOrigin = ''
-      }
-      inner.addEventListener('transitionend', clear, { once: true })
-      setTimeout(clear, 250)
-    }
-    // Scroll anchoring again from the next frame: when a chapter far away gets its editor and its
-    // real height, the browser keeps the text on screen in place.
-    const restore = requestAnimationFrame(() => {
-      if (!anchor) el.style.overflowAnchor = ''
-    })
-    setBadge(zoom)
-    const timer = setTimeout(() => setBadge(null), 1100)
-    return () => {
-      clearTimeout(timer)
-      cancelAnimationFrame(restore)
-    }
-  }, [zoom, deskRef])
-
   return badge
+}
+
+/** The scale of the desk now, from an element inside the scaled pages (1 when not scaled). */
+export function scaleOf(el: HTMLElement): number {
+  const w = el.offsetWidth
+  return w ? el.getBoundingClientRect().width / w : 1
 }

@@ -33,11 +33,25 @@ interface Break {
   rest: number
 }
 
+/** A new page that opens: its gap grows from nothing to its full height (growPages). */
+interface Growth {
+  /** Breaks from this index on are the new pages */
+  from: number
+  /** Progress, 0 to 1, after the easing. 1 when the growth is done or stopped. */
+  p: number
+  /**
+   * The line height of the text. A gap inside a paragraph has a line of its own, and that line is
+   * never lower than one line of text: the gap starts at that height, so it pushes the words at once.
+   */
+  floor: number
+}
+
 interface PageState {
   breaks: Break[]
   /** Empty space at the end of the last page */
   tail: number
   decorations: DecorationSet
+  grow: Growth | null
 }
 
 export const paginationKey = new PluginKey<PageState>('pagination')
@@ -49,17 +63,17 @@ function zoomed(px: number, m: PageMetrics): string {
   return `calc(${(px / m.zoom).toFixed(3)}px * var(--page-zoom))`
 }
 
-function gapElement(b: Break, m: PageMetrics, index: number, fresh: boolean): HTMLElement {
+/** `grow`: the growth of a new page that opens now, or null for a page like the others. */
+function gapElement(b: Break, m: PageMetrics, index: number, grow: Growth | null): HTMLElement {
   const el = document.createElement(b.inline ? 'span' : 'div')
-  el.className = `pm-page-gap${b.inline ? ' is-inline' : ''}${fresh ? ' is-new' : ''}`
+  el.className = `pm-page-gap${b.inline ? ' is-inline' : ''}${grow !== null ? ' is-growing' : ''}`
   el.setAttribute('contenteditable', 'false')
   el.setAttribute('aria-hidden', 'true')
   el.dataset.page = String(index + 1)
-  // A new page grows in one time: after that it is a page like the others.
-  if (fresh) el.addEventListener('animationend', (e) => e.target === el && el.classList.remove('is-new'))
-  el.style.height = zoomed(b.rest + m.marginBottom + m.gap + m.marginTop, m)
-  // A new page grows from the end of the page before it (editor.css).
-  el.style.setProperty('--gap-from', zoomed(b.rest + m.marginBottom, m))
+  const height = b.rest + m.marginBottom + m.gap + m.marginTop
+  el.dataset.height = String(height)
+  el.dataset.start = String(b.inline && grow ? Math.min(grow.floor, height) : 0)
+  el.style.height = zoomed(grow ? heightAt(el, grow.p) : height, m)
   el.appendChild(pageNumber(b.rest + m.marginBottom / 2, m))
   const band = document.createElement('span')
   band.className = 'pm-page-band'
@@ -92,22 +106,16 @@ function pageNumber(top: number, m: PageMetrics): HTMLElement {
 }
 
 /**
- * `fresh`: breaks from this index on are new pages that typing made; they grow in one time.
- * ProseMirror draws a widget again when the paragraph around it changes (the author types on the
- * new page): only the first drawing of a new gap animates.
+ * `grow`: the new pages that open now. ProseMirror draws a gap again when the author types in its
+ * paragraph (each key on the new page): the new element starts at the progress of now, so the
+ * growth goes on without a jump.
  */
-function build(state: EditorState, breaks: Break[], tail: number, m: PageMetrics, fresh = Infinity): DecorationSet {
+function build(state: EditorState, breaks: Break[], tail: number, m: PageMetrics, grow: Growth | null): DecorationSet {
   const decos = breaks.map((b, i) => {
-    let grow = i >= fresh
-    const draw = (): HTMLElement => {
-      const el = gapElement(b, m, i, grow)
-      grow = false
-      return el
-    }
+    const draw = (): HTMLElement => gapElement(b, m, i, grow && i >= grow.from && grow.p < 1 ? grow : null)
     return Decoration.widget(b.pos, draw, {
       side: -1,
       ignoreSelection: true,
-      // Not the new mark: the next measure (fast typing) keeps the same element and its animation.
       key: `gap-${b.inline ? 'i' : 'b'}-${Math.round(b.rest)}-${m.contentHeight}`
     })
   })
@@ -325,17 +333,18 @@ export const Pagination = Extension.create<PaginationOptions>({
       new Plugin<PageState>({
         key: paginationKey,
         state: {
-          init: () => ({ breaks: [], tail: 0, decorations: DecorationSet.empty }),
+          init: () => ({ breaks: [], tail: 0, decorations: DecorationSet.empty, grow: null }),
           apply(tr, prev, _old, next) {
-            const meta = tr.getMeta(paginationKey) as { breaks: Break[]; tail: number; metrics: PageMetrics; animate?: boolean } | undefined
+            const meta = tr.getMeta(paginationKey) as { breaks: Break[]; tail: number; metrics: PageMetrics; animate?: boolean; floor?: number } | undefined
             if (meta) {
-              const fresh = meta.animate ? prev.breaks.length : Infinity
-              return { breaks: meta.breaks, tail: meta.tail, decorations: build(next, meta.breaks, meta.tail, meta.metrics, fresh) }
+              // A measure while a new page opens keeps its growth.
+              const grow = meta.animate ? { from: prev.breaks.length, p: 0, floor: meta.floor ?? 0 } : prev.grow && prev.grow.p < 1 ? prev.grow : null
+              return { breaks: meta.breaks, tail: meta.tail, decorations: build(next, meta.breaks, meta.tail, meta.metrics, grow), grow }
             }
             if (!tr.docChanged) return prev
             // Keep the gaps near their place while the user types; the next measure fixes them.
             const breaks = prev.breaks.map((b) => ({ ...b, pos: tr.mapping.map(b.pos, -1) }))
-            return { breaks, tail: prev.tail, decorations: prev.decorations.map(tr.mapping, tr.doc) }
+            return { breaks, tail: prev.tail, decorations: prev.decorations.map(tr.mapping, tr.doc), grow: prev.grow }
           }
         },
         props: {
@@ -364,15 +373,19 @@ export const Pagination = Extension.create<PaginationOptions>({
             // Never loop: a layout that does not settle stops after a few rounds.
             if (++rounds > 4) return
             const added = fromEdit && cur ? result.breaks.length - cur.breaks.length : 0
+            const animate = added > 0 && !reducedMotion()
+            // A page that still opens ends now: the new growth starts from the pages as they are.
+            if (animate) settle(view, m)
             const tr = view.state.tr
-              .setMeta(paginationKey, { ...result, metrics: m, animate: added > 0 && !reducedMotion() })
+              .setMeta(paginationKey, { ...result, metrics: m, animate, floor: parseFloat(getComputedStyle(view.dom as HTMLElement).lineHeight) || 0 })
               .setMeta('addToHistory', false)
               .setMeta('allowDuringReview', true)
             // Typing moved the cursor onto a new page: keep it on screen.
             if (fromEdit && view.hasFocus()) tr.scrollIntoView()
             view.dispatch(tr)
             height = (view.dom as HTMLElement).offsetHeight
-            if (added > 0 && view.hasFocus()) followNewPage(view, m)
+            const grow = paginationKey.getState(view.state)?.grow
+            if (animate && grow) growPages(view, grow, m)
           }
           const schedule = (delay: number): void => {
             clearTimeout(timer)
@@ -408,6 +421,8 @@ export const Pagination = Extension.create<PaginationOptions>({
               }
             },
             destroy() {
+              const grow = paginationKey.getState(view.state)?.grow
+              if (grow) grow.p = 1
               triggers.delete(view)
               clearTimeout(timer)
               if (frame) cancelAnimationFrame(frame)
@@ -425,18 +440,68 @@ function reducedMotion(): boolean {
   return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 }
 
+/** Space under the cursor, in screen pixels, that a new page keeps on screen */
+const FOLLOW_ROOM = 90
+
+/** The height of a growing gap at a progress: from its start height to its full height */
+function heightAt(el: HTMLElement, p: number): number {
+  const start = Number(el.dataset.start) || 0
+  return start + (Number(el.dataset.height) - start) * p
+}
+
+const growing = (view: EditorView): HTMLElement[] => Array.from((view.dom as HTMLElement).querySelectorAll<HTMLElement>('.pm-page-gap.is-growing'))
+
+/** Stop a growth: its pages get their full height at once. */
+function settle(view: EditorView, m: PageMetrics): void {
+  const grow = paginationKey.getState(view.state)?.grow
+  if (grow) grow.p = 1
+  for (const el of growing(view)) {
+    el.classList.remove('is-growing')
+    el.style.height = zoomed(Number(el.dataset.height), m)
+  }
+}
+
 /**
- * A new page grows in (editor.css), so the cursor goes down while it grows. When the cursor would
- * end under the visible part of the desk, glide the desk down with it.
+ * A new page opens like a sheet that slides in: its gap grows from nothing to its full height, so
+ * the words that go to the new page slide down to it without a jump. One frame loop sets the height
+ * of the gap and, when the cursor is under the gap and would end low on the screen, the scroll of
+ * the desk, with the same progress: the cursor moves on one smooth path. The progress is in the
+ * plugin state, so a gap that ProseMirror draws again starts where the growth is now.
  */
-function followNewPage(view: EditorView, m: PageMetrics): void {
-  const desk = view.dom.closest('.desk') as HTMLElement | null
-  if (!desk) return
-  const caret = view.coordsAtPos(view.state.selection.head)
-  const grow = reducedMotion() ? 0 : (m.gap + m.marginTop) * scaleOf(view.dom as HTMLElement)
-  const bottom = desk.getBoundingClientRect().bottom - 90
-  const over = caret.bottom + grow - bottom
-  if (over > 0) desk.scrollBy({ top: over, behavior: reducedMotion() ? 'auto' : 'smooth' })
+function growPages(view: EditorView, grow: Growth, m: PageMetrics): void {
+  const root = view.dom as HTMLElement
+  const desk = root.closest('.desk') as HTMLElement | null
+  const duration = parseFloat(getComputedStyle(root).getPropertyValue('--dur-page')) || 0
+  if (!duration) return settle(view, m)
+  // How far the desk scrolls during the growth: the cursor goes down by the gaps above it.
+  let scroll = 0
+  if (desk && view.hasFocus()) {
+    const caret = view.coordsAtPos(view.state.selection.head)
+    const z = scaleOf(root)
+    const down = growing(view)
+      .filter((el) => el.getBoundingClientRect().top <= caret.top)
+      .reduce((sum, el) => sum + (Number(el.dataset.height) - (Number(el.dataset.start) || 0)) * z, 0)
+    scroll = Math.max(0, caret.bottom + down - (desk.getBoundingClientRect().bottom - FOLLOW_ROOM))
+  }
+  const start = performance.now()
+  let done = 0
+  const step = (now: number): void => {
+    if (view.isDestroyed || grow.p >= 1) return
+    // The time of the first frame can be a little before the start.
+    const t = Math.min(1, Math.max(0, (now - start) / duration))
+    // Fast at first, then slow: the page answers the key at once and comes to rest softly.
+    grow.p = 1 - Math.pow(1 - t, 3)
+    for (const el of growing(view)) el.style.height = zoomed(heightAt(el, grow.p), m)
+    if (desk && scroll) {
+      // The scroll snaps to device pixels: count what moved, the rest goes in the next frames.
+      const before = desk.scrollTop
+      desk.scrollTop = before + scroll * grow.p - done
+      done += desk.scrollTop - before
+    }
+    if (t < 1) requestAnimationFrame(step)
+    else settle(view, m)
+  }
+  requestAnimationFrame(step)
 }
 
 const triggers = new WeakMap<EditorView, () => void>()

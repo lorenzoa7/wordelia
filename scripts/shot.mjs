@@ -62,7 +62,8 @@ await page.waitForFunction(() => document.querySelector('.app-view, .welcome') &
 // default, so any duration would make every change of size a transition. --motion keeps them.
 if (!motion) {
   await page.addStyleTag({
-    content: '*, *::before, *::after { animation-duration: 0s !important; animation-delay: 0s !important; transition-duration: 0s !important; transition-delay: 0s !important; }'
+    // A new page that opens (timed in code with a token) takes no time too.
+    content: ':root { --dur-page: 0ms !important; } *, *::before, *::after { animation-duration: 0s !important; animation-delay: 0s !important; transition-duration: 0s !important; transition-delay: 0s !important; }'
   })
 }
 await page.waitForTimeout(150)

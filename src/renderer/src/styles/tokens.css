@@ -68,6 +68,8 @@
   --dur-fast: 120ms;
   --dur-med: 220ms;
   --dur-slow: 420ms;
+  /* A new page that opens while the author types (pagination.ts) */
+  --dur-page: 420ms;
 
   /* Light theme: "Paper" */
   --desk: #ece5d8;

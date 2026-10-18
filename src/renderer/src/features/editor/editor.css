@@ -890,28 +890,12 @@
   height: 0 !important;
 }
 
-/* A new page grows in from the end of the page before it, and its band fades in (pagination.ts). */
-.pm-page-gap.is-new {
-  animation: pm-gap-grow 380ms var(--ease-in-out) both;
-}
-.pm-page-gap.is-new .pm-page-band {
-  animation: pm-band-in 380ms var(--ease-in-out) both;
-}
-@keyframes pm-gap-grow {
-  from {
-    height: var(--gap-from);
-  }
-}
-@keyframes pm-band-in {
-  from {
-    opacity: 0;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .pm-page-gap.is-new,
-  .pm-page-gap.is-new .pm-page-band {
-    animation: none;
-  }
+/* A new page opens: pagination.ts grows its gap from nothing, frame by frame. The gap shows only
+   what fits in its height (the end of the sheet, then the band, then the top of the next sheet), so
+   the band never covers the words that slide down. The band is wider than the text: clip only above
+   and below. */
+.pm-page-gap.is-growing {
+  clip-path: inset(0 calc(-1 * var(--page-mr)) 0 calc(-1 * var(--page-ml)));
 }
 
 /* The zoom of the page in the toolbar: a fixed width, so the toolbar does not move */

@@ -324,8 +324,8 @@ export interface ProviderSettings {
 export type Locale = 'en' | 'pt-BR' | 'es'
 
 export interface AppSettings {
-  /** 2: Claude Code routes have an explicit effort. 3: the chat effort default is medium. 4: each action has its own shortcut. */
-  version: 4
+  /** 2: Claude Code routes have an explicit effort. 3: the chat effort default is medium. 4: each action has its own shortcut. 5: unchanged retired built-in actions (Expand) are removed. */
+  version: 5
   /** Language of the interface */
   language: Locale
   theme: ThemeSetting

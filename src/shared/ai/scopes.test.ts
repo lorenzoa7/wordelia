@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { AiAction } from '../types'
 import { DEFAULT_ACTIONS } from './defaults'
 import { actionForKeys, freeShortcut, shortcutConflict, type KeyPress } from './shortcuts'
-import { addToGroup, asBookAction, bookActionsFile, mergeActions, parseBookActions, restoreBuiltIns, shortcutInBook, withoutShortcut } from './scopes'
+import { addToGroup, bookActionsFile, mergeActions, parseBookActions, restoreBuiltIns, shortcutInBook, withoutShortcut } from './scopes'
 
 const action = (id: string, shortcut?: string, extra: Partial<AiAction> = {}): AiAction => ({
   id,
@@ -32,11 +32,16 @@ describe('book actions file', () => {
     expect(parseBookActions(null)).toEqual([])
     expect(parseBookActions({ actions: 'no' })).toEqual([])
   })
-  it('is never a built-in action, and drops a bad model choice', () => {
-    const [a] = parseBookActions([{ id: 'polish', name: 'Polish', builtIn: true, route: { provider: 'other', model: 'x' }, effort: 'huge' }])
-    expect(a.builtIn).toBe(false)
+  it('keeps a built-in action that moved to the book, and drops a bad model choice', () => {
+    const [a, b] = parseBookActions([
+      { id: 'tighten', name: 'Tighten', builtIn: true, route: { provider: 'other', model: 'x' }, effort: 'huge' },
+      { id: 'act_x', name: 'Mine', builtIn: true }
+    ])
+    expect(a.builtIn).toBe(true)
     expect(a.route).toBeNull()
     expect(a.effort).toBeUndefined()
+    // Only the ids of built-in actions can be built in.
+    expect(b.builtIn).toBe(false)
   })
   it('cleans the shortcuts: one text form, no app keys, no repeats, Ctrl or Alt', () => {
     const got = parseBookActions([
@@ -104,15 +109,25 @@ describe('moving an action to the other group', () => {
     expect(r.taken?.id).toBe('tighten')
     expect(r.group.at(-1)?.id).toBe('voice')
   })
-  it('makes a built-in action an own action of the book, with the texts that the settings show', () => {
-    const a = asBookAction(global[1], { id: 'act_new', name: 'Enxugar', instructions: 'Corte palavras.' })
-    expect(a).toMatchObject({ id: 'act_new', name: 'Enxugar', instructions: 'Corte palavras.', builtIn: false, shortcut: 'Alt+2' })
-    const own = action('own')
-    expect(asBookAction(own, { id: 'x', name: 'y', instructions: 'z' })).toBe(own)
+  it('keeps a built-in action as it is, so it can go back without a change', () => {
+    const toBook = addToGroup([], global[1])
+    expect(toBook.action).toBe(global[1])
+    const back = addToGroup(global.filter((a) => a.id !== 'tighten'), toBook.action)
+    expect(back.group.at(-1)).toEqual(DEFAULT_ACTIONS[1])
+  })
+  it('replaces an action with the same id', () => {
+    const r = addToGroup(global, { ...global[1], name: 'Changed' })
+    expect(r.group.filter((a) => a.id === 'tighten').map((a) => a.name)).toEqual(['Changed'])
+    expect(r.taken).toBeUndefined()
   })
 })
 
 describe('restoring the built-in actions', () => {
+  it('gives a built-in action of the book back to all books', () => {
+    const r = restoreBuiltIns(global.filter((a) => a.id !== 'show'), [global[3], action('voice', 'Alt+6')])
+    expect(r.global.map((a) => a.id)).toEqual(['polish', 'tighten', 'grammar', 'show'])
+    expect(r.book.map((a) => a.id)).toEqual(['voice'])
+  })
   it('frees the shortcuts of the built-in actions in the two groups', () => {
     const r = restoreBuiltIns([global[0], action('own', 'Alt+3'), action('mine', 'Alt+7')], [action('voice', 'Alt+4'), action('tone', 'Alt+8')])
     expect(r.global.map((a) => [a.id, a.shortcut ?? null])).toEqual([

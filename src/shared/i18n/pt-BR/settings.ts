@@ -234,6 +234,20 @@ export const settings: typeof en = {
     },
     isMain: 'Ação principal',
     makeMain: 'Tornar a ação principal',
-    mainHint: 'A ação principal é o primeiro botão acima do texto selecionado.'
+    mainHint: 'A ação principal é o primeiro botão acima do texto selecionado.',
+    allBooks: 'Todos os livros',
+    thisBook: 'Este livro',
+    newForAll: 'Nova ação para todos os livros',
+    newForBook: 'Nova ação para este livro',
+    bookEmpty: 'Nenhuma ação ainda. As ações daqui funcionam só neste livro.',
+    useIn: 'Usar em',
+    globalHint: 'Todos os livros têm esta ação.',
+    bookHint: 'Só este livro tem esta ação. A pasta do livro guarda a ação.',
+    mainForAll: 'A ação principal vale para todos os livros.',
+    toBookTitle: (name) => `Usar “${name}” só neste livro?`,
+    toBookMessage: 'Os outros livros não vão ter esta ação. Para devolver a ação a eles, abra este livro e escolha “Todos os livros”.',
+    toBookConfirm: 'Usar só neste livro',
+    movedWithoutShortcut: (name, keys, other) => `“${name}” ficou sem atalho: ${keys} é o atalho de “${other}”.`,
+    shortcutInBook: (keys, other) => `Neste livro, ${keys} executa “${other}”.`
   }
 }

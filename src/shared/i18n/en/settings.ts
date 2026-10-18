@@ -258,6 +258,23 @@ export const settings = {
     },
     isMain: 'Main action',
     makeMain: 'Make it the main action',
-    mainHint: 'The main action is the first button above the selected text.'
+    mainHint: 'The main action is the first button above the selected text.',
+    /** The two groups of actions: in the app settings, and in the folder of the open book */
+    allBooks: 'All books',
+    thisBook: 'This book',
+    newForAll: 'New action for all books',
+    newForBook: 'New action for this book',
+    bookEmpty: 'No actions yet. The actions here work only in this book.',
+    /** The field that moves an action to the other group */
+    useIn: 'Use in',
+    globalHint: 'Every book has this action.',
+    bookHint: 'Only this book has this action. The book folder keeps it.',
+    mainForAll: 'The main action is for all books.',
+    toBookTitle: (name: string): string => `Use “${name}” only in this book?`,
+    toBookMessage: 'The other books will not have this action. To give it back to them, open this book and choose “All books”.',
+    toBookConfirm: 'Use only in this book',
+    movedWithoutShortcut: (name: string, keys: string, other: string): string => `“${name}” has no shortcut now: ${keys} is the shortcut for “${other}”.`,
+    /** Under the shortcut of a global action when an action of the open book has the same shortcut */
+    shortcutInBook: (keys: string, other: string): string => `In this book, ${keys} runs “${other}”.`
   }
 }

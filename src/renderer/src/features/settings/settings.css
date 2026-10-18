@@ -714,6 +714,94 @@
   padding-top: 6px;
   border-top: 1px solid var(--rule-soft);
 }
+/* The two groups: all books (app settings) and this book (the book folder). */
+.actions-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.actions-group-book {
+  margin-top: var(--s-5);
+}
+.actions-group-head {
+  padding: 0 10px 6px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.actions-empty {
+  margin: 0;
+  padding: 4px 10px 6px;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--ink-4);
+}
+/* A global shortcut that an action of the open book has: it does not work in this book. */
+.action-key.is-off {
+  text-decoration: line-through;
+}
+.shortcut-over {
+  margin-top: 6px;
+}
+/* Use in: All books | This book */
+.scope-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  max-width: 360px;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--desk-2);
+  box-shadow: var(--shadow-inset);
+}
+.scope-switch-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  height: 30px;
+  padding: 0 var(--s-3);
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  white-space: nowrap;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.scope-switch-btn svg {
+  flex-shrink: 0;
+  translate: 0 var(--icon-lift);
+}
+.scope-switch-btn svg.icon-book {
+  translate: 0 var(--icon-lift-book);
+}
+.scope-switch-btn span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.scope-switch-btn:hover:not(:disabled) {
+  color: var(--ink);
+  background: var(--desk-3);
+}
+.scope-switch-btn.is-active,
+.scope-switch-btn.is-active:hover {
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 14%, transparent);
+}
+.scope-switch-btn.is-active svg {
+  color: var(--ribbon);
+}
+.scope-switch-btn:disabled {
+  color: var(--ink-4);
+}
 .action-name-row {
   display: flex;
   gap: var(--s-2);

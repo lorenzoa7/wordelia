@@ -71,7 +71,8 @@ export async function listLibrary(): Promise<LibraryItem[]> {
         const facts = await readFacts(it.root).catch(() => null)
         if (facts) {
           changed = true
-          return { ...it, ...facts, missing: false }
+          // An estimate: the editor did not count this text.
+          return { ...it, ...facts, pagesExact: false, pagesWords: undefined, missing: false }
         }
       }
       return { ...it, missing: false }

@@ -56,7 +56,9 @@ export default async function ({ page, shot, openBook, book, work }) {
   await page.waitForTimeout(400)
   const again = await page.locator('.book-card-pages').first().innerText()
   console.log(JSON.stringify({ olderCard: again }))
-  if (again !== card) fail(`a card without pages shows "${again}", not "${card}"`)
+  // Not counted by the editor yet: an estimate, with "≈", near the pages on screen.
+  const guess = Number(again.replace(/[^\d]/g, ''))
+  if (!/^≈ \d+ pages$/.test(again) || Math.abs(guess - screen) > Math.max(1, screen * 0.1)) fail(`a card without pages shows "${again}"; the Write view shows ${screen}`)
 
   // The card in Portuguese (Brazil), as the author uses the app.
   await page.evaluate(() => window.__wordelia.app.getState().updateSettings({ language: 'pt-BR' }))

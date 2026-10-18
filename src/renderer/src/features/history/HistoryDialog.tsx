@@ -26,6 +26,12 @@ function when(t: Messages, iso: string): string {
 const CHANGE_AT = 0.3
 
 /**
+ * A version that loads for longer than this shows a spinner. A faster load shows no spinner: the compare
+ * view keeps the version before it until the new text is there, so nothing flashes.
+ */
+const SPINNER_AFTER_MS = 300
+
+/**
  * Scroll the compare view to its first change (the first word that the restore adds or removes), smoothly,
  * so the author sees at once what changed. A version without changes goes back to the top.
  *
@@ -68,19 +74,40 @@ export function HistoryDialog({ chapterId, onClose }: { chapterId: string | null
   const chapter = useBook((s) => s.chapters.find((c) => c.id === chapterId))
   const [items, setItems] = useState<HistoryItem[] | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
-  /** The text of a saved version, with the id of that version */
+  /**
+   * The version in the compare view: its id and its text (null: the file cannot be read). While the
+   * selected version loads, this is still the version before it.
+   */
   const [loaded, setLoaded] = useState<{ id: string; text: string | null } | null>(null)
-  // Only the text of the selected version: while a new version loads, the old text does not show.
-  const body = loaded && loaded.id === selected ? loaded.text : null
+  const body = loaded?.text ?? null
+  /** The selected version is not in the compare view yet */
+  const waiting = selected !== null && loaded?.id !== selected
+  /** The selected version takes long to load: show a spinner */
+  const [slow, setSlow] = useState(false)
+  /** The reads of the versions of this chapter, by id. A version that the author selects again shows at once. */
+  const reads = useRef(new Map<string, Promise<string | null>>())
   const textRef = useRef<HTMLDivElement>(null)
   /** The version that the compare view went to the first change of, so a later render does not move the view again. */
   const shownRef = useRef<string | null>(null)
   /** Stops the glide to the first change */
   const glideRef = useRef<() => void>(() => {})
+  /** A restore waits for its version: a second click does nothing */
+  const restoring = useRef(false)
+
+  const read = (id: string): Promise<string | null> => {
+    let p = reads.current.get(id)
+    if (!p && root && chapterId) {
+      p = invoke('history:read', root, chapterId, id)
+      reads.current.set(id, p)
+    }
+    return p ?? Promise.resolve(null)
+  }
 
   useEffect(() => {
     setItems(null)
     setSelected(null)
+    setLoaded(null)
+    reads.current = new Map()
     shownRef.current = null
     if (!chapterId || !root) return
     flushEditor()
@@ -93,11 +120,18 @@ export function HistoryDialog({ chapterId, onClose }: { chapterId: string | null
   useEffect(() => {
     if (!selected || !chapterId || !root) return
     let live = true
-    void invoke('history:read', root, chapterId, selected).then((text) => live && setLoaded({ id: selected, text }))
+    void read(selected).then((text) => live && setLoaded({ id: selected, text }))
     return () => {
       live = false
     }
-  }, [selected, chapterId, root])
+  }, [selected, chapterId, root]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    setSlow(false)
+    if (!waiting) return
+    const timer = setTimeout(() => setSlow(true), SPINNER_AFTER_MS)
+    return () => clearTimeout(timer)
+  }, [waiting, selected])
 
   const ops = useMemo(() => {
     if (body == null || !chapter) return null
@@ -106,26 +140,42 @@ export function HistoryDialog({ chapterId, onClose }: { chapterId: string | null
   const stats = ops ? diffStats(ops) : null
 
   // A new version in the compare view: go to its first change, one time.
+  const shownId = loaded?.id ?? null
   useEffect(() => {
     const box = textRef.current
-    if (!ops || !box || shownRef.current === selected) return
+    if (!ops || !box || shownRef.current === shownId) return
     // After the layout of the new text. A glide to the change of another version stops first.
     const frame = requestAnimationFrame(() => {
-      shownRef.current = selected
+      shownRef.current = shownId
       glideRef.current()
       glideRef.current = scrollToFirstChange(box)
     })
     return () => cancelAnimationFrame(frame)
-  }, [ops, selected])
+  }, [ops, shownId])
   useEffect(() => () => glideRef.current(), [])
 
-  const restore = (): void => {
-    if (!chapter || body == null) return
+  /**
+   * Restore the selected version. The button stays on while a version loads, so it does not flash at
+   * each new selection: a click then waits for the text of the selected version, never the one on screen.
+   */
+  const restore = async (): Promise<void> => {
+    const id = selected
+    if (!chapter || !id || restoring.current) return
+    restoring.current = true
+    const text = loaded?.id === id ? loaded.text : await read(id)
+    restoring.current = false
+    if (text == null) {
+      toast(t.history.unreadable, { kind: 'error' })
+      return
+    }
     snapshot(chapter.id, SNAPSHOT_EN.labels.beforeRestore)
-    useBook.getState().restoreChapter(chapter.id, body)
-    toast(t.history.restored(chapter.title, when(t, items?.find((i) => i.id === selected)?.at ?? '')))
+    useBook.getState().restoreChapter(chapter.id, text)
+    toast(t.history.restored(chapter.title, when(t, items?.find((i) => i.id === id)?.at ?? '')))
     onClose()
   }
+  // Off only when there is nothing to restore: no versions, or the selected version cannot be read.
+  const cannotRestore = (items !== null && items.length === 0) || (loaded !== null && loaded.id === selected && loaded.text === null)
+  const spinner = loaded === null || (waiting && slow)
 
   return (
     <Dialog
@@ -139,14 +189,15 @@ export function HistoryDialog({ chapterId, onClose }: { chapterId: string | null
           <Button variant="ghost" onClick={onClose}>
             {t.common.close}
           </Button>
-          <Button variant="primary" icon={<ClockCounterClockwise size={14} />} disabled={body == null} onClick={restore}>
+          <Button variant="primary" icon={<ClockCounterClockwise size={14} />} disabled={cannotRestore} onClick={() => void restore()}>
             {t.history.restore}
           </Button>
         </>
       }
     >
       {items === null ? (
-        <div className="history-empty">
+        // As high as the versions and the compare view, so the dialog keeps its size when they show.
+        <div className="history-empty is-reading">
           <Spinner /> {t.history.reading}
         </div>
       ) : items.length === 0 ? (
@@ -165,14 +216,23 @@ export function HistoryDialog({ chapterId, onClose }: { chapterId: string | null
               </li>
             ))}
           </ol>
-          <div className="history-preview">
-            {stats && (
-              <div className="history-stats">
-                {t.history.ifRestore} <span className="plus">+{t.common.number(stats.added)}</span> <span className="minus">−{t.common.number(stats.removed)}</span> {t.history.words}
-              </div>
-            )}
+          <div className="history-preview" aria-busy={waiting}>
+            {/* The line keeps its height without numbers, so the compare view does not move. */}
+            <div className={clsx('history-stats', (!stats || spinner) && 'is-empty')} aria-hidden={!stats || spinner}>
+              {stats ? (
+                <>
+                  {t.history.ifRestore} <span className="plus">+{t.common.number(stats.added)}</span> <span className="minus">−{t.common.number(stats.removed)}</span> {t.history.words}
+                </>
+              ) : (
+                '\u00a0'
+              )}
+            </div>
             <div className="history-text prose" ref={textRef}>
-              {ops ? (
+              {spinner ? (
+                <Spinner />
+              ) : loaded?.text == null ? (
+                <span className="history-unreadable">{t.history.unreadable}</span>
+              ) : ops ? (
                 ops.map((op, i) =>
                   op.type === 'equal' ? (
                     <span key={i}>{op.text}</span>

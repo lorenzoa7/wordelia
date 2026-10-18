@@ -96,4 +96,52 @@ export default async function ({ page, shot, openBook, book }) {
   console.log('oldest version:', JSON.stringify(other))
   if (other.top == null || other.top < 0 || other.top > other.height) fail('the first change of another version is not in view')
   await shot('first-change-other')
+
+  // The buttons stay still while the author goes from version to version: no flash, no move. Each change
+  // of an attribute in the footer counts, also one that lasts less than a frame (the Restore button was
+  // off while each version loaded). The compare view keeps its place too.
+  await page.evaluate(() => {
+    const foot = document.querySelector('.dialog-foot')
+    const rec = (window.__historyFoot = { mutations: [], frames: [] })
+    const observer = new MutationObserver((list) => {
+      for (const m of list) rec.mutations.push(`${m.type} ${m.attributeName ?? ''} ${m.target.nodeName}`)
+    })
+    observer.observe(foot, { attributes: true, childList: true, subtree: true, characterData: true })
+    rec.stop = () => observer.disconnect()
+    const sample = () => {
+      const buttons = [...foot.querySelectorAll('button')].map((b) => {
+        const r = b.getBoundingClientRect()
+        const cs = getComputedStyle(b)
+        return [b.textContent, b.disabled, cs.opacity, cs.backgroundColor, cs.color, Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)].join('|')
+      })
+      const text = document.querySelector('.history-text').getBoundingClientRect()
+      return [...buttons, `compare view ${Math.round(text.y)} ${Math.round(text.height)}`].join(' ; ')
+    }
+    const tick = () => {
+      rec.frames.push(sample())
+      if (!rec.done) requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+  })
+  const versions = await page.locator('.history-item').count()
+  // Each version, then the first one again (the dialog keeps the versions that it read).
+  for (const i of [...Array(versions).keys(), 0]) {
+    await page.locator('.history-item').nth(i).click()
+    await page.waitForFunction(
+      (n) => document.querySelectorAll('.history-item')[n].getAttribute('aria-current') === 'true' && document.querySelector('.history-preview[aria-busy="false"]'),
+      i
+    )
+    await page.waitForTimeout(150)
+  }
+  const foot = await page.evaluate(() => {
+    const r = window.__historyFoot
+    r.done = true
+    r.stop()
+    return { mutations: r.mutations, states: [...new Set(r.frames)], frames: r.frames.length }
+  })
+  console.log('footer:', JSON.stringify({ versions, ...foot }))
+  if (versions < 3) fail(`only ${versions} versions to go through`)
+  if (foot.mutations.length) fail(`the buttons changed while the versions loaded: ${foot.mutations.join(', ')}`)
+  if (foot.states.length !== 1) fail(`the buttons or the compare view moved or flashed: ${foot.states.join(' / ')}`)
+  await shot('versions-buttons-still')
 }

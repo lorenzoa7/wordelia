@@ -6,6 +6,7 @@ export const history: typeof en = {
   description: 'O Wordelia guarda versões quando você abre um capítulo, a cada poucos minutos enquanto você escreve e antes das mudanças da IA.',
   restore: 'Restaurar esta versão',
   reading: 'Lendo o histórico…',
+  unreadable: 'O Wordelia não consegue ler esta versão.',
   empty: 'Ainda não há versões. O Wordelia salva uma quando você abre o capítulo e enquanto você escreve.',
   ifRestore: 'Se você restaurar esta versão:',
   words: 'palavras',

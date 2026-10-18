@@ -162,11 +162,12 @@ function run(args) {
 }
 
 const isBad = (code, out) => code !== 0 || /\[renderer (error|pageerror)\]|Error:|-error\.png|saved: false|saved:\s*false/.test(out)
+// The output of a failed scenario, without the lines of saved screenshots: its measures help to find the cause.
 const errorLines = (out) =>
   out
     .split('\n')
-    .filter((l) => /error|Error|saved/.test(l))
-    .slice(0, 12)
+    .filter((l) => l.trim() && !/^saved /.test(l) && !/^\s+at /.test(l))
+    .slice(-40)
     .join('\n')
 
 const started = Date.now()

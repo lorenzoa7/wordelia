@@ -54,6 +54,10 @@ jobs:
 
       - run: npx electron-vite build
 
+      # The first start of Electron sets up its files; two apps that start at the same time must not both do it.
+      - name: Start Electron one time
+        run: npx electron --version
+
       # The runner screen is 1024 × 768; the scenarios need a 1440 × 900 window.
       - name: Make the screen larger
         shell: pwsh

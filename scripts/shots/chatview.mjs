@@ -515,4 +515,74 @@ export default async function ({ app, page, shot, openBook, book }) {
   if (reopened.empty.length) fail(`empty threads on disk: ${reopened.empty.join(', ')}`)
   if (reopened.active !== newest.id) fail(`the chat opened on "${reopened.title}", not on the last thread with messages`)
   await shot('reopened')
+
+  // 12. The bar for all the proposals of a reply, with 32 proposals and long file names, at each panel width:
+  //     the title, one line of files (names with "…", then "+N") and the two buttons fit in the bar. A button
+  //     that does not fit beside the text goes to its own line; no button is ever cut.
+  const names = pt
+    ? ['Revisão do manuscrito e da continuidade da segunda parte', 'Elias Andrade, o faroleiro de Santa Ilha desde a grande tempestade', 'Marta e o caderno de bordo do bote azul']
+    : ['Manuscript review and the continuity of the second part', 'Elias Andrade, the keeper of Saint Isle since the great storm', 'Marta and the logbook of the blue boat']
+  await page.evaluate((names) => {
+    const book = window.__wordelia.book.getState()
+    const now = new Date().toISOString()
+    const creates = Array.from({ length: 32 }, (_, i) => {
+      const name = i < names.length ? names[i] : `${names[i % names.length]} (${i + 1})`
+      return `<create file="planning/Characters/${name}.md">\n---\nsummary: Note ${i + 1}.\n---\nText of note ${i + 1}.\n</create>`
+    })
+    const thread = { id: 'th_bulk', title: 'Bulk bar', brief: '', digest: '', digestedCount: 0, createdAt: now, updatedAt: now, pinned: false, route: null,
+      messages: [
+        { id: 'm_bulk_user', role: 'user', content: 'Update the notes.', createdAt: now },
+        { id: 'm_bulk_ai', role: 'assistant', content: `Thirty-two notes.\n\n${creates.join('\n\n')}`, createdAt: now }
+      ] }
+    book.saveThread(thread)
+    window.__wordelia.chat.getState().setActiveThread('th_bulk')
+  }, names)
+  await page.waitForSelector('.msg-bulk', { timeout: 10000 })
+  const fullWords = pt ? 'Aplicar todas as 32' : 'Apply all 32'
+  for (const w of [320, 360, 400, 520, 680]) {
+    await setChat(w)
+    await page.waitForTimeout(350)
+    const r = await page.evaluate(() => {
+      const bar = document.querySelector('.msg-bulk')
+      const rect = (el) => {
+        const b = el.getBoundingClientRect()
+        return { l: Math.round(b.left * 10) / 10, r: Math.round(b.right * 10) / 10, t: Math.round(b.top * 10) / 10, b: Math.round(b.bottom * 10) / 10 }
+      }
+      const cut = (el) => el.scrollWidth > el.clientWidth + 1
+      const buttons = [...bar.querySelectorAll('.msg-bulk-actions .proposal-btn')]
+      const files = bar.querySelector('.msg-bulk-files')
+      const more = bar.querySelector('.msg-bulk-more')
+      const names = bar.querySelector('.msg-bulk-names')
+      const style = getComputedStyle(bar)
+      const inner = { l: bar.getBoundingClientRect().left + parseFloat(style.borderLeftWidth), r: bar.getBoundingClientRect().right - parseFloat(style.borderRightWidth) }
+      return {
+        bar: rect(bar),
+        inner,
+        count: { ...rect(bar.querySelector('.msg-bulk-count')), lines: Math.round(bar.querySelector('.msg-bulk-count').getBoundingClientRect().height / parseFloat(getComputedStyle(bar.querySelector('.msg-bulk-count')).lineHeight)) },
+        files: { ...rect(files), lines: Math.round(files.getBoundingClientRect().height / parseFloat(getComputedStyle(files).fontSize) / 1.2) },
+        names: { ...rect(names), ellipsis: cut(names) },
+        more: more ? { ...rect(more), text: more.textContent, cut: cut(more) } : null,
+        buttons: buttons.map((b) => ({ ...rect(b), text: b.textContent.trim(), cut: cut(b) })),
+        scroll: { cut: document.querySelector('.chat-scroll').scrollWidth > document.querySelector('.chat-scroll').clientWidth + 1 }
+      }
+    })
+    console.log(`reply bar at ${w}px:`, JSON.stringify(r))
+    const inside = (b) => b.l >= r.inner.l - 0.5 && b.r <= r.inner.r + 0.5
+    if (!inside(r.count) || !inside(r.files)) fail(`the text of the reply bar goes past the bar at ${w}px`)
+    if (r.files.lines !== 1) fail(`the files of the reply bar take ${r.files.lines} lines at ${w}px`)
+    if (!r.more || r.more.text !== '+29' || r.more.cut || !inside(r.more)) fail(`the count of the other files does not show at ${w}px`)
+    if (r.buttons.length !== 2) fail('the reply bar has no two buttons')
+    for (const b of r.buttons) {
+      if (!inside(b) || b.cut) fail(`the button "${b.text}" is cut at ${w}px`)
+    }
+    if (!r.buttons.some((b) => b.text.includes(fullWords))) fail(`no button says "${fullWords}" at ${w}px`)
+    const [a, b] = r.buttons
+    if (a.t === b.t && a.r > b.l + 0.5) fail(`the two buttons overlap at ${w}px`)
+    // The buttons are beside the text or under it, never on top of it.
+    const meet = (p, q) => p.l < q.r - 0.5 && q.l < p.r - 0.5 && p.t < q.b - 0.5 && q.t < p.b - 0.5
+    for (const btn of r.buttons) if (meet(btn, r.count) || meet(btn, r.files)) fail(`the button "${btn.text}" covers the text at ${w}px`)
+    if (r.scroll.cut) fail(`the chat scrolls sideways at ${w}px`)
+    await shot(`reply-bar-${w}`)
+    await crop(`reply-bar-${w}`, '.msg-bulk')
+  }
 }

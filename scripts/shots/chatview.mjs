@@ -130,6 +130,12 @@ export default async function ({ app, page, shot, openBook, book }) {
     w.ro.observe(list)
     w.t0 = performance.now()
   })
+  // A new observer reports the sizes once at the start: that is the state before the send, not a frame after it.
+  await page.waitForTimeout(100)
+  await page.evaluate(() => {
+    window.__scroll.samples = []
+    window.__scroll.t0 = performance.now()
+  })
   await page.keyboard.press('Enter')
   // The first frames after send.
   await page.waitForTimeout(60)

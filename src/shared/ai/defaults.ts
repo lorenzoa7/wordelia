@@ -1,7 +1,14 @@
 // Default AI actions and the writing rules template.
 
 import type { AiAction } from '../types'
+import { normalizeShortcut } from './shortcuts'
 
+/**
+ * The built-in actions: the passes of a line editor that keep the words and the facts of the author.
+ * Fix grammar only (proofread), Polish (line edit, the main action), Tighten (cut) and Show, don't tell
+ * (one craft note). Expand left the defaults in version 0.7: it is the only action that writes new
+ * material, and the chat does that better (see RETIRED_ACTIONS).
+ */
 export const DEFAULT_ACTIONS: AiAction[] = [
   {
     id: 'polish',
@@ -63,7 +70,15 @@ export const DEFAULT_ACTIONS: AiAction[] = [
       'Find places where emotions or traits are stated directly, and show them instead through action, sensory detail, body language or dialogue.',
       'Keep every fact. Keep the length within about 30% of the original.'
     ].join('\n')
-  },
+  }
+]
+
+/**
+ * Built-in actions of older versions, exactly as those versions wrote them to the settings. Settings
+ * version 5 removes each one that the author did not change (`withoutRetiredActions`). A changed one
+ * stays, and its name and instructions still show in the interface language (`common.builtinActions`).
+ */
+export const RETIRED_ACTIONS: AiAction[] = [
   {
     id: 'expand',
     name: 'Expand',
@@ -79,7 +94,42 @@ export const DEFAULT_ACTIONS: AiAction[] = [
   }
 ]
 
+/** Every built-in action that a settings file can hold: the defaults and the retired ones. */
+export const BUILTIN_ACTIONS: AiAction[] = [...DEFAULT_ACTIONS, ...RETIRED_ACTIONS]
+
 export const DEFAULT_ACTION_ID = 'polish'
+
+/**
+ * True when `a` is the built-in action `def` as the app wrote it: the same name, instructions, icon,
+ * model, effort, context and shortcut. `anyShortcut`: settings from before version 4, where the user
+ * could not choose a shortcut, so the shortcut that version 4 gave does not count as a change.
+ */
+export function isUnchangedBuiltIn(a: AiAction, def: AiAction, anyShortcut = false): boolean {
+  return (
+    a.builtIn === true &&
+    a.id === def.id &&
+    a.name === def.name &&
+    a.instructions === def.instructions &&
+    a.icon === def.icon &&
+    a.route == null &&
+    a.effort == null &&
+    a.contextChars === def.contextChars &&
+    (anyShortcut || normalizeShortcut(a.shortcut) === def.shortcut)
+  )
+}
+
+/**
+ * Settings version 5: remove the retired built-in actions that the author did not change. A changed
+ * one stays, and so does the main action (the author chose it). The other actions keep their
+ * shortcuts; a shortcut of a removed action becomes free. The list never becomes empty.
+ */
+export function withoutRetiredActions(actions: AiAction[], mainId: string, anyShortcut = false): AiAction[] {
+  const next = actions.filter((a) => {
+    const def = RETIRED_ACTIONS.find((r) => r.id === a.id)
+    return !def || a.id === mainId || !isUnchangedBuiltIn(a, def, anyShortcut)
+  })
+  return next.length ? next : actions
+}
 
 export function writingRulesTemplate(language: string): string {
   return `# Writing rules

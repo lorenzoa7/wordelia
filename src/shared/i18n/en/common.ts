@@ -1,7 +1,7 @@
 // Words that many parts of the app use. English is the source language: the other
 // languages must have the same keys (TypeScript checks it).
 
-import { DEFAULT_ACTIONS } from '../../ai/defaults'
+import { BUILTIN_ACTIONS } from '../../ai/defaults'
 
 const n = (v: number): string => v.toLocaleString('en-US')
 
@@ -52,14 +52,14 @@ export const common = {
     sync: { name: 'Planning sync', hint: 'Reads chapters and updates the planning.' },
     background: { name: 'Background', hint: 'Thread digests, titles and chapter summaries.' }
   },
-  /** Names of the built-in actions, by action id */
+  /** Names of the built-in actions, by action id. Expand is retired, but an author can still have a changed copy. */
   builtinActions: { polish: 'Polish', tighten: 'Tighten', grammar: 'Fix grammar only', show: "Show, don't tell", expand: 'Expand' } as Record<string, string>,
   /**
    * Instructions of the built-in actions, by action id. The app shows them, and sends them to the AI,
    * while the user has not changed them (see `actionInstructions`). The English text is the text of
-   * DEFAULT_ACTIONS in src/shared/ai/defaults.ts. Translate each line; keep the same lines.
+   * BUILTIN_ACTIONS in src/shared/ai/defaults.ts (the defaults and the retired ones). Translate each line; keep the same lines.
    */
-  builtinActionInstructions: Object.fromEntries(DEFAULT_ACTIONS.map((a) => [a.id, a.instructions])) as Record<string, string>,
+  builtinActionInstructions: Object.fromEntries(BUILTIN_ACTIONS.map((a) => [a.id, a.instructions])) as Record<string, string>,
   /** Names of the default planning categories, by category id */
   categories: { characters: 'Characters', places: 'Places', world: 'World', plot: 'Plot', notes: 'Notes' } as Record<string, string>
 }

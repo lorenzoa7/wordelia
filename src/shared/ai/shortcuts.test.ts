@@ -68,10 +68,10 @@ describe('shortcuts', () => {
   })
   it('the built-in actions have the default shortcuts', () => {
     expect(withDefaultShortcuts(DEFAULT_ACTIONS, 'polish')).toEqual(DEFAULT_ACTIONS)
-    expect(DEFAULT_ACTIONS.map((a) => a.shortcut)).toEqual(['Ctrl+J', 'Alt+2', 'Alt+3', 'Alt+4', 'Alt+5'])
+    expect(DEFAULT_ACTIONS.map((a) => a.shortcut)).toEqual(['Ctrl+J', 'Alt+2', 'Alt+3', 'Alt+4'])
   })
   it('finds a free shortcut for a new action', () => {
-    expect(freeShortcut(DEFAULT_ACTIONS, 5)).toBe('Alt+6')
+    expect(freeShortcut(DEFAULT_ACTIONS, 4)).toBe('Alt+5')
     expect(freeShortcut([action('a', 'Alt+2')], 1)).toBe('Alt+1')
   })
   it('finds the action of a key press', () => {

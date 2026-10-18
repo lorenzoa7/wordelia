@@ -1,19 +1,25 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_ACTIONS } from '../ai/defaults'
+import { BUILTIN_ACTIONS, DEFAULT_ACTIONS } from '../ai/defaults'
 import { MESSAGES, actionInstructions } from '.'
 
 describe('built-in action instructions', () => {
   it('the English text is the default text', () => {
-    for (const a of DEFAULT_ACTIONS) expect(MESSAGES.en.common.builtinActionInstructions[a.id]).toBe(a.instructions)
+    for (const a of BUILTIN_ACTIONS) expect(MESSAGES.en.common.builtinActionInstructions[a.id]).toBe(a.instructions)
   })
   it('each language has each built-in action, with the same number of lines', () => {
     for (const locale of ['pt-BR', 'es'] as const) {
-      for (const a of DEFAULT_ACTIONS) {
+      for (const a of BUILTIN_ACTIONS) {
         const text = MESSAGES[locale].common.builtinActionInstructions[a.id]
         expect(text, `${locale} ${a.id}`).toBeTruthy()
         expect(text.split('\n').length, `${locale} ${a.id}`).toBe(a.instructions.split('\n').length)
       }
     }
+  })
+  it('each language has a name for each built-in action, also for the retired ones', () => {
+    for (const locale of ['en', 'pt-BR', 'es'] as const) {
+      for (const a of BUILTIN_ACTIONS) expect(MESSAGES[locale].common.builtinActions[a.id], `${locale} ${a.id}`).toBeTruthy()
+    }
+    expect(MESSAGES.en.common.builtinActions).toEqual(Object.fromEntries(BUILTIN_ACTIONS.map((a) => [a.id, a.name])))
   })
   it('shows unchanged instructions in the interface language, and changed ones as they are', () => {
     const polish = DEFAULT_ACTIONS[0]

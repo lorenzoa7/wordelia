@@ -33,6 +33,8 @@ This file is the ubiquitous language of Wordelia. Use these words in code, docs 
 | **Brief** | The purpose of a thread, written by the user. Example: "Marta's arc". | `thread.brief` |
 | **Digest** | A short summary of a thread that the AI keeps up to date. All other threads read it. | `thread.digest` |
 | **Action** | A configurable AI operation on selected text, for example **Polish**. | `Action` |
+| **Global action** | An action for all books. The app settings keep it. The settings call the group "All books". | `AppSettings.actions`, scope `global` |
+| **Book action** | An action that only one book has. The book folder keeps it in `ai/actions.json`. The settings call the group "This book". | `useBook.actions`, scope `book` |
 | **Writing rules** | The rules of the author that apply to all AI work on this book. | `writingRules` |
 | **Proposal** | A change that the AI proposes. The user must accept or reject it. | `Proposal` |
 | **Hunk** | One part of a proposal: one find-and-replace on one file. | `Hunk` |

@@ -54,6 +54,7 @@ Outside React (stores, plain functions): `getT()` from `@/lib/i18n`. In the main
 | Change (in a diff) | Mudança | Cambio |
 | Action | Ação | Acción |
 | Main action | Ação principal | Acción principal |
+| All books / This book (where an action is kept) | Todos os livros / Este livro | Todos los libros / Este libro |
 | Reply (send to chat) | Responder | Responder |
 | Mention | Menção | Mención |
 | Version / Version history | Versão / Histórico de versões | Versión / Historial de versiones |

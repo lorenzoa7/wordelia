@@ -261,6 +261,15 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] Settings → Writing rules: long rules no longer touch the bottom edge of the dialog. Each tab keeps 32 px under its content at the end of its scroll (the `settings` scenario measures all tabs, also with 60 rules)
 - [x] The bar for all the proposals of a reply fits at every panel width: the title, one line of files (three names with "…", then "+29"; all the names in a tooltip), and the two buttons, which go to their own line when they do not fit and never get cut (the `chatview` scenario: 32 proposals with long names at 320, 360, 400, 520 and 680 px)
 
+## Version 0.8 — fifth feedback of the author
+
+### Actions and history
+
+- [x] Actions for one book. Settings → Actions has two groups: "All books" (the app settings) and "This book" (only when a book is open). The book keeps its actions in `ai/actions.json` in its folder, so they go with the book. Each group has "New". "Use in: All books | This book" moves an action to the other group; a move to this book asks first, because the other books lose the action. A built-in action keeps its name and instructions in the interface language when it moves, and it can go back without a change. The main action (Ctrl+J) stays for all books (decision 0004)
+- [x] The selection menu, the shortcuts, Retry, the review bar and the keyboard list in Settings → General use the global actions, then the actions of the open book (`mergeActions`, `useAllActions`)
+- [x] Shortcuts across the two groups: the settings refuse a shortcut that an action of the other group has. When two actions get one shortcut anyway (a global shortcut set while another book was open, or a book from another computer), the book action wins inside its book. The settings show the shortcut of the global action struck through, with "In this book, Alt+2 runs “Narrator voice”." (unit tests in `scopes.test.ts`; scenario `book-actions`, also in Portuguese)
+- [x] Version history: "Close" and "Restore this version" stay still when the author selects another version. Restore stays on while a version loads, and a click waits for the selected version. The compare view keeps the last version until the new text is there (a spinner only after 300 ms), and the line "If you restore this version" keeps its height, so nothing moves. The `history` scenario records the footer in each frame, and each change of its attributes, while it goes through all versions (the old dialog fails it: Restore went off at each version, and the compare view moved 24 px)
+
 ## Tests and CI
 
 - [x] End-to-end scenarios run with a hidden window (transparent, no focus) and with CSS animations off
@@ -272,4 +281,3 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - Sync to a git remote from the app
 - EPUB export
 - Typewriter sounds (optional)
-- Book-level overrides of actions

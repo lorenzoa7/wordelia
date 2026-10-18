@@ -42,6 +42,13 @@ export function useFollowEnd(box: HTMLElement | null, content: HTMLElement | nul
     if (was && !busy && on.current) follow()
   }, [busy, follow])
 
+  // Every render of the panel while it follows (new text, the thinking line): back to the end before the
+  // browser paints. The ResizeObserver below catches the changes that React does not make (a font that
+  // loads), but its callback can come after other observers in the same frame.
+  useLayoutEffect(() => {
+    if (box && on.current && (busyNow.current || performance.now() < until.current)) toEnd()
+  })
+
   useEffect(() => {
     if (!box || !content) return
     last.current = { top: box.scrollTop, height: box.scrollHeight }

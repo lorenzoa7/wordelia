@@ -1,6 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import {
-  ArrowsClockwise,
   CaretRight,
   DownloadSimple,
   Folder,
@@ -14,12 +13,12 @@ import {
   type IconProps
 } from '@phosphor-icons/react'
 import clsx from 'clsx'
-import { IconButton, Tooltip } from '@/ui'
+import { IconButton } from '@/ui'
 import { askText } from '@/ui/prompt'
 import { categoryName, useT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
 import { HideSidebarButton } from '@/features/book/SidebarToggle'
-import { changedChapters, startPlanningSync } from './sync'
+import { SyncButton, SyncResultCard } from './SyncPanel'
 import { importNotes } from './importNotes'
 
 const CATEGORY_ICONS: Record<string, React.ComponentType<IconProps>> = {
@@ -47,10 +46,7 @@ export function PlanSidebar(): React.JSX.Element {
   const entries = useBook((s) => s.entries)
   const activeCategory = useBook((s) => s.activeCategory)
   const activeEntry = useBook((s) => s.activeEntryId)
-  const chapters = useBook((s) => s.chapters)
-  const syncState = useBook((s) => s.syncState)
   const [open, setOpen] = useState<Record<string, boolean>>({})
-  const pending = useMemo(() => changedChapters().length, [chapters, syncState]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const categories = manifest?.planning.categories ?? []
   const isOverview = !activeEntry && !categories.some((c) => c.folder === activeCategory)
@@ -72,27 +68,8 @@ export function PlanSidebar(): React.JSX.Element {
       </div>
 
       {/* The planning sync: the AI reads the changed chapters and proposes changes to the notes. */}
-      <Tooltip
-        side="right"
-        label={
-          <span className="sync-tip">
-            <span>{t.plan.sidebar.updateNotesHint}</span>
-            <b>{pending ? t.plan.sidebar.changedChapters(pending) : t.plan.sidebar.upToDate}</b>
-          </span>
-        }
-      >
-        <button
-          className={clsx('sync-btn', pending > 0 && 'has-pending')}
-          aria-label={t.plan.sidebar.sync}
-          onClick={() => void startPlanningSync()}
-        >
-          <ArrowsClockwise size={15} />
-          <span className="sync-text">
-            <span className="sync-label">{t.plan.sidebar.sync}</span>
-          </span>
-          {pending > 0 && <span className="sync-count">{pending}</span>}
-        </button>
-      </Tooltip>
+      <SyncButton />
+      <SyncResultCard />
 
       <nav className="plan-nav">
         <button

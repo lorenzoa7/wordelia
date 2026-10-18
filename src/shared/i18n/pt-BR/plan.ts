@@ -18,7 +18,7 @@ export const plan: typeof en = {
       'A IA lê os capítulos que mudaram desde a última atualização e propõe mudanças nas notas do planejamento. Você aceita ou rejeita cada mudança. A IA não muda o manuscrito.',
     changedChapters: (count) =>
       count === 1 ? '1 capítulo mudou desde a última atualização.' : `${count} capítulos mudaram desde a última atualização.`,
-    upToDate: 'Nenhum capítulo mudou desde a última atualização.',
+    upToDate: 'Em dia: nenhum capítulo mudou desde a última atualização.',
     overview: 'Visão geral',
     showEntries: (category) => `${category}: mostrar notas`,
     hideEntries: (category) => `${category}: ocultar notas`,
@@ -95,9 +95,21 @@ export const plan: typeof en = {
     connectAiFirst: 'Conecte uma IA primeiro.',
     openSettings: 'Abrir configurações',
     upToDate: 'O planejamento está em dia com o manuscrito.',
-    done: 'Sincronização concluída. Revise as propostas no chat.',
+    syncing: 'Sincronizando…',
+    reading: (n) => (n === 1 ? 'Lendo 1 capítulo…' : `Lendo ${n} capítulos…`),
+    writing: (found) => (found === 0 ? 'Escrevendo as mudanças…' : found === 1 ? '1 mudança até agora…' : `${found} mudanças até agora…`),
+    part: (part, parts) => `Parte ${part} de ${parts}`,
+    cancel: 'Cancelar a sincronização',
+    proposed: (n) => (n === 1 ? '1 mudança proposta nas notas' : `${n} mudanças propostas nas notas`),
+    noChanges: 'Nenhuma mudança. As notas estão de acordo com os capítulos.',
+    review: 'Revisar',
+    reviewHint: 'Abrir as mudanças no chat. Lá você aceita ou rejeita cada mudança.',
+    accepted: (n) => (n === 1 ? '1 mudança aplicada nas notas.' : `${n} mudanças aplicadas nas notas.`),
+    rejected: (n) => (n === 1 ? '1 mudança rejeitada.' : `${n} mudanças rejeitadas.`),
+    failed: 'A sincronização parou.',
+    result: 'Resultado da sincronização',
     threadTitle: 'Sincronização do planejamento',
-    threadBrief: 'Mantém o planejamento em dia com o manuscrito. As propostas vêm do botão Atualizar notas.',
+    threadBrief: 'Mantém o planejamento em dia com o manuscrito. As propostas vêm do botão Sincronizar.',
     request: (bootstrap, count, chapters, part, parts) => {
       const what = bootstrap
         ? count === 1

@@ -9,7 +9,7 @@ import { Button, Tooltip } from '@/ui'
 import { categoryName, folderCategoryName, useT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
 import { CategoryIcon } from '@/features/plan/PlanSidebar'
-import { startPlanningSync } from '@/features/plan/sync'
+import { BuildPlanningButton } from '@/features/plan/SyncPanel'
 import { MapCanvas } from './MapCanvas'
 import { openCards, openEntryFromMap, openMap } from './nav'
 import './graph.css'
@@ -208,11 +208,7 @@ export function MapView(): React.JSX.Element {
               <Graph size={40} weight="thin" aria-hidden />
               <h2>{t.plan.map.emptyTitle}</h2>
               <p>{t.plan.map.emptyText}</p>
-              {chapters.some((c) => c.body.trim()) && (
-                <Button variant="ribbon" onClick={() => void startPlanningSync({ bootstrap: true })}>
-                  {t.plan.overview.buildFromManuscript}
-                </Button>
-              )}
+              {chapters.some((c) => c.body.trim()) && <BuildPlanningButton />}
             </div>
           ) : map.nodes.length === 0 ? (
             <div className="map-empty">

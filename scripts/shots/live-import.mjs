@@ -26,6 +26,9 @@ export default async function ({ page, shot }) {
   }
   const seconds = Math.round((Date.now() - t0) / 1000)
   if (!reply) throw new Error('No sync reply after 9 minutes')
+  // The sync runs in the background: Review in the card of the Plan sidebar opens its thread.
+  await page.keyboard.press('Control+2')
+  await page.locator('.sync-review').click({ timeout: 30000 })
   await page.waitForTimeout(1500)
   await shot('sync-reply')
 

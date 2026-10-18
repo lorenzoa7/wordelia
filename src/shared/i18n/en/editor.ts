@@ -22,7 +22,10 @@ export const editor = {
     findReplace: 'Find and replace',
     focusMode: 'Focus mode',
     zoom: 'Zoom',
-    zoomReset: 'Back to 100 %'
+    zoomReset: 'Back to 100 %',
+    zoomIn: 'Zoom in',
+    zoomOut: 'Zoom out',
+    zoomSliderHint: 'Drag to zoom. Double-click: 100 %'
   },
   /** The small menu above a text selection */
   selection: {
@@ -37,6 +40,8 @@ export const editor = {
     chapter: 'Chapter'
   },
   /** The bar under an inline AI review */
+  /** The mark of a selected page break (Ctrl+Enter) */
+  pageBreak: 'Page break',
   review: {
     chatProposal: 'Chat proposal',
     /** Words that the AI wrote so far */

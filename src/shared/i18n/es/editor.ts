@@ -21,7 +21,10 @@ export const editor: typeof en = {
     findReplace: 'Buscar y reemplazar',
     focusMode: 'Modo concentración',
     zoom: 'Zoom',
-    zoomReset: 'Volver al 100 %'
+    zoomReset: 'Volver al 100 %',
+    zoomIn: 'Acercar',
+    zoomOut: 'Alejar',
+    zoomSliderHint: 'Arrastra para cambiar el zoom. Doble clic: 100 %'
   },
   selection: {
     askChat: 'Preguntar al chat sobre esto',
@@ -32,6 +35,8 @@ export const editor: typeof en = {
     editActions: 'Editar acciones…',
     chapter: 'Capítulo'
   },
+  /** The mark of a selected page break (Ctrl+Enter) */
+  pageBreak: 'Salto de página',
   review: {
     chatProposal: 'Propuesta del chat',
     words: (n) => (n === 1 ? '1 palabra' : `${n} palabras`),

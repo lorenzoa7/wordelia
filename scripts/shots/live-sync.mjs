@@ -47,6 +47,8 @@ export default async function ({ page, shot, work }) {
   }
   const seconds = Math.round((Date.now() - t0) / 1000)
   if (!reply) throw new Error('No sync reply')
+  // The sync runs in the background: Review in the card of the Plan sidebar opens its thread.
+  await page.locator('.sync-review').click({ timeout: 30000 })
   await page.waitForTimeout(1500)
   await shot('sync-reply')
   const bulk = page.locator('.msg-bulk .proposal-btn.is-accept')

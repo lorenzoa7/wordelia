@@ -110,7 +110,9 @@ function spacer(state: EditorState, r: ReviewData): Decoration {
 }
 
 function decorations(state: EditorState, r: ReviewData): DecorationSet {
-  const decos: Decoration[] = [spacer(state, r)]
+  // The room for the review bar under the paragraph: only when the change is ready. While the AI
+  // works, the bar sits above the selection (ReviewBar.tsx).
+  const decos: Decoration[] = r.phase === 'ready' ? [spacer(state, r)] : []
   if (r.phase !== 'ready') {
     decos.push(Decoration.inline(r.from, r.to, { class: r.phase === 'error' ? 'ai-error' : 'ai-pending' }))
     return DecorationSet.create(state.doc, decos)

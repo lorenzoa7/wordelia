@@ -96,12 +96,21 @@ export default async function ({ page, shot, openBook }) {
   console.log('text at the reading line before and after:', JSON.stringify(before), JSON.stringify(after))
   if (before !== after) throw new Error('Zoom in and out moved the view to other text')
 
-  // The zoom menu of the toolbar
+  // The zoom slider of the toolbar: drag to 150 %, then a double click goes back to 100 %.
   await page.locator('.toolbar-zoom').click()
-  await page.locator('[role="menuitemradio"]', { hasText: '150%' }).click()
+  await page.waitForSelector('.zoom-slider', { state: 'visible' })
+  await page.locator('.zoom-slider').evaluate((el) => {
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    set.call(el, '150')
+    el.dispatchEvent(new Event('input', { bubbles: true }))
+  })
   await page.waitForTimeout(400)
   const z = await page.evaluate(() => window.__wordelia.app.getState().settings.ui.zoom)
   await shot('toolbar-zoom')
-  if (z !== 1.5) throw new Error('The zoom menu did not set the zoom')
+  if (z !== 1.5) throw new Error(`The zoom slider did not set the zoom (${z})`)
+  await page.locator('.zoom-slider').dblclick()
+  await page.waitForTimeout(300)
+  const back = await page.evaluate(() => window.__wordelia.app.getState().settings.ui.zoom)
+  if (back !== 1) throw new Error(`A double click on the slider did not go back to 100 % (${back})`)
   await page.keyboard.press('Control+0')
 }

@@ -234,6 +234,25 @@ This file is the source of truth for progress. Update it after each task. Mark a
 
 ## Version 0.7 — fourth feedback of the author
 
+### Editor
+
+- [x] A new page grows in one time; it no longer flickers (the measure restarted its animation)
+- [x] Smooth zoom (a short transform) and a zoom slider in the toolbar; a double click goes back to 100 %
+- [x] The loading bar of an action stays above the selection; the result bar goes under the paragraph
+- [x] The Polish button is a light chip, not red
+- [x] Accept and Reject in the text are labeled pills
+- [x] Chat proposals for planning notes show in the note as a diff (scenario `notediff`)
+- [x] The first Backspace selects a page break and shows its mark; a selected scene break has a ring
+
+### Planning
+
+- [x] The sync runs in the background. "Sync" no longer opens the chat or changes its thread. The button shows a spinner, "Syncing…" and the progress ("Reading 2 chapters…", then "1 change so far…"; "Part 1 of 2" for a long book), with a button that cancels. A cancel keeps the complete changes, and the chapters of the stopped part still wait (scenario `sync`)
+- [x] The result shows in the Plan sidebar, under the button: "2 changes proposed to the notes", the names of the notes, Review, Accept all and Reject all (Reject all has Undo). An error shows in the same card, with Try again or Open settings. When the Plan sidebar is not on screen, a toast tells the result, with Review
+- [x] Review opens the chat on the "Planning sync" thread, at its proposal cards. The proposals stay in that thread, so the cards, the inline diffs in the notes and Apply all work as before. The author never looks for the thread
+- [x] The Sync button is off when no chapter changed since the last sync. Its tooltip says "Up to date". A chapter that the author changes while the sync runs still waits for the next sync
+- [x] Category rows in the Plan sidebar: the caret, the icon and the name share one middle (the `icons` scenario measures the caret). A click anywhere on the row shows the category page and its entries; on the page that shows, a click folds or unfolds the entries. The caret only folds and unfolds. Enter is a click, → unfolds, ← folds (scenario `plannav`)
+- [x] Map hover with a fade: the pale map and the highlight fade in and out in 180 ms (ease-out; no fade with reduced motion). The pale map is three groups that fade as one, and a focus layer above them draws the node, its neighbors and its edges again. With 300 entries at rest, a hover frame takes 6.8 ms on average, p95 7.5 ms (version 0.6: 27 ms, p95 60 ms, up to 195 ms). So the fade shows, and the old fade of 120 ms did not (scenario `graph`)
+
 ### Settings, library, history and the reply bar
 
 - [x] Four built-in actions: Polish (Ctrl+J), Tighten (Alt+2), Fix grammar only (Alt+3) and Show, don't tell (Alt+4). Expand left the defaults: it is the only action that writes new material, and the chat does that better. Settings version 5 removes Expand only when the author did not change it (name, instructions, icon, model, effort, context, shortcut) and it is not the main action; Alt+5 becomes free. A kept Expand and old "Before Expand" versions still show in the interface language (`withoutRetiredActions`, unit tests; the `settings` scenario counts the actions)

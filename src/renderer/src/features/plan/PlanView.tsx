@@ -16,7 +16,7 @@ import { MAP_PAGE, MapView, PlanViewSwitch, mapBack, useReturnsToMap } from '@/f
 import { NoteEditor } from './NoteEditor'
 import { CategoryIcon } from './PlanSidebar'
 import { importNotes } from './importNotes'
-import { startPlanningSync } from './sync'
+import { BuildPlanningButton } from './SyncPanel'
 import './plan.css'
 
 /** One level up: from an entry to its category, from a category or the map to the overview. An entry opened from the map goes back to the map. */
@@ -168,9 +168,7 @@ function CategoryGrid({ folder }: { folder: string | null }): React.JSX.Element 
             <p>{t.plan.overview.intro}</p>
             {total === 0 && (
               <div className="plan-hero-actions">
-                <Button variant="ribbon" onClick={() => void startPlanningSync({ bootstrap: true })}>
-                  {t.plan.overview.buildFromManuscript}
-                </Button>
+                <BuildPlanningButton />
               </div>
             )}
           </header>
@@ -372,6 +370,7 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
             value={entry.body}
             onChange={(md) => update(entry.id, { body: md })}
             quoteLabel={entry.name}
+            inlineProposals
             placeholder={t.plan.entry.notesPlaceholder}
           />
         </div>

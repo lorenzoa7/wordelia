@@ -54,6 +54,8 @@ function gapElement(b: Break, m: PageMetrics, index: number, fresh: boolean): HT
   el.setAttribute('contenteditable', 'false')
   el.setAttribute('aria-hidden', 'true')
   el.dataset.page = String(index + 1)
+  // A new page grows in one time: after that it is a page like the others.
+  if (fresh) el.addEventListener('animationend', (e) => e.target === el && el.classList.remove('is-new'))
   el.style.height = zoomed(b.rest + m.marginBottom + m.gap + m.marginTop, m)
   // A new page grows from the end of the page before it (editor.css).
   el.style.setProperty('--gap-from', zoomed(b.rest + m.marginBottom, m))

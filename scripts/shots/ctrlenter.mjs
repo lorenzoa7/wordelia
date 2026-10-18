@@ -55,6 +55,16 @@ export default async function ({ page, shot, openBook }) {
 
   // The page break is saved in the Markdown, and Backspace at the start of the new page removes it.
   for (let i = 0; i < 40; i++) await page.keyboard.press('Backspace')
+  // The first Backspace at the start of the new page selects the page break and shows its mark.
+  await page.keyboard.press('Backspace')
+  await page.waitForTimeout(300)
+  const marked = await page.evaluate(() => {
+    const el = document.querySelector('.page-break.ProseMirror-selectednode')
+    return el ? getComputedStyle(el, '::after').content : null
+  })
+  console.log('page break mark:', marked)
+  if (!marked || marked === 'none') throw new Error('The first Backspace did not show the page break as selected')
+  await shot('page-break-selected')
   await page.keyboard.press('Backspace')
   await page.waitForTimeout(900)
   const end = await check('after Backspace')

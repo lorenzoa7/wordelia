@@ -28,7 +28,10 @@ export interface InlineProposal {
   threadId: string
   messageId: string
   key: string
-  chapterId: string
+  /** A chapter or a planning entry */
+  kind: 'chapter' | 'entry'
+  /** The id of the chapter or the entry */
+  docId: string
   /** The proposal file, as the AI wrote it */
   file: string
   /** Markdown, as the AI wrote it */
@@ -48,8 +51,8 @@ interface InlineState {
 
 export const useInlineProposals = create<InlineState>(() => ({ list: [], focus: null }))
 
-/** The chapter changes of a thread that wait for a decision. */
-export function pendingChapterProposals(thread: Thread): InlineProposal[] {
+/** The changes of a thread to chapters and planning entries that wait for a decision. */
+export function pendingProposals(thread: Thread): InlineProposal[] {
   const out: InlineProposal[] = []
   for (const m of thread.messages) {
     if (m.role !== 'assistant' || !m.content.includes('<edit')) continue
@@ -57,7 +60,8 @@ export function pendingChapterProposals(thread: Thread): InlineProposal[] {
     for (const seg of parseProposals(m.content)) {
       if (seg.kind !== 'edit') continue
       const target = resolveTarget(seg.file)
-      if (target.kind !== 'chapter') continue
+      if (target.kind !== 'chapter' && target.kind !== 'entry') continue
+      const doc = target.kind === 'chapter' ? { kind: 'chapter' as const, docId: target.chapter.id } : { kind: 'entry' as const, docId: target.entry.id }
       seg.hunks.forEach((h, i) => {
         const key = hunkKey(seg.index, i)
         const state = states[key]
@@ -67,7 +71,7 @@ export function pendingChapterProposals(thread: Thread): InlineProposal[] {
           threadId: thread.id,
           messageId: m.id,
           key,
-          chapterId: target.chapter.id,
+          ...doc,
           file: seg.file,
           find: h.find,
           replace: h.replace
@@ -79,7 +83,7 @@ export function pendingChapterProposals(thread: Thread): InlineProposal[] {
 }
 
 function sameList(a: InlineProposal[], b: InlineProposal[]): boolean {
-  return a.length === b.length && a.every((p, i) => p.id === b[i].id && p.find === b[i].find && p.replace === b[i].replace && p.chapterId === b[i].chapterId)
+  return a.length === b.length && a.every((p, i) => p.id === b[i].id && p.find === b[i].find && p.replace === b[i].replace && p.docId === b[i].docId)
 }
 
 /* ------------------------------------------------------------------ */
@@ -96,6 +100,11 @@ const seen = new Set<string>()
 function stateOf(p: InlineProposal): string | undefined {
   const m = threadOf(p)?.messages.find((x) => x.id === p.messageId)
   return m?.hunks?.[p.key]
+}
+
+/** The new text as it goes into the document: chapters get the typography of the book. */
+function replaceText(p: InlineProposal): string {
+  return p.kind === 'chapter' ? typesetForBook(p.replace) : p.replace
 }
 
 function remember(list: InlineProposal[], p: InlineProposal): void {
@@ -118,15 +127,15 @@ function countIn(text: string, markdown: string): number {
  * gone) was undone: it is pending again and shows in the text. An undone change whose new words are
  * back was done again: it is accepted again.
  */
-function checkUndo(chapterId: string, doc: EditorState['doc']): void {
-  const mine = [...accepted, ...undone].filter((p) => p.chapterId === chapterId)
+function checkUndo(docId: string, doc: EditorState['doc']): void {
+  const mine = [...accepted, ...undone].filter((p) => p.docId === docId)
   if (!mine.length) return
   const { text } = textWithMap(doc, 0, doc.content.size)
   for (const p of mine) {
     const thread = threadOf(p)
     if (!thread) continue
     const oldBack = countIn(text, p.find) === 1
-    const newThere = countIn(text, typesetForBook(p.replace)) >= 1
+    const newThere = countIn(text, replaceText(p)) >= 1
     if (accepted.includes(p) && oldBack && !newThere) {
       accepted.splice(accepted.indexOf(p), 1)
       remember(undone, p)
@@ -154,7 +163,7 @@ export function useProposalUndoKeys(): void {
       const target = e.target as HTMLElement | null
       if (target?.closest('input, textarea, select, [contenteditable="true"]')) return
       const p = isUndo ? accepted[accepted.length - 1] : undone[undone.length - 1]
-      const ed = p && getChapterEditor(p.chapterId)
+      const ed = p && p.kind === 'chapter' ? getChapterEditor(p.docId) : null
       if (!ed) return
       e.preventDefault()
       ed.editor.commands.focus()
@@ -175,7 +184,7 @@ export function useInlineProposalSync(): void {
   useEffect(() => {
     // The open thread; with no open thread, the thread with the newest activity.
     const thread = threads.find((t) => t.id === activeId) ?? [...threads].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]
-    const list = thread ? pendingChapterProposals(thread) : []
+    const list = thread ? pendingProposals(thread) : []
     const prev = useInlineProposals.getState().list
     if (sameList(prev, list)) return
     // Proposals that left the list because the author accepted them: Ctrl+Z can bring them back.
@@ -183,12 +192,12 @@ export function useInlineProposalSync(): void {
     useInlineProposals.setState({ list })
     // A new reply with proposals in the same thread: show the last new one in the text.
     const sameThread = thread?.id === lastThread.current
-    const fresh = list.filter((p) => !seen.has(p.id))
+    const fresh = list.filter((p) => !seen.has(p.id) && p.kind === 'chapter')
     for (const p of list) seen.add(p.id)
     lastThread.current = thread?.id ?? null
     if (sameThread && fresh.length) {
       const p = fresh[fresh.length - 1]
-      setTimeout(() => revealProposal(p.chapterId, p.find, p.id), 200)
+      setTimeout(() => revealProposal(p.docId, p.find, p.id), 200)
     }
   }, [threads, files, activeId])
 }
@@ -213,7 +222,8 @@ export function acceptInline(p: InlineProposal): void {
     return
   }
   markAfter(snap)
-  const label = useBook.getState().chapters.find((c) => c.id === p.chapterId)?.title ?? ''
+  const book = useBook.getState()
+  const label = (p.kind === 'chapter' ? book.chapters.find((c) => c.id === p.docId)?.title : book.entries.find((e) => e.id === p.docId)?.name) ?? ''
   if (!snap) return
   toast(t.chat.changeApplied(label), {
     ms: 8000,
@@ -287,12 +297,11 @@ const CHECK = 'M232.49,80.49l-128,128a12,12,0,0,1-17,0l-56-56a12,12,0,1,1,17-17L
 const CROSS =
   'M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z'
 
-function iconButton(className: string, label: string, path: string, run: () => void): HTMLElement {
+function iconButton(className: string, label: string, text: string, path: string, run: () => void): HTMLElement {
   const b = document.createElement('button')
   b.type = 'button'
   b.className = className
   b.title = label
-  b.setAttribute('aria-label', label)
   const svg = document.createElementNS(SVG_NS, 'svg')
   svg.setAttribute('viewBox', '0 0 256 256')
   svg.setAttribute('aria-hidden', 'true')
@@ -300,6 +309,9 @@ function iconButton(className: string, label: string, path: string, run: () => v
   p.setAttribute('d', path)
   svg.appendChild(p)
   b.appendChild(svg)
+  const span = document.createElement('span')
+  span.textContent = text
+  b.appendChild(span)
   // Keep the cursor and the selection in the text.
   b.addEventListener('mousedown', (e) => e.preventDefault())
   b.addEventListener('click', (e) => {
@@ -316,8 +328,8 @@ function actionsWidget(p: InlineProposal): HTMLElement {
   el.className = 'pm-prop-actions'
   el.setAttribute('contenteditable', 'false')
   el.dataset.prop = p.id
-  el.appendChild(iconButton('pm-prop-btn is-accept', t.chat.acceptChange, CHECK, () => acceptInline(p)))
-  el.appendChild(iconButton('pm-prop-btn is-reject', t.chat.rejectChange, CROSS, () => rejectInline(p)))
+  el.appendChild(iconButton('pm-prop-btn is-accept', t.chat.acceptChange, t.common.accept, CHECK, () => acceptInline(p)))
+  el.appendChild(iconButton('pm-prop-btn is-reject', t.chat.rejectChange, t.common.reject, CROSS, () => rejectInline(p)))
   return el
 }
 
@@ -339,7 +351,7 @@ function build(state: EditorState, list: InlineProposal[], focus: string | null)
     if (taken.some((r) => from < r.to && to > r.from)) continue
     taken.push({ from, to })
     const original = textWithMap(doc, from, to).text
-    const ops = wordDiff(original, proposedPlain(typesetForBook(p.replace)))
+    const ops = wordDiff(original, proposedPlain(replaceText(p)))
     decos.push(...diffDecorations(doc, from, to, ops, p.id))
     decos.push(Decoration.inline(from, to, { class: `pm-prop${focus === p.id ? ' is-focus' : ''}`, 'data-prop': p.id }))
     decos.push(
@@ -355,7 +367,8 @@ function build(state: EditorState, list: InlineProposal[], focus: string | null)
 }
 
 export interface InlineProposalsOptions {
-  chapterId: () => string
+  /** The chapter or the planning entry of this editor */
+  docId: () => string
 }
 
 // Test runs (WORDELIA_E2E) can reach the proposals in the text.
@@ -367,7 +380,7 @@ export const InlineProposals = Extension.create<InlineProposalsOptions>({
   name: 'inlineProposals',
 
   addOptions() {
-    return { chapterId: () => '' }
+    return { docId: () => '' }
   },
 
   addProseMirrorPlugins() {
@@ -390,10 +403,10 @@ export const InlineProposals = Extension.create<InlineProposalsOptions>({
           let timer: ReturnType<typeof setTimeout> | undefined
           const rebuild = (): void => {
             if (view.isDestroyed) return
-            const id = opts.chapterId()
+            const id = opts.docId()
             checkUndo(id, view.state.doc)
             const { list, focus } = useInlineProposals.getState()
-            const mine = list.filter((p) => p.chapterId === id)
+            const mine = list.filter((p) => p.docId === id)
             // Nothing to show and nothing shown: no transaction.
             if (!mine.length && inlineProposalsKey.getState(view.state) === DecorationSet.empty) return
             const set = build(view.state, mine, focus)

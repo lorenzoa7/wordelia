@@ -232,6 +232,18 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] Send goes to the very end of the thread, and the end stays in view when the layout changes after the first frame (a font that loads, a quote, the thinking line) and while the reply streams. A scroll up stops the follow; a scroll back to the end starts it again (`useFollowEnd`, `features/chat/follow.ts`). The scenario `chatview` sends a long message with a quote and two pills and measures scrollTop + clientHeight against scrollHeight in each resize step
 - [x] No row of the thread list looks selected: while the list shows, the user is in no thread. The row with the keyboard focus shows a focus ring
 
+## Version 0.7 — fourth feedback of the author
+
+### Editor
+
+- [x] A new page grows in one time; it no longer flickers (the measure restarted its animation)
+- [x] Smooth zoom (a short transform) and a zoom slider in the toolbar; a double click goes back to 100 %
+- [x] The loading bar of an action stays above the selection; the result bar goes under the paragraph
+- [x] The Polish button is a light chip, not red
+- [x] Accept and Reject in the text are labeled pills
+- [x] Chat proposals for planning notes show in the note as a diff (scenario `notediff`)
+- [x] The first Backspace selects a page break and shows its mark; a selected scene break has a ring
+
 ## Tests and CI
 
 - [x] End-to-end scenarios run with a hidden window (transparent, no focus) and with CSS animations off

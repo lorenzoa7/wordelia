@@ -2,6 +2,32 @@
 
 Each version has its Windows installer in GitHub Releases. The release workflow copies the section of the version from this file to the release notes.
 
+## 0.6.0 (2026-10-17)
+
+### New
+- Ctrl+Enter makes a page break, like a word processor: the text after the cursor starts on a new page, and the cursor goes there. Backspace at the start of the new page removes it. PDF and DOCX exports keep it.
+- Ctrl+Z after you accept a chat change undoes it, and the proposal shows in the text again. It also works right after you click Accept in the chat. Ctrl+Y applies it again.
+- A new proposal from the chat scrolls into view in the text by itself (the last one of the reply).
+- A zoom menu in the toolbar.
+- A new page grows in with a short animation.
+
+### Changed
+- Zoom is smooth: the text does not adjust after a change, and the view stays on the same text, also in a long book.
+- The planning map has a new look: each entry is a paper token with the icon of its category, chapters are small books, and the background has a light dot grid.
+- The "Cards | Map" buttons stay in the same place when you switch.
+- The sync button says "Sync". Its tooltip tells what it does.
+- The Plan overview is now "The world of the story".
+- Typewriter mode is in Settings → General, with an explanation.
+- The "New thread" button fits the chat panel.
+- In the thread list, no thread looks selected.
+
+### Fixed
+- After an accepted change, the spaces between words in a justified line could become too wide: a page break inside the paragraph stayed in a wrong place.
+- Many line breaks (Shift+Enter) made a page grow without end. All pages keep the same height.
+- Typewriter mode did not follow the cursor while you typed.
+- A new thread that you leave empty is not saved, and old empty threads no longer show in the list.
+- The chat scrolls fully to the end when you send a message, and follows the reply.
+
 ## 0.5.0 (2026-10-17)
 
 ### New

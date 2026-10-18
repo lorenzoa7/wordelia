@@ -16,6 +16,7 @@ import { SNAPSHOT_EN, snapshot } from '@/features/history/snapshots'
 import { actionInstructions, getT } from '@/lib/i18n'
 import { typesetForBook } from '@/lib/typeset'
 import { nearestEffort } from '@shared/ai/effort'
+import { findAction } from './allActions'
 
 interface ActionRunState {
   running: boolean
@@ -133,7 +134,7 @@ export async function retryAction(): Promise<void> {
   if (!active) return
   const r = reviewKey.getState(active.editor.state)
   const actionId = useActionRun.getState().actionId
-  const action = useApp.getState().settings?.actions.find((a) => a.id === actionId)
+  const action = findAction(actionId)
   if (!r || !action) return
   const range = { from: r.from, to: r.to }
   active.editor.commands.rejectReview()

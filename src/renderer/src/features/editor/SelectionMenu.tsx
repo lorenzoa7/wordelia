@@ -8,13 +8,14 @@ import { useBook } from '@/stores/book'
 import { Kbd, MenuItem, MenuLabel, MenuSeparator, Tooltip } from '@/ui'
 import { ActionIcon } from '@/features/actions/ActionIcon'
 import { runAction } from '@/features/actions/runAction'
+import { useAllActions } from '@/features/actions/allActions'
 import { addQuote } from '@/features/chat/chatStore'
 import { actionName, useT } from '@/lib/i18n'
 import { reviewKey, textWithMap } from './review'
 
 /** The small menu above a text selection: Reply, the default action, and more actions. */
 export function SelectionMenu({ editor }: { editor: Editor }): React.JSX.Element {
-  const actions = useApp((s) => s.settings?.actions ?? [])
+  const actions = useAllActions()
   const defaultId = useApp((s) => s.settings?.defaultActionId)
   const primary = actions.find((a) => a.id === defaultId) ?? actions[0]
   const t = useT()

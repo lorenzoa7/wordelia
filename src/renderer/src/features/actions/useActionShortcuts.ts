@@ -1,11 +1,13 @@
 // Keyboard shortcuts of the actions. Each action has its own shortcut (`AiAction.shortcut`), set in
 // Settings → Actions. The defaults are Ctrl+J for the main action and Alt+2, Alt+3… for the others.
+// The actions of the open book count too; inside its book, a book action wins a shortcut that a global
+// action also has.
 
 import { useEffect } from 'react'
 import { actionForKeys } from '@shared/ai/shortcuts'
-import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
 import { useUi } from '@/stores/ui'
+import { allActions } from './allActions'
 import { runAction } from './runAction'
 
 export function useActionShortcuts(): void {
@@ -14,8 +16,6 @@ export function useActionShortcuts(): void {
       if (e.repeat || useBook.getState().view !== 'write') return
       // The settings record shortcuts: do not run an action behind the dialog.
       if (useUi.getState().settingsOpen) return
-      const s = useApp.getState().settings
-      if (!s) return
       const a = actionForKeys(
         {
           key: e.key,
@@ -26,7 +26,7 @@ export function useActionShortcuts(): void {
           metaKey: e.metaKey,
           altGraph: e.getModifierState?.('AltGraph')
         },
-        s.actions
+        allActions()
       )
       if (!a) return
       e.preventDefault()

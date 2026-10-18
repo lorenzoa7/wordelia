@@ -10,6 +10,7 @@ import { useUi } from '@/stores/ui'
 import { LOCALES, actionName, useT } from '@/lib/i18n'
 import { typewriterSound } from '@/features/editor/typewriter-sound'
 import { ZOOM_STEPS } from '@/features/editor/zoom'
+import { useAllActions } from '@/features/actions/allActions'
 
 const THEMES: Array<{ id: ThemeSetting; icon: React.ReactNode }> = [
   { id: 'light', icon: <Sun size={16} /> },
@@ -31,6 +32,8 @@ export function GeneralTab(): React.JSX.Element | null {
   const settings = useApp((s) => s.settings)
   const update = useApp((s) => s.updateSettings)
   const setUi = useApp((s) => s.setUi)
+  // The actions of the open book too, with the shortcuts that work in it.
+  const actions = useAllActions()
   const t = useT()
   if (!settings) return null
   const g = t.settings.general
@@ -103,7 +106,7 @@ export function GeneralTab(): React.JSX.Element | null {
       <h3 className="settings-h">{g.keyboard}</h3>
       <dl className="shortcuts">
         {[
-          ...settings.actions.filter((a) => a.shortcut).map((a) => [actionName(t, a), a.shortcut!]),
+          ...actions.filter((a) => a.shortcut).map((a) => [actionName(t, a), a.shortcut!]),
           [g.shortcuts.acceptReject, 'Enter / Esc'],
           [g.shortcuts.dialogueDash, '--'],
           [g.shortcuts.sceneBreak, 'Ctrl+Shift+Enter'],

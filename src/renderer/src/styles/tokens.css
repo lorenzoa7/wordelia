@@ -114,6 +114,7 @@
   --map-tint: 9%; /* the category color in the paper of a node */
   --map-deep: 24%; /* the ink in the ring and the icon of a node */
   --map-book: #f1e9da; /* the cover of a chapter */
+  --map-fade: 180ms; /* hover on the map: the pale map and the highlight fade in and out */
 
   --strike: #a83a2b;
   --strike-soft: #f5e3dc;

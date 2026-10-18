@@ -17,9 +17,21 @@ npm run dev          # start the app with hot reload
 npm run typecheck    # TypeScript, all processes
 npm test             # Vitest unit tests
 npm run shot         # build, start the app with Playwright, save screenshots to test-results/
+npm run e2e -- --changed   # build, then only the end-to-end scenarios for the files you changed
+npm run e2e -- pages zoom  # build, then only these scenarios
+npm run e2e          # build, then all end-to-end scenarios, 4 at a time (about 2 minutes)
+node scripts/shot.mjs <scenario> --visible   # one scenario with the window on screen
 npm run build        # production build to out/
 npm run dist         # Windows installer to release/ (local only, not in git)
 ```
+
+## Tests
+
+- End-to-end scenarios run with a hidden window (transparent, no focus) and with CSS animations off. Use `--visible` to watch one, and `--motion` for a scenario that checks motion.
+- While you work: `npm run typecheck`, `npm test` and `npm run e2e -- --changed`. Add or update the scenario of the feature, and look at its screenshots.
+- Run the full `npm run e2e` one time: after all work is merged, before a release. Agents that work at the same time do not run the full suite; the coordinator runs it after the merge.
+- A scenario that fails at first and passes alone is reported as unstable. Make it stable (wait for a condition, not a fixed time) instead of ignoring it.
+- CI (`.github/workflows/ci.yml`) runs the types, the unit tests and all scenarios on each push to main and on each pull request. A release tag builds the installer only when these checks pass.
 
 ## Releases
 

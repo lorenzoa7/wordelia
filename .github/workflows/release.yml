@@ -1,6 +1,8 @@
 # Build the Windows installer and publish it to GitHub Releases.
 # Start it with a version tag: git tag v0.2.0 && git push origin v0.2.0
 # A manual run (workflow_dispatch) only builds, to check that the build works.
+# The checks of ci.yml (types, unit tests, all end-to-end scenarios) run first; the installer is
+# built only when they pass.
 name: Release
 
 on:
@@ -12,8 +14,13 @@ permissions:
   contents: write
 
 jobs:
+  checks:
+    name: Checks
+    uses: ./.github/workflows/ci.yml
+
   windows:
     name: Windows installer
+    needs: checks
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5

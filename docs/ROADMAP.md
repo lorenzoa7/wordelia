@@ -232,6 +232,12 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] Send goes to the very end of the thread, and the end stays in view when the layout changes after the first frame (a font that loads, a quote, the thinking line) and while the reply streams. A scroll up stops the follow; a scroll back to the end starts it again (`useFollowEnd`, `features/chat/follow.ts`). The scenario `chatview` sends a long message with a quote and two pills and measures scrollTop + clientHeight against scrollHeight in each resize step
 - [x] No row of the thread list looks selected: while the list shows, the user is in no thread. The row with the keyboard focus shows a focus ring
 
+## Tests and CI
+
+- [x] End-to-end scenarios run with a hidden window (transparent, no focus) and with CSS animations off
+- [x] `npm run e2e` runs 4 scenarios at the same time (about 2 minutes instead of 7); `--changed` runs only the scenarios for the changed files; a failed scenario runs once more alone and is reported as unstable when it passes
+- [x] CI on GitHub (`ci.yml`): types, unit tests and all scenarios in three parts on clean Windows machines, for each push to main and each pull request; a release tag builds the installer only after these checks
+
 ## Later (not in version 1)
 
 - Sync to a git remote from the app

@@ -1,0 +1,67 @@
+# Checks for every push to main and every pull request: types, unit tests and all the end-to-end
+# scenarios, on clean Windows machines. The end-to-end scenarios run in three parts at the same time.
+# The release workflow runs this workflow first: no installer without green checks.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_call' }}
+
+jobs:
+  checks:
+    name: Types and unit tests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - run: npm test
+
+  e2e:
+    name: End-to-end, part ${{ matrix.shard }} of 3
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx electron-vite build
+
+      - name: Run the scenarios of this part
+        run: node scripts/e2e.mjs --shard ${{ matrix.shard }}/3 --workers 2
+
+      # The screenshots show what went wrong.
+      - name: Keep the screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-part-${{ matrix.shard }}
+          path: test-results/shots
+          retention-days: 7

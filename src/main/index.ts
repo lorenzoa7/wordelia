@@ -16,6 +16,19 @@ import { initUpdater, quitForUpdate } from './updater'
 // Tests use a separate data folder, so they never touch the user's library.
 if (process.env['WORDELIA_USER_DATA']) app.setPath('userData', process.env['WORDELIA_USER_DATA'])
 
+/**
+ * Test runs (WORDELIA_E2E) do not show the window: it is fully transparent, lets the mouse through
+ * and never takes the focus, so tests do not get in the way of the person at the computer. Chromium
+ * must not stop painting a window that it thinks nobody sees, or the screenshots would wait.
+ * WORDELIA_E2E_VISIBLE=1 shows it (scripts/shot.mjs --visible).
+ */
+const HIDDEN_TEST_WINDOW = process.env['WORDELIA_E2E'] === '1' && process.env['WORDELIA_E2E_VISIBLE'] !== '1'
+if (HIDDEN_TEST_WINDOW) {
+  app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
+  app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
+  app.commandLine.appendSwitch('disable-renderer-backgrounding')
+}
+
 registerAssetScheme()
 
 async function createWindow(): Promise<void> {
@@ -31,6 +44,7 @@ async function createWindow(): Promise<void> {
     minWidth: 980,
     minHeight: 640,
     show: false,
+    skipTaskbar: HIDDEN_TEST_WINDOW,
     title: 'Wordelia',
     icon: join(__dirname, '../../resources/icon.png'),
     backgroundColor: dark ? '#191714' : '#ece5d8',
@@ -40,11 +54,18 @@ async function createWindow(): Promise<void> {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: true,
       contextIsolation: true,
-      spellcheck: true
+      spellcheck: true,
+      backgroundThrottling: !HIDDEN_TEST_WINDOW
     }
   })
 
   win.once('ready-to-show', () => {
+    if (HIDDEN_TEST_WINDOW) {
+      win.setOpacity(0)
+      win.setIgnoreMouseEvents(true)
+      win.showInactive()
+      return
+    }
     if (saved?.maximized) win.maximize()
     win.show()
   })

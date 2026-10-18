@@ -162,7 +162,11 @@ export default async function ({ page, shot, openBook, book, work }) {
       const s = window.__wordelia.book.getState()
       return { category: s.activeCategory, entry: s.activeEntryId, view: s.view }
     })
-  const settle = () => page.waitForTimeout(2600)
+  // The map stands still: its layout and its view stopped moving.
+  const settle = async () => {
+    await page.waitForTimeout(150)
+    await page.waitForSelector('.map-stage[data-rest]', { timeout: 8000 })
+  }
   // The second button of the switch; its text is the word for the map in the interface language
   const mapButton = () => page.locator('.plan-switch-btn').nth(1)
   if (process.env.I18N_LANG) {

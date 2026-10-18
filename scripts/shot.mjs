@@ -1,6 +1,7 @@
 // Launch the built app with Playwright and save screenshots.
-// Usage: node scripts/shot.mjs [scenario] [--dark] [--fresh] [--real-ai] [--en]
+// Usage: node scripts/shot.mjs [scenario] [--dark] [--fresh] [--real-ai] [--en] [--visible] [--motion]
 // --en uses the English sample book (for the README screenshots); the default is the Portuguese one.
+// The window is hidden (transparent, no focus) unless --visible. CSS animations are off unless --motion.
 // Scenarios live in scripts/shots/<name>.mjs. The app runs with a fresh data folder
 // and a scripted AI (WORDELIA_MOCK_AI=1), so it never touches the user's books or AI.
 import { _electron as electron } from '@playwright/test'
@@ -14,6 +15,8 @@ const dark = process.argv.includes('--dark')
 const realAi = process.argv.includes('--real-ai')
 const fresh = process.argv.includes('--fresh')
 const english = process.argv.includes('--en')
+const visible = process.argv.includes('--visible')
+const motion = process.argv.includes('--motion')
 const outDir = resolve('test-results/shots')
 await mkdir(outDir, { recursive: true })
 await mkdir(resolve('test-results/exports'), { recursive: true })
@@ -39,7 +42,7 @@ await cp(resolve(english ? 'e2e/fixtures/sample-book-en' : 'e2e/fixtures/sample-
 
 const app = await electron.launch({
   args: [resolve('out/main/index.js')],
-  env: { ...process.env, WORDELIA_E2E: '1', WORDELIA_MOCK_AI: realAi ? '' : '1', WORDELIA_USER_DATA: userData, WORDELIA_EXPORT_DIR: resolve('test-results/exports'), WORDELIA_BOOKS_DIR: join(work, 'books') }
+  env: { ...process.env, WORDELIA_E2E: '1', ...(visible ? { WORDELIA_E2E_VISIBLE: '1' } : {}), WORDELIA_MOCK_AI: realAi ? '' : '1', WORDELIA_USER_DATA: userData, WORDELIA_EXPORT_DIR: resolve('test-results/exports'), WORDELIA_BOOKS_DIR: join(work, 'books') }
 })
 const page = await app.firstWindow()
 page.on('console', (m) => {
@@ -52,7 +55,17 @@ await app.evaluate(({ BrowserWindow }) => {
   w.center()
 })
 await page.waitForLoadState('domcontentloaded')
-await page.waitForTimeout(900)
+// The first screen is there and its fonts are loaded.
+await page.waitForFunction(() => document.querySelector('.app-view, .welcome') && document.fonts.status === 'loaded', null, { timeout: 20000 })
+// CSS animations and transitions take no time: the scenarios wait less, and screenshots are never
+// taken in the middle of one. Zero, not 1 ms: every element has `transition-property: all` by
+// default, so any duration would make every change of size a transition. --motion keeps them.
+if (!motion) {
+  await page.addStyleTag({
+    content: '*, *::before, *::after { animation-duration: 0s !important; animation-delay: 0s !important; transition-duration: 0s !important; transition-delay: 0s !important; }'
+  })
+}
+await page.waitForTimeout(150)
 
 let n = 0
 const shot = async (name) => {
@@ -62,7 +75,9 @@ const shot = async (name) => {
 }
 const openBook = async () => {
   await page.evaluate((p) => window.__wordelia.openBook(p), book)
-  await page.waitForTimeout(900)
+  // The book is open, its first chapter has an editor, and the pages are measured once.
+  await page.waitForFunction(() => document.querySelector('.manuscript') && document.fonts.status === 'loaded', null, { timeout: 20000 })
+  await page.waitForTimeout(350)
 }
 
 try {

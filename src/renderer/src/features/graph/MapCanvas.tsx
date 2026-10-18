@@ -286,10 +286,13 @@ export function MapCanvas({ map, memoryKey, colorOf, labelOf, iconOf, matches, a
       if (Math.abs(to.x - next.x) > 0.5 || Math.abs(to.y - next.y) > 0.5 || Math.abs(to.k - next.k) > 0.001) again = true
     }
     paint()
+    // `data-rest`: the map stands still (tests wait for it).
+    stageRef.current?.toggleAttribute('data-rest', !again)
     if (again) raf.current = requestAnimationFrame(frame)
   }
 
   const kick = (): void => {
+    stageRef.current?.removeAttribute('data-rest')
     if (!raf.current) raf.current = requestAnimationFrame(frame)
   }
 

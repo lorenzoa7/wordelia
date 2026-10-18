@@ -1,6 +1,9 @@
 /* ---------- "Cards | Map" switch (Plan overview and map) ---------- */
+/* Two segments of the same width: the buttons stay in the same place on the two pages. */
 .plan-switch {
-  display: inline-flex;
+  display: inline-grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
   flex-shrink: 0;
   gap: 2px;
   margin-top: 6px;
@@ -12,6 +15,7 @@
 .plan-switch-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   height: 26px;
   padding: 0 var(--s-3);
@@ -76,13 +80,18 @@
 }
 
 /* ---------- Page ---------- */
+/* The map page is a `.plan-scroll` too: the same padding, scrollbar gutter and column as the
+   cards, so the title and the switch do not move. It does not scroll. */
+.plan-scroll.map-wrap {
+  overflow: hidden;
+  padding-bottom: var(--s-6);
+}
 .map-page {
   display: flex;
   flex-direction: column;
   height: 100%;
-  max-width: 1320px;
+  max-width: var(--plan-w);
   margin: 0 auto;
-  padding: var(--s-6) var(--s-8);
 }
 .map-head {
   flex-shrink: 0;
@@ -252,12 +261,16 @@
 }
 
 /* ---------- Sheet and stage ---------- */
+/* Paper with a soft light in the middle, darker edges and a faint grain; the dot grid is in the SVG. */
 .map-sheet {
   position: relative;
   flex: 1;
   min-height: 260px;
   border-radius: var(--radius-md);
-  background: var(--paper);
+  background:
+    radial-gradient(ellipse 60% 55% at 50% 45%, var(--map-glow), transparent 75%),
+    radial-gradient(ellipse 85% 80% at 50% 45%, transparent 45%, var(--map-vignette) 100%),
+    var(--map-ground);
   box-shadow: var(--shadow-page);
   overflow: hidden;
 }
@@ -286,6 +299,11 @@
   cursor: grabbing;
 }
 
+/* The dot grid: dots of one size on the screen at every zoom (`dotGrid` in layout.ts) */
+.map-grid-dot {
+  fill: var(--map-dot);
+}
+
 .map-edge {
   stroke: var(--ink-4);
   stroke-opacity: 0.4;
@@ -304,7 +322,9 @@
   stroke-dasharray: 2 4;
 }
 
+/* A node: a paper token. `--c` is the color of its category; `--ink-c` is that color with some ink, for the ring and the icon. */
 .map-node {
+  --ink-c: color-mix(in srgb, var(--c), var(--ink) var(--map-deep));
   cursor: pointer;
   transition: opacity var(--dur-fast) var(--ease-out);
 }
@@ -316,25 +336,95 @@
   fill-opacity: 0;
   transition: fill-opacity var(--dur-fast) var(--ease-out);
 }
+.map-shade,
+.map-rim,
+.map-icon,
+.map-book-spine,
+.map-book-ribbon,
+.map-book-no {
+  pointer-events: none;
+}
+.map-shade-stop {
+  stop-color: var(--map-shade);
+}
 .map-dot {
-  fill: var(--c);
-  stroke: var(--paper);
+  fill: color-mix(in srgb, var(--c) var(--map-tint), var(--map-ground));
+  stroke: var(--ink-c);
   stroke-width: 1.5px;
   vector-effect: non-scaling-stroke;
+  transition:
+    fill var(--dur-fast) var(--ease-out),
+    stroke var(--dur-fast) var(--ease-out),
+    stroke-width var(--dur-fast) var(--ease-out);
 }
-.map-node.is-chapter .map-dot {
-  fill: var(--paper);
+/* The inner ring of a token, like the rim of a seal */
+.map-rim {
+  display: none;
+  fill: none;
+  stroke: var(--ink-c);
+  stroke-width: 0.75px;
+  stroke-opacity: 0.4;
+  vector-effect: non-scaling-stroke;
+}
+.map-icon {
+  color: var(--ink-c);
+}
+
+/* Level of detail (`levelOfDetail` in MapCanvas.tsx): a token shows only what it is big enough to show.
+   A token without its icon gets more color, so its category still shows. */
+.map-svg[data-lod='near'] .map-rim {
+  display: inline;
+}
+.map-svg[data-lod='ml'] .map-node[data-size='s'] .map-icon,
+.map-svg[data-lod='far'] .map-node:not([data-size='l']) .map-icon,
+.map-svg[data-lod='tiny'] .map-icon,
+.map-svg[data-lod='far'] .map-shade,
+.map-svg[data-lod='tiny'] .map-shade,
+.map-svg[data-lod='far'] .map-book-no,
+.map-svg[data-lod='tiny'] .map-book-no {
+  display: none;
+}
+.map-svg[data-lod='ml'] .map-node[data-size='s'] .map-dot,
+.map-svg[data-lod='far'] .map-node:not([data-size='l']) .map-dot,
+.map-svg[data-lod='tiny'] .map-dot {
+  fill: color-mix(in srgb, var(--c) calc(var(--map-tint) * 3), var(--map-ground));
+}
+.map-svg[data-lod] .map-node.is-chapter .map-dot {
+  fill: var(--map-book);
+}
+
+/* A chapter: a closed book with a spine, a ribbon and its number */
+.map-book {
+  fill: var(--map-book);
   stroke: var(--ink-3);
+  stroke-width: 1.25px;
 }
+.map-book-spine {
+  stroke: var(--ink-3);
+  stroke-opacity: 0.6;
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+}
+.map-book-ribbon {
+  fill: var(--ribbon);
+}
+.map-book-no {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  fill: var(--ink-2);
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
 .map-label {
   font-family: var(--font-prose);
-  font-size: calc(var(--text-sm) / var(--map-k, 1));
+  font-size: var(--text-sm);
   fill: var(--ink-2);
   text-anchor: middle;
   dominant-baseline: hanging;
   paint-order: stroke;
-  stroke: var(--paper);
-  stroke-width: calc(3px / var(--map-k, 1));
+  stroke: var(--map-ground);
+  stroke-width: 3px;
   stroke-linejoin: round;
   pointer-events: none;
   opacity: 0;
@@ -342,7 +432,7 @@
 }
 .map-tag.is-chapter .map-label {
   font-family: var(--font-ui);
-  font-size: calc(var(--text-xs) / var(--map-k, 1));
+  font-size: var(--text-xs);
   fill: var(--ink-3);
 }
 .map-tag {
@@ -369,7 +459,14 @@
   stroke-opacity: 0.75;
 }
 .map-node.is-hover .map-hit {
-  fill-opacity: 0.2;
+  fill-opacity: 0.16;
+}
+.map-node.is-hover .map-dot {
+  fill: color-mix(in srgb, var(--c) calc(var(--map-tint) * 2), var(--map-ground));
+  stroke-width: 2.25px;
+}
+.map-node.is-chapter.is-hover .map-dot {
+  stroke: var(--ink);
 }
 .map-tag.is-hover .map-label,
 .map-tag.is-match .map-label {
@@ -377,7 +474,7 @@
   font-weight: 700;
 }
 
-/* Search: the matches; the rest goes pale */
+/* Search: the matches; the rest goes pale. The best match has an ink ring. */
 .map-svg.has-search .map-node:not(.is-match),
 .map-svg.has-search .map-tag:not(.is-match) {
   opacity: 0.2;
@@ -386,11 +483,11 @@
   opacity: 0.25;
 }
 .map-node.is-match .map-hit {
-  fill-opacity: 0.22;
+  fill-opacity: 0.2;
 }
 .map-node.is-best .map-dot {
   stroke: var(--ink);
-  stroke-width: 2px;
+  stroke-width: 2.25px;
 }
 
 /* Zoom buttons */

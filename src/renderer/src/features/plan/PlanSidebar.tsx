@@ -31,8 +31,13 @@ const CATEGORY_ICONS: Record<string, React.ComponentType<IconProps>> = {
   Folder
 }
 
+/** The icon of a category; an unknown name gets the folder. */
+export function categoryIcon(name: string): React.ComponentType<IconProps> {
+  return CATEGORY_ICONS[name] ?? Folder
+}
+
 export function CategoryIcon({ name, size = 15 }: { name: string; size?: number }): React.JSX.Element {
-  const Icon = CATEGORY_ICONS[name] ?? Folder
+  const Icon = categoryIcon(name)
   return <Icon size={size} />
 }
 

@@ -55,6 +55,9 @@
   --sidebar-w: 256px;
   --chat-w: 400px;
   --page-w: 760px;
+  /* The column of the Plan pages: the cards, a category and the map use the same width,
+     so the title and the "Cards | Map" switch stay in place. */
+  --plan-w: 980px;
   --window-controls-w: 140px;
 
   /* Motion */
@@ -101,6 +104,16 @@
   --map-6: #c4508a;
   --map-7: #9a5a28;
   --map-8: #00929a;
+  /* The stage of the map: paper, a dot grid, a soft light in the middle and darker edges */
+  --map-ground: var(--paper);
+  --map-dot: #d6ccb9;
+  --map-glow: rgba(255, 254, 250, 0.7);
+  --map-vignette: rgba(110, 84, 48, 0.075);
+  /* A node: a paper token with a ring and an icon in the color of its category */
+  --map-shade: rgba(64, 48, 28, 0.3); /* the soft shadow under a node */
+  --map-tint: 9%; /* the category color in the paper of a node */
+  --map-deep: 24%; /* the ink in the ring and the icon of a node */
+  --map-book: #f1e9da; /* the cover of a chapter */
 
   --strike: #a83a2b;
   --strike-soft: #f5e3dc;
@@ -171,6 +184,13 @@
   --map-6: #d8609a;
   --map-7: #b06f3c;
   --map-8: #14a6ae;
+  --map-dot: #3d372e;
+  --map-glow: rgba(255, 214, 160, 0.035);
+  --map-vignette: rgba(0, 0, 0, 0.32);
+  --map-shade: rgba(0, 0, 0, 0.6);
+  --map-tint: 15%;
+  --map-deep: 0%;
+  --map-book: #2e2922;
 
   --strike: #e58d76;
   --strike-soft: #3a231d;

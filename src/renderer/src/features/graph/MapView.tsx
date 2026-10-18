@@ -85,6 +85,7 @@ export function MapView(): React.JSX.Element {
   const shownEntries = map.nodes.filter((n) => n.kind === 'entry').length
   const colorOf = (n: MapNode): number => (n.kind === 'chapter' ? -1 : (slots.get(n.category ?? '') ?? 7))
   const labelOf = (n: MapNode): string => (n.kind === 'chapter' ? `${n.order + 1}. ${n.label}` : n.label)
+  const iconOf = (n: MapNode): string => byFolder.get(n.category ?? '')?.icon ?? 'Folder'
   const catLabel = (folder: string): string => folderCategoryName(t, folder, categories)
 
   const open = (n: MapNode): void => {
@@ -111,7 +112,7 @@ export function MapView(): React.JSX.Element {
     return (
       <>
         <span className={clsx('map-card-kind', `slot-${colorOf(n) % 8}`)}>
-          <CategoryIcon name={byFolder.get(n.category ?? '')?.icon ?? 'Folder'} size={12} /> {catLabel(n.category ?? '')}
+          <CategoryIcon name={iconOf(n)} size={12} /> {catLabel(n.category ?? '')}
         </span>
         <span className="map-card-name">{n.label}</span>
         {about && <span className="map-card-about">{about}</span>}
@@ -121,125 +122,128 @@ export function MapView(): React.JSX.Element {
   }
 
   return (
-    <div className="map-page">
-      <header className="map-head">
-        <div className="map-title-row">
-          <div className="map-title">
-            <h1>{t.plan.map.map}</h1>
-            {entries.length > 0 && <p className="map-stats">{t.plan.map.stats(shownEntries, map.edges.length)}</p>}
+    <div className="plan-scroll map-wrap">
+      <div className="map-page">
+        <header className="map-head">
+          <div className="map-title-row">
+            <div className="map-title">
+              <h1>{t.plan.map.map}</h1>
+              {entries.length > 0 && <p className="map-stats">{t.plan.map.stats(shownEntries, map.edges.length)}</p>}
+            </div>
+            <PlanViewSwitch active="map" />
           </div>
-          <PlanViewSwitch active="map" />
-        </div>
-        {entries.length > 0 && (
-          <div className="map-tools">
-            <label className="map-search">
-              <MagnifyingGlass size={14} aria-hidden />
-              <input
-                ref={searchRef}
-                value={ui.query}
-                placeholder={t.plan.map.searchPlaceholder}
-                aria-label={t.plan.map.search}
-                spellCheck={false}
-                onChange={(e) => setUi({ query: e.target.value })}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && matches[0]) {
-                    const n = map.nodes.find((x) => x.id === matches[0])
-                    if (n) open(n)
-                  } else if (e.key === 'Escape' && ui.query) {
-                    e.stopPropagation()
-                    setUi({ query: '' })
-                  }
-                }}
-              />
-              {ui.query.trim() && (
-                <>
-                  <span className="map-search-count" aria-live="polite">
-                    {t.plan.map.matches(matches.length)}
-                  </span>
-                  <button
-                    className="map-search-clear"
-                    aria-label={t.plan.map.clearSearch}
-                    onClick={() => {
+          {entries.length > 0 && (
+            <div className="map-tools">
+              <label className="map-search">
+                <MagnifyingGlass size={14} aria-hidden />
+                <input
+                  ref={searchRef}
+                  value={ui.query}
+                  placeholder={t.plan.map.searchPlaceholder}
+                  aria-label={t.plan.map.search}
+                  spellCheck={false}
+                  onChange={(e) => setUi({ query: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && matches[0]) {
+                      const n = map.nodes.find((x) => x.id === matches[0])
+                      if (n) open(n)
+                    } else if (e.key === 'Escape' && ui.query) {
+                      e.stopPropagation()
                       setUi({ query: '' })
-                      searchRef.current?.focus()
-                    }}
-                  >
-                    <X size={11} />
-                  </button>
-                </>
-              )}
-            </label>
-            <div className="map-chips" role="group" aria-label={t.plan.map.categories}>
-              {chips.map((c) => {
-                const shown = !hidden.has(c.folder)
-                const label = categoryName(t, c)
-                return (
-                  <Tooltip key={c.id} label={t.plan.map.toggleCategory(label, shown)}>
-                    <button className={clsx('map-chip', `slot-${(slots.get(c.folder) ?? 7) % 8}`, !shown && 'is-off')} aria-pressed={shown} onClick={() => toggle(c.folder)}>
-                      <CategoryIcon name={c.icon} size={13} />
-                      <span>{label}</span>
-                      <span className="map-chip-count">{counts.get(c.folder)}</span>
+                    }
+                  }}
+                />
+                {ui.query.trim() && (
+                  <>
+                    <span className="map-search-count" aria-live="polite">
+                      {t.plan.map.matches(matches.length)}
+                    </span>
+                    <button
+                      className="map-search-clear"
+                      aria-label={t.plan.map.clearSearch}
+                      onClick={() => {
+                        setUi({ query: '' })
+                        searchRef.current?.focus()
+                      }}
+                    >
+                      <X size={11} />
                     </button>
-                  </Tooltip>
-                )
-              })}
-              {chapters.length > 0 && (
-                <>
-                  <span className="map-chips-rule" aria-hidden />
-                  <Tooltip label={t.plan.map.chaptersHint}>
-                    <button className={clsx('map-chip map-chip-chapters', !ui.chapters && 'is-off')} aria-pressed={ui.chapters} onClick={() => setUi({ chapters: !ui.chapters })}>
-                      <BookOpenText size={13} />
-                      <span>{t.plan.map.chapters}</span>
-                      <span className="map-chip-count">{chapters.length}</span>
-                    </button>
-                  </Tooltip>
-                </>
+                  </>
+                )}
+              </label>
+              <div className="map-chips" role="group" aria-label={t.plan.map.categories}>
+                {chips.map((c) => {
+                  const shown = !hidden.has(c.folder)
+                  const label = categoryName(t, c)
+                  return (
+                    <Tooltip key={c.id} label={t.plan.map.toggleCategory(label, shown)}>
+                      <button className={clsx('map-chip', `slot-${(slots.get(c.folder) ?? 7) % 8}`, !shown && 'is-off')} aria-pressed={shown} onClick={() => toggle(c.folder)}>
+                        <CategoryIcon name={c.icon} size={13} />
+                        <span>{label}</span>
+                        <span className="map-chip-count">{counts.get(c.folder)}</span>
+                      </button>
+                    </Tooltip>
+                  )
+                })}
+                {chapters.length > 0 && (
+                  <>
+                    <span className="map-chips-rule" aria-hidden />
+                    <Tooltip label={t.plan.map.chaptersHint}>
+                      <button className={clsx('map-chip map-chip-chapters', !ui.chapters && 'is-off')} aria-pressed={ui.chapters} onClick={() => setUi({ chapters: !ui.chapters })}>
+                        <BookOpenText size={13} />
+                        <span>{t.plan.map.chapters}</span>
+                        <span className="map-chip-count">{chapters.length}</span>
+                      </button>
+                    </Tooltip>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </header>
+
+        <div className="map-sheet grain">
+          {entries.length === 0 ? (
+            <div className="map-empty">
+              <Graph size={40} weight="thin" aria-hidden />
+              <h2>{t.plan.map.emptyTitle}</h2>
+              <p>{t.plan.map.emptyText}</p>
+              {chapters.some((c) => c.body.trim()) && (
+                <Button variant="ribbon" onClick={() => void startPlanningSync({ bootstrap: true })}>
+                  {t.plan.overview.buildFromManuscript}
+                </Button>
               )}
             </div>
-          </div>
-        )}
-      </header>
-
-      <div className="map-sheet">
-        {entries.length === 0 ? (
-          <div className="map-empty">
-            <Graph size={40} weight="thin" aria-hidden />
-            <h2>{t.plan.map.emptyTitle}</h2>
-            <p>{t.plan.map.emptyText}</p>
-            {chapters.some((c) => c.body.trim()) && (
-              <Button variant="ribbon" onClick={() => void startPlanningSync({ bootstrap: true })}>
-                {t.plan.overview.buildFromManuscript}
+          ) : map.nodes.length === 0 ? (
+            <div className="map-empty">
+              <p>{t.plan.map.allHidden}</p>
+              <Button size="sm" onClick={() => setUi({ hidden: [] })}>
+                {t.plan.map.showAll}
               </Button>
-            )}
-          </div>
-        ) : map.nodes.length === 0 ? (
-          <div className="map-empty">
-            <p>{t.plan.map.allHidden}</p>
-            <Button size="sm" onClick={() => setUi({ hidden: [] })}>
-              {t.plan.map.showAll}
-            </Button>
-          </div>
-        ) : (
-          <>
-            <MapCanvas
-              map={map}
-              memoryKey={root}
-              colorOf={colorOf}
-              labelOf={labelOf}
-              matches={matches}
-              ariaLabel={t.plan.map.label(shownEntries, map.edges.length)}
-              onOpen={open}
-              renderCard={renderCard}
-              texts={{ zoomIn: t.plan.map.zoomIn, zoomOut: t.plan.map.zoomOut, fit: t.plan.map.fit }}
-            />
-            {map.edges.length === 0 && (
-              <div className="map-hint" role="note">
-                <strong>{t.plan.map.noLinksTitle}</strong>
-                <span>{t.plan.map.noLinks}</span>
-              </div>
-            )}
-          </>
-        )}
+            </div>
+          ) : (
+            <>
+              <MapCanvas
+                map={map}
+                memoryKey={root}
+                colorOf={colorOf}
+                labelOf={labelOf}
+                iconOf={iconOf}
+                matches={matches}
+                ariaLabel={t.plan.map.label(shownEntries, map.edges.length)}
+                onOpen={open}
+                renderCard={renderCard}
+                texts={{ zoomIn: t.plan.map.zoomIn, zoomOut: t.plan.map.zoomOut, fit: t.plan.map.fit }}
+              />
+              {map.edges.length === 0 && (
+                <div className="map-hint" role="note">
+                  <strong>{t.plan.map.noLinksTitle}</strong>
+                  <span>{t.plan.map.noLinks}</span>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   )

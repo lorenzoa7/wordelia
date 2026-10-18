@@ -153,7 +153,8 @@ export default async function ({ app, page, openBook }) {
   await page.keyboard.press('Control+2')
   await page.waitForTimeout(700)
   await away()
-  await measure('.view-tab:not(.is-active)', '.sidebar-head', '.plan-item-top', '.plan-item-main')
+  // '.plan-cat' measures the caret of each category row: it shares the middle of the icon and the name.
+  await measure('.view-tab:not(.is-active)', '.sidebar-head', '.plan-item-top', '.plan-item-main', '.plan-cat')
   await crop('plan-sidebar', page.locator('.plan-nav'))
 
   // Settings

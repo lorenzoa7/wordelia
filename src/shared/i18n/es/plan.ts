@@ -21,6 +21,7 @@ export const plan: typeof en = {
     upToDate: 'Ningún capítulo cambió desde la última actualización.',
     overview: 'Vista general',
     showEntries: (category) => `${category}: mostrar notas`,
+    hideEntries: (category) => `${category}: ocultar notas`,
     importNotesInto: (category) => `Importar notas a ${category}`,
     newIn: (category) => `Nueva nota en ${category}`,
     empty: 'Vacía',

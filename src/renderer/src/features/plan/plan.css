@@ -166,6 +166,8 @@
   color: var(--ink-4);
   font-variant-numeric: tabular-nums;
 }
+/* The caret folds and unfolds the entries. It has the lift of the category icon, so the caret,
+   the icon and the name share one middle. */
 .plan-caret {
   display: inline-grid;
   place-items: center;
@@ -177,12 +179,21 @@
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--ink-4);
+  font: inherit;
   transition: color var(--dur-fast) var(--ease-out);
 }
-.plan-caret:hover {
+.plan-cat:hover .plan-caret {
+  color: var(--ink-3);
+}
+.plan-caret:hover,
+.plan-cat:hover .plan-caret:hover {
   color: var(--ink);
 }
+/* The box of the caret has the height of the category icon (15 px), so the two boxes round to the
+   same pixels; the caret draws in the middle of its box. */
 .plan-caret svg {
+  height: 15px;
+  translate: 0 var(--icon-lift);
   transition: transform var(--dur-fast) var(--ease-out);
 }
 .plan-caret svg.is-open {

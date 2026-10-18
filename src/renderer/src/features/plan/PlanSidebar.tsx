@@ -107,28 +107,47 @@ export function PlanSidebar(): React.JSX.Element {
         {categories.map((c) => {
           const list = entries.filter((e) => e.category === c.folder).sort((a, b) => a.name.localeCompare(b.name))
           const isOpen = open[c.folder] ?? (activeCategory === c.folder || list.some((e) => e.id === activeEntry))
+          const isPage = activeCategory === c.folder && !activeEntry
           const label = categoryName(t, c)
+          const fold = (to: boolean): void => setOpen((o) => ({ ...o, [c.folder]: to }))
+          // A click on the row shows the category page and its entries. On the page that shows, it folds or unfolds the list.
+          const onRow = (): void => {
+            if (isPage) return fold(!isOpen)
+            useBook.getState().selectCategory(c.folder)
+            fold(true)
+          }
           return (
             <div key={c.id} className="plan-group">
-              <div className={clsx('plan-item', activeCategory === c.folder && !activeEntry && 'is-active')}>
+              <div className={clsx('plan-item plan-cat', isPage && 'is-active')} onClick={onRow}>
+                {/* The caret only folds and unfolds; the page stays. */}
                 <button
                   className="plan-caret"
-                  onClick={() => setOpen((o) => ({ ...o, [c.folder]: !isOpen }))}
-                  aria-label={t.plan.sidebar.showEntries(label)}
+                  tabIndex={-1}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    fold(!isOpen)
+                  }}
+                  aria-label={isOpen ? t.plan.sidebar.hideEntries(label) : t.plan.sidebar.showEntries(label)}
                   aria-expanded={isOpen}
                 >
-                  <CaretRight size={10} className={clsx(isOpen && 'is-open')} />
+                  <CaretRight size={10} weight="bold" className={clsx(isOpen && 'is-open')} />
                 </button>
                 <button
                   className="plan-item-main"
-                  aria-current={activeCategory === c.folder && !activeEntry ? 'page' : undefined}
-                  onClick={() => useBook.getState().selectCategory(c.folder)}
+                  aria-current={isPage ? 'page' : undefined}
+                  aria-expanded={isOpen}
+                  onKeyDown={(e) => {
+                    if (e.key === 'ArrowRight' && !isOpen) fold(true)
+                    else if (e.key === 'ArrowLeft' && isOpen) fold(false)
+                    else return
+                    e.preventDefault()
+                  }}
                 >
                   <CategoryIcon name={c.icon} />
                   <span className="plan-item-label">{label}</span>
                   <span className="plan-item-count">{list.length || ''}</span>
                 </button>
-                <span className="plan-item-add">
+                <span className="plan-item-add" onClick={(e) => e.stopPropagation()}>
                   <IconButton label={t.plan.sidebar.importNotesInto(label)} onClick={() => void importNotes(c.folder)}>
                     <DownloadSimple size={13} />
                   </IconButton>

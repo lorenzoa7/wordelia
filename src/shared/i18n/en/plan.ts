@@ -25,6 +25,7 @@ export const plan = {
     upToDate: 'No chapter changed since the last update.',
     overview: 'Overview',
     showEntries: (category: string): string => `${category}: show entries`,
+    hideEntries: (category: string): string => `${category}: hide entries`,
     importNotesInto: (category: string): string => `Import notes into ${category}`,
     newIn: (category: string): string => `New in ${category}`,
     empty: 'Empty',

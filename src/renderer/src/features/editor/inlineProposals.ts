@@ -287,12 +287,11 @@ const CHECK = 'M232.49,80.49l-128,128a12,12,0,0,1-17,0l-56-56a12,12,0,1,1,17-17L
 const CROSS =
   'M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z'
 
-function iconButton(className: string, label: string, path: string, run: () => void): HTMLElement {
+function iconButton(className: string, label: string, text: string, path: string, run: () => void): HTMLElement {
   const b = document.createElement('button')
   b.type = 'button'
   b.className = className
   b.title = label
-  b.setAttribute('aria-label', label)
   const svg = document.createElementNS(SVG_NS, 'svg')
   svg.setAttribute('viewBox', '0 0 256 256')
   svg.setAttribute('aria-hidden', 'true')
@@ -300,6 +299,9 @@ function iconButton(className: string, label: string, path: string, run: () => v
   p.setAttribute('d', path)
   svg.appendChild(p)
   b.appendChild(svg)
+  const span = document.createElement('span')
+  span.textContent = text
+  b.appendChild(span)
   // Keep the cursor and the selection in the text.
   b.addEventListener('mousedown', (e) => e.preventDefault())
   b.addEventListener('click', (e) => {
@@ -316,8 +318,8 @@ function actionsWidget(p: InlineProposal): HTMLElement {
   el.className = 'pm-prop-actions'
   el.setAttribute('contenteditable', 'false')
   el.dataset.prop = p.id
-  el.appendChild(iconButton('pm-prop-btn is-accept', t.chat.acceptChange, CHECK, () => acceptInline(p)))
-  el.appendChild(iconButton('pm-prop-btn is-reject', t.chat.rejectChange, CROSS, () => rejectInline(p)))
+  el.appendChild(iconButton('pm-prop-btn is-accept', t.chat.acceptChange, t.common.accept, CHECK, () => acceptInline(p)))
+  el.appendChild(iconButton('pm-prop-btn is-reject', t.chat.rejectChange, t.common.reject, CROSS, () => rejectInline(p)))
   return el
 }
 

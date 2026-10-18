@@ -30,6 +30,13 @@ export function ReviewBar({ editor }: { editor: Editor }): React.JSX.Element {
       if (!desk) return
       const box = desk.getBoundingClientRect()
       const page = editor.view.dom.getBoundingClientRect()
+      // While the AI works, the bar stays where the selection menu was: above the start of the selection.
+      if (review.phase !== 'ready') {
+        const start = editor.view.coordsAtPos(Math.min(review.from, editor.state.doc.content.size))
+        const left = Math.max(page.left, Math.min(start.left - 12, page.right - 320))
+        setPos({ top: start.top - box.top + desk.scrollTop - 48, left: left - box.left + desk.scrollLeft })
+        return
+      }
       const gap = editor.view.dom.querySelector('.review-spacer')
       if (gap) {
         const r = gap.getBoundingClientRect()

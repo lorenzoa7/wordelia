@@ -32,6 +32,8 @@ export const editor: typeof en = {
     editActions: 'Editar ações…',
     chapter: 'Capítulo'
   },
+  /** The mark of a selected page break (Ctrl+Enter) */
+  pageBreak: 'Quebra de página',
   review: {
     chatProposal: 'Proposta do chat',
     words: (n) => (n === 1 ? '1 palavra' : `${n} palavras`),

@@ -37,6 +37,8 @@ export const editor = {
     chapter: 'Chapter'
   },
   /** The bar under an inline AI review */
+  /** The mark of a selected page break (Ctrl+Enter) */
+  pageBreak: 'Page break',
   review: {
     chatProposal: 'Chat proposal',
     /** Words that the AI wrote so far */

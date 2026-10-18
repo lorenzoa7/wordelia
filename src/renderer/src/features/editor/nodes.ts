@@ -1,7 +1,8 @@
 // Custom nodes and attributes of the book schema.
 
 import { Extension, InputRule, Node, mergeAttributes } from '@tiptap/core'
-import { TextSelection } from '@tiptap/pm/state'
+import { NodeSelection, TextSelection } from '@tiptap/pm/state'
+import { getT } from '@/lib/i18n'
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -76,13 +77,14 @@ export const SceneBreak = Node.create({
 
 /**
  * A page break (Ctrl+Enter), like a word processor: the text after it starts on a new page.
- * Stored as `<!-- page break -->` on its own line. It has no height; the page gap shows it.
+ * Stored as `<!-- page break -->` on its own line. It has no height; the page gap shows it. When it is
+ * selected, a mark "Page break" shows where it is (editor.css).
  */
 export const PageBreak = Node.create({
   name: 'pageBreak',
   group: 'block',
   atom: true,
-  selectable: false,
+  selectable: true,
   draggable: false,
   // Before the hard break of StarterKit, which also listens to Mod-Enter.
   priority: 1000,
@@ -92,7 +94,7 @@ export const PageBreak = Node.create({
   },
 
   renderHTML({ HTMLAttributes }) {
-    return ['div', mergeAttributes(HTMLAttributes, { class: 'page-break', 'data-page-break': '', contenteditable: 'false' })]
+    return ['div', mergeAttributes(HTMLAttributes, { class: 'page-break', 'data-page-break': '', 'data-label': getT().editor.pageBreak, contenteditable: 'false' })]
   },
 
   addCommands() {
@@ -132,9 +134,16 @@ export const PageBreak = Node.create({
   },
 
   addKeyboardShortcuts() {
-    /** Remove the page break next to the cursor: Backspace at the start of the next block, Delete at the end of the block before. */
+    /**
+     * Backspace at the start of the block after a page break, or Delete at the end of the block before
+     * it: the first press selects the page break (its mark shows), the second press removes it.
+     */
     const removeNext = (dir: -1 | 1): boolean => {
       const { state, view } = this.editor
+      if (state.selection instanceof NodeSelection && state.selection.node.type.name === this.name) {
+        view.dispatch(state.tr.deleteSelection().scrollIntoView())
+        return true
+      }
       const { $from, empty } = state.selection
       if (!empty || $from.depth !== 1) return false
       const atEdge = dir < 0 ? $from.parentOffset === 0 : $from.parentOffset === $from.parent.content.size
@@ -144,7 +153,7 @@ export const PageBreak = Node.create({
       const node = state.doc.child(index)
       if (node.type.name !== this.name) return false
       const pos = dir < 0 ? $from.before() - node.nodeSize : $from.after()
-      view.dispatch(state.tr.delete(pos, pos + node.nodeSize))
+      view.dispatch(state.tr.setSelection(NodeSelection.create(state.doc, pos)).scrollIntoView())
       return true
     }
     return {

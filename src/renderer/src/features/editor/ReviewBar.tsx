@@ -1,22 +1,30 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEditorState, type Editor } from '@tiptap/react'
-import { ArrowsClockwise, Check, Stop, X } from '@phosphor-icons/react'
+import { Article, ArrowsClockwise, Check, Rows, Stop, TextStrikethrough, X } from '@phosphor-icons/react'
 import { diffStats } from '@shared/text/diff'
 import { Kbd, Spinner } from '@/ui'
 import { useApp } from '@/stores/app'
 import { actionName, useT } from '@/lib/i18n'
 import { cancelAction, retryAction, useActionRun } from '@/features/actions/runAction'
 import { reviewKey } from './review'
+import { DIFF_VIEWS, setDiffView, useDiffView, type DiffView } from './diffView'
+
+const VIEW_ICONS: Record<DiffView, React.ReactNode> = {
+  words: <TextStrikethrough size={14} />,
+  stacked: <Rows size={14} />,
+  new: <Article size={14} />
+}
 import { isChatReview } from './registry'
 
-/** The floating bar under an inline AI review: Accept, Reject, Retry. */
+/** The floating bar of an inline AI review, above the passage: Accept, Reject, Retry, and the view of the change. */
 export function ReviewBar({ editor }: { editor: Editor }): React.JSX.Element {
   const review = useEditorState({ editor, selector: ({ editor: e }) => reviewKey.getState(e.state) ?? null })
   const words = useActionRun((s) => s.words)
   const actionId = useActionRun((s) => s.actionId)
   const action = useApp((s) => s.settings?.actions.find((a) => a.id === actionId))
   const t = useT()
+  const view = useDiffView()
   const ref = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
 
@@ -30,21 +38,11 @@ export function ReviewBar({ editor }: { editor: Editor }): React.JSX.Element {
       if (!desk) return
       const box = desk.getBoundingClientRect()
       const page = editor.view.dom.getBoundingClientRect()
-      // While the AI works, the bar stays where the selection menu was: above the start of the selection.
-      if (review.phase !== 'ready') {
-        const start = editor.view.coordsAtPos(Math.min(review.from, editor.state.doc.content.size))
-        const left = Math.max(page.left, Math.min(start.left - 12, page.right - 320))
-        setPos({ top: start.top - box.top + desk.scrollTop - 48, left: left - box.left + desk.scrollLeft })
-        return
-      }
-      const gap = editor.view.dom.querySelector('.review-spacer')
-      if (gap) {
-        const r = gap.getBoundingClientRect()
-        setPos({ top: r.top - box.top + desk.scrollTop + 6, left: page.left - box.left + desk.scrollLeft })
-        return
-      }
-      const end = editor.view.coordsAtPos(Math.min(review.to, editor.state.doc.content.size))
-      setPos({ top: end.bottom - box.top + desk.scrollTop + 12, left: page.left - box.left + desk.scrollLeft })
+      // The bar stays where the selection menu was: above the start of the passage, while the AI
+      // works and when the change is ready.
+      const start = editor.view.coordsAtPos(Math.min(review.from, editor.state.doc.content.size))
+      const left = Math.max(page.left, Math.min(start.left - 12, page.right - 420))
+      setPos({ top: start.top - box.top + desk.scrollTop - 48, left: left - box.left + desk.scrollLeft })
     }
     place()
     const id = requestAnimationFrame(place)
@@ -110,6 +108,21 @@ export function ReviewBar({ editor }: { editor: Editor }): React.JSX.Element {
                   <ArrowsClockwise size={14} />
                 </button>
               )}
+              <span className="review-views" role="radiogroup" aria-label={t.editor.review.viewLabel}>
+                {DIFF_VIEWS.map((v) => (
+                  <button
+                    key={v}
+                    className="review-view"
+                    role="radio"
+                    aria-checked={view === v}
+                    title={t.editor.review.views[v]}
+                    aria-label={t.editor.review.views[v]}
+                    onClick={() => setDiffView(v)}
+                  >
+                    {VIEW_ICONS[v]}
+                  </button>
+                ))}
+              </span>
             </>
           )}
         </motion.div>

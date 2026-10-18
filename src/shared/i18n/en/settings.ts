@@ -46,6 +46,8 @@ export const settings = {
     typewriterSounds: 'Typewriter sounds',
     typewriterScrolling: 'Typewriter mode',
     typewriterHint: 'While you type, the line stays at the same height on the screen and the page moves up, as in a typewriter. Without it, the cursor goes down the screen until the page scrolls.',
+    diffView: 'AI changes in the text',
+    diffViewHint: 'How a change of the AI shows before you accept it. The bar of the change can switch it at any time.',
     keyboard: 'Keyboard',
     /** Shown under the list of shortcuts */
     actionKeysHint: 'Change the shortcuts of the actions in “Actions”.',

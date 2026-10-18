@@ -8,6 +8,7 @@ import { Slice, type Node as PMNode, type Schema } from '@tiptap/pm/model'
 import { parseMarkdown } from '@shared/markdown/parse'
 import { markdownToPlain } from '@shared/book'
 import { wordDiff, type DiffOp } from '@shared/text/diff'
+import { useApp } from '@/stores/app'
 
 export interface ReviewData {
   id: string
@@ -93,37 +94,36 @@ export function proposedPlain(markdown: string): string {
     .join('\n\n')
 }
 
-/** An empty block after the reviewed text. The review bar sits in it, so it never covers text. */
-function spacer(state: EditorState, r: ReviewData): Decoration {
-  const $to = state.doc.resolve(Math.min(r.to, state.doc.content.size))
-  const pos = $to.depth >= 1 ? $to.after(1) : r.to
-  return Decoration.widget(
-    pos,
-    () => {
-      const el = document.createElement('div')
-      el.className = 'review-spacer'
-      el.setAttribute('contenteditable', 'false')
-      return el
-    },
-    { side: 1, key: 'review-spacer', ignoreSelection: true }
-  )
-}
 
 function decorations(state: EditorState, r: ReviewData): DecorationSet {
   // The room for the review bar under the paragraph: only when the change is ready. While the AI
   // works, the bar sits above the selection (ReviewBar.tsx).
-  const decos: Decoration[] = r.phase === 'ready' ? [spacer(state, r)] : []
+  const decos: Decoration[] = []
   if (r.phase !== 'ready') {
     decos.push(Decoration.inline(r.from, r.to, { class: r.phase === 'error' ? 'ai-error' : 'ai-pending' }))
     return DecorationSet.create(state.doc, decos)
   }
-  decos.push(...diffDecorations(state.doc, r.from, r.to, r.ops, r.id))
+  decos.push(...diffDecorations(state.doc, r.from, r.to, r.ops, r.id, currentDiffView()))
   decos.push(Decoration.inline(r.from, r.to, { class: 'ai-range' }))
   return DecorationSet.create(state.doc, decos)
 }
 
 /** A word diff drawn in the text: deleted words struck through, new words as widgets. */
-export function diffDecorations(doc: PMNode, from: number, to: number, ops: DiffOp[], id: string): Decoration[] {
+export type DiffView = 'words' | 'stacked' | 'new'
+
+/** The view of AI changes in the text (Settings → General, and the review bar) */
+export function currentDiffView(): DiffView {
+  return useApp.getState().settings?.editor.diffView ?? 'words'
+}
+
+/**
+ * An AI change drawn in the text, in one of three views:
+ * - words: deleted words struck through and new words in green, word by word;
+ * - stacked: the old text struck through, then the whole new text under it, to read one over the other;
+ * - new: only the new text, in the place of the old one.
+ */
+export function diffDecorations(doc: PMNode, from: number, to: number, ops: DiffOp[], id: string, view: DiffView = 'words'): Decoration[] {
+  if (view !== 'words') return wholeDecorations(doc, from, to, ops, id, view)
   const decos: Decoration[] = []
   const { map } = textWithMap(doc, from, to)
   let i = 0
@@ -161,6 +161,49 @@ export function diffDecorations(doc: PMNode, from: number, to: number, ops: Diff
       )
     }
   })
+  return decos
+}
+
+/** The "stacked" and the "new" views: the old text as one piece, the new text as one piece. */
+function wholeDecorations(doc: PMNode, from: number, to: number, ops: DiffOp[], id: string, view: 'stacked' | 'new'): Decoration[] {
+  const decos: Decoration[] = []
+  const text = ops
+    .filter((o) => o.type !== 'delete')
+    .map((o) => o.text)
+    .join('')
+  if (view === 'stacked') {
+    decos.push(Decoration.inline(from, to, { class: 'ai-del' }))
+  } else {
+    // Hide the old text. A paragraph that is all inside the change hides as a whole, but not the
+    // last one: the new text shows in it.
+    doc.nodesBetween(from, to, (node, pos) => {
+      if (!node.isTextblock) return true
+      const start = pos + 1
+      const end = pos + 1 + node.content.size
+      const whole = from <= start && to >= end && end < to
+      if (whole) decos.push(Decoration.node(pos, pos + node.nodeSize, { class: 'ai-hide' }))
+      else if (Math.min(to, end) > Math.max(from, start)) decos.push(Decoration.inline(Math.max(from, start), Math.min(to, end), { class: 'ai-hide' }))
+      return false
+    })
+  }
+  decos.push(
+    Decoration.widget(
+      to,
+      () => {
+        const wrap = document.createElement('span')
+        wrap.className = view === 'stacked' ? 'ai-ins ai-ins-stacked' : 'ai-ins ai-ins-new'
+        text.split(/\n\n+/).forEach((part, k) => {
+          const p = document.createElement('span')
+          // The first paragraph goes on in the line (the "new" view); the next ones are paragraphs.
+          p.className = k > 0 || view === 'stacked' ? 'ai-ins-para' : ''
+          p.textContent = part
+          wrap.appendChild(p)
+        })
+        return wrap
+      },
+      { side: 1, key: `ins-${view}-${id}-${text.length}`, ignoreSelection: true }
+    )
+  )
   return decos
 }
 

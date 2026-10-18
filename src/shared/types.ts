@@ -347,6 +347,8 @@ export interface AppSettings {
     typewriterSounds: boolean
     /** Words a day. 0 hides the goal. */
     dailyGoal: number
+    /** How an AI change shows in the text: word by word, the old text over the new, or only the new text */
+    diffView?: 'words' | 'stacked' | 'new'
   }
   providers: Record<ProviderId, ProviderSettings>
   routes: ModelRoutes

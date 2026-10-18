@@ -46,7 +46,14 @@ export const editor = {
     chatProposal: 'Chat proposal',
     /** Words that the AI wrote so far */
     words: (n: number): string => `${n} words`,
-    stop: 'Stop'
+    stop: 'Stop',
+    /** The three views of an AI change in the review bar */
+    viewLabel: 'View of the change',
+    views: {
+      words: 'Word by word',
+      stacked: 'Old over new',
+      new: 'New text only'
+    }
   },
   /** Find and replace */
   find: {

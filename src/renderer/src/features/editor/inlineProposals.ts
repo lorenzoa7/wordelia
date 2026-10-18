@@ -19,7 +19,8 @@ import { getT } from '@/lib/i18n'
 import { typesetForBook } from '@/lib/typeset'
 import { useChat } from '@/features/chat/chatStore'
 import { applyEditHunk, markAfter, resolveTarget, restoreSnapshot, setHunkStates, snapshotOf } from '@/features/chat/applyProposal'
-import { diffDecorations, proposedPlain, textWithMap } from './review'
+import { currentDiffView, diffDecorations, proposedPlain, textWithMap } from './review'
+import { useApp } from '@/stores/app'
 import { chapterHasText, getChapterEditor, locateInChapter, scrollToPos, whenChapterEditor } from './registry'
 
 export interface InlineProposal {
@@ -352,7 +353,7 @@ function build(state: EditorState, list: InlineProposal[], focus: string | null)
     taken.push({ from, to })
     const original = textWithMap(doc, from, to).text
     const ops = wordDiff(original, proposedPlain(replaceText(p)))
-    decos.push(...diffDecorations(doc, from, to, ops, p.id))
+    decos.push(...diffDecorations(doc, from, to, ops, p.id, currentDiffView()))
     decos.push(Decoration.inline(from, to, { class: `pm-prop${focus === p.id ? ' is-focus' : ''}`, 'data-prop': p.id }))
     decos.push(
       Decoration.widget(to, () => actionsWidget(p), {
@@ -413,6 +414,10 @@ export const InlineProposals = Extension.create<InlineProposalsOptions>({
             view.dispatch(view.state.tr.setMeta(inlineProposalsKey, set).setMeta('addToHistory', false).setMeta('allowDuringReview', true))
           }
           const unsubscribe = useInlineProposals.subscribe(rebuild)
+          // A new view of the changes (words, stacked, new): draw the proposals again.
+          const unsubscribeView = useApp.subscribe((s, prev) => {
+            if (s.settings?.editor.diffView !== prev.settings?.editor.diffView) rebuild()
+          })
           // After the editor is ready.
           const first = setTimeout(rebuild, 0)
           return {
@@ -424,6 +429,7 @@ export const InlineProposals = Extension.create<InlineProposalsOptions>({
             },
             destroy() {
               unsubscribe()
+              unsubscribeView()
               clearTimeout(timer)
               clearTimeout(first)
             }

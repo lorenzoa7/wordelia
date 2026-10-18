@@ -37,6 +37,11 @@ export function registerChapterEditor(e: ChapterEditor): () => void {
   }
 }
 
+/** The chapter editors on screen now */
+export function chapterEditors(): ChapterEditor[] {
+  return Array.from(editors.values()).filter((e) => !e.editor.isDestroyed)
+}
+
 export function getChapterEditor(chapterId: string): ChapterEditor | null {
   const e = editors.get(chapterId)
   return e && !e.editor.isDestroyed ? e : null

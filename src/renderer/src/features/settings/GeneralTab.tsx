@@ -10,6 +10,7 @@ import { useUi } from '@/stores/ui'
 import { LOCALES, actionName, useT } from '@/lib/i18n'
 import { typewriterSound } from '@/features/editor/typewriter-sound'
 import { ZOOM_STEPS } from '@/features/editor/zoom'
+import { DIFF_VIEWS, setDiffView, type DiffView } from '@/features/editor/diffView'
 
 const THEMES: Array<{ id: ThemeSetting; icon: React.ReactNode }> = [
   { id: 'light', icon: <Sun size={16} /> },
@@ -96,6 +97,14 @@ export function GeneralTab(): React.JSX.Element | null {
       </Field>
       <Field label={g.typewriterScrolling} hint={g.typewriterHint} inline>
         <Switch checked={settings.ui.typewriterScroll} onCheckedChange={(v) => setUi({ typewriterScroll: v })} />
+      </Field>
+      <Field label={g.diffView} hint={g.diffViewHint} inline>
+        <Select
+          value={settings.editor.diffView ?? 'words'}
+          onValueChange={(v) => setDiffView(v as DiffView)}
+          options={DIFF_VIEWS.map((v) => ({ value: v, label: t.editor.review.views[v] }))}
+          ariaLabel={g.diffView}
+        />
       </Field>
 
       <UpdatesSection />

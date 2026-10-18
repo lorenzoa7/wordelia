@@ -40,7 +40,14 @@ export const editor: typeof en = {
   review: {
     chatProposal: 'Proposta do chat',
     words: (n) => (n === 1 ? '1 palavra' : `${n} palavras`),
-    stop: 'Parar'
+    stop: 'Parar',
+    /** The three views of an AI change in the review bar */
+    viewLabel: 'Ver a mudança',
+    views: {
+      words: 'Palavra a palavra',
+      stacked: 'Antes e depois',
+      new: 'Só o texto novo'
+    }
   },
   find: {
     replaceToggle: 'Substituir',

@@ -797,16 +797,61 @@
   color: var(--ink-3);
 }
 
-/* Room for the review bar, under the reviewed text */
-.review-spacer {
-  height: 46px;
-  text-indent: 0;
-  animation: spacer-open var(--dur-med) var(--ease-out) both;
+/* The views of an AI change (review.ts): the review bar switches them */
+.review-views {
+  display: inline-flex;
+  gap: 1px;
+  margin-left: 4px;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--desk-3);
 }
-@keyframes spacer-open {
-  from {
-    height: 0;
-  }
+.review-view {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 24px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.review-view svg {
+  translate: 0 var(--icon-lift);
+}
+.review-view:hover {
+  color: var(--ink);
+}
+.review-view[aria-checked='true'] {
+  background: var(--paper);
+  box-shadow: var(--shadow-page);
+  color: var(--ink);
+}
+/* "New text only": the old text is hidden */
+.ai-hide {
+  display: none;
+}
+/* "Old over new": the new text starts on its own line, under the old text */
+.ai-ins-stacked {
+  display: block;
+  margin-top: 0.15em;
+  text-indent: 0;
+}
+.ai-ins-para {
+  display: block;
+  text-indent: var(--book-indent);
+}
+.ai-ins-stacked .ai-ins-para:first-child {
+  text-indent: 0;
+}
+/* "New text only": the new text reads like the book, with a light tint that says it is a proposal */
+.ai-ins-new {
+  color: var(--ink);
+  background: var(--pen-wash);
 }
 
 /* A page break (Ctrl+Enter) has no height: the page gap after it shows the new page. Selected

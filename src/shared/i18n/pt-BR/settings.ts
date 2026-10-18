@@ -42,6 +42,8 @@ export const settings: typeof en = {
     typewriterSounds: 'Sons de máquina de escrever',
     typewriterScrolling: 'Modo máquina de escrever',
     typewriterHint: 'Enquanto você digita, a linha fica sempre na mesma altura da tela e a página sobe, como numa máquina de escrever. Sem ele, o cursor desce pela tela até a página rolar.',
+    diffView: 'Mudanças da IA no texto',
+    diffViewHint: 'Como uma mudança da IA aparece antes de você aceitar. A barra da mudança troca a qualquer momento.',
     keyboard: 'Teclado',
     actionKeysHint: 'Mude os atalhos das ações em “Ações”.',
     shortcuts: {

@@ -1,5 +1,7 @@
 // A new page grows in one time: typing after it, and the page measures, do not start its animation again.
 export default async function ({ page, openBook }) {
+  // The machine may ask for reduced motion (CI servers do): this scenario checks the animation itself.
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
   await openBook()
   await page.waitForTimeout(800)
   await page.evaluate(() => {

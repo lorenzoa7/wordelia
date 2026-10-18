@@ -50,9 +50,19 @@ export function useFollowEnd(box: HTMLElement | null, content: HTMLElement | nul
       const prev = last.current
       // The view went up and the content did not get shorter: the user scrolled up.
       const up = box.scrollTop < prev.top - 1 && box.scrollHeight >= prev.height
-      if (up && gap() > AT_END) on.current = false
-      else if (gap() <= NEAR_END) on.current = true
+      // A scroll up never starts the follow, also when its first step is still near the end.
+      if (up) {
+        if (gap() > AT_END) on.current = false
+      } else if (gap() <= NEAR_END) on.current = true
       last.current = { top: box.scrollTop, height: box.scrollHeight }
+    }
+    // The wheel or a key goes up: stop at once, before the scroll starts. Else the next change of size
+    // could put the view back at the end in the middle of the scroll.
+    const onWheel = (e: WheelEvent): void => {
+      if (e.deltaY < 0 && box.scrollTop > 0) on.current = false
+    }
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'ArrowUp' || e.key === 'PageUp' || e.key === 'Home') on.current = false
     }
     const ro = new ResizeObserver((entries) => {
       if (!on.current) return
@@ -64,9 +74,13 @@ export function useFollowEnd(box: HTMLElement | null, content: HTMLElement | nul
     ro.observe(box)
     ro.observe(content)
     box.addEventListener('scroll', onScroll, { passive: true })
+    box.addEventListener('wheel', onWheel, { passive: true })
+    box.addEventListener('keydown', onKey)
     return () => {
       ro.disconnect()
       box.removeEventListener('scroll', onScroll)
+      box.removeEventListener('wheel', onWheel)
+      box.removeEventListener('keydown', onKey)
     }
   }, [box, content, toEnd])
 

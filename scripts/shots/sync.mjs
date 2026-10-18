@@ -135,7 +135,8 @@ export default async function ({ app, page, shot, openBook }) {
   const error = await card.innerText()
   if (english && (!error.includes('The sync stopped.') || !error.includes('Connect an AI first.') || !error.includes('Open settings'))) fail(`the error card says "${error}"`)
   await page.waitForTimeout(300)
-  await shot('error')
+  // Not "error": the e2e runner reads a screenshot named error as a failed scenario.
+  await shot('error-card')
   await page.evaluate((r) => {
     const app = window.__wordelia.app
     app.setState({ settings: { ...app.getState().settings, routes: r } })

@@ -232,6 +232,17 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] Send goes to the very end of the thread, and the end stays in view when the layout changes after the first frame (a font that loads, a quote, the thinking line) and while the reply streams. A scroll up stops the follow; a scroll back to the end starts it again (`useFollowEnd`, `features/chat/follow.ts`). The scenario `chatview` sends a long message with a quote and two pills and measures scrollTop + clientHeight against scrollHeight in each resize step
 - [x] No row of the thread list looks selected: while the list shows, the user is in no thread. The row with the keyboard focus shows a focus ring
 
+## Version 0.7 — fourth feedback of the author
+
+### Planning
+
+- [x] The sync runs in the background. "Sync" no longer opens the chat or changes its thread. The button shows a spinner, "Syncing…" and the progress ("Reading 2 chapters…", then "1 change so far…"; "Part 1 of 2" for a long book), with a button that cancels. A cancel keeps the complete changes, and the chapters of the stopped part still wait (scenario `sync`)
+- [x] The result shows in the Plan sidebar, under the button: "2 changes proposed to the notes", the names of the notes, Review, Accept all and Reject all (Reject all has Undo). An error shows in the same card, with Try again or Open settings. When the Plan sidebar is not on screen, a toast tells the result, with Review
+- [x] Review opens the chat on the "Planning sync" thread, at its proposal cards. The proposals stay in that thread, so the cards, the inline diffs in the notes and Apply all work as before. The author never looks for the thread
+- [x] The Sync button is off when no chapter changed since the last sync. Its tooltip says "Up to date". A chapter that the author changes while the sync runs still waits for the next sync
+- [x] Category rows in the Plan sidebar: the caret, the icon and the name share one middle (the `icons` scenario measures the caret). A click anywhere on the row shows the category page and its entries; on the page that shows, a click folds or unfolds the entries. The caret only folds and unfolds. Enter is a click, → unfolds, ← folds (scenario `plannav`)
+- [x] Map hover with a fade: the pale map and the highlight fade in and out in 180 ms (ease-out; no fade with reduced motion). The pale map is three groups that fade as one, and a focus layer above them draws the node, its neighbors and its edges again. With 300 entries at rest, a hover frame takes 6.8 ms on average, p95 7.5 ms (version 0.6: 27 ms, p95 60 ms, up to 195 ms). So the fade shows, and the old fade of 120 ms did not (scenario `graph`)
+
 ## Tests and CI
 
 - [x] End-to-end scenarios run with a hidden window (transparent, no focus) and with CSS animations off

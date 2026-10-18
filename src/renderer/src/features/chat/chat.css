@@ -1407,13 +1407,14 @@ button.proposal-file:hover span {
   background: var(--pen-wash);
   color: var(--pen);
 }
-/* The icon and the text. It takes the free room of the line (grow 999), so the buttons keep their
-   own width beside it. When the buttons do not fit beside it, they go to the next line. */
+/* The icon and the text. Its own width is the width of the title on one line (the files line does not
+   count, see below). It takes the free room of the line (grow 999), so the buttons keep their own
+   width beside it. When the buttons do not fit beside the whole title, they go to the next line. */
 .msg-bulk-main {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex: 999 1 15em;
+  flex: 999 1 auto;
   min-width: 0;
 }
 .msg-bulk-info {
@@ -1429,8 +1430,10 @@ button.proposal-file:hover span {
   line-height: 1.3;
   color: var(--ink);
 }
-/* One line: the names get "…", the count of the other files always shows. */
+/* One line: the names get "…", the count of the other files always shows. Its width does not count
+   in the width of the bar (contain), so long names never push the buttons to the next line. */
 .msg-bulk-files {
+  contain: inline-size;
   display: flex;
   align-items: baseline;
   gap: 5px;

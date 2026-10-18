@@ -570,6 +570,8 @@ export default async function ({ app, page, shot, openBook, book }) {
     const inside = (b) => b.l >= r.inner.l - 0.5 && b.r <= r.inner.r + 0.5
     if (!inside(r.count) || !inside(r.files)) fail(`the text of the reply bar goes past the bar at ${w}px`)
     if (r.files.lines !== 1) fail(`the files of the reply bar take ${r.files.lines} lines at ${w}px`)
+    // The buttons go to their own line before the title has to wrap.
+    if (r.count.lines !== 1) fail(`the title of the reply bar takes ${r.count.lines} lines at ${w}px`)
     if (!r.more || r.more.text !== '+29' || r.more.cut || !inside(r.more)) fail(`the count of the other files does not show at ${w}px`)
     if (r.buttons.length !== 2) fail('the reply bar has no two buttons')
     for (const b of r.buttons) {

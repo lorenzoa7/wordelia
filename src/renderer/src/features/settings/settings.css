@@ -799,8 +799,9 @@
 .scope-switch-btn.is-active svg {
   color: var(--ribbon);
 }
+/* The main action cannot move to a book: the hint under the switch says why. */
 .scope-switch-btn:disabled {
-  color: var(--ink-4);
+  opacity: 0.5;
 }
 .action-name-row {
   display: flex;

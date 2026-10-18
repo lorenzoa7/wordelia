@@ -13,7 +13,7 @@ import { proposedPlain, reviewKey, textWithMap } from '@/features/editor/review'
 import { create } from 'zustand'
 import { normalizeRange } from './range'
 import { SNAPSHOT_EN, snapshot } from '@/features/history/snapshots'
-import { actionInstructions, getT } from '@/lib/i18n'
+import { actionInstructions, actionName, getT } from '@/lib/i18n'
 import { typesetForBook } from '@/lib/typeset'
 import { nearestEffort } from '@shared/ai/effort'
 import { findAction } from './allActions'
@@ -92,7 +92,8 @@ export async function runAction(action: AiAction, range?: { from: number; to: nu
 
   const id = `review-${++seq}`
   // Collapse the selection: the review marks show the range, and the selection menu closes.
-  editor.chain().setTextSelection(to).startReview({ id, from, to, label: action.name }).run()
+  // The label is the name as the settings show it, also for a built-in action that moved to the book.
+  editor.chain().setTextSelection(to).startReview({ id, from, to, label: actionName(t, action) }).run()
   useActionRun.setState({ running: true, words: 0, actionId: action.id })
 
   const handle = runCompletion(

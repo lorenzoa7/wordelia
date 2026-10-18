@@ -76,16 +76,26 @@ function tailElement(height: number, m: PageMetrics): HTMLElement {
   return el
 }
 
-/** `fresh`: breaks from this index on are new pages that typing made; they grow in. */
+/**
+ * `fresh`: breaks from this index on are new pages that typing made; they grow in one time.
+ * ProseMirror draws a widget again when the paragraph around it changes (the author types on the
+ * new page): only the first drawing of a new gap animates.
+ */
 function build(state: EditorState, breaks: Break[], tail: number, m: PageMetrics, fresh = Infinity): DecorationSet {
-  const decos = breaks.map((b, i) =>
-    Decoration.widget(b.pos, () => gapElement(b, m, i, i >= fresh), {
+  const decos = breaks.map((b, i) => {
+    let grow = i >= fresh
+    const draw = (): HTMLElement => {
+      const el = gapElement(b, m, i, grow)
+      grow = false
+      return el
+    }
+    return Decoration.widget(b.pos, draw, {
       side: -1,
       ignoreSelection: true,
       // Not the new mark: the next measure (fast typing) keeps the same element and its animation.
       key: `gap-${b.inline ? 'i' : 'b'}-${Math.round(b.rest)}-${m.contentHeight}`
     })
-  )
+  })
   if (tail > 0) {
     decos.push(
       Decoration.widget(state.doc.content.size, () => tailElement(tail, m), { side: 1, ignoreSelection: true, key: `tail-${Math.round(tail)}-${m.zoom}` })

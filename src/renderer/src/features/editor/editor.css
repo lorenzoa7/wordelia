@@ -840,10 +840,10 @@
 
 /* A new page grows in from the end of the page before it, and its band fades in (pagination.ts). */
 .pm-page-gap.is-new {
-  animation: pm-gap-grow 200ms var(--ease-out) both;
+  animation: pm-gap-grow 380ms var(--ease-in-out) both;
 }
 .pm-page-gap.is-new .pm-page-band {
-  animation: pm-band-in 200ms var(--ease-out) both;
+  animation: pm-band-in 380ms var(--ease-in-out) both;
 }
 @keyframes pm-gap-grow {
   from {

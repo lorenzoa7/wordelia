@@ -2,6 +2,24 @@
 
 Each version has its Windows installer in GitHub Releases. The release workflow copies the section of the version from this file to the release notes.
 
+## 0.8.0 (2026-10-18)
+
+### New
+- Each page shows its number in the bottom corner.
+- Page counts are exact: the chapter list, the library card and the page numbers count the white sheets. The library card shows "≈" only before the book is counted.
+- The chapter list shows the pages of each chapter. The word count is in its tooltip.
+- Three views of an AI change, with three buttons in the review bar: word by word, the old text over the new text, and the new text only. Settings → General sets the default view.
+- Actions for one book. Settings → Actions has two groups: "All books" and "This book". The book keeps its actions in its folder, so they go with the book. "Use in" moves an action to the other group. The main action (Ctrl+J) stays for all books.
+
+### Changed
+- Zoom is a smooth, even scale of the pages. The words and the page breaks do not move when you zoom.
+- A new page grows in more slowly and more softly.
+- The bar with Accept and Reject stays above the passage when the change is ready.
+
+### Fixed
+- Typing on a new page at the end of a chapter no longer makes the page flicker.
+- In the version history, "Close" and "Restore this version" no longer blink when you select another version.
+
 ## 0.7.0 (2026-10-18)
 
 ### New

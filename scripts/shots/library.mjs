@@ -65,7 +65,8 @@ export default async function ({ page, shot, openBook, book, work }) {
   await page.waitForTimeout(400)
   const pt = await page.locator('.book-card-pages').first().innerText()
   console.log(JSON.stringify({ pt }))
-  if (pt !== `≈ ${estimate} páginas`) fail(`the Portuguese card says "${pt}"`)
+  // The older card above has the estimate now.
+  if (pt !== `≈ ${guess} páginas`) fail(`the Portuguese card says "${pt}"`)
   await shot('with-book-pt')
   await page.evaluate(() => window.__wordelia.app.getState().updateSettings({ language: 'en' }))
   await page.waitForTimeout(300)

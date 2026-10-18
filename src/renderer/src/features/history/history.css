@@ -12,6 +12,12 @@
   color: var(--ink-3);
   font-size: var(--text-sm);
 }
+/* While the list loads: the height of the list, so the dialog does not grow when it shows. */
+.history-empty.is-reading {
+  align-items: flex-start;
+  box-sizing: border-box;
+  height: min(520px, calc(100vh - 280px));
+}
 .history-list {
   margin: 0;
   padding: 0 var(--s-2) 0 0;
@@ -66,6 +72,14 @@
   margin-bottom: var(--s-2);
   font-size: var(--text-xs);
   color: var(--ink-3);
+}
+.history-stats.is-empty {
+  visibility: hidden;
+}
+.history-unreadable {
+  color: var(--ink-3);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
 }
 .history-stats .plus {
   color: var(--pen);

@@ -2,6 +2,7 @@
 
 import { create } from 'zustand'
 import {
+  ACTIONS_FILE,
   MANIFEST_FILE,
   MANUSCRIPT_DIR,
   PLANNING_DIR,
@@ -17,7 +18,8 @@ import {
   normalizeManifest,
   uniqueName
 } from '@shared/book'
-import type { BookManifest, BookSnapshot, CategoryDef, Chapter, Entry, SyncState, Thread } from '@shared/types'
+import type { AiAction, BookManifest, BookSnapshot, CategoryDef, Chapter, Entry, SyncState, Thread } from '@shared/types'
+import { bookActionsFile, parseBookActions } from '@shared/ai/scopes'
 import { invoke, on } from '@/lib/api'
 import { saver } from './saver'
 import { chapterWord } from '@shared/export/model'
@@ -34,6 +36,8 @@ interface BookState {
   threads: Thread[]
   writingRules: string
   syncState: SyncState
+  /** The actions of this book (`ai/actions.json`). The app settings keep the actions for all books. */
+  actions: AiAction[]
   view: BookView
   activeChapterId: string | null
   activeEntryId: string | null
@@ -74,6 +78,7 @@ interface BookState {
   deleteThread(id: string): Promise<void>
   setWritingRules(text: string): void
   setSyncState(state: SyncState): void
+  setActions(actions: AiAction[]): void
 
   /** Write any text file in the book (used by accepted AI proposals) */
   writeRaw(rel: string, content: string): Promise<void>
@@ -117,6 +122,14 @@ export const useBook = create<BookState>((set, get) => {
       set({ writingRules: content })
       return
     }
+    if (rel === ACTIONS_FILE) {
+      try {
+        set({ actions: content == null ? [] : parseBookActions(JSON.parse(content)) })
+      } catch {
+        /* a partial write from a sync client: ignore */
+      }
+      return
+    }
     if (rel.startsWith(`${MANUSCRIPT_DIR}/`) && rel.endsWith('.md')) {
       const file = rel.slice(MANUSCRIPT_DIR.length + 1)
       const existing = st.chapters.find((c) => c.file === file)
@@ -153,6 +166,7 @@ export const useBook = create<BookState>((set, get) => {
     threads: [],
     writingRules: '',
     syncState: { chapters: {}, syncedAt: null },
+    actions: [],
     view: 'write',
     activeChapterId: null,
     activeEntryId: null,
@@ -174,6 +188,7 @@ export const useBook = create<BookState>((set, get) => {
         threads: snap.threads,
         writingRules: snap.writingRules,
         syncState: snap.syncState,
+        actions: snap.actions ?? [],
         view: 'write',
         activeChapterId: snap.chapters[0]?.id ?? null,
         activeEntryId: null,
@@ -189,7 +204,7 @@ export const useBook = create<BookState>((set, get) => {
       if (root) await invoke('book:close', root)
       offExternal?.()
       offExternal = null
-      set({ root: null, manifest: null, chapters: [], entries: [], threads: [], activeChapterId: null, activeEntryId: null })
+      set({ root: null, manifest: null, chapters: [], entries: [], threads: [], actions: [], activeChapterId: null, activeEntryId: null })
     },
 
     setView(view) {
@@ -421,6 +436,13 @@ export const useBook = create<BookState>((set, get) => {
       const root = get().root
       set({ syncState: state })
       if (root) saver.write(root, SYNC_STATE_FILE, JSON.stringify(state, null, 2), true)
+    },
+
+    setActions(actions) {
+      const root = get().root
+      if (!root) return
+      set({ actions })
+      saver.write(root, ACTIONS_FILE, bookActionsFile(actions))
     },
 
     async writeRaw(rel, content) {

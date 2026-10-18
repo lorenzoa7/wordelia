@@ -135,6 +135,8 @@ export interface BookSnapshot {
   threads: Thread[]
   writingRules: string
   syncState: SyncState
+  /** The actions of this book, from `ai/actions.json`. The app settings keep the actions for all books. */
+  actions: AiAction[]
 }
 
 export interface HistoryItem {

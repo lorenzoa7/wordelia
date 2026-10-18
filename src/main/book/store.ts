@@ -3,6 +3,7 @@
 import { mkdir, readdir, stat } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import {
+  ACTIONS_FILE,
   AI_DIR,
   MANIFEST_FILE,
   MANUSCRIPT_DIR,
@@ -21,6 +22,7 @@ import {
   uniqueName
 } from '@shared/book'
 import { writingRulesTemplate } from '@shared/ai/defaults'
+import { parseBookActions } from '@shared/ai/scopes'
 import { chapterWord } from '@shared/export/model'
 import type { BookManifest, BookSnapshot, Chapter, Entry, SyncState, Thread } from '@shared/types'
 import { atomicWrite, readJson, readTextOr, safeJoin } from '../fsutil'
@@ -166,9 +168,11 @@ export async function openBook(root: string): Promise<BookSnapshot> {
 
   const writingRules = (await readTextOr(join(root, WRITING_RULES_FILE), '')) ?? ''
   const syncState = await readJson<SyncState>(join(root, SYNC_STATE_FILE), { chapters: {}, syncedAt: null })
+  // The actions of this book. A book without the file has none.
+  const actions = parseBookActions(await readJson<unknown>(join(root, ACTIONS_FILE), null))
   if (!(await exists(join(root, AI_DIR)))) await mkdir(join(root, THREADS_DIR), { recursive: true })
 
-  return { root, manifest, chapters, entries, threads, writingRules, syncState }
+  return { root, manifest, chapters, entries, threads, writingRules, syncState, actions }
 }
 
 function normalizeThread(t: Thread): Thread {

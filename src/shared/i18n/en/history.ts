@@ -6,6 +6,8 @@ export const history = {
   description: 'Wordelia keeps versions when you open a chapter, every few minutes while you write, and before AI changes.',
   restore: 'Restore this version',
   reading: 'Reading the history…',
+  /** A saved version whose file Wordelia cannot read */
+  unreadable: 'Wordelia cannot read this version.',
   empty: 'No versions yet. Wordelia saves one when you open the chapter and while you write.',
   /** Before "+12 −3 words" */
   ifRestore: 'If you restore this version:',

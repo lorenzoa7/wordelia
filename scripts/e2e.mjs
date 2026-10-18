@@ -24,6 +24,7 @@ const SCENARIOS = [
   { args: ['history'], areas: ['history', 'store'], s: 8 },
   { args: ['settings'], areas: ['settings'], s: 12 },
   { args: ['settings-shortcuts'], areas: ['settings', 'actions'], s: 10 },
+  { args: ['book-actions'], areas: ['settings', 'actions'], s: 14 },
   { args: ['settings-rules'], areas: ['settings'], s: 7 },
   { args: ['dark', '--dark'], areas: ['shell'], s: 7 },
   { args: ['library'], areas: ['library'], s: 6 },

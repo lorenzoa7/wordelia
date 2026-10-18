@@ -86,6 +86,7 @@ My Book/
     _assets/             Images for entries
   ai/
     writing-rules.md     The writing rules of this book
+    actions.json         The actions of this book (Settings → Actions → This book)
     threads/
       <thread-id>.json   One file for each chat thread
     sync-state.json      Content hashes of chapters at the last planning sync
@@ -309,6 +310,17 @@ The built-in actions are Polish (the main action, Ctrl+J), Tighten (Alt+2), Fix 
 
 Each action has its own keyboard shortcut (`AiAction.shortcut`, for example "Ctrl+J"). `src/shared/ai/shortcuts.ts` reads key presses, keeps one text form and finds conflicts with other actions and with the keys of the app and the editor (`RESERVED_SHORTCUTS`). `useActionShortcuts` runs the action of a shortcut in the Write view. Settings version 4 gave the actions of old settings the keys that they had by position: Ctrl+J for the main action, Alt+2, Alt+3… for the others. See `docs/decisions/0003-action-shortcuts-and-builtin-instructions.md`.
 
+#### Actions for all books and for one book
+
+The global actions are in the app settings (`AppSettings.actions`). The actions of one book are in `ai/actions.json` in the book folder (`{ "actions": [...] }`), so they go with the book. The main process reads the file when the book opens (`BookSnapshot.actions`). The book store keeps the list (`useBook.actions`) and writes the file (`setActions`). A change from outside (a sync client) loads the file again. `src/shared/ai/scopes.ts` has the rules, with unit tests. See `docs/decisions/0004-book-actions.md`.
+
+- **One list.** The open book uses the global actions, then its own actions (`mergeActions`; `useAllActions()`, `allActions()` and `findAction()` in `features/actions/allActions.ts`). The selection menu, the shortcuts, Retry, the review bar and the keyboard list in Settings → General use this list. Without a book, the list is the global actions.
+- **Settings → Actions.** Two groups: "All books" and, when a book is open, "This book". Each group has its own "New". The field "Use in: All books | This book" moves the selected action to the other group (`addToGroup`). A move to the book asks first, because the other books lose the action. A move to all books does not ask.
+- **Shortcuts.** The recorder checks the two groups: it refuses a shortcut that an action of the other group has. A new action gets a shortcut that is free in the two groups (`freeShortcut`). Two actions can still get one shortcut: a global shortcut that the author set while another book was open, or a book from another computer. Then the book action wins inside its book: in the merged list, the global action has no shortcut. Settings → Actions shows the shortcut of the global action struck through, and under its shortcut field: "In this book, Alt+2 runs “Narrator voice”." A move loses the shortcut only when an action of the other group has it; a toast tells.
+- **Built-in actions** can move to a book. A moved action stays the same: a built-in action stays built in (the file can mark only the ids of built-in actions as built in), so its name and instructions still show in the interface language, and it can go back without a change. "Restore the built-in actions" puts all built-in actions back in the global group, also one that moved to the open book. An own action of the open book loses a shortcut that a built-in action gets back. A global action with the id of a book action is left out of the merged list: the book action wins.
+- **The main action** (`defaultActionId`, Ctrl+J by default) is a global setting, and it cannot move to a book. Thus the first button above the selection and Ctrl+J do the same thing in every book. A main action of one book would leave the other books without a first button.
+- The review bar shows the name of the action as the settings show it (`actionName`), also for an action of the book.
+
 ### 5.5 Thread digests
 
 After each AI reply, a background job (Background route) updates the digest of the thread: the old digest plus the last exchange gives the new digest (12 bullets or fewer).
@@ -354,7 +366,7 @@ The language of a book is a different setting. It controls the AI output, the di
 
 App data folder (`app.getPath('userData')`):
 
-- `settings.json`: theme, editor preferences, providers, model routes, actions.
+- `settings.json`: theme, editor preferences, providers, model routes, the actions for all books. The actions of one book are in its folder (§5.4).
 - `library.json`: known books. Each card keeps the title, the author, the words, the chapters, the pages (an estimate, see §7a) and the first words of the book (`bookFacts` in `src/main/library.ts`). The main process writes them when a book opens, when it closes (after the renderer saved everything), and when the window closes with a book open. A card of an older version without pages gets them the next time the library shows: the main process reads the book from its folder one time.
 - `secrets.json`: API keys, encrypted with `safeStorage`.
 
@@ -425,6 +437,7 @@ The Plan overview has a switch: "Cards | Map". The map shows the planning as a g
 - Deleted chapters and entries move to `.wordelia/trash/`. Nothing is deleted for good.
 - Accepted AI proposals show an **Undo** toast. It restores the text from before the change.
 - **Version history** (`src/renderer/src/features/history/`). The app saves a version of a chapter when the chapter opens, when the author leaves it, every 8 minutes, and before AI changes (the newest 60 for each chapter, in `.wordelia/history/`). The dialog compares the chapter with the selected version, word by word. When a version shows, the compare view glides to its first change, with 30% of the view above it for context. The glide takes the time of the `--dur-slow` token, also in a long chapter; with reduced motion it jumps. A wheel, a key or a click stops it.
+  - When the author selects another version, nothing in the dialog flashes or moves. The compare view keeps the last version until the text of the new version is there; a spinner shows only when a version takes more than 300 ms. The line "If you restore this version: +12 −3 words" keeps its height when it has no numbers. "Close" and "Restore this version" do not change: Restore is off only when the chapter has no versions or the selected version cannot be read. A click on Restore while a version loads waits for the text of the selected version, never the text on screen. The dialog keeps the versions that it read, so a version that the author selects again shows at once. While the list of versions loads, the dialog has the height of the list. The `history` scenario records the two buttons and the compare view in each frame, and each change of an attribute in the footer, while it goes through all the versions.
 
 ## 9. Long books
 

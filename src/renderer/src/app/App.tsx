@@ -16,6 +16,7 @@ import { SettingsDialog } from '@/features/settings/SettingsDialog'
 import { Welcome } from '@/features/onboarding/Welcome'
 import { getActiveEditor } from '@/features/editor/registry'
 import { runAction } from '@/features/actions/runAction'
+import { findAction } from '@/features/actions/allActions'
 import { TitleBar } from './TitleBar'
 import { Toasts } from './Toasts'
 import { useGlobalShortcuts } from './shortcuts'
@@ -58,7 +59,7 @@ export function App(): React.JSX.Element {
         app: useApp,
         editor: () => getActiveEditor()?.editor,
         runAction: (id: string) => {
-          const a = useApp.getState().settings?.actions.find((x) => x.id === id)
+          const a = findAction(id)
           return a ? runAction(a) : Promise.resolve()
         }
       }

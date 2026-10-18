@@ -271,6 +271,13 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] Three views of an AI change in the review bar (word by word, old over new, new text only); the default in Settings → General (scenario `diffviews`)
 - [x] Page numbers in the bottom corner of each page; exact page counts in the chapter list and on the library card (scenario `pagecount`)
 
+### Actions and history
+
+- [x] Actions for one book. Settings → Actions has two groups: "All books" (the app settings) and "This book" (only when a book is open). The book keeps its actions in `ai/actions.json` in its folder, so they go with the book. Each group has "New". "Use in: All books | This book" moves an action to the other group; a move to this book asks first, because the other books lose the action. A built-in action keeps its name and instructions in the interface language when it moves, and it can go back without a change. The main action (Ctrl+J) stays for all books (decision 0004)
+- [x] The selection menu, the shortcuts, Retry, the review bar and the keyboard list in Settings → General use the global actions, then the actions of the open book (`mergeActions`, `useAllActions`)
+- [x] Shortcuts across the two groups: the settings refuse a shortcut that an action of the other group has. When two actions get one shortcut anyway (a global shortcut set while another book was open, or a book from another computer), the book action wins inside its book. The settings show the shortcut of the global action struck through, with "In this book, Alt+2 runs “Narrator voice”." (unit tests in `scopes.test.ts`; scenario `book-actions`, also in Portuguese)
+- [x] Version history: "Close" and "Restore this version" stay still when the author selects another version. Restore stays on while a version loads, and a click waits for the selected version. The compare view keeps the last version until the new text is there (a spinner only after 300 ms), and the line "If you restore this version" keeps its height, so nothing moves. The `history` scenario records the footer in each frame, and each change of its attributes, while it goes through all versions (the old dialog fails it: Restore went off at each version, and the compare view moved 24 px)
+
 ## Tests and CI
 
 - [x] End-to-end scenarios run with a hidden window (transparent, no focus) and with CSS animations off
@@ -282,4 +289,3 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - Sync to a git remote from the app
 - EPUB export
 - Typewriter sounds (optional)
-- Book-level overrides of actions

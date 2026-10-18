@@ -37,6 +37,10 @@
   display: inline-flex;
   translate: 0 var(--icon-lift);
 }
+.btn-icon:has(> .icon-trash),
+.menu-item-icon:has(> .icon-trash) {
+  translate: 0 var(--icon-lift-trash);
+}
 .btn-primary {
   background: var(--ink);
   color: var(--paper);

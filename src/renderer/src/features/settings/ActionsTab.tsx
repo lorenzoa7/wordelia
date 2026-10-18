@@ -217,7 +217,7 @@ export function ActionsTab(): React.JSX.Element | null {
               ) : (
                 <span />
               )}
-              <Button size="sm" variant="ghost" className="action-delete" icon={<Trash size={13} />} onClick={() => void remove()} disabled={scope === 'global' && global.length <= 1}>
+              <Button size="sm" variant="ghost" className="action-delete" icon={<Trash size={13} className="icon-trash" />} onClick={() => void remove()} disabled={scope === 'global' && global.length <= 1}>
                 {t.common.delete}
               </Button>
             </div>

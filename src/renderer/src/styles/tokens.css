@@ -30,6 +30,8 @@
   --icon-lift: -0.14em;
   /* The open book icon draws low in its box: it moves up a little more. */
   --icon-lift-book: calc(var(--icon-lift) - 0.06em);
+  /* The trash icon draws high in its box (the handle is on top): it moves up a little less. */
+  --icon-lift-trash: calc(var(--icon-lift) + 0.03em);
 
   /* Space (4 px grid) */
   --s-1: 4px;

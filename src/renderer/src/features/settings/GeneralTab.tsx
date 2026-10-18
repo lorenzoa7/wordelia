@@ -19,7 +19,6 @@ const THEMES: Array<{ id: ThemeSetting; icon: React.ReactNode }> = [
   { id: 'system', icon: <Desktop size={16} /> }
 ]
 
-/** The zoom steps of the page: the same steps as the zoom keys of the editor (Ctrl+= and Ctrl+-). */
 /** The highest daily goal, in words */
 const MAX_GOAL = 100000
 

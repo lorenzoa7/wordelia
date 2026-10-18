@@ -14,14 +14,14 @@ const limitFor = (scale) => (scale < 1.2 ? 1.4 : 0.75)
 
 /** Runs in the page: where the icon, a capital letter and a small letter of each pair are.
  *  "selector|last" measures the last icon of the item (a caret after the text). */
-function locate(query) {
+function locate([query, index]) {
   const [selector, which] = query.split('|')
   // Letters with a flat top and a flat bottom first (no overshoot, no ascender, no descender),
   // then round letters: their overshoot is the same at the top and at the bottom.
   const CAPS = 'HEFTILNMZKXVWUAPRBDOCGSÉÁÍÚÓ'
   const SMALL = 'xnmrzuvwaceosç'
   const out = []
-  for (const host of document.querySelectorAll(selector)) {
+  for (const host of [document.querySelectorAll(selector)[index]].filter(Boolean)) {
     const icons = host.querySelectorAll('svg')
     const svg = which === 'last' ? icons[icons.length - 1] : icons[0]
     if (!svg || !host.getClientRects().length) continue
@@ -111,7 +111,18 @@ export default async function ({ app, page, openBook }) {
   const rows = []
   const measure = async (...selectors) => {
     for (const sel of selectors) {
-      for (const p of await page.evaluate(locate, sel)) {
+      const hosts = page.locator(sel.split('|')[0])
+      const count = await hosts.count()
+      for (let i = 0; i < count; i++) {
+        // An item under the edge of a scrolled box (the settings) shows only after a scroll.
+        if (!(await hosts.nth(i).evaluate((el) => {
+          if (!el.getClientRects().length) return false
+          el.scrollIntoView({ block: 'nearest' })
+          return true
+        }))) continue
+        await page.waitForTimeout(60)
+        const [p] = await page.evaluate(locate, [sel, i])
+        if (!p) continue
         const m = await app.evaluate(ink, p)
         const mid = (e) => (e.top + e.bottom) / 2
         const iconMid = mid(m.icon)

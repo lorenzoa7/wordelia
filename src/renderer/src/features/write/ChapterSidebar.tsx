@@ -201,7 +201,7 @@ function ChapterItem({
             {t.write.versionHistoryMenu}
           </MenuItem>
           <MenuSeparator />
-          <MenuItem danger icon={<Trash size={15} />} onSelect={() => void remove()}>
+          <MenuItem danger icon={<Trash size={15} className="icon-trash" />} onSelect={() => void remove()}>
             {t.write.deleteChapter}
           </MenuItem>
         </Menu>

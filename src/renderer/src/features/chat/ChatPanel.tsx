@@ -256,7 +256,7 @@ function ThreadMenuItems({ thread, onEdit, onDelete }: { thread: Thread; onEdit:
         {thread.pinned ? t.chat.unpin : t.chat.pin}
       </MenuItem>
       <MenuSeparator />
-      <MenuItem danger icon={<Trash size={15} />} onSelect={() => onDelete(thread)}>
+      <MenuItem danger icon={<Trash size={15} className="icon-trash" />} onSelect={() => onDelete(thread)}>
         {t.chat.deleteThread}
       </MenuItem>
     </>

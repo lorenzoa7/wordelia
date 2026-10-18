@@ -7,6 +7,10 @@ export const write = {
   chapterTitle: 'Chapter title',
   chapterOptions: 'Chapter options',
   /** aria-label of a chapter in the sidebar */
+  /** Pages of a chapter in the chapter list */
+  chapterPages: (n: number): string => `${n} p.`,
+  /** Tooltip of the pages: the words of the chapter */
+  chapterWords: (n: number): string => `${n.toLocaleString('en')} words`,
   chapterLabel: (n: number, title: string, words: number): string =>
     `Chapter ${n}: ${title}, ${words} words. F2 renames, Alt and arrow keys move it.`,
   newChapterAfter: 'New chapter after this',

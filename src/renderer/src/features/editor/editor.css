@@ -987,3 +987,36 @@
 .zoom-pop-reset:disabled {
   opacity: 0.5;
 }
+
+/* Page numbers (pagination.ts): a counter through the whole book; each sheet sets its start. */
+.pm-page-gap,
+.pm-page-tail {
+  position: relative;
+}
+.pm-page-num {
+  position: absolute;
+  right: 0;
+  translate: 0 -50%;
+  color: var(--ink-4);
+  font-family: var(--book-font);
+  font-size: 0.72em;
+  font-style: normal;
+  font-variant-numeric: oldstyle-nums;
+  line-height: 1;
+  text-indent: 0;
+  pointer-events: none;
+  user-select: none;
+}
+.pm-page-num::before {
+  counter-increment: page;
+  content: counter(page);
+}
+
+/* The hidden sheet that counts the pages of a chapter far from the screen (pageCounts.tsx) */
+.page-measure {
+  position: absolute;
+  top: 0;
+  left: var(--s-8);
+  visibility: hidden;
+  pointer-events: none;
+}

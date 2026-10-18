@@ -62,6 +62,8 @@ export interface IpcInvokeMap {
   'library:list': [[], LibraryItem[]]
   'library:remove': [[root: string], void]
   'library:touch': [[item: LibraryItem], void]
+  /** The editor counted the pages of the open book: the card shows this number, not an estimate */
+  'library:pages': [[root: string, pages: number, words: number], void]
 
   'book:create': [[opts: { parentDir: string; title: string; author: string; language: string; empty?: boolean }], BookSnapshot]
   'book:open': [[root: string], BookSnapshot]
@@ -138,6 +140,7 @@ export const INVOKE_CHANNELS: InvokeChannel[] = [
   'library:list',
   'library:remove',
   'library:touch',
+  'library:pages',
   'book:create',
   'book:open',
   'book:close',

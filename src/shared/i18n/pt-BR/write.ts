@@ -8,6 +8,10 @@ export const write: typeof en = {
   addChapter: 'Adicionar capítulo',
   chapterTitle: 'Título do capítulo',
   chapterOptions: 'Opções do capítulo',
+  /** Pages of a chapter in the chapter list */
+  chapterPages: (n) => `${n} p.`,
+  /** Tooltip of the pages: the words of the chapter */
+  chapterWords: (n) => `${n.toLocaleString('pt-BR')} palavras`,
   chapterLabel: (num, title, words) =>
     `Capítulo ${num}: ${title}, ${words} palavras. F2 renomeia; Alt e as setas o movem.`,
   newChapterAfter: 'Novo capítulo depois deste',

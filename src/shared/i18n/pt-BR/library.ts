@@ -18,7 +18,7 @@ export const library: typeof en = {
   emptyHint: 'Seu primeiro livro começa aqui. Cada livro é uma pasta comum de arquivos neste computador.',
   folderNotFound: 'Pasta não encontrada',
   bookMeta: (w, c) => `${words(w)} · ${chapters(c)}`,
-  bookPages: (v) => (v === 1 ? '≈ 1 página' : `≈ ${n(v)} páginas`),
+  bookPages: (v, exact = false) => `${exact ? '' : '≈ '}${v === 1 ? '1 página' : `${n(v)} páginas`}`,
   bookOptions: 'Opções do livro',
   showFolder: 'Mostrar pasta',
   removeFromList: 'Remover da lista',

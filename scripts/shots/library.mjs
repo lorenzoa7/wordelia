@@ -41,8 +41,9 @@ export default async function ({ page, shot, openBook, book, work }) {
   const card = await page.locator('.book-card-pages').first().innerText()
   const estimate = Number(card.replace(/[^\d]/g, ''))
   console.log(JSON.stringify({ sheets, screen, card, estimate }))
-  if (!/^≈ \d+ pages$/.test(card)) fail(`the card says "${card}"`)
-  if (Math.abs(estimate - screen) > Math.max(1, screen * 0.1)) fail(`the card says ${estimate} pages; the Write view shows ${screen}`)
+  // The editor counted the pages of the book: the card shows the exact number, without "≈".
+  if (!/^\d+ pages$/.test(card)) fail(`the card says "${card}"`)
+  if (estimate !== screen) fail(`the card says ${estimate} pages; the Write view shows ${screen}`)
   await shot('with-book')
   await page.locator('.book-card').first().screenshot({ path: 'test-results/shots/library-zoom-card.png' })
 

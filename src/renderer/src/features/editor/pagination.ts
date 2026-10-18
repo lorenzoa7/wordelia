@@ -60,6 +60,7 @@ function gapElement(b: Break, m: PageMetrics, index: number, fresh: boolean): HT
   el.style.height = zoomed(b.rest + m.marginBottom + m.gap + m.marginTop, m)
   // A new page grows from the end of the page before it (editor.css).
   el.style.setProperty('--gap-from', zoomed(b.rest + m.marginBottom, m))
+  el.appendChild(pageNumber(b.rest + m.marginBottom / 2, m))
   const band = document.createElement('span')
   band.className = 'pm-page-band'
   band.style.top = zoomed(b.rest + m.marginBottom, m)
@@ -74,7 +75,20 @@ function tailElement(height: number, m: PageMetrics): HTMLElement {
   el.setAttribute('contenteditable', 'false')
   el.setAttribute('aria-hidden', 'true')
   el.style.height = zoomed(height, m)
+  el.appendChild(pageNumber(height + m.marginBottom / 2, m))
   return el
+}
+
+/**
+ * The number of the page that ends here, in the middle of its bottom margin. A CSS counter gives
+ * the number: each chapter sheet sets where its pages start (PageEditor.tsx), so the numbers go on
+ * through the whole book.
+ */
+function pageNumber(top: number, m: PageMetrics): HTMLElement {
+  const n = document.createElement('span')
+  n.className = 'pm-page-num'
+  n.style.top = zoomed(top, m)
+  return n
 }
 
 /**
@@ -122,7 +136,7 @@ interface Unit {
 
 /** Line boxes of a paragraph, from the rectangles of its text, in client coordinates. */
 /** `scale`: the zoom of the desk; the rectangles are on screen, the line height is at 100 %. */
-function lineBoxes(el: HTMLElement, scale: number): Array<{ top: number; bottom: number; left: number }> {
+export function lineBoxes(el: HTMLElement, scale: number): Array<{ top: number; bottom: number; left: number }> {
   const lh = (parseFloat(getComputedStyle(el).lineHeight) || 0) * scale
   const rects: DOMRect[] = []
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
@@ -217,26 +231,11 @@ function measureFlow(view: EditorView, root: HTMLElement, m: PageMetrics, firstO
     const bottom = at100(r.bottom) + (parseFloat(style.marginBottom) || 0)
     units.push({ top, bottom, blockPos: offset, first: true, force, x: r.left + 1, y: r.top + 1 })
   })
-  if (!units.length) return { breaks: [], tail: Math.max(0, m.contentHeight - firstOffset) }
-
-  const breaks: Break[] = []
-  let pageStart = 0
-  let limit = m.contentHeight - firstOffset
-  for (const u of units) {
-    // A page break (Ctrl+Enter): the rest of the page stays empty.
-    if (u.force && u.top - pageStart > EPS) {
-      breaks.push({ pos: u.blockPos, inline: false, rest: Math.max(0, limit - (u.top - pageStart)) })
-      pageStart = u.top
-      limit = m.contentHeight
-      continue
-    }
-    if (u.bottom - pageStart <= limit + EPS) continue
-    // A unit taller than a whole page stays where it is.
-    if (u.top - pageStart <= EPS) continue
-    const rest = Math.max(0, limit - (u.top - pageStart))
+  const { cuts, tail } = cutPages(units, m.contentHeight, firstOffset)
+  const breaks: Break[] = cuts.map(({ unit: u, rest, forced }) => {
     let pos = u.blockPos
     let inline = false
-    if (!u.first) {
+    if (!u.first && !forced) {
       const hit = view.posAtCoords({ left: u.x, top: u.y })
       if (hit) {
         pos = wordStart(view.state, hit.pos)
@@ -245,13 +244,48 @@ function measureFlow(view: EditorView, root: HTMLElement, m: PageMetrics, firstO
         if (!inline) pos = $p.before($p.depth)
       }
     }
-    breaks.push({ pos, inline, rest })
+    return { pos, inline, rest }
+  })
+  return { breaks, tail }
+}
+
+/** A line or a block of the text, in coordinates at 100 % from the top of the text */
+export interface FlowUnit {
+  top: number
+  bottom: number
+  /** The first line of its block, or a block that cannot break */
+  first: boolean
+  /** The first line after a page break: it starts a new page */
+  force: boolean
+}
+
+/**
+ * Where the pages end: the units that start a new page, and the empty space at the end of each page
+ * and of the last page. The same rule for the editor and for the page count of a chapter that is
+ * not on screen (pageCounts.ts).
+ */
+export function cutPages<U extends FlowUnit>(units: U[], contentHeight: number, firstOffset: number): { cuts: Array<{ unit: U; rest: number; forced: boolean }>; tail: number } {
+  if (!units.length) return { cuts: [], tail: Math.max(0, contentHeight - firstOffset) }
+  const cuts: Array<{ unit: U; rest: number; forced: boolean }> = []
+  let pageStart = 0
+  let limit = contentHeight - firstOffset
+  for (const u of units) {
+    // A page break (Ctrl+Enter): the rest of the page stays empty.
+    if (u.force && u.top - pageStart > EPS) {
+      cuts.push({ unit: u, rest: Math.max(0, limit - (u.top - pageStart)), forced: true })
+      pageStart = u.top
+      limit = contentHeight
+      continue
+    }
+    if (u.bottom - pageStart <= limit + EPS) continue
+    // A unit taller than a whole page stays where it is.
+    if (u.top - pageStart <= EPS) continue
+    cuts.push({ unit: u, rest: Math.max(0, limit - (u.top - pageStart)), forced: false })
     pageStart = u.top
-    limit = m.contentHeight
+    limit = contentHeight
   }
   const last = units[units.length - 1]
-  const tail = Math.max(0, limit - (last.bottom - pageStart))
-  return { breaks, tail }
+  return { cuts, tail: Math.max(0, limit - (last.bottom - pageStart)) }
 }
 
 /** Move a position back to the start of its word: a break inside a hyphenated word must not split it. */
@@ -274,6 +308,8 @@ export interface PaginationOptions {
   metrics: () => PageMetrics | null
   /** Height of the chapter heading on the first page */
   firstPageOffset: () => number
+  /** The number of pages after each measure */
+  onCount?: (pages: number) => void
 }
 
 export const Pagination = Extension.create<PaginationOptions>({
@@ -318,6 +354,7 @@ export const Pagination = Extension.create<PaginationOptions>({
             if (!m || view.isDestroyed) return
             const result = measure(view, m, opts.firstPageOffset())
             if (!result) return
+            opts.onCount?.(result.breaks.length + 1)
             const cur = paginationKey.getState(view.state)
             if (cur && same(cur, result)) {
               rounds = 0

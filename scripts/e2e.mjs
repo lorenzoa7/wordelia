@@ -50,6 +50,7 @@ const SCENARIOS = [
   { args: ['newpage', '--en', '--motion'], areas: ['editor'], s: 8 },
   { args: ['notediff'], areas: ['editor', 'plan', 'chat'], s: 6 },
   { args: ['diffviews', '--en'], areas: ['editor', 'actions', 'settings'], s: 7 },
+  { args: ['pagecount', '--en'], areas: ['editor', 'library', 'shell'], s: 9 },
   { args: ['typewriter', '--en'], areas: ['editor'], s: 10 },
   { args: ['graph', '--en'], areas: ['plan'], s: 34 },
   { args: ['graph', '--en', '--dark'], areas: ['plan'], s: 33 },

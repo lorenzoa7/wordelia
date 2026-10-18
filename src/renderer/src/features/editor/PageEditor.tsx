@@ -23,6 +23,7 @@ import { ReviewBar } from './ReviewBar'
 import { FindBar } from './FindBar'
 import { useEditorStats } from './stats'
 import { scaleOf, useDeskZoom } from './zoom'
+import { PageCounter, countKey, setPageCount, usePagesOf } from './pageCounts'
 import { useProposalUndoKeys } from './inlineProposals'
 import { typewriterSound } from './typewriter-sound'
 import { cleanPastedHtml } from './paste'
@@ -140,6 +141,16 @@ export function PageEditor(): React.JSX.Element | null {
 
   useEditorStats(active?.editor ?? null)
   const zoomBadge = useDeskZoom(deskRef, sizerRef, innerRef)
+  // The first page number of each chapter: the pages of the chapters before it, plus one.
+  const { pages } = usePagesOf()
+  const starts = useMemo(() => {
+    let n = 1
+    return ids.map((id) => {
+      const start = n
+      n += pages[id] ?? 1
+      return start
+    })
+  }, [ids, pages])
   useProposalUndoKeys()
 
   if (!manifest || !typo || !geometry) return null
@@ -171,9 +182,10 @@ export function PageEditor(): React.JSX.Element | null {
         <div ref={sizerRef} className="desk-zoom">
           <div ref={innerRef} className="desk-inner" style={vars}>
             {ids.map((id, i) => (
-              <ChapterSheet key={id} chapterId={id} index={i} geometry={geometry} deskRef={deskRef} onTyping={onTyping} />
+              <ChapterSheet key={id} chapterId={id} index={i} firstPage={starts[i]} geometry={geometry} deskRef={deskRef} onTyping={onTyping} />
             ))}
             {ids.length ? <PageEnd /> : <EmptyManuscript />}
+            <PageCounter />
           </div>
           {/* Outside the scaled pages: the bar keeps its size at every zoom. */}
           {active && <ReviewBar editor={active.editor} />}
@@ -190,6 +202,8 @@ export function PageEditor(): React.JSX.Element | null {
 }
 
 interface SheetProps {
+  /** The number of its first page in the book */
+  firstPage: number
   chapterId: string
   index: number
   geometry: Geometry
@@ -198,7 +212,7 @@ interface SheetProps {
 }
 
 /** One chapter: its heading and its pages. The editor mounts when the chapter comes near the screen. */
-function ChapterSheet({ chapterId, index, geometry, deskRef, onTyping }: SheetProps): React.JSX.Element | null {
+function ChapterSheet({ chapterId, index, firstPage, geometry, deskRef, onTyping }: SheetProps): React.JSX.Element | null {
   const chapter = useBook((s) => s.chapters.find((c) => c.id === chapterId))
   const isActive = useBook((s) => s.activeChapterId === chapterId)
   const ref = useRef<HTMLElement>(null)
@@ -242,7 +256,13 @@ function ChapterSheet({ chapterId, index, geometry, deskRef, onTyping }: SheetPr
   }
 
   return (
-    <article ref={ref} data-chapter={chapterId} className={clsx('page grain', !mounted && 'is-asleep')} style={mounted ? undefined : { height: estimate() }}>
+    <article
+      ref={ref}
+      data-chapter={chapterId}
+      className={clsx('page grain', !mounted && 'is-asleep')}
+      // The page numbers of the sheet go on from the chapters before it (a CSS counter, editor.css).
+      style={{ counterReset: `page ${firstPage - 1}`, ...(mounted ? {} : { height: estimate() }) }}
+    >
       <ChapterHead index={index} title={chapter.title} id={chapterId} />
       {mounted && <SheetEditor chapterId={chapterId} geometry={geometry} onTyping={onTyping} sheetRef={ref} />}
     </article>
@@ -296,6 +316,12 @@ function SheetEditor({ chapterId, geometry, onTyping, sheetRef }: EditorProps): 
             if (!sheet || !root) return 0
             // On screen the pages are scaled by the zoom; the measure works at 100 %.
             return (root.getBoundingClientRect().top - sheet.getBoundingClientRect().top) / scaleOf(root as HTMLElement) - geometryRef.current.marginTop
+          },
+          // The exact page count of this chapter, for the sidebar, the page numbers and the library.
+          onCount: (n) => {
+            const { chapters, manifest: m } = useBook.getState()
+            const ch = chapters.find((c) => c.id === chapterId)
+            if (ch && m) setPageCount(chapterId, n, countKey(ch, m))
           }
         },
         proposals: { docId: () => chapterId }

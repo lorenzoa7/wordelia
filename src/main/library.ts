@@ -81,10 +81,27 @@ export async function listLibrary(): Promise<LibraryItem[]> {
   return checked.sort((a, b) => b.openedAt.localeCompare(a.openedAt))
 }
 
+/** Keep the exact page count of the editor while the words of the book are the same; else the estimate. */
+function withPages(old: LibraryItem | undefined, next: LibraryItem): LibraryItem {
+  if (old?.pagesExact && old.pages != null && old.pagesWords === next.words) return { ...next, pages: old.pages, pagesExact: true, pagesWords: old.pagesWords }
+  return { ...next, pagesExact: false, pagesWords: undefined }
+}
+
 export async function touchLibrary(item: LibraryItem): Promise<void> {
-  const items = (await load()).filter((i) => !sameRoot(i, item.root))
-  items.unshift({ ...item, missing: undefined })
+  const all = await load()
+  const old = all.find((i) => sameRoot(i, item.root))
+  const items = all.filter((i) => !sameRoot(i, item.root))
+  items.unshift(withPages(old, { ...item, missing: undefined }))
   await save(items.slice(0, 50))
+}
+
+/** The editor counted the pages of an open book (the white sheets on screen). */
+export async function setLibraryPages(root: string, pages: number, words: number): Promise<void> {
+  const items = await load()
+  const i = items.findIndex((it) => sameRoot(it, root))
+  if (i < 0 || (items[i].pagesExact && items[i].pages === pages && items[i].pagesWords === words)) return
+  items[i] = { ...items[i], pages, pagesExact: true, pagesWords: words }
+  await save(items)
 }
 
 /** After a book closes: its card gets the words, the pages and the first words of the saved text. */
@@ -94,7 +111,7 @@ export async function refreshLibraryItem(root: string): Promise<void> {
   if (i < 0) return
   const facts = await readFacts(root).catch(() => null)
   if (!facts) return
-  items[i] = { ...items[i], ...facts }
+  items[i] = withPages(items[i], { ...items[i], ...facts })
   await save(items)
 }
 

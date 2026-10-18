@@ -151,8 +151,11 @@ export interface LibraryItem {
   author: string
   words: number
   chapters: number
-  /** An estimate of the pages on screen (src/shared/export/pages.ts). Undefined in a card of an older version. */
+  /** The pages on screen: counted by the editor (exact), or an estimate (src/shared/export/pages.ts) for a book that the app did not count yet */
   pages?: number
+  /** True when `pages` is the count of the editor, for the text with `pagesWords` words */
+  pagesExact?: boolean
+  pagesWords?: number
   openedAt: string
   /** The first words of the book, for the library card */
   excerpt?: string

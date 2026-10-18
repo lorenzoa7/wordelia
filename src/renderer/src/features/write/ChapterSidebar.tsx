@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Reorder } from 'motion/react'
 import { ArrowDown, ArrowUp, ChatCircleText, ClockCounterClockwise, DotsThree, PencilSimple, Plus, Trash } from '@phosphor-icons/react'
 import clsx from 'clsx'
-import { countMarkdownWords, formatCount } from '@shared/book'
+import { countMarkdownWords } from '@shared/book'
 import type { Chapter } from '@shared/types'
 import { IconButton, Menu, MenuItem, MenuSeparator } from '@/ui'
 import { askConfirm } from '@/ui/prompt'
@@ -12,12 +12,14 @@ import { useChat } from '@/features/chat/chatStore'
 import { useApp } from '@/stores/app'
 import { useT } from '@/lib/i18n'
 import { HideSidebarButton } from '@/features/book/SidebarToggle'
+import { usePagesOf } from '@/features/editor/pageCounts'
 
 export function ChapterSidebar(): React.JSX.Element {
   const t = useT()
   const chapters = useBook((s) => s.chapters)
   const activeId = useBook((s) => s.activeChapterId)
   const [renaming, setRenaming] = useState<string | null>(null)
+  const { pages } = usePagesOf()
 
   return (
     <div className="sidebar">
@@ -41,6 +43,7 @@ export function ChapterSidebar(): React.JSX.Element {
             <ChapterItem
               chapter={c}
               index={i}
+              pages={pages[c.id] ?? 1}
               last={i === chapters.length - 1}
               active={c.id === activeId}
               renaming={renaming === c.id}
@@ -60,6 +63,7 @@ export function ChapterSidebar(): React.JSX.Element {
 function ChapterItem({
   chapter,
   index,
+  pages,
   last,
   active,
   renaming,
@@ -68,6 +72,8 @@ function ChapterItem({
 }: {
   chapter: Chapter
   index: number
+  /** Pages of the chapter on screen */
+  pages: number
   last: boolean
   active: boolean
   renaming: boolean
@@ -156,7 +162,9 @@ function ChapterItem({
       ) : (
         <span className="chapter-item-title">{chapter.title}</span>
       )}
-      <span className="chapter-item-words">{formatCount(words)}</span>
+      <span className="chapter-item-words" title={t.write.chapterWords(words)}>
+        {t.write.chapterPages(pages)}
+      </span>
       <span className="chapter-item-menu" onClick={(e) => e.stopPropagation()}>
         <Menu
           align="start"

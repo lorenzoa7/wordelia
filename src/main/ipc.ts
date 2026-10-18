@@ -14,7 +14,7 @@ import { exportDocx, exportPdf, exportText } from './export'
 import { atomicWrite, readTextOr, safeJoin } from './fsutil'
 import { mainT } from './i18n'
 import { readImport } from './import'
-import { bookFacts, listLibrary, refreshLibraryItem, removeFromLibrary, touchLibrary } from './library'
+import { bookFacts, listLibrary, refreshLibraryItem, removeFromLibrary, setLibraryPages, touchLibrary } from './library'
 import { getSecret, getSettings, setSecret, setSettings } from './settings'
 import { assetUrl, registerBookRoot } from './assets'
 import { themeOverlay } from './window'
@@ -55,6 +55,7 @@ export function registerIpc(): void {
   handle('library:list', () => listLibrary())
   handle('library:remove', (_e, root) => removeFromLibrary(root))
   handle('library:touch', (_e, item) => touchLibrary(item))
+  handle('library:pages', (_e, root, pages, words) => setLibraryPages(root, pages, words))
 
   handle('book:create', async (e, opts) => {
     if (!E2E && !isPicked(opts.parentDir) && !samePath(opts.parentDir, defaultBooksDir())) {

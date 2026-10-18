@@ -134,7 +134,7 @@ function BookCard({ item, index, onRemoved }: { item: LibraryItem; index: number
             </>
           ) : (
             <>
-              {item.pages != null && <span className="book-card-pages">{t.library.bookPages(item.pages)}</span>}
+              {item.pages != null && <span className="book-card-pages">{t.library.bookPages(item.pages, item.pagesExact)}</span>}
               <span>{t.library.bookMeta(item.words, item.chapters)}</span>
             </>
           )}

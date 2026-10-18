@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
 import { ClockCounterClockwise } from '@phosphor-icons/react'
 import { markdownToPlain } from '@shared/book'
@@ -22,17 +22,66 @@ function when(t: Messages, iso: string): string {
   return `${d.toLocaleDateString(t.common.locale, { month: 'short', day: 'numeric' })}, ${time}`
 }
 
+/** The first change shows this far from the top of the compare view, so the text before it gives context. */
+const CHANGE_AT = 0.3
+
+/**
+ * Scroll the compare view to its first change (the first word that the restore adds or removes), smoothly,
+ * so the author sees at once what changed. A version without changes goes back to the top.
+ *
+ * The glide takes the time of the `--dur-slow` motion token, also for a long chapter: the smooth scroll of
+ * the browser takes about 2 s for a few thousand pixels. A wheel, a key or a click on the view stops it.
+ * Returns a function that stops it.
+ */
+function scrollToFirstChange(box: HTMLElement): () => void {
+  const mark = box.querySelector('ins, del')
+  const wanted = mark ? box.scrollTop + mark.getBoundingClientRect().top - box.getBoundingClientRect().top - box.clientHeight * CHANGE_AT : 0
+  const to = Math.round(Math.min(Math.max(0, wanted), box.scrollHeight - box.clientHeight))
+  const from = box.scrollTop
+  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+  const duration = parseFloat(getComputedStyle(box).getPropertyValue('--dur-slow')) || 0
+  if (reduced || !duration || Math.abs(to - from) < 2) {
+    box.scrollTop = to
+    return () => {}
+  }
+  const start = performance.now()
+  let frame = 0
+  const stop = (): void => {
+    cancelAnimationFrame(frame)
+    for (const type of ['wheel', 'keydown', 'pointerdown'] as const) box.removeEventListener(type, stop)
+  }
+  const step = (now: number): void => {
+    const t = Math.min(1, (now - start) / duration)
+    // Ease out, like the --ease-out token: fast at the start, slow at the end.
+    box.scrollTop = from + (to - from) * (1 - Math.pow(1 - t, 4))
+    if (t < 1) frame = requestAnimationFrame(step)
+    else stop()
+  }
+  for (const type of ['wheel', 'keydown', 'pointerdown'] as const) box.addEventListener(type, stop, { passive: true })
+  frame = requestAnimationFrame(step)
+  return stop
+}
+
 export function HistoryDialog({ chapterId, onClose }: { chapterId: string | null; onClose: () => void }): React.JSX.Element {
   const t = useT()
   const root = useBook((s) => s.root)
   const chapter = useBook((s) => s.chapters.find((c) => c.id === chapterId))
   const [items, setItems] = useState<HistoryItem[] | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
-  const [body, setBody] = useState<string | null>(null)
+  /** The text of a saved version, with the id of that version */
+  const [loaded, setLoaded] = useState<{ id: string; text: string | null } | null>(null)
+  // Only the text of the selected version: while a new version loads, the old text does not show.
+  const body = loaded && loaded.id === selected ? loaded.text : null
+  const textRef = useRef<HTMLDivElement>(null)
+  /** The version that the compare view went to the first change of, so a later render does not move the view again. */
+  const shownRef = useRef<string | null>(null)
+  /** Stops the glide to the first change */
+  const glideRef = useRef<() => void>(() => {})
 
   useEffect(() => {
     setItems(null)
     setSelected(null)
+    shownRef.current = null
     if (!chapterId || !root) return
     flushEditor()
     void invoke('history:list', root, chapterId).then((list) => {
@@ -42,9 +91,12 @@ export function HistoryDialog({ chapterId, onClose }: { chapterId: string | null
   }, [chapterId, root])
 
   useEffect(() => {
-    setBody(null)
     if (!selected || !chapterId || !root) return
-    void invoke('history:read', root, chapterId, selected).then(setBody)
+    let live = true
+    void invoke('history:read', root, chapterId, selected).then((text) => live && setLoaded({ id: selected, text }))
+    return () => {
+      live = false
+    }
   }, [selected, chapterId, root])
 
   const ops = useMemo(() => {
@@ -52,6 +104,20 @@ export function HistoryDialog({ chapterId, onClose }: { chapterId: string | null
     return wordDiff(markdownToPlain(chapter.body).trim(), markdownToPlain(body).trim())
   }, [body, chapter])
   const stats = ops ? diffStats(ops) : null
+
+  // A new version in the compare view: go to its first change, one time.
+  useEffect(() => {
+    const box = textRef.current
+    if (!ops || !box || shownRef.current === selected) return
+    // After the layout of the new text. A glide to the change of another version stops first.
+    const frame = requestAnimationFrame(() => {
+      shownRef.current = selected
+      glideRef.current()
+      glideRef.current = scrollToFirstChange(box)
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [ops, selected])
+  useEffect(() => () => glideRef.current(), [])
 
   const restore = (): void => {
     if (!chapter || body == null) return
@@ -105,7 +171,7 @@ export function HistoryDialog({ chapterId, onClose }: { chapterId: string | null
                 {t.history.ifRestore} <span className="plus">+{t.common.number(stats.added)}</span> <span className="minus">−{t.common.number(stats.removed)}</span> {t.history.words}
               </div>
             )}
-            <div className="history-text prose">
+            <div className="history-text prose" ref={textRef}>
               {ops ? (
                 ops.map((op, i) =>
                   op.type === 'equal' ? (

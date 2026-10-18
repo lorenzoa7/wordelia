@@ -139,6 +139,8 @@ export const chat: typeof en = {
   passageNotFound: 'No se encontró el fragmento en el capítulo. Quizás cambió.',
   replyProposals: (v) => (v === 1 ? '1 propuesta en esta respuesta' : `${v} propuestas en esta respuesta`),
   applyAll: (v) => `Aplicar las ${v}`,
+  moreFiles: (v) => `+${v}`,
+  moreFilesLabel: (v) => (v === 1 ? '1 archivo más' : `${v} archivos más`),
   applyAllHint: 'Aplicar cada cambio y cada nota de esta respuesta. Antes, cada capítulo recibe una versión en el historial.',
 
   connectFirst: 'Primero conecta una IA.',

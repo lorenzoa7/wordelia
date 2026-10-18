@@ -2,7 +2,7 @@
 
 import { app, safeStorage } from 'electron'
 import { join } from 'node:path'
-import { DEFAULT_ACTIONS, DEFAULT_ACTION_ID } from '@shared/ai/defaults'
+import { DEFAULT_ACTIONS, DEFAULT_ACTION_ID, withoutRetiredActions } from '@shared/ai/defaults'
 import type { AiAction, AppSettings, ModelRoutes, ProviderId, TaskKind } from '@shared/types'
 import { TASK_EFFORT } from '@shared/ai/effort'
 import { withDefaultShortcuts } from '@shared/ai/shortcuts'
@@ -11,9 +11,12 @@ import { atomicWrite, readJson } from './fsutil'
 const settingsFile = (): string => join(app.getPath('userData'), 'settings.json')
 const secretsFile = (): string => join(app.getPath('userData'), 'secrets.json')
 
+/** The version of the settings file that this app writes. Older files are migrated when they load. */
+const SETTINGS_VERSION = 5
+
 export function defaultSettings(): AppSettings {
   return {
-    version: 4,
+    version: SETTINGS_VERSION,
     language: 'en',
     autoUpdate: true,
     theme: 'light',
@@ -48,7 +51,7 @@ export async function getSettings(): Promise<AppSettings> {
     routes: migrateRoutes(raw.version, { ...d.routes, ...(raw.routes ?? {}) }),
     actions: migrateActions(raw.version, actions, raw.defaultActionId ?? d.defaultActionId),
     language: raw.language === 'pt-BR' || raw.language === 'es' ? raw.language : 'en',
-    version: 4
+    version: SETTINGS_VERSION
   }
   return cache
 }
@@ -57,10 +60,15 @@ export async function getSettings(): Promise<AppSettings> {
  * Version 4: each action has its own shortcut. Before, Ctrl+J ran the main action and Alt+1…9 ran the
  * actions by position. Actions without a shortcut get these as their own. In version 4, an action
  * without a shortcut is one that the user cleared.
+ *
+ * Version 5: fewer built-in actions. A retired built-in action (Expand) goes away when the author did not
+ * change it. Before version 4 the user could not choose a shortcut, so its shortcut does not count.
  */
 function migrateActions(version: number | undefined, actions: AiAction[], mainId: string): AiAction[] {
-  if (version && version >= 4) return actions
-  return withDefaultShortcuts(actions, mainId)
+  let out = actions
+  if (!version || version < 4) out = withDefaultShortcuts(out, mainId)
+  if (!version || version < 5) out = withoutRetiredActions(out, mainId, !version || version < 4)
+  return out
 }
 
 /**

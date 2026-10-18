@@ -62,7 +62,7 @@ An action shows its result as an **inline diff** on the page: removed words in r
 ### 4.4 Actions
 
 - An action has a name, instructions, a model route, and a context size (how much text before and after the selection to send).
-- Wordelia ships with good default actions: Polish, Tighten, Fix grammar only, Show don't tell, Expand.
+- Wordelia ships with four default actions: Polish (the main action), Tighten, Fix grammar only and Show, don't tell. Each one edits the words of the writer and adds no new material. Version 0.7 removed Expand from the defaults; settings version 5 removes it from the settings of a writer who did not change it.
 - The writer can edit, add, remove and reorder actions. The writer can assign a shortcut to an action.
 - **Writing rules** are book-level rules. Every action and every chat reads them.
 

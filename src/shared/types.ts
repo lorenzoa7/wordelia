@@ -151,6 +151,8 @@ export interface LibraryItem {
   author: string
   words: number
   chapters: number
+  /** An estimate of the pages on screen (src/shared/export/pages.ts). Undefined in a card of an older version. */
+  pages?: number
   openedAt: string
   /** The first words of the book, for the library card */
   excerpt?: string
@@ -324,8 +326,8 @@ export interface ProviderSettings {
 export type Locale = 'en' | 'pt-BR' | 'es'
 
 export interface AppSettings {
-  /** 2: Claude Code routes have an explicit effort. 3: the chat effort default is medium. 4: each action has its own shortcut. */
-  version: 4
+  /** 2: Claude Code routes have an explicit effort. 3: the chat effort default is medium. 4: each action has its own shortcut. 5: unchanged retired built-in actions (Expand) are removed. */
+  version: 5
   /** Language of the interface */
   language: Locale
   theme: ThemeSetting

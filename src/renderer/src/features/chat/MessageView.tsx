@@ -237,6 +237,9 @@ function AssistantMessage({ message, thread, after, canAct }: Props): React.JSX.
   )
 }
 
+/** How many file names the bar of a reply shows before the count of the others ("+5"). */
+const BULK_NAMES = 3
+
 /** One decision for all the proposals of a reply, for example after a planning sync. */
 function ReplyReview({ segments, message, thread }: { segments: Segment[]; message: ChatMessage; thread: Thread }): React.JSX.Element | null {
   const t = useT()
@@ -271,14 +274,31 @@ function ReplyReview({ segments, message, thread }: { segments: Segment[]; messa
   }
   const rejectAll = (): void => setHunkStates(thread, message.id, Object.fromEntries(pending.map((k) => [k, 'rejected'])))
 
+  // A few names, then a count of the others. The names get "…" when they do not fit; the count always shows.
+  const named = files.slice(0, BULK_NAMES)
+  const more = files.length - named.length
+
   return (
     <div className="msg-bulk" role="group" aria-label={t.chat.replyProposals(pending.length)}>
-      <span className="msg-bulk-icon" aria-hidden>
-        <ListChecks size={18} />
-      </span>
-      <div className="msg-bulk-info">
-        <span className="msg-bulk-count">{t.chat.replyProposals(pending.length)}</span>
-        {files.length > 0 && <span className="msg-bulk-files">{files.join(' · ')}</span>}
+      <div className="msg-bulk-main">
+        <span className="msg-bulk-icon" aria-hidden>
+          <ListChecks size={18} />
+        </span>
+        <div className="msg-bulk-info">
+          <span className="msg-bulk-count">{t.chat.replyProposals(pending.length)}</span>
+          {files.length > 0 && (
+            <Tooltip label={<span className="msg-bulk-tip">{files.join(' · ')}</span>} side="top">
+              <span className="msg-bulk-files">
+                <span className="msg-bulk-names">{named.join(' · ')}</span>
+                {more > 0 && (
+                  <span className="msg-bulk-more" aria-label={t.chat.moreFilesLabel(more)}>
+                    {t.chat.moreFiles(more)}
+                  </span>
+                )}
+              </span>
+            </Tooltip>
+          )}
+        </div>
       </div>
       <div className="msg-bulk-actions">
         <button className="proposal-btn msg-bulk-reject" onClick={rejectAll} disabled={busy}>

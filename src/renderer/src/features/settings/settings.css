@@ -379,13 +379,18 @@
 }
 
 /* Writing rules: a sheet of paper for the rules of the book */
-.rules-tab {
+/* The pane is at least as tall as the scroll area, and grows with long rules. With a fixed height,
+   long rules went past the pane, and the bottom padding of the scroll area came before their end:
+   the sheet touched the bottom edge of the dialog. */
+.settings-pane-rules:not([hidden]) {
   display: flex;
   flex-direction: column;
   min-height: 100%;
 }
-.settings-pane-rules {
-  height: 100%;
+.rules-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 .rules-tab .settings-note {
   margin: var(--s-2) 0 var(--s-3);

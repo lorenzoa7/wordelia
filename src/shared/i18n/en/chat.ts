@@ -157,6 +157,9 @@ export const chat = {
   /** The bar for all the proposals of one reply */
   replyProposals: (v: number): string => (v === 1 ? '1 proposal in this reply' : `${v} proposals in this reply`),
   applyAll: (v: number): string => `Apply all ${v}`,
+  /** The files of the bar that do not show by name: a count after the names */
+  moreFiles: (v: number): string => `+${v}`,
+  moreFilesLabel: (v: number): string => (v === 1 ? '1 more file' : `${v} more files`),
   applyAllHint: 'Apply every change and note of this reply. Chapters get a version in the history first.',
 
   // Sending

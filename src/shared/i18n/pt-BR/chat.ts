@@ -138,6 +138,8 @@ export const chat: typeof en = {
   passageNotFound: 'O trecho não foi encontrado no capítulo. Talvez ele tenha mudado.',
   replyProposals: (v) => (v === 1 ? '1 proposta nesta resposta' : `${v} propostas nesta resposta`),
   applyAll: (v) => `Aplicar todas as ${v}`,
+  moreFiles: (v) => `+${v}`,
+  moreFilesLabel: (v) => (v === 1 ? 'mais 1 arquivo' : `mais ${v} arquivos`),
   applyAllHint: 'Aplicar cada mudança e cada nota desta resposta. Antes, cada capítulo ganha uma versão no histórico.',
 
   connectFirst: 'Conecte uma IA primeiro.',

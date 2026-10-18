@@ -133,7 +133,10 @@ function BookCard({ item, index, onRemoved }: { item: LibraryItem; index: number
               <WarningCircle size={13} /> {t.library.folderNotFound}
             </>
           ) : (
-            <>{t.library.bookMeta(item.words, item.chapters)}</>
+            <>
+              {item.pages != null && <span className="book-card-pages">{t.library.bookPages(item.pages)}</span>}
+              <span>{t.library.bookMeta(item.words, item.chapters)}</span>
+            </>
           )}
         </span>
         <span className="book-card-time">{timeAgo(t, item.openedAt)}</span>

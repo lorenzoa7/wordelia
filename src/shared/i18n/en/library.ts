@@ -18,6 +18,8 @@ export const library = {
   emptyHint: 'Your first book starts here. Every book is a plain folder of files on this computer.',
   folderNotFound: 'Folder not found',
   bookMeta: (words: number, chapters: number): string => `${words === 1 ? '1 word' : `${formatCount(words)} words`} · ${chapters} ${chapterWord(chapters)}`,
+  /** The pages on screen, an estimate from the page size, the margins and the typography of the book */
+  bookPages: (v: number): string => (v === 1 ? '≈ 1 page' : `≈ ${v.toLocaleString('en')} pages`),
   bookOptions: 'Book options',
   showFolder: 'Show folder',
   removeFromList: 'Remove from list',

@@ -151,6 +151,8 @@ export interface LibraryItem {
   author: string
   words: number
   chapters: number
+  /** An estimate of the pages on screen (src/shared/export/pages.ts). Undefined in a card of an older version. */
+  pages?: number
   openedAt: string
   /** The first words of the book, for the library card */
   excerpt?: string

@@ -3,7 +3,7 @@
 import { app, BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
 import { copyFile, mkdir, rename, rm } from 'node:fs/promises'
 import { basename, extname, join, resolve } from 'node:path'
-import { ASSETS_DIR, countMarkdownWords, fileNameFromTitle, markdownToPlain, uniqueName } from '@shared/book'
+import { ASSETS_DIR, fileNameFromTitle, uniqueName } from '@shared/book'
 import type { InvokeArgs, InvokeChannel, InvokeResult } from '@shared/ipc'
 import { cancel, complete, providerModels, providerStatus } from './ai'
 import { openLogin } from './ai/login'
@@ -14,7 +14,7 @@ import { exportDocx, exportPdf, exportText } from './export'
 import { atomicWrite, readTextOr, safeJoin } from './fsutil'
 import { mainT } from './i18n'
 import { readImport } from './import'
-import { listLibrary, removeFromLibrary, touchLibrary } from './library'
+import { bookFacts, listLibrary, refreshLibraryItem, removeFromLibrary, touchLibrary } from './library'
 import { getSecret, getSettings, setSecret, setSettings } from './settings'
 import { assetUrl, registerBookRoot } from './assets'
 import { themeOverlay } from './window'
@@ -40,17 +40,9 @@ function defaultBooksDir(): string {
 
 const samePath = (a: string, b: string): boolean => resolve(a).toLowerCase() === resolve(b).toLowerCase()
 
-/** The first sentence or two of the book, for the library card. */
-function excerptOf(bodies: string[]): string {
-  const text = markdownToPlain(bodies.find((b) => b.trim()) ?? '')
-    .replace(/\s+/g, ' ')
-    .trim()
-  if (text.length <= 180) return text
-  const cut = text.slice(0, 180)
-  return cut.slice(0, cut.lastIndexOf(' ')) + '…'
-}
-
 const flushWaiters = new Map<number, (ok: boolean, error: string) => void>()
+/** The books that are open in a window, by the id of its web contents: their library cards change when they close. */
+const openRoots = new Map<number, string>()
 
 /** Call `fn` when the renderer of `webContentsId` reports that it saved everything (or could not). */
 export function onFlushDone(webContentsId: number, fn: (ok: boolean, error: string) => void): void {
@@ -73,10 +65,7 @@ export function registerIpc(): void {
     await touchLibrary({
       root: snap.root,
       id: snap.manifest.id,
-      title: snap.manifest.title,
-      author: snap.manifest.author,
-      words: 0,
-      chapters: snap.chapters.length,
+      ...bookFacts(snap.manifest, snap.chapters),
       openedAt: new Date().toISOString()
     })
     return snap
@@ -91,17 +80,18 @@ export function registerIpc(): void {
     await touchLibrary({
       root,
       id: snap.manifest.id,
-      title: snap.manifest.title,
-      author: snap.manifest.author,
-      words: snap.chapters.reduce((n, c) => n + countMarkdownWords(c.body), 0),
-      chapters: snap.chapters.length,
-      openedAt: new Date().toISOString(),
-      excerpt: excerptOf(snap.chapters.map((c) => c.body))
+      ...bookFacts(snap.manifest, snap.chapters),
+      openedAt: new Date().toISOString()
     })
     return snap
   })
 
-  handle('book:close', (_e, root) => unwatchBook(root))
+  handle('book:close', async (e, root) => {
+    if (openRoots.get(e.sender.id) === root) openRoots.delete(e.sender.id)
+    await unwatchBook(root)
+    // The renderer saved everything before it closed the book: the card gets the new words and pages.
+    await refreshLibraryItem(root)
+  })
 
   handle('book:pickFolder', async (e, opts) => {
     const w = win(e)
@@ -256,9 +246,12 @@ export function registerIpc(): void {
   handle('app:updateState', () => updateState())
   handle('app:checkUpdate', () => checkForUpdate())
   handle('app:installUpdate', () => installUpdate())
-  handle('app:flushDone', (e, ok, error) => {
+  handle('app:flushDone', async (e, ok, error) => {
     const fn = flushWaiters.get(e.sender.id)
     flushWaiters.delete(e.sender.id)
+    // The window closes with a book open, and its text is on disk: its card gets the new words and pages.
+    const root = openRoots.get(e.sender.id)
+    if (ok && fn && root) await refreshLibraryItem(root).catch(() => {})
     fn?.(ok, error)
   })
 
@@ -280,6 +273,7 @@ export function registerIpc(): void {
 }
 
 async function afterOpen(e: IpcMainInvokeEvent, root: string): Promise<void> {
+  openRoots.set(e.sender.id, root)
   allowRoot(root)
   registerBookRoot(root)
   watchBook(root, (change) => {

@@ -21,7 +21,10 @@ export const editor: typeof en = {
     findReplace: 'Localizar e substituir',
     focusMode: 'Modo foco',
     zoom: 'Zoom',
-    zoomReset: 'Voltar para 100 %'
+    zoomReset: 'Voltar para 100 %',
+    zoomIn: 'Aumentar o zoom',
+    zoomOut: 'Diminuir o zoom',
+    zoomSliderHint: 'Arraste para mudar o zoom. Clique duplo: 100 %'
   },
   selection: {
     askChat: 'Perguntar ao chat sobre isto',

@@ -22,7 +22,10 @@ export const editor = {
     findReplace: 'Find and replace',
     focusMode: 'Focus mode',
     zoom: 'Zoom',
-    zoomReset: 'Back to 100 %'
+    zoomReset: 'Back to 100 %',
+    zoomIn: 'Zoom in',
+    zoomOut: 'Zoom out',
+    zoomSliderHint: 'Drag to zoom. Double-click: 100 %'
   },
   /** The small menu above a text selection */
   selection: {

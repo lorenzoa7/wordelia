@@ -873,3 +873,65 @@
 .typewriter .page-end {
   padding-bottom: 55vh;
 }
+
+/* The zoom slider of the toolbar (ZoomControl.tsx) */
+.zoom-pop {
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 248px;
+  padding: 12px 12px 10px;
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  box-shadow: var(--shadow-pop);
+  animation: pop-in var(--dur-med) var(--ease-out);
+}
+.zoom-pop-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.zoom-pop-value {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.zoom-pop-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.zoom-pop-step {
+  flex: none;
+  width: 26px;
+  height: 26px;
+}
+.zoom-slider {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--ink-2);
+  cursor: pointer;
+}
+.zoom-pop-reset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-2);
+  font-size: var(--text-xs);
+  text-align: left;
+  transition: background-color var(--dur-fast) var(--ease-out);
+}
+.zoom-pop-reset:hover:not(:disabled) {
+  background: var(--desk-3);
+  color: var(--ink);
+}
+.zoom-pop-reset:disabled {
+  opacity: 0.5;
+}

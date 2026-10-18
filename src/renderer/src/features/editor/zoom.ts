@@ -28,14 +28,21 @@ export function zoomKey(e: Pick<KeyboardEvent, 'key' | 'code' | 'ctrlKey' | 'met
 /** The desk of the Write view, while it is on screen */
 let desk: HTMLElement | null = null
 /** The point to keep in place (desk coordinates), the scroll position and the zoom before the change */
-let anchor: { x: number; y: number; top: number; left: number; from: number } | null = null
+let anchor: { x: number; y: number; top: number; left: number; from: number; animate: boolean } | null = null
+
+function reducedMotion(): boolean {
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+}
 
 function currentZoom(): number {
   return useApp.getState().settings?.ui.zoom ?? 1
 }
 
-/** Set the page zoom. The text at `point` (client coordinates), or at the reading line, stays in place. */
-export function setPageZoom(to: number, point?: { x: number; y: number }): void {
+/**
+ * Set the page zoom. The text at `point` (client coordinates), or at the reading line, stays in place.
+ * `animate`: a short, smooth change of size (not while the author drags the zoom slider).
+ */
+export function setPageZoom(to: number, point?: { x: number; y: number }, animate = true): void {
   const cur = currentZoom()
   if (Math.abs(to - cur) < 0.001) return
   if (desk) {
@@ -49,7 +56,8 @@ export function setPageZoom(to: number, point?: { x: number; y: number }): void 
       // Read now: a smaller zoom makes the desk shorter, and the browser then pulls the scroll up.
       top: desk.scrollTop,
       left: desk.scrollLeft,
-      from: cur
+      from: cur,
+      animate
     }
   }
   useApp.getState().setUi({ zoom: to })
@@ -101,6 +109,23 @@ export function usePageZoom(deskRef: React.RefObject<HTMLDivElement | null>): nu
     const pad = inner ? parseFloat(getComputedStyle(inner).paddingTop) || 0 : 0
     el.scrollTop = (a.top + a.y - pad) * ratio + pad - a.y
     el.scrollLeft = Math.max(0, (a.left + a.x) * ratio - a.x)
+    // A smooth change, like a word processor: the pages have their new size already; show them at the
+    // old size around the anchor point, and let them grow or shrink to the new size. Only a transform
+    // moves: the text is laid out one time.
+    if (inner && a.animate && !reducedMotion()) {
+      inner.style.transition = 'none'
+      inner.style.transformOrigin = `${el.scrollLeft + a.x}px ${el.scrollTop + a.y}px`
+      inner.style.transform = `scale(${1 / ratio})`
+      void inner.offsetWidth
+      inner.style.transition = 'transform 160ms var(--ease-out)'
+      inner.style.transform = ''
+      const clear = (): void => {
+        inner.style.transition = ''
+        inner.style.transformOrigin = ''
+      }
+      inner.addEventListener('transitionend', clear, { once: true })
+      setTimeout(clear, 250)
+    }
     // Scroll anchoring again from the next frame: when a chapter far away gets its editor and its
     // real height, the browser keeps the text on screen in place.
     const restore = requestAnimationFrame(() => {

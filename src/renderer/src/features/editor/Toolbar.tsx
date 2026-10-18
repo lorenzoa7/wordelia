@@ -21,7 +21,7 @@ import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
 import { useUi } from '@/stores/ui'
 import { useT } from '@/lib/i18n'
-import { ZOOM_STEPS, setPageZoom } from './zoom'
+import { ZoomControl } from './ZoomControl'
 
 const ALIGN_ICONS = {
   left: <TextAlignLeft size={17} />,
@@ -38,7 +38,6 @@ export function Toolbar({ editor }: { editor: Editor }): React.JSX.Element {
   const openSettings = useUi((s) => s.openSettings)
   const t = useT()
   const tb = t.editor.toolbar
-  const zoom = ui?.zoom ?? 1
 
   const st = useEditorState({
     editor,
@@ -165,26 +164,7 @@ export function Toolbar({ editor }: { editor: Editor }): React.JSX.Element {
           <CrosshairSimple size={17} />
         </IconButton>
         <span className="toolbar-sep" />
-        <Menu
-          align="end"
-          trigger={
-            <button className="toolbar-select toolbar-zoom" aria-label={tb.zoom}>
-              <span>{Math.round(zoom * 100)}%</span>
-              <CaretDown size={10} />
-            </button>
-          }
-        >
-          <MenuLabel>{tb.zoom}</MenuLabel>
-          {ZOOM_STEPS.map((z) => (
-            <MenuItem key={z} checked={Math.abs(z - zoom) < 0.001} onSelect={() => setPageZoom(z)}>
-              {Math.round(z * 100)}%
-            </MenuItem>
-          ))}
-          <MenuSeparator />
-          <MenuItem onSelect={() => setPageZoom(1)} shortcut="Ctrl+0">
-            {tb.zoomReset}
-          </MenuItem>
-        </Menu>
+        <ZoomControl />
       </div>
     </div>
   )

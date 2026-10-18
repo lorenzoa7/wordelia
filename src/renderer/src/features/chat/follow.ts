@@ -22,6 +22,12 @@ export function useFollowEnd(box: HTMLElement | null, content: HTMLElement | nul
   const until = useRef(0)
   const busyNow = useRef(busy)
   const last = useRef({ top: 0, height: 0 })
+  // One observer for the life of the panel, made at its first render: in a frame, observers get their
+  // callbacks in the order they were made, so this one always comes before observers made later.
+  const onResize = useRef<(entries: ResizeObserverEntry[]) => void>(() => {})
+  const observer = useRef<ResizeObserver | null>(null)
+  if (!observer.current && typeof ResizeObserver !== 'undefined') observer.current = new ResizeObserver((entries) => onResize.current(entries))
+  useEffect(() => () => observer.current?.disconnect(), [])
 
   const toEnd = useCallback((): void => {
     if (!box) return
@@ -71,20 +77,23 @@ export function useFollowEnd(box: HTMLElement | null, content: HTMLElement | nul
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'ArrowUp' || e.key === 'PageUp' || e.key === 'Home') on.current = false
     }
-    const ro = new ResizeObserver((entries) => {
+    onResize.current = (entries) => {
       if (!on.current) return
       const ofContent = entries.some((e) => e.target === content)
       if (!ofContent || busyNow.current || performance.now() < until.current) toEnd()
       // At rest, for example when the user opens the thinking of a reply: do not move the view.
       else on.current = gap() <= NEAR_END
-    })
-    ro.observe(box)
-    ro.observe(content)
+    }
+    const ro = observer.current
+    ro?.observe(box)
+    ro?.observe(content)
     box.addEventListener('scroll', onScroll, { passive: true })
     box.addEventListener('wheel', onWheel, { passive: true })
     box.addEventListener('keydown', onKey)
     return () => {
-      ro.disconnect()
+      ro?.unobserve(box)
+      ro?.unobserve(content)
+      onResize.current = () => {}
       box.removeEventListener('scroll', onScroll)
       box.removeEventListener('wheel', onWheel)
       box.removeEventListener('keydown', onKey)

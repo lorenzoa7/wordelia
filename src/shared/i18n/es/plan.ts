@@ -96,6 +96,7 @@ export const plan: typeof en = {
     openSettings: 'Abrir ajustes',
     upToDate: 'La planificación está al día con el manuscrito.',
     syncing: 'Sincronizando…',
+    started: 'Las notas se actualizan en segundo plano. La vista Planificar muestra el progreso.',
     reading: (n) => (n === 1 ? 'Leyendo 1 capítulo…' : `Leyendo ${n} capítulos…`),
     writing: (found) => (found === 0 ? 'Escribiendo los cambios…' : found === 1 ? '1 cambio hasta ahora…' : `${found} cambios hasta ahora…`),
     part: (part, parts) => `Parte ${part} de ${parts}`,

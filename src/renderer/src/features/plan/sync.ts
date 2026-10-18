@@ -267,6 +267,8 @@ export async function startPlanningSync(opts: { bootstrap?: boolean } = {}): Pro
   const root = book.root
   const run = { cancel: (): void => {}, cancelled: false }
   current = run
+  // Away from the Plan sidebar (an import starts the sync in the Write view), say where the progress is.
+  if (!sidebarShows()) toast(t.plan.sync.started)
   const ids: string[] = []
   const groups = batches(todo)
   // The book of the run is still open

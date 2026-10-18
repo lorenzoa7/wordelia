@@ -111,6 +111,8 @@ export const plan = {
     upToDate: 'The planning is up to date with the manuscript.',
     /** The sync button while the sync runs */
     syncing: 'Syncing…',
+    /** A toast when a sync starts away from the Plan sidebar (for example after an import) */
+    started: 'The notes update in the background. The Plan view shows the progress.',
     /** Under "Syncing…": the AI reads the chapters */
     reading: (n: number): string => (n === 1 ? 'Reading 1 chapter…' : `Reading ${n} chapters…`),
     /** Under "Syncing…": the AI writes its reply. `found`: the complete changes so far. */

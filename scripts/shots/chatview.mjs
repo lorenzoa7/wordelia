@@ -205,6 +205,7 @@ export default async function ({ app, page, shot, openBook, book }) {
     `resize steps measured: ${rec.samples.length}; before the scroll up: ${before.length}, worst gap ${worst}px; after the scroll back: ${after.length}, worst gap ${worstAfter}px; ` +
       `thinking line seen: ${rec.samples.some((s) => s.think)}; reply text seen: ${rec.samples.some((s) => s.text)}; at the end after the reply: ${endGap}px`
   )
+  if (worst > 2) console.log('samples before the scroll up:', JSON.stringify(before))
   if (worst > 2) fail(`a frame after send was not at the end (${worst}px)`)
   if (worstAfter > 2) fail(`a frame after the scroll back to the end was not at the end (${worstAfter}px)`)
   if (!rec.samples.some((s) => s.think) || !rec.samples.some((s) => s.text)) fail('the measure did not see the thinking line and the reply')

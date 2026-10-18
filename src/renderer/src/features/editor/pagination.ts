@@ -82,7 +82,8 @@ function build(state: EditorState, breaks: Break[], tail: number, m: PageMetrics
     Decoration.widget(b.pos, () => gapElement(b, m, i, i >= fresh), {
       side: -1,
       ignoreSelection: true,
-      key: `gap-${b.inline ? 'i' : 'b'}-${Math.round(b.rest)}-${m.contentHeight}${i >= fresh ? '-new' : ''}`
+      // Not the new mark: the next measure (fast typing) keeps the same element and its animation.
+      key: `gap-${b.inline ? 'i' : 'b'}-${Math.round(b.rest)}-${m.contentHeight}`
     })
   )
   if (tail > 0) {

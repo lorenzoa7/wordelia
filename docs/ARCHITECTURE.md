@@ -247,7 +247,7 @@ The renderer parses the tags while the reply streams. It shows each tag as a dif
 - **Proposals in the text** (`src/renderer/src/features/editor/inlineProposals.ts`). Every pending chapter change of the open thread shows in its chapter as a word diff, with Accept (✓) and Reject (✕) after it. The card and the text show the same proposal: a decision in one place sets the hunk state, and the other place follows. A passage that is not in the chapter once (the user changed it, or it occurs two times) does not show in the text; the card still shows it.
 - "Show in text" on a change calls `revealProposal`: it scrolls from where the user is to the change and marks it for a moment. It never decides the proposal. When a new reply of the open thread has chapter proposals, the text scrolls to the last new one by itself.
 - **Undo of an accepted change.** The app remembers the chapter changes that the author accepted in the session. When the text of the chapter shows the old words again (Ctrl+Z), the change is pending again and shows in the text; when the new words come back (Ctrl+Y), it is accepted again. Ctrl+Z with the focus outside a text (for example on the Accept button of the chat) undoes the last accepted change in its chapter.
-- A reply with two or more open proposals has a bar for all of them ("Apply all 3", "Reject all").
+- A reply with two or more open proposals has a bar for all of them ("Apply all 3", "Reject all"). The icon and the text take the free room of the line; the buttons go to their own line when they do not fit beside the text, and there they share the width. When the two buttons do not fit side by side, each one takes a line, so a button is never cut. The files line shows three names (with "…" when they are long) and then a count of the others ("+29"); a tooltip shows all the names. The `chatview` scenario checks 32 proposals with long names at 320 to 680 px.
 - An accepted `<create>` that replaces an entry keeps the old entry file in the message (`ChatMessage.replaced`).
 
 #### Rewind, Edit and Retry
@@ -305,6 +305,8 @@ The composer (`Composer.tsx`) and the edit box of a sent message use `ChatInput.
 
 An action sends: the writing rules, the action instructions, N characters before the selection, the selection, and N characters after. The AI returns `<rewrite>...</rewrite>`. The editor shows a word diff as decorations on the page. Accept replaces the range in one transaction.
 
+The built-in actions are Polish (the main action, Ctrl+J), Tighten (Alt+2), Fix grammar only (Alt+3) and Show, don't tell (Alt+4) (`DEFAULT_ACTIONS` in `src/shared/ai/defaults.ts`). Each one edits the words of the author and adds no new material. Expand left the defaults in version 0.7 (`RETIRED_ACTIONS`): settings version 5 removes it when the author did not change it (the same name, instructions, icon, model, effort, context and shortcut, and it is not the main action). A changed Expand stays, and its name and instructions still show in the interface language. The shortcut Alt+5 becomes free; the other actions keep their shortcuts.
+
 Each action has its own keyboard shortcut (`AiAction.shortcut`, for example "Ctrl+J"). `src/shared/ai/shortcuts.ts` reads key presses, keeps one text form and finds conflicts with other actions and with the keys of the app and the editor (`RESERVED_SHORTCUTS`). `useActionShortcuts` runs the action of a shortcut in the Write view. Settings version 4 gave the actions of old settings the keys that they had by position: Ctrl+J for the main action, Alt+2, Alt+3… for the others. See `docs/decisions/0003-action-shortcuts-and-builtin-instructions.md`.
 
 ### 5.5 Thread digests
@@ -340,7 +342,7 @@ The language of a book is a different setting. It controls the AI output, the di
 App data folder (`app.getPath('userData')`):
 
 - `settings.json`: theme, editor preferences, providers, model routes, actions.
-- `library.json`: known books.
+- `library.json`: known books. Each card keeps the title, the author, the words, the chapters, the pages (an estimate, see §7a) and the first words of the book (`bookFacts` in `src/main/library.ts`). The main process writes them when a book opens, when it closes (after the renderer saved everything), and when the window closes with a book open. A card of an older version without pages gets them the next time the library shows: the main process reads the book from its folder one time.
 - `secrets.json`: API keys, encrypted with `safeStorage`.
 
 ## 7. Export
@@ -363,6 +365,7 @@ The Write view shows the manuscript as pages, like a word processor (`src/render
   - A page that typing adds grows in (280 ms, not with reduced motion), and the desk glides down when the cursor would go under the screen.
 - **Registry** (`registry.ts`). The mounted editors, by chapter. The toolbar, the selection menu, the review bar, the find bar and the actions use the active editor (`useActiveEditor`). `applyToChapter` changes a chapter in its editor when it is mounted, else in the store. `locateInChapter` and `chapterHasText` find a passage for "Show in text".
 - **Find** searches the active chapter, scrolls to each match, and goes on into the next chapter that has a match.
+- **Page estimate** (`src/shared/export/pages.ts`, pure, with tests). The library card shows "≈ 214 pages" for books that are not open, so the main process cannot measure the screen. It follows the page on screen instead: the text width and height from the page size and the margins, the line height from the font size and the line height of the book typography, the first-line indent and the space after a paragraph, the chapter heading on the first page of each chapter (183.7 px for 12 pt), scene breaks (their margins collapse with the space of a paragraph), and page breaks. Words fill each line, and a word never breaks (the app has no hyphenation). A word is its number of characters times the average character width of the font (`FONT_WIDTHS`: measured with the canvas of the browser on the sample prose, then fitted by 1% or less to the line breaks of the browser at ten widths). So the estimate also counts the short last lines of dialogue. For real-looking chapters in six layouts, the estimate was within 10% of the pages on screen, most often exact (`pages.test.ts`). The `library` scenario compares the card with the pages that the Write view shows.
 
 ## 7b. Planning map
 
@@ -397,6 +400,7 @@ The Plan overview has a switch: "Cards | Map". The map shows the planning as a g
 - Closing the window: the main process stops the close, sends `app:flushRequest`, and closes when the renderer answers `app:flushDone` (or after 4 s).
 - Deleted chapters and entries move to `.wordelia/trash/`. Nothing is deleted for good.
 - Accepted AI proposals show an **Undo** toast. It restores the text from before the change.
+- **Version history** (`src/renderer/src/features/history/`). The app saves a version of a chapter when the chapter opens, when the author leaves it, every 8 minutes, and before AI changes (the newest 60 for each chapter, in `.wordelia/history/`). The dialog compares the chapter with the selected version, word by word. When a version shows, the compare view glides to its first change, with 30% of the view above it for context. The glide takes the time of the `--dur-slow` token, also in a long chapter; with reduced motion it jumps. A wheel, a key or a click stops it.
 
 ## 9. Long books
 

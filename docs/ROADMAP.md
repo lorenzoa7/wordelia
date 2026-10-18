@@ -232,6 +232,16 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] Send goes to the very end of the thread, and the end stays in view when the layout changes after the first frame (a font that loads, a quote, the thinking line) and while the reply streams. A scroll up stops the follow; a scroll back to the end starts it again (`useFollowEnd`, `features/chat/follow.ts`). The scenario `chatview` sends a long message with a quote and two pills and measures scrollTop + clientHeight against scrollHeight in each resize step
 - [x] No row of the thread list looks selected: while the list shows, the user is in no thread. The row with the keyboard focus shows a focus ring
 
+## Version 0.7 — fourth feedback of the author
+
+### Settings, library, history and the reply bar
+
+- [x] Four built-in actions: Polish (Ctrl+J), Tighten (Alt+2), Fix grammar only (Alt+3) and Show, don't tell (Alt+4). Expand left the defaults: it is the only action that writes new material, and the chat does that better. Settings version 5 removes Expand only when the author did not change it (name, instructions, icon, model, effort, context, shortcut) and it is not the main action; Alt+5 becomes free. A kept Expand and old "Before Expand" versions still show in the interface language (`withoutRetiredActions`, unit tests; the `settings` scenario counts the actions)
+- [x] Pages on the library card: "≈ 214 páginas" above the words and the chapters. A pure estimate (`src/shared/export/pages.ts`) follows the page on screen: page size, margins, the font, size and line height of the book typography, the indent, the chapter heading, scene breaks and page breaks; words fill each line with the measured average character width of the font. The main process computes it when a book opens and closes, so a book that is not open has a number too. Within 10% of the pages on screen for real-looking chapters in six layouts, most often exact (unit tests; the `library` scenario compares the card with the Write view: 24 and 25 pages)
+- [x] Version history: when a version shows, the compare view glides to its first change (about 400 ms, the `--dur-slow` token; reduced motion jumps). The `history` scenario checks a long chapter with one change at its end
+- [x] Settings → Writing rules: long rules no longer touch the bottom edge of the dialog. Each tab keeps 32 px under its content at the end of its scroll (the `settings` scenario measures all tabs, also with 60 rules)
+- [x] The bar for all the proposals of a reply fits at every panel width: the title, one line of files (three names with "…", then "+29"; all the names in a tooltip), and the two buttons, which go to their own line when they do not fit and never get cut (the `chatview` scenario: 32 proposals with long names at 320, 360, 400, 520 and 680 px)
+
 ## Tests and CI
 
 - [x] End-to-end scenarios run with a hidden window (transparent, no focus) and with CSS animations off

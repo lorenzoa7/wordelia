@@ -162,8 +162,18 @@ export default async function ({ app, page, shot, openBook, book }) {
   const mark = (key) => page.evaluate((k) => (window.__scroll[k] = performance.now() - window.__scroll.t0), key)
   await mark('upAt')
   await page.mouse.wheel(0, -500)
-  await page.waitForTimeout(400)
-  const upTop = await page.locator('.chat-scroll').evaluate((el) => el.scrollTop)
+  // Wait until the scroll of the wheel ends (the same position for 200 ms).
+  const settled = () =>
+    page.locator('.chat-scroll').evaluate(async (el) => {
+      let last = el.scrollTop
+      for (let still = 0; still < 4; ) {
+        await new Promise((r) => setTimeout(r, 50))
+        still = Math.abs(el.scrollTop - last) < 0.5 ? still + 1 : 0
+        last = el.scrollTop
+      }
+      return last
+    })
+  const upTop = await settled()
   await page.waitForTimeout(1200)
   const up = await page.locator('.chat-scroll').evaluate((el) => ({ top: el.scrollTop, gap: el.scrollHeight - el.scrollTop - el.clientHeight }))
   const stillStreaming = await page.locator('.msg-ai.is-streaming').count()

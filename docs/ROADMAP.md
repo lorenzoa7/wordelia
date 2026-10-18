@@ -225,6 +225,13 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] Faster frames: the labels are in screen units, so no CSS variable changes on each frame, and a frame writes only the attributes that change. With 300 entries: 12 to 16 ms a frame on average, p95 17 to 22 ms (version 0.5: 15 to 21 ms, p95 22 to 28 ms, on the same computer)
 - [x] When all labels show, the layout keeps room for them at the zoom of the fit, so they overlap less. Far out, a small map shows only the major labels
 
+### Chat
+
+- [x] "New thread" in the thread list has a soft tone of the panel, not the white of the paper. Its hover is one step darker (light and dark themes)
+- [x] A new thread exists only after its first message. "New thread" shows a blank thread that is not in the book and not on disk; the first message saves it with its title, purpose and model. The thread list, another thread and another book remove it. An empty thread never shows in the thread list or in the "@" list. When a book opens, the chat shows the most recent thread with messages, and the app deletes the empty threads that older versions saved (no messages, no purpose, the default title). The scenario `chatview` checks the thread files on disk
+- [x] Send goes to the very end of the thread, and the end stays in view when the layout changes after the first frame (a font that loads, a quote, the thinking line) and while the reply streams. A scroll up stops the follow; a scroll back to the end starts it again (`useFollowEnd`, `features/chat/follow.ts`). The scenario `chatview` sends a long message with a quote and two pills and measures scrollTop + clientHeight against scrollHeight in each resize step
+- [x] No row of the thread list looks selected: while the list shows, the user is in no thread. The row with the keyboard focus shows a focus ring
+
 ## Later (not in version 1)
 
 - Sync to a git remote from the app

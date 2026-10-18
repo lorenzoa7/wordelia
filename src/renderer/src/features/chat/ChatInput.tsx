@@ -109,7 +109,10 @@ function useCandidates(query: string | null): Candidate[] {
     const all: Candidate[] = [
       ...chapters.map((c, i) => ({ kind: 'chapter' as const, id: c.id, label: c.title, sub: t.chat.chapterNumber(i + 1) })),
       ...entries.map((e) => ({ kind: 'entry' as const, id: e.id, label: e.name, sub: folderCategoryName(t, e.category, categories ?? []) })),
-      ...threads.map((th) => ({ kind: 'thread' as const, id: th.id, label: mentionLabel(t, { kind: 'thread', label: th.title }), sub: t.chat.thread }))
+      // A thread without messages is not a thread yet.
+      ...threads
+        .filter((th) => th.messages.length > 0)
+        .map((th) => ({ kind: 'thread' as const, id: th.id, label: mentionLabel(t, { kind: 'thread', label: th.title }), sub: t.chat.thread }))
     ]
     // Names that start with the letters first, then names that have them inside.
     const hits = all.filter((c) => fold(c.label).includes(q))

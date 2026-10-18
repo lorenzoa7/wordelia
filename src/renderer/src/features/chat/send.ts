@@ -70,11 +70,9 @@ export async function sendMessage(text: string): Promise<void> {
   const message = text.trim()
   if (!message && !chat.quotes.length) return
 
-  let thread = book.threads.find((t) => t.id === chat.activeThreadId)
-  if (!thread) {
-    thread = newThread()
-    useChat.getState().setActiveThread(thread.id)
-  }
+  // The blank thread (or a new one) is saved with its first message, not before.
+  const saved = chat.blank ? undefined : book.threads.find((t) => t.id === chat.activeThreadId)
+  const thread = saved ?? chat.blank ?? newThread()
   if (useChat.getState().streaming[thread.id]) return
   if (!chatRoute(thread)) {
     connectFirst()
@@ -89,7 +87,9 @@ export async function sendMessage(text: string): Promise<void> {
     ...(chat.quotes.length ? { quotes: chat.quotes } : {}),
     ...(chat.mentions.length ? { mentions: chat.mentions } : {})
   }
-  useBook.getState().saveThread({ ...thread, messages: [...thread.messages, userMsg], updatedAt: new Date().toISOString() }, true)
+  const now = new Date().toISOString()
+  useBook.getState().saveThread({ ...thread, messages: [...thread.messages, userMsg], updatedAt: now, ...(saved ? {} : { createdAt: now }) }, true)
+  if (!saved) useChat.getState().setActiveThread(thread.id)
   useChat.getState().clearComposer()
   await requestReply(thread.id)
 }

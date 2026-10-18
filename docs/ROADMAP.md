@@ -261,6 +261,16 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] Settings → Writing rules: long rules no longer touch the bottom edge of the dialog. Each tab keeps 32 px under its content at the end of its scroll (the `settings` scenario measures all tabs, also with 60 rules)
 - [x] The bar for all the proposals of a reply fits at every panel width: the title, one line of files (three names with "…", then "+29"; all the names in a tooltip), and the two buttons, which go to their own line when they do not fit and never get cut (the `chatview` scenario: 32 proposals with long names at 320, 360, 400, 520 and 680 px)
 
+## Version 0.8 — fifth feedback of the author
+
+### Editor
+
+- [x] Zoom is a scale of the desk: the pages stay laid out at 100 %, so words and page breaks never move; a smooth, even animation (scenario `zoom`)
+- [x] A new page grows in more softly, and typing on it no longer starts its animation again (scenario `newpage`)
+- [x] The review bar stays above the passage also when the change is ready
+- [x] Three views of an AI change in the review bar (word by word, old over new, new text only); the default in Settings → General (scenario `diffviews`)
+- [x] Page numbers in the bottom corner of each page; exact page counts in the chapter list and on the library card (scenario `pagecount`)
+
 ## Tests and CI
 
 - [x] End-to-end scenarios run with a hidden window (transparent, no focus) and with CSS animations off

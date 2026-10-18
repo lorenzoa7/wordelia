@@ -2,6 +2,11 @@
 
 Each version has its Windows installer in GitHub Releases. The release workflow copies the section of the version from this file to the release notes.
 
+## 0.8.1 (2026-10-18)
+
+### Fixed
+- A new page opens in one smooth movement while you type. The words that do not fit slide down to the new page, and the screen scrolls with them, so the cursor stays still. Before, the next key stopped the movement and the page jumped.
+
 ## 0.8.0 (2026-10-18)
 
 ### New

@@ -7,23 +7,12 @@ export default async function ({ page, shot, openBook }) {
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await openBook()
   await page.waitForTimeout(1200)
-  // Each new page that comes in (its gap has a veil that fades out) and each page that goes (its
-  // space stays for a moment after the text, pagination.ts)
+  // Each new page that comes in (its gap has a veil that fades out, pagination.ts)
   await page.evaluate(() => {
     window.__arrivals = 0
-    window.__departures = 0
-    // ProseMirror may draw these widgets again: count only when one shows and none was there.
-    let arriving = false
-    let leaving = false
-    const root = document.querySelector('.manuscript')
-    new MutationObserver(() => {
-      const a = Boolean(root.querySelector('.pm-page-gap > .pm-page-veil'))
-      const l = Boolean(root.querySelector('.pm-page-leave'))
-      if (a && !arriving) window.__arrivals++
-      if (l && !leaving) window.__departures++
-      arriving = a
-      leaving = l
-    }).observe(root, { childList: true, subtree: true })
+    new MutationObserver((list) => {
+      for (const m of list) for (const n of m.addedNodes) if (n instanceof HTMLElement && n.querySelector?.('.pm-page-veil')) window.__arrivals++
+    }).observe(document.querySelector('.manuscript'), { childList: true, subtree: true })
   })
   // Height of a page and of the space between two sheets, from the CSS of the desk
   const geo = await page.evaluate(() => {
@@ -32,8 +21,6 @@ export default async function ({ page, shot, openBook }) {
     return { pageH: n('--page-mt') + n('--page-content-h') + n('--page-mb'), gap: n('--page-gap') }
   })
   const check = async (label) => {
-    // A page that goes keeps its space for a moment: measure after that.
-    await page.waitForFunction(() => !document.querySelector('.pm-page-leave'), null, { timeout: 5000 })
     const r = await page.evaluate(() => {
       const sheet = document.querySelector('.page[data-chapter]')
       return { height: sheet.getBoundingClientRect().height, gaps: sheet.querySelectorAll('.pm-page-gap').length }
@@ -89,7 +76,7 @@ export default async function ({ page, shot, openBook }) {
   const where = () =>
     page.evaluate(() => {
       const ed = window.__wordelia.editor()
-      return { head: ed.state.selection.head, size: ed.state.doc.content.size, node: ed.state.selection.constructor.name, arrivals: window.__arrivals, departures: window.__departures }
+      return { head: ed.state.selection.head, size: ed.state.doc.content.size, node: ed.state.selection.constructor.name, arrivals: window.__arrivals }
     })
   const step = async (key, label, pages) => {
     await page.keyboard.press(key)
@@ -106,39 +93,29 @@ export default async function ({ page, shot, openBook }) {
   const base = await check('end of the chapter')
   let w = await step('Control+Enter', '1. Ctrl+Enter', base + 1)
   if (w.arrivals !== textEnd.arrivals + 1) throw new Error('1. The new page did not come in')
-  // Backspace on the empty new page: the page goes, and the cursor goes back to the end of the text.
-  // What is under the chapter (the next chapter) moves up at once and softly: no wait, no jump.
+  // Backspace on the empty new page: the page goes at once, like Google Docs, and the cursor goes
+  // back to the end of the text. What is under the chapter is in its last place in the first frame:
+  // nothing moves later.
   await page.evaluate(() => {
     const under = document.querySelector('.page[data-chapter] ~ .page, .page-end')
     const frames = (window.__under = [])
-    // Times from the key press; the last frame before it is where the movement starts.
     let key = null
     document.addEventListener('keydown', () => (key = performance.now()), { capture: true, once: true })
     const start = performance.now()
     const tick = () => {
       const now = performance.now()
-      frames.push({ t: key === null ? -1 : now - key, y: under.getBoundingClientRect().top })
-      if (now - start < 2500) requestAnimationFrame(tick)
+      if (key !== null) frames.push({ t: now - key, y: under.getBoundingClientRect().top })
+      if (now - start < 2000) requestAnimationFrame(tick)
     }
     requestAnimationFrame(tick)
   })
   w = await step('Backspace', '2. Backspace on the empty page', base)
+  await page.waitForTimeout(800)
+  const under = await page.evaluate(() => window.__under)
+  const moves = under.slice(1).filter((f, i) => Math.abs(f.y - under[i].y) > 1)
+  console.log('   under the chapter, moves after the first frame:', JSON.stringify(moves.map((f) => Math.round(f.t))))
+  if (moves.length) throw new Error(`2. What is under the chapter moved ${Math.round(moves[0].t)} ms after the key`)
   if (w.head !== textEnd.head || w.size !== textEnd.size) throw new Error(`2. The cursor is at ${w.head} of ${w.size}, not at the end of the text (${textEnd.head} of ${textEnd.size})`)
-  if (w.departures !== textEnd.departures + 1) throw new Error('2. The page did not go out')
-  await page.waitForTimeout(1000)
-  const all = await page.evaluate(() => window.__under)
-  const under = all.slice(Math.max(0, all.findIndex((f) => f.t >= 0) - 1))
-  const distance = under[0].y - under[under.length - 1].y
-  const moved = under.findIndex((f) => f.y < under[0].y - 1)
-  const speed = Math.max(...under.slice(1).map((f, i) => (under[i].y - f.y) / Math.max(1, f.t - under[i].t)))
-  console.log('   under the chapter:', JSON.stringify({ distance: Math.round(distance), startsAfter: moved > 0 ? Math.round(under[moved].t) : null, topSpeed: +speed.toFixed(2) }))
-  if (distance < 100) throw new Error(`2. What is under the chapter moved only ${Math.round(distance)} px`)
-  // On this machine (CI servers have slow frames): it starts within 100 ms, and no frame moves it
-  // faster than the whole way in 250 ms.
-  if (!process.env.CI) {
-    if (moved < 0 || under[moved].t > 100) throw new Error(`2. What is under the chapter waited ${moved < 0 ? '' : Math.round(under[moved].t) + ' ms '}before it moved`)
-    if (speed > distance / 250) throw new Error(`2. What is under the chapter jumped: ${speed.toFixed(1)} px/ms`)
-  }
   // Ctrl+Enter again: the new page comes in again. Ctrl+Enter on the empty page: one more page.
   w = await step('Control+Enter', '3. Ctrl+Enter again', base + 1)
   if (w.arrivals !== textEnd.arrivals + 2) throw new Error('3. The new page did not come in the second time')
@@ -146,10 +123,8 @@ export default async function ({ page, shot, openBook }) {
   if (w.arrivals !== textEnd.arrivals + 3) throw new Error('4. The second new page did not come in')
   await shot('two-empty-pages')
   // Backspace two times: the two pages go, one at a time, and the cursor is at the end of the text.
-  w = await step('Backspace', '5. Backspace', base + 1)
-  if (w.departures !== textEnd.departures + 2) throw new Error('5. The page did not go out')
+  await step('Backspace', '5. Backspace', base + 1)
   w = await step('Backspace', '6. Backspace', base)
-  if (w.departures !== textEnd.departures + 3) throw new Error('6. The page did not go out')
   if (w.head !== textEnd.head || w.size !== textEnd.size) throw new Error(`6. The cursor is at ${w.head} of ${w.size}, not at the end of the text`)
 
   // The page break is saved in the Markdown.

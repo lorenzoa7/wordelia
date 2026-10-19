@@ -878,19 +878,6 @@
   background: var(--desk);
   pointer-events: none;
 }
-/* Pages that an edit removed (pagination.ts): their space stays for a moment after the end of the
-   text, the veil comes over their sheets, and then the space closes. The bands show only inside the
-   space that is left: clipped above and below, not at the sides (they are wider than the text). */
-.pm-page-leave {
-  position: relative;
-  pointer-events: none;
-  user-select: none;
-}
-.pm-page-leave-bands {
-  position: absolute;
-  inset: 0;
-  clip-path: inset(0 calc(-1 * var(--page-mr)) 0 calc(-1 * var(--page-ml)));
-}
 
 /* The zoom of the page in the toolbar: a fixed width, so the toolbar does not move */
 .toolbar-zoom {

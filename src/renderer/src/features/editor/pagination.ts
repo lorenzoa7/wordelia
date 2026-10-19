@@ -43,14 +43,6 @@ interface Arrival {
   p: number
 }
 
-/** Pages that an edit removed (departAt): their sheets go back into the desk, then the space closes. */
-interface Departure {
-  /** How many pages went */
-  pages: number
-  /** Progress in time, 0 to 1. 1 when it is done or stopped. */
-  p: number
-}
-
 interface PageState {
   breaks: Break[]
   /** The number of breaks at the last measure (a deleted break leaves `breaks` at once, not this) */
@@ -59,7 +51,6 @@ interface PageState {
   tail: number
   decorations: DecorationSet
   arrival: Arrival | null
-  departure: Departure | null
 }
 
 export const paginationKey = new PluginKey<PageState>('pagination')
@@ -126,74 +117,12 @@ function pageNumber(top: number, m: PageMetrics): HTMLElement {
   return n
 }
 
-/** The part of a departure in which the sheets go into the desk. The space closes all the time. */
-const LEAVE_FADE = 0.5
-
-const easeOut = (x: number): number => 1 - Math.pow(1 - x, 3)
-const easeInOutSine = (x: number): number => (1 - Math.cos(Math.PI * x)) / 2
-
-/**
- * The pages that an edit removed, after the end of the text: they keep their place for a moment, so
- * nothing jumps. The last page of the text ends here: first its bottom margin (white), then for each
- * page that went the band and a sheet. The bottom margin of the last of them is the bottom padding
- * of the chapter sheet.
- */
-function leaveElement(pages: number, m: PageMetrics, p: number): HTMLElement {
-  const el = document.createElement('div')
-  el.className = 'pm-page-leave'
-  el.setAttribute('contenteditable', 'false')
-  el.setAttribute('aria-hidden', 'true')
-  const step = m.marginBottom + m.gap + m.marginTop + m.contentHeight
-  el.dataset.height = String(step * pages)
-  el.dataset.margin = String(m.marginBottom)
-  el.dataset.under = String(m.gap * 0.75)
-  // The bands show only inside the space that is left (clipped above and below, not at the sides).
-  const bands = document.createElement('span')
-  bands.className = 'pm-page-leave-bands'
-  for (let i = 0; i < pages; i++) {
-    const band = document.createElement('span')
-    band.className = 'pm-page-band'
-    band.style.top = zoomed(m.marginBottom + i * step, m)
-    band.style.height = zoomed(m.gap, m)
-    bands.appendChild(band)
-  }
-  el.appendChild(bands)
-  const veil = document.createElement('span')
-  veil.className = 'pm-page-veil'
-  el.appendChild(veil)
-  leaveAt(el, p, m)
-  return el
-}
-
-/**
- * A departure at a progress. The veil comes over the sheets that went (they go into the desk), and
- * at the same time their space closes, from the first frame to the last: slowly at the start and at
- * the end, so what is under it (the next chapter, the button under the book) moves on one smooth
- * path, with no wait and no jump. The last page of the text keeps its bottom margin the whole time:
- * first the start of the space, then the bottom padding of the chapter sheet under it.
- */
-function leaveAt(el: HTMLElement, p: number, m: PageMetrics): void {
-  const fade = easeOut(Math.min(1, p / LEAVE_FADE))
-  const close = easeInOutSine(p)
-  const height = Number(el.dataset.height) * (1 - close)
-  const margin = Number(el.dataset.margin)
-  el.style.height = zoomed(height, m)
-  const veil = el.querySelector<HTMLElement>('.pm-page-veil')
-  if (!veil) return
-  // From under the bottom margin to the bottom padding of the chapter sheet and its shadow (not as
-  // far as the next sheet). The shadow of the last page shows again while the space closes.
-  const top = margin + VEIL_FROM * (1 - close)
-  veil.style.top = zoomed(top, m)
-  veil.style.height = zoomed(Math.max(0, height + margin + Number(el.dataset.under) * (1 - close) - top), m)
-  veil.style.opacity = String(fade)
-}
-
 /**
  * `arrival`: the new page that comes in now. ProseMirror draws a gap again when the author types in
  * its paragraph (each key on the new page): the new element starts at the progress of now, so the
- * page comes in without a jump. `departure`: pages that went, after the end of the text.
+ * page comes in without a jump.
  */
-function build(state: EditorState, breaks: Break[], tail: number, m: PageMetrics, arrival: Arrival | null, departure: Departure | null): DecorationSet {
+function build(state: EditorState, breaks: Break[], tail: number, m: PageMetrics, arrival: Arrival | null): DecorationSet {
   const decos = breaks.map((b, i) => {
     const draw = (): HTMLElement => gapElement(b, m, i, arrival && i === arrival.index && arrival.p < 1 ? arrival.p : null)
     return Decoration.widget(b.pos, draw, {
@@ -206,10 +135,6 @@ function build(state: EditorState, breaks: Break[], tail: number, m: PageMetrics
     decos.push(
       Decoration.widget(state.doc.content.size, () => tailElement(tail, m), { side: 1, ignoreSelection: true, key: `tail-${Math.round(tail)}-${m.zoom}` })
     )
-  }
-  if (departure && departure.p < 1) {
-    const draw = (): HTMLElement => leaveElement(departure.pages, m, departure.p)
-    decos.push(Decoration.widget(state.doc.content.size, draw, { side: 2, ignoreSelection: true, key: `leave-${departure.pages}`, leave: true }))
   }
   return DecorationSet.create(state.doc, decos)
 }
@@ -422,22 +347,13 @@ export const Pagination = Extension.create<PaginationOptions>({
       new Plugin<PageState>({
         key: paginationKey,
         state: {
-          init: () => ({ breaks: [], measured: 0, tail: 0, decorations: DecorationSet.empty, arrival: null, departure: null }),
+          init: () => ({ breaks: [], measured: 0, tail: 0, decorations: DecorationSet.empty, arrival: null }),
           apply(tr, prev, _old, next) {
-            const meta = tr.getMeta(paginationKey) as
-              | { breaks: Break[]; tail: number; metrics: PageMetrics; arrive?: number; leave?: number }
-              | { left: true }
-              | undefined
-            // The pages that went are gone: their space closed (departAt).
-            if (meta && 'left' in meta) {
-              const leaving = prev.decorations.find(undefined, undefined, (spec) => spec.leave === true)
-              return { ...prev, decorations: prev.decorations.remove(leaving), departure: null }
-            }
+            const meta = tr.getMeta(paginationKey) as { breaks: Break[]; tail: number; metrics: PageMetrics; arrive?: number } | undefined
             if (meta) {
-              // A measure while a page comes in or goes keeps its movement.
+              // A measure while a new page comes in keeps its arrival.
               const arrival = meta.arrive !== undefined ? { index: meta.arrive, p: 0 } : prev.arrival && prev.arrival.p < 1 ? prev.arrival : null
-              const departure = meta.leave ? { pages: meta.leave, p: 0 } : prev.departure && prev.departure.p < 1 ? prev.departure : null
-              return { breaks: meta.breaks, measured: meta.breaks.length, tail: meta.tail, decorations: build(next, meta.breaks, meta.tail, meta.metrics, arrival, departure), arrival, departure }
+              return { breaks: meta.breaks, measured: meta.breaks.length, tail: meta.tail, decorations: build(next, meta.breaks, meta.tail, meta.metrics, arrival), arrival }
             }
             if (!tr.docChanged) return prev
             // Keep the gaps near their place while the user types; the next measure fixes them. A gap
@@ -475,31 +391,23 @@ export const Pagination = Extension.create<PaginationOptions>({
             if (cur && same(cur, result)) {
               rounds = 0
               height = (view.dom as HTMLElement).offsetHeight
-              // An edit that changed no page: keep the cursor on screen (ProseMirror scrolls only when it must).
-              if (fromEdit && view.hasFocus()) view.dispatch(view.state.tr.scrollIntoView().setMeta('addToHistory', false).setMeta('allowDuringReview', true))
               return
             }
             // Never loop: a layout that does not settle stops after a few rounds.
             if (++rounds > 4) return
-            const motion = fromEdit && cur && !reducedMotion()
-            const arrive = motion && before ? newPage(cur.breaks, result.breaks, view.state.selection.head) : -1
-            // Pages that an edit removed (the text got shorter, or a page break went)
-            const leave = motion ? Math.max(0, cur.measured - result.breaks.length) : 0
-            // A page that still comes in or goes is done now.
-            if (arrive >= 0 || leave) settle(view)
-            if (leave && cur?.departure) cur.departure.p = 1
+            const arrive = fromEdit && cur && before && !reducedMotion() ? newPage(cur.breaks, result.breaks, view.state.selection.head) : -1
+            // A page that still comes in is done now.
+            if (arrive >= 0) settle(view)
             const tr = view.state.tr
-              .setMeta(paginationKey, { ...result, metrics: m, arrive: arrive >= 0 ? arrive : undefined, leave: leave || undefined })
+              .setMeta(paginationKey, { ...result, metrics: m, arrive: arrive >= 0 ? arrive : undefined })
               .setMeta('addToHistory', false)
               .setMeta('allowDuringReview', true)
-            // Typing moved the cursor onto another page: keep it on screen. A page that comes in or goes
-            // scrolls itself, in the same movement.
-            if (fromEdit && view.hasFocus() && arrive < 0 && !leave) tr.scrollIntoView()
+            // Typing moved the cursor onto another page: keep it on screen. A new page scrolls itself.
+            if (fromEdit && view.hasFocus() && arrive < 0) tr.scrollIntoView()
             view.dispatch(tr)
             height = (view.dom as HTMLElement).offsetHeight
-            const state = paginationKey.getState(view.state)
-            if (arrive >= 0 && state?.arrival && before) arriveAt(view, state.arrival, before.top)
-            if (leave && state?.departure) departAt(view, state.departure, m)
+            const arrival = paginationKey.getState(view.state)?.arrival
+            if (arrive >= 0 && arrival && before) arriveAt(view, arrival, before.top)
           }
           const schedule = (delay: number): void => {
             clearTimeout(timer)
@@ -538,9 +446,8 @@ export const Pagination = Extension.create<PaginationOptions>({
               }
             },
             destroy() {
-              const state = paginationKey.getState(view.state)
-              if (state?.arrival) state.arrival.p = 1
-              if (state?.departure) state.departure.p = 1
+              const arrival = paginationKey.getState(view.state)?.arrival
+              if (arrival) arrival.p = 1
               triggers.delete(view)
               clearTimeout(timer)
               if (frame) cancelAnimationFrame(frame)
@@ -578,7 +485,7 @@ export function newPage(old: Array<Pick<Break, 'pos' | 'inline'>>, next: Array<P
 /** Space under the cursor, in screen pixels, that a new page keeps on screen */
 const FOLLOW_ROOM = 90
 
-const veils = (view: EditorView): HTMLElement[] => Array.from((view.dom as HTMLElement).querySelectorAll<HTMLElement>('.pm-page-gap > .pm-page-veil'))
+const veils = (view: EditorView): HTMLElement[] => Array.from((view.dom as HTMLElement).querySelectorAll<HTMLElement>('.pm-page-veil'))
 
 /** End an arrival: the veil goes. */
 function settle(view: EditorView): void {
@@ -626,55 +533,6 @@ function arriveAt(view: EditorView, arrival: Arrival, from: number): void {
     if (desk && scroll) desk.scrollTop = Math.max(desk.scrollTop, top + scroll * arrival.p)
     if (t < 1) requestAnimationFrame(step)
     else settle(view)
-  }
-  requestAnimationFrame(step)
-}
-
-/** The pages that went are gone: their space is closed, and the widget leaves the decorations. */
-function departed(view: EditorView): void {
-  const departure = paginationKey.getState(view.state)?.departure
-  if (departure) departure.p = 1
-  if (view.isDestroyed) return
-  view.dispatch(view.state.tr.setMeta(paginationKey, { left: true }).setMeta('addToHistory', false).setMeta('allowDuringReview', true))
-}
-
-/**
- * Pages go, the reverse of a new page: after the edit, the space of the pages that went stays for a
- * moment after the end of the text (leaveElement). A veil in the color of the desk comes over their
- * sheets, so they go back into the desk; then the space closes, and what is under it (the next
- * chapter) slides up. The last page of the text keeps its size the whole time. The cursor stays where
- * the edit put it (Backspace on an empty page: the end of the text of the page before).
- */
-function departAt(view: EditorView, departure: Departure, m: PageMetrics): void {
-  const root = view.dom as HTMLElement
-  // Longer than a new page: the space of a whole page closes, and a long way needs more time to stay soft.
-  const duration = (parseFloat(getComputedStyle(root).getPropertyValue('--dur-page')) || 0) * 1.5
-  if (!duration) {
-    departed(view)
-    if (view.hasFocus()) view.dispatch(view.state.tr.scrollIntoView().setMeta('addToHistory', false).setMeta('allowDuringReview', true))
-    return
-  }
-  // The cursor can be off the screen now (Backspace on an empty page puts it at the end of the text
-  // of the page before): the desk scrolls to it in the same movement, not at once.
-  const desk = root.closest('.desk') as HTMLElement | null
-  let delta = 0
-  if (desk && view.hasFocus()) {
-    const caret = view.coordsAtPos(view.state.selection.head)
-    const box = desk.getBoundingClientRect()
-    const above = box.top + (parseFloat(getComputedStyle(desk).scrollPaddingTop) || 0)
-    if (caret.top < above) delta = caret.top - above
-    else if (caret.bottom > box.bottom - FOLLOW_ROOM) delta = caret.bottom - (box.bottom - FOLLOW_ROOM)
-  }
-  const top = desk?.scrollTop ?? 0
-  const start = performance.now()
-  const step = (now: number): void => {
-    if (view.isDestroyed || departure.p >= 1) return
-    // The time of the first frame can be a little before the start.
-    departure.p = Math.min(1, Math.max(0, (now - start) / duration))
-    for (const el of root.querySelectorAll<HTMLElement>('.pm-page-leave')) leaveAt(el, departure.p, m)
-    if (desk && delta) desk.scrollTop = top + delta * easeInOutSine(departure.p)
-    if (departure.p < 1) requestAnimationFrame(step)
-    else departed(view)
   }
   requestAnimationFrame(step)
 }

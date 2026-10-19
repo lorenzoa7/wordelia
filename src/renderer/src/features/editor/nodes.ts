@@ -171,8 +171,7 @@ export const PageBreak = Node.create({
         const end = at + near.nodeSize + (next?.isTextblock && next.content.size === 0 ? next.nodeSize : 0)
         tr.delete(at, end)
       }
-      // The pages keep the cursor on screen (pagination.ts): softly, when a page goes with the page break.
-      view.dispatch(tr)
+      view.dispatch(tr.scrollIntoView())
       return true
     }
     return {

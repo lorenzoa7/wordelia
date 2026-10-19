@@ -7,12 +7,23 @@ export default async function ({ page, shot, openBook }) {
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await openBook()
   await page.waitForTimeout(1200)
-  // Each new page that comes in (its gap has a veil that fades out, pagination.ts)
+  // Each new page that comes in (its gap has a veil that fades out) and each page that goes (its
+  // space stays for a moment after the text, pagination.ts)
   await page.evaluate(() => {
     window.__arrivals = 0
-    new MutationObserver((list) => {
-      for (const m of list) for (const n of m.addedNodes) if (n instanceof HTMLElement && n.querySelector?.('.pm-page-veil')) window.__arrivals++
-    }).observe(document.querySelector('.manuscript'), { childList: true, subtree: true })
+    window.__departures = 0
+    // ProseMirror may draw these widgets again: count only when one shows and none was there.
+    let arriving = false
+    let leaving = false
+    const root = document.querySelector('.manuscript')
+    new MutationObserver(() => {
+      const a = Boolean(root.querySelector('.pm-page-gap > .pm-page-veil'))
+      const l = Boolean(root.querySelector('.pm-page-leave'))
+      if (a && !arriving) window.__arrivals++
+      if (l && !leaving) window.__departures++
+      arriving = a
+      leaving = l
+    }).observe(root, { childList: true, subtree: true })
   })
   // Height of a page and of the space between two sheets, from the CSS of the desk
   const geo = await page.evaluate(() => {
@@ -21,6 +32,8 @@ export default async function ({ page, shot, openBook }) {
     return { pageH: n('--page-mt') + n('--page-content-h') + n('--page-mb'), gap: n('--page-gap') }
   })
   const check = async (label) => {
+    // A page that goes keeps its space for a moment: measure after that.
+    await page.waitForFunction(() => !document.querySelector('.pm-page-leave'), null, { timeout: 5000 })
     const r = await page.evaluate(() => {
       const sheet = document.querySelector('.page[data-chapter]')
       return { height: sheet.getBoundingClientRect().height, gaps: sheet.querySelectorAll('.pm-page-gap').length }
@@ -76,7 +89,7 @@ export default async function ({ page, shot, openBook }) {
   const where = () =>
     page.evaluate(() => {
       const ed = window.__wordelia.editor()
-      return { head: ed.state.selection.head, size: ed.state.doc.content.size, node: ed.state.selection.constructor.name, arrivals: window.__arrivals }
+      return { head: ed.state.selection.head, size: ed.state.doc.content.size, node: ed.state.selection.constructor.name, arrivals: window.__arrivals, departures: window.__departures }
     })
   const step = async (key, label, pages) => {
     await page.keyboard.press(key)
@@ -96,6 +109,7 @@ export default async function ({ page, shot, openBook }) {
   // Backspace on the empty new page: the page goes, and the cursor goes back to the end of the text.
   w = await step('Backspace', '2. Backspace on the empty page', base)
   if (w.head !== textEnd.head || w.size !== textEnd.size) throw new Error(`2. The cursor is at ${w.head} of ${w.size}, not at the end of the text (${textEnd.head} of ${textEnd.size})`)
+  if (w.departures !== textEnd.departures + 1) throw new Error('2. The page did not go out')
   // Ctrl+Enter again: the new page comes in again. Ctrl+Enter on the empty page: one more page.
   w = await step('Control+Enter', '3. Ctrl+Enter again', base + 1)
   if (w.arrivals !== textEnd.arrivals + 2) throw new Error('3. The new page did not come in the second time')
@@ -103,8 +117,10 @@ export default async function ({ page, shot, openBook }) {
   if (w.arrivals !== textEnd.arrivals + 3) throw new Error('4. The second new page did not come in')
   await shot('two-empty-pages')
   // Backspace two times: the two pages go, one at a time, and the cursor is at the end of the text.
-  await step('Backspace', '5. Backspace', base + 1)
+  w = await step('Backspace', '5. Backspace', base + 1)
+  if (w.departures !== textEnd.departures + 2) throw new Error('5. The page did not go out')
   w = await step('Backspace', '6. Backspace', base)
+  if (w.departures !== textEnd.departures + 3) throw new Error('6. The page did not go out')
   if (w.head !== textEnd.head || w.size !== textEnd.size) throw new Error(`6. The cursor is at ${w.head} of ${w.size}, not at the end of the text`)
 
   // The page break is saved in the Markdown.

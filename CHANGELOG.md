@@ -2,6 +2,11 @@
 
 Each version has its Windows installer in GitHub Releases. The release workflow copies the section of the version from this file to the release notes.
 
+## 0.8.5 (2026-10-19)
+
+### Changed
+- A page that you remove goes at once, like Google Docs. The movement of 0.8.3 and 0.8.4 is removed: at the end of the book, it moved the page above.
+
 ## 0.8.4 (2026-10-19)
 
 ### Changed

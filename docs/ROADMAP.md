@@ -5,7 +5,7 @@ This file is the source of truth for progress. Update it after each task. Mark a
 ## Current focus
 
 > **Milestone:** Version 0.8 — the fifth feedback of the author (9 items) is done
-> **Next task:** Collect feedback on 0.8.1. Then fix what the author finds.
+> **Next task:** Collect feedback on 0.8.2. Then fix what the author finds.
 > **Not verified:** Codex and the two API transports. The user has no Codex account, and no API keys are set. The scripted provider (`WORDELIA_MOCK_AI=1`) covers their UI flows.
 
 ## M0 — Foundation
@@ -281,6 +281,14 @@ This file is the source of truth for progress. Update it after each task. Mark a
 ### Version 0.8.1: the new page
 
 - [x] A new page opens in one smooth movement: the gap grows from nothing, and the screen scrolls with it on the same path, so the cursor stays still. Before, each key on the new page drew the gap again at its full height: the growth stopped after one key, and the page jumped. The progress is now in the plugin state (scenario `newpage` checks each frame: one word goes to the new page, no step of more than 30 % of the gap, the cursor does not go up)
+
+### Version 0.8.2: page breaks like Google Docs
+
+- [x] Backspace at the start of a new page removes the page break at once (no selection). On an empty page, the empty paragraph goes too, and the cursor goes back to the end of the text of the page before. Delete at the end of the page before does the same
+- [x] Ctrl+Enter on an empty page makes one more page; two page breaks in a row are removed
+- [x] A new page comes in every time (also a second page break on the same place), and the page before it never changes its size: a veil over the new sheet fades out, and the desk scrolls with it
+- [x] A removed page break no longer leaves a page that is too tall: a gap whose place is deleted leaves the list of breaks too
+- Scenarios: `ctrlenter` (the author's steps: Ctrl+Enter, Backspace, Ctrl+Enter two times, Backspace two times; pages, cursor and new pages after each step), `newpage` (each frame: the gap keeps its height, the veil only fades, the desk never scrolls back); unit tests for `newPage`
 
 ## Tests and CI
 

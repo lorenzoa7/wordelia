@@ -2,6 +2,18 @@
 
 Each version has its Windows installer in GitHub Releases. The release workflow copies the section of the version from this file to the release notes.
 
+## 0.8.2 (2026-10-19)
+
+### Changed
+- A new page comes in like a new sheet on the desk: the page before it keeps its size, the new sheet fades in, and the screen scrolls to it. The page no longer stretches.
+- Backspace at the start of a new page removes the page break at once, like Google Docs. On an empty page, the cursor goes back to the end of the text of the page before.
+
+### Fixed
+- Ctrl+Enter on an empty page makes one more page.
+- A second page break shows the new page coming in again.
+- After you remove a page break, every page keeps the same size.
+- Backspace always removes a page break; it no longer selects it and then shows it again.
+
 ## 0.8.1 (2026-10-18)
 
 ### Fixed

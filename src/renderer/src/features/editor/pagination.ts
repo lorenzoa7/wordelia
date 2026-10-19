@@ -126,10 +126,11 @@ function pageNumber(top: number, m: PageMetrics): HTMLElement {
   return n
 }
 
-/** The part of a departure in which the sheets go into the desk; then the space closes. */
+/** The part of a departure in which the sheets go into the desk. The space closes all the time. */
 const LEAVE_FADE = 0.5
 
-const easeInOut = (x: number): number => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2)
+const easeOut = (x: number): number => 1 - Math.pow(1 - x, 3)
+const easeInOutSine = (x: number): number => (1 - Math.cos(Math.PI * x)) / 2
 
 /**
  * The pages that an edit removed, after the end of the text: they keep their place for a moment, so
@@ -165,22 +166,25 @@ function leaveElement(pages: number, m: PageMetrics, p: number): HTMLElement {
 }
 
 /**
- * A departure at a progress. First the veil comes over the sheets that went (they go into the
- * desk); then the space closes. The last page of the text keeps its bottom margin and its size.
+ * A departure at a progress. The veil comes over the sheets that went (they go into the desk), and
+ * at the same time their space closes, from the first frame to the last: slowly at the start and at
+ * the end, so what is under it (the next chapter, the button under the book) moves on one smooth
+ * path, with no wait and no jump. The last page of the text keeps its bottom margin the whole time:
+ * first the start of the space, then the bottom padding of the chapter sheet under it.
  */
 function leaveAt(el: HTMLElement, p: number, m: PageMetrics): void {
-  const fade = easeInOut(Math.min(1, p / LEAVE_FADE))
-  const close = easeInOut(Math.max(0, (p - LEAVE_FADE) / (1 - LEAVE_FADE)))
-  const full = Number(el.dataset.height)
+  const fade = easeOut(Math.min(1, p / LEAVE_FADE))
+  const close = easeInOutSine(p)
+  const height = Number(el.dataset.height) * (1 - close)
   const margin = Number(el.dataset.margin)
-  const height = margin + (full - margin) * (1 - close)
   el.style.height = zoomed(height, m)
   const veil = el.querySelector<HTMLElement>('.pm-page-veil')
   if (!veil) return
-  // Down to the bottom padding of the chapter sheet and its shadow, but not as far as the next sheet.
-  const top = Math.min(margin + VEIL_FROM, height)
+  // From under the bottom margin to the bottom padding of the chapter sheet and its shadow (not as
+  // far as the next sheet). The shadow of the last page shows again while the space closes.
+  const top = margin + VEIL_FROM * (1 - close)
   veil.style.top = zoomed(top, m)
-  veil.style.height = zoomed(height + margin + Number(el.dataset.under) - top, m)
+  veil.style.height = zoomed(Math.max(0, height + margin + Number(el.dataset.under) * (1 - close) - top), m)
   veil.style.opacity = String(fade)
 }
 
@@ -471,6 +475,8 @@ export const Pagination = Extension.create<PaginationOptions>({
             if (cur && same(cur, result)) {
               rounds = 0
               height = (view.dom as HTMLElement).offsetHeight
+              // An edit that changed no page: keep the cursor on screen (ProseMirror scrolls only when it must).
+              if (fromEdit && view.hasFocus()) view.dispatch(view.state.tr.scrollIntoView().setMeta('addToHistory', false).setMeta('allowDuringReview', true))
               return
             }
             // Never loop: a layout that does not settle stops after a few rounds.
@@ -486,8 +492,9 @@ export const Pagination = Extension.create<PaginationOptions>({
               .setMeta(paginationKey, { ...result, metrics: m, arrive: arrive >= 0 ? arrive : undefined, leave: leave || undefined })
               .setMeta('addToHistory', false)
               .setMeta('allowDuringReview', true)
-            // Typing moved the cursor onto another page: keep it on screen. A new page scrolls itself.
-            if (fromEdit && view.hasFocus() && arrive < 0) tr.scrollIntoView()
+            // Typing moved the cursor onto another page: keep it on screen. A page that comes in or goes
+            // scrolls itself, in the same movement.
+            if (fromEdit && view.hasFocus() && arrive < 0 && !leave) tr.scrollIntoView()
             view.dispatch(tr)
             height = (view.dom as HTMLElement).offsetHeight
             const state = paginationKey.getState(view.state)
@@ -640,15 +647,32 @@ function departed(view: EditorView): void {
  */
 function departAt(view: EditorView, departure: Departure, m: PageMetrics): void {
   const root = view.dom as HTMLElement
-  // A little longer than a new page: two movements, one after the other.
-  const duration = (parseFloat(getComputedStyle(root).getPropertyValue('--dur-page')) || 0) * 1.2
-  if (!duration) return departed(view)
+  // Longer than a new page: the space of a whole page closes, and a long way needs more time to stay soft.
+  const duration = (parseFloat(getComputedStyle(root).getPropertyValue('--dur-page')) || 0) * 1.5
+  if (!duration) {
+    departed(view)
+    if (view.hasFocus()) view.dispatch(view.state.tr.scrollIntoView().setMeta('addToHistory', false).setMeta('allowDuringReview', true))
+    return
+  }
+  // The cursor can be off the screen now (Backspace on an empty page puts it at the end of the text
+  // of the page before): the desk scrolls to it in the same movement, not at once.
+  const desk = root.closest('.desk') as HTMLElement | null
+  let delta = 0
+  if (desk && view.hasFocus()) {
+    const caret = view.coordsAtPos(view.state.selection.head)
+    const box = desk.getBoundingClientRect()
+    const above = box.top + (parseFloat(getComputedStyle(desk).scrollPaddingTop) || 0)
+    if (caret.top < above) delta = caret.top - above
+    else if (caret.bottom > box.bottom - FOLLOW_ROOM) delta = caret.bottom - (box.bottom - FOLLOW_ROOM)
+  }
+  const top = desk?.scrollTop ?? 0
   const start = performance.now()
   const step = (now: number): void => {
     if (view.isDestroyed || departure.p >= 1) return
     // The time of the first frame can be a little before the start.
     departure.p = Math.min(1, Math.max(0, (now - start) / duration))
     for (const el of root.querySelectorAll<HTMLElement>('.pm-page-leave')) leaveAt(el, departure.p, m)
+    if (desk && delta) desk.scrollTop = top + delta * easeInOutSine(departure.p)
     if (departure.p < 1) requestAnimationFrame(step)
     else departed(view)
   }

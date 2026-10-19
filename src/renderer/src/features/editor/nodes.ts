@@ -1,7 +1,7 @@
 // Custom nodes and attributes of the book schema.
 
 import { Extension, InputRule, Node, mergeAttributes } from '@tiptap/core'
-import { NodeSelection, TextSelection } from '@tiptap/pm/state'
+import { Plugin, PluginKey, Selection, TextSelection } from '@tiptap/pm/state'
 import { getT } from '@/lib/i18n'
 
 declare module '@tiptap/core' {
@@ -77,14 +77,15 @@ export const SceneBreak = Node.create({
 
 /**
  * A page break (Ctrl+Enter), like a word processor: the text after it starts on a new page.
- * Stored as `<!-- page break -->` on its own line. It has no height; the page gap shows it. When it is
- * selected, a mark "Page break" shows where it is (editor.css).
+ * Stored as `<!-- page break -->` on its own line. It has no height and no mark of its own: the page
+ * gap shows it. It is never selected; Backspace at the start of the new page, or Delete at the end
+ * of the page before it, removes it at once.
  */
 export const PageBreak = Node.create({
   name: 'pageBreak',
   group: 'block',
   atom: true,
-  selectable: true,
+  selectable: false,
   draggable: false,
   // Before the hard break of StarterKit, which also listens to Mod-Enter.
   priority: 1000,
@@ -110,10 +111,14 @@ export const PageBreak = Node.create({
           if (!dispatch) return true
           let caret: number
           if ($pos.parentOffset === 0) {
-            // At the start of a paragraph: the whole paragraph goes to the next page.
+            // At the start of a paragraph: the whole paragraph goes to the next page. When nothing is
+            // before it on its page (the start of the chapter, or a page break: an empty page), an
+            // empty paragraph keeps that page, so each Ctrl+Enter makes one more page.
             const before = $pos.before()
-            tr = tr.insert(before, type.create())
-            caret = before + 2
+            const index = $pos.index(0)
+            const empty = index === 0 || tr.doc.child(index - 1).type === type
+            tr = tr.insert(before, empty ? [para.create(), type.create()] : type.create())
+            caret = before + (empty ? 4 : 2)
           } else if ($pos.parentOffset === $pos.parent.content.size) {
             // At the end: a new empty paragraph on the next page.
             const after = $pos.after()
@@ -135,32 +140,70 @@ export const PageBreak = Node.create({
 
   addKeyboardShortcuts() {
     /**
-     * Backspace at the start of the block after a page break, or Delete at the end of the block before
-     * it: the first press selects the page break (its mark shows), the second press removes it.
+     * Like Google Docs. Backspace at the start of the page after a page break removes the page break.
+     * When that page has only an empty paragraph, the paragraph goes too, and the cursor goes back to
+     * the end of the text of the page before. Delete at the end of the page before a page break removes
+     * the page break, and an empty paragraph after it.
      */
-    const removeNext = (dir: -1 | 1): boolean => {
+    const removeBreak = (dir: -1 | 1): boolean => {
       const { state, view } = this.editor
-      if (state.selection instanceof NodeSelection && state.selection.node.type.name === this.name) {
-        view.dispatch(state.tr.deleteSelection().scrollIntoView())
-        return true
-      }
       const { $from, empty } = state.selection
-      if (!empty || $from.depth !== 1) return false
+      if (!empty || $from.depth !== 1 || !$from.parent.isTextblock) return false
       const atEdge = dir < 0 ? $from.parentOffset === 0 : $from.parentOffset === $from.parent.content.size
       if (!atEdge) return false
-      const index = $from.index(0) + dir
-      if (index < 0 || index >= state.doc.childCount) return false
-      const node = state.doc.child(index)
-      if (node.type.name !== this.name) return false
-      const pos = dir < 0 ? $from.before() - node.nodeSize : $from.after()
-      view.dispatch(state.tr.setSelection(NodeSelection.create(state.doc, pos)).scrollIntoView())
+      const index = $from.index(0)
+      const near = state.doc.maybeChild(index + dir)
+      if (near?.type.name !== this.name) return false
+      const tr = state.tr
+      if (dir < 0) {
+        const at = $from.before() - near.nodeSize
+        // The first block of the chapter stays, so the chapter is never empty.
+        if ($from.parent.content.size === 0 && at > 0) {
+          tr.delete(at, $from.after())
+          const back = Selection.findFrom(tr.doc.resolve(at), -1, true)
+          if (back) tr.setSelection(back)
+        } else {
+          tr.delete(at, at + near.nodeSize)
+        }
+      } else {
+        const at = $from.after()
+        const next = state.doc.maybeChild(index + 2)
+        const end = at + near.nodeSize + (next?.isTextblock && next.content.size === 0 ? next.nodeSize : 0)
+        tr.delete(at, end)
+      }
+      view.dispatch(tr.scrollIntoView())
       return true
     }
     return {
       'Mod-Enter': () => this.editor.commands.insertPageBreak(),
-      Backspace: () => removeNext(-1),
-      Delete: () => removeNext(1)
+      Backspace: () => removeBreak(-1),
+      Delete: () => removeBreak(1)
     }
+  },
+
+  addProseMirrorPlugins() {
+    const name = this.name
+    return [
+      new Plugin({
+        key: new PluginKey('pageBreakTidy'),
+        // Two page breaks in a row make one page, and a page break at the end of the chapter makes
+        // none: remove them, so each page break is one page that Backspace removes.
+        appendTransaction: (trs, _old, state) => {
+          if (!trs.some((t) => t.docChanged)) return null
+          const extra: number[] = []
+          let after = false
+          state.doc.forEach((node, offset, i) => {
+            const isBreak = node.type.name === name
+            if (isBreak && (after || i === state.doc.childCount - 1)) extra.push(offset)
+            after = isBreak
+          })
+          if (!extra.length) return null
+          const tr = state.tr.setMeta('allowDuringReview', true)
+          for (const at of extra.reverse()) tr.delete(at, at + 1)
+          return tr
+        }
+      })
+    ]
   }
 })
 

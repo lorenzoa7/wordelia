@@ -1,8 +1,19 @@
 // Ctrl+Enter makes a page break: the text after the cursor starts on a new page, and the cursor
-// goes there. Shift+Enter line breaks count as lines. Every page keeps the same height.
+// goes there. Shift+Enter line breaks count as lines. Every page keeps the same height. Backspace
+// and Ctrl+Enter work like Google Docs: the author's steps at the end of a chapter are below.
 export default async function ({ page, shot, openBook }) {
+  // The machine may ask for reduced motion (CI servers do): then no new page comes in, and this
+  // scenario counts them.
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
   await openBook()
   await page.waitForTimeout(1200)
+  // Each new page that comes in (its gap has a veil that fades out, pagination.ts)
+  await page.evaluate(() => {
+    window.__arrivals = 0
+    new MutationObserver((list) => {
+      for (const m of list) for (const n of m.addedNodes) if (n instanceof HTMLElement && n.querySelector?.('.pm-page-veil')) window.__arrivals++
+    }).observe(document.querySelector('.manuscript'), { childList: true, subtree: true })
+  })
   // Height of a page and of the space between two sheets, from the CSS of the desk
   const geo = await page.evaluate(() => {
     const s = getComputedStyle(document.querySelector('.desk-inner'))
@@ -53,22 +64,50 @@ export default async function ({ page, shot, openBook }) {
   if (afterLines <= afterBreak) throw new Error('Line breaks did not make new pages')
   await shot('line-breaks')
 
-  // The page break is saved in the Markdown, and Backspace at the start of the new page removes it.
+  // Backspace at the start of the new page removes the page break at once: nothing is selected.
   for (let i = 0; i < 40; i++) await page.keyboard.press('Backspace')
-  // The first Backspace at the start of the new page selects the page break and shows its mark.
   await page.keyboard.press('Backspace')
-  await page.waitForTimeout(300)
-  const marked = await page.evaluate(() => {
-    const el = document.querySelector('.page-break.ProseMirror-selectednode')
-    return el ? getComputedStyle(el, '::after').content : null
-  })
-  console.log('page break mark:', marked)
-  if (!marked || marked === 'none') throw new Error('The first Backspace did not show the page break as selected')
-  await shot('page-break-selected')
-  await page.keyboard.press('Backspace')
-  await page.waitForTimeout(900)
+  await page.waitForTimeout(600)
+  if (await page.evaluate(() => document.querySelector('.ProseMirror-selectednode'))) throw new Error('Backspace selected the page break')
   const end = await check('after Backspace')
   if (end !== before) throw new Error('Backspace did not remove the page break')
+
+  // The author's steps at the end of the chapter.
+  const where = () =>
+    page.evaluate(() => {
+      const ed = window.__wordelia.editor()
+      return { head: ed.state.selection.head, size: ed.state.doc.content.size, node: ed.state.selection.constructor.name, arrivals: window.__arrivals }
+    })
+  const step = async (key, label, pages) => {
+    await page.keyboard.press(key)
+    await page.waitForTimeout(600)
+    const n = await check(label)
+    const w = await where()
+    console.log('  ', JSON.stringify(w))
+    if (n !== pages) throw new Error(`${label}: ${n} pages, expected ${pages}`)
+    return w
+  }
+  await page.keyboard.press('Control+End')
+  await page.waitForTimeout(300)
+  const textEnd = await where()
+  const base = await check('end of the chapter')
+  let w = await step('Control+Enter', '1. Ctrl+Enter', base + 1)
+  if (w.arrivals !== textEnd.arrivals + 1) throw new Error('1. The new page did not come in')
+  // Backspace on the empty new page: the page goes, and the cursor goes back to the end of the text.
+  w = await step('Backspace', '2. Backspace on the empty page', base)
+  if (w.head !== textEnd.head || w.size !== textEnd.size) throw new Error(`2. The cursor is at ${w.head} of ${w.size}, not at the end of the text (${textEnd.head} of ${textEnd.size})`)
+  // Ctrl+Enter again: the new page comes in again. Ctrl+Enter on the empty page: one more page.
+  w = await step('Control+Enter', '3. Ctrl+Enter again', base + 1)
+  if (w.arrivals !== textEnd.arrivals + 2) throw new Error('3. The new page did not come in the second time')
+  w = await step('Control+Enter', '4. Ctrl+Enter on the empty page', base + 2)
+  if (w.arrivals !== textEnd.arrivals + 3) throw new Error('4. The second new page did not come in')
+  await shot('two-empty-pages')
+  // Backspace two times: the two pages go, one at a time, and the cursor is at the end of the text.
+  await step('Backspace', '5. Backspace', base + 1)
+  w = await step('Backspace', '6. Backspace', base)
+  if (w.head !== textEnd.head || w.size !== textEnd.size) throw new Error(`6. The cursor is at ${w.head} of ${w.size}, not at the end of the text`)
+
+  // The page break is saved in the Markdown.
   await page.keyboard.press('Control+Enter')
   await page.waitForTimeout(800)
   const md = await page.evaluate(() => window.__wordelia.book.getState().chapters[0].body)

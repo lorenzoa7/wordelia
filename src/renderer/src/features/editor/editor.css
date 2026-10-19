@@ -854,34 +854,11 @@
   background: var(--pen-wash);
 }
 
-/* A page break (Ctrl+Enter) has no height: the page gap after it shows the new page. Selected
-   (the first Backspace on the next page), it shows a mark, so the next Backspace clearly removes it. */
+/* A page break (Ctrl+Enter) has no height and no mark: the page gap after it shows the new page. */
 .page-break {
   position: relative;
   height: 0;
   margin: 0;
-}
-.page-break.ProseMirror-selectednode::after {
-  content: attr(data-label);
-  position: absolute;
-  top: 6px;
-  left: 0;
-  right: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 24px;
-  border: 1.5px dashed var(--ribbon);
-  border-radius: var(--radius-pill);
-  background: var(--ribbon-wash);
-  color: var(--ribbon);
-  font-family: var(--font-ui);
-  font-size: var(--text-xs);
-  font-weight: 700;
-  letter-spacing: var(--tracking-caps);
-  text-indent: 0;
-  text-transform: uppercase;
-  pointer-events: none;
 }
 /* While the pages are measured, the gaps take no room: the text flows free (pagination.ts).
    Not display: none, which would start the grow animation of a new page again at each measure. */
@@ -890,12 +867,16 @@
   height: 0 !important;
 }
 
-/* A new page opens: pagination.ts grows its gap from nothing, frame by frame. The gap shows only
-   what fits in its height (the end of the sheet, then the band, then the top of the next sheet), so
-   the band never covers the words that slide down. The band is wider than the text: clip only above
-   and below. */
-.pm-page-gap.is-growing {
-  clip-path: inset(0 calc(-1 * var(--page-mr)) 0 calc(-1 * var(--page-ml)));
+/* A new page comes in (pagination.ts): the page before it has its full size at once, and a veil in
+   the color of the desk covers the band and the new sheet, then fades out, so the new sheet comes
+   out of the desk. The veil is wider and longer than the sheet, to cover its shadow too. */
+.pm-page-veil {
+  position: absolute;
+  z-index: 1;
+  left: calc(-1 * var(--page-ml) - 32px);
+  right: calc(-1 * var(--page-mr) - 32px);
+  background: var(--desk);
+  pointer-events: none;
 }
 
 /* The zoom of the page in the toolbar: a fixed width, so the toolbar does not move */

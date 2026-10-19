@@ -31,19 +31,16 @@ interface Break {
   inline: boolean
   /** Empty space at the bottom of the page before the gap */
   rest: number
+  /** A page break (Ctrl+Enter) starts the page after the gap */
+  forced: boolean
 }
 
-/** A new page that opens: its gap grows from nothing to its full height (growPages). */
-interface Growth {
-  /** Breaks from this index on are the new pages */
-  from: number
-  /** Progress, 0 to 1, after the easing. 1 when the growth is done or stopped. */
+/** A new page that comes in (arrive): a veil over it fades out. */
+interface Arrival {
+  /** The break before the new page */
+  index: number
+  /** Progress, 0 to 1, after the easing. 1 when it is done or stopped. */
   p: number
-  /**
-   * The line height of the text. A gap inside a paragraph has a line of its own, and that line is
-   * never lower than one line of text: the gap starts at that height, so it pushes the words at once.
-   */
-  floor: number
 }
 
 interface PageState {
@@ -51,7 +48,7 @@ interface PageState {
   /** Empty space at the end of the last page */
   tail: number
   decorations: DecorationSet
-  grow: Growth | null
+  arrival: Arrival | null
 }
 
 export const paginationKey = new PluginKey<PageState>('pagination')
@@ -63,23 +60,36 @@ function zoomed(px: number, m: PageMetrics): string {
   return `calc(${(px / m.zoom).toFixed(3)}px * var(--page-zoom))`
 }
 
-/** `grow`: the growth of a new page that opens now, or null for a page like the others. */
-function gapElement(b: Break, m: PageMetrics, index: number, grow: Growth | null): HTMLElement {
+/** The band keeps its top shadow (the edge of the sheet before it) under the veil. */
+const VEIL_FROM = 8
+
+/**
+ * The gap between two pages. Its height never changes: every page has the size of the book page.
+ * `arriving`: the progress of a new page that comes in now, or null for a page like the others.
+ */
+function gapElement(b: Break, m: PageMetrics, index: number, arriving: number | null): HTMLElement {
   const el = document.createElement(b.inline ? 'span' : 'div')
-  el.className = `pm-page-gap${b.inline ? ' is-inline' : ''}${grow !== null ? ' is-growing' : ''}`
+  el.className = `pm-page-gap${b.inline ? ' is-inline' : ''}`
   el.setAttribute('contenteditable', 'false')
   el.setAttribute('aria-hidden', 'true')
   el.dataset.page = String(index + 1)
-  const height = b.rest + m.marginBottom + m.gap + m.marginTop
-  el.dataset.height = String(height)
-  el.dataset.start = String(b.inline && grow ? Math.min(grow.floor, height) : 0)
-  el.style.height = zoomed(grow ? heightAt(el, grow.p) : height, m)
+  el.style.height = zoomed(b.rest + m.marginBottom + m.gap + m.marginTop, m)
   el.appendChild(pageNumber(b.rest + m.marginBottom / 2, m))
   const band = document.createElement('span')
   band.className = 'pm-page-band'
   band.style.top = zoomed(b.rest + m.marginBottom, m)
   band.style.height = zoomed(m.gap, m)
   el.appendChild(band)
+  if (arriving !== null) {
+    // Over the band and the whole new sheet, and a little under it (its shadow), but not as far as
+    // the next sheet.
+    const veil = document.createElement('span')
+    veil.className = 'pm-page-veil'
+    veil.style.top = zoomed(b.rest + m.marginBottom + VEIL_FROM, m)
+    veil.style.height = zoomed(m.gap - VEIL_FROM + m.marginTop + m.contentHeight + m.marginBottom + m.gap * 0.75, m)
+    veil.style.opacity = String(1 - arriving)
+    el.appendChild(veil)
+  }
   return el
 }
 
@@ -106,13 +116,13 @@ function pageNumber(top: number, m: PageMetrics): HTMLElement {
 }
 
 /**
- * `grow`: the new pages that open now. ProseMirror draws a gap again when the author types in its
- * paragraph (each key on the new page): the new element starts at the progress of now, so the
- * growth goes on without a jump.
+ * `arrival`: the new page that comes in now. ProseMirror draws a gap again when the author types in
+ * its paragraph (each key on the new page): the new element starts at the progress of now, so the
+ * page comes in without a jump.
  */
-function build(state: EditorState, breaks: Break[], tail: number, m: PageMetrics, grow: Growth | null): DecorationSet {
+function build(state: EditorState, breaks: Break[], tail: number, m: PageMetrics, arrival: Arrival | null): DecorationSet {
   const decos = breaks.map((b, i) => {
-    const draw = (): HTMLElement => gapElement(b, m, i, grow && i >= grow.from && grow.p < 1 ? grow : null)
+    const draw = (): HTMLElement => gapElement(b, m, i, arrival && i === arrival.index && arrival.p < 1 ? arrival.p : null)
     return Decoration.widget(b.pos, draw, {
       side: -1,
       ignoreSelection: true,
@@ -252,7 +262,7 @@ function measureFlow(view: EditorView, root: HTMLElement, m: PageMetrics, firstO
         if (!inline) pos = $p.before($p.depth)
       }
     }
-    return { pos, inline, rest }
+    return { pos, inline, rest, forced }
   })
   return { breaks, tail }
 }
@@ -333,22 +343,30 @@ export const Pagination = Extension.create<PaginationOptions>({
       new Plugin<PageState>({
         key: paginationKey,
         state: {
-          init: () => ({ breaks: [], tail: 0, decorations: DecorationSet.empty, grow: null }),
+          init: () => ({ breaks: [], tail: 0, decorations: DecorationSet.empty, arrival: null }),
           apply(tr, prev, _old, next) {
-            const meta = tr.getMeta(paginationKey) as { breaks: Break[]; tail: number; metrics: PageMetrics; animate?: boolean; floor?: number } | undefined
+            const meta = tr.getMeta(paginationKey) as { breaks: Break[]; tail: number; metrics: PageMetrics; arrive?: number } | undefined
             if (meta) {
-              // A measure while a new page opens keeps its growth.
-              const grow = meta.animate ? { from: prev.breaks.length, p: 0, floor: meta.floor ?? 0 } : prev.grow && prev.grow.p < 1 ? prev.grow : null
-              return { breaks: meta.breaks, tail: meta.tail, decorations: build(next, meta.breaks, meta.tail, meta.metrics, grow), grow }
+              // A measure while a new page comes in keeps its arrival.
+              const arrival = meta.arrive !== undefined ? { index: meta.arrive, p: 0 } : prev.arrival && prev.arrival.p < 1 ? prev.arrival : null
+              return { breaks: meta.breaks, tail: meta.tail, decorations: build(next, meta.breaks, meta.tail, meta.metrics, arrival), arrival }
             }
             if (!tr.docChanged) return prev
-            // Keep the gaps near their place while the user types; the next measure fixes them.
-            const breaks = prev.breaks.map((b) => ({ ...b, pos: tr.mapping.map(b.pos, -1) }))
-            return { breaks, tail: prev.tail, decorations: prev.decorations.map(tr.mapping, tr.doc), grow: prev.grow }
+            // Keep the gaps near their place while the user types; the next measure fixes them. A gap
+            // whose place is deleted goes, like its widget: the list and the gaps on screen stay the
+            // same, so the next measure sees the change.
+            const breaks: Break[] = []
+            for (const b of prev.breaks) {
+              const r = tr.mapping.mapResult(b.pos, -1)
+              if (!r.deleted) breaks.push({ ...b, pos: r.pos })
+            }
+            return { breaks, tail: prev.tail, decorations: prev.decorations.map(tr.mapping, tr.doc), arrival: prev.arrival }
           }
         },
         props: {
-          decorations: (state) => paginationKey.getState(state)?.decorations
+          decorations: (state) => paginationKey.getState(state)?.decorations,
+          // While a new page comes in, the desk scrolls to it (arrive): ProseMirror does not scroll too.
+          handleScrollToSelection: (view) => (paginationKey.getState(view.state)?.arrival?.p ?? 1) < 1
         },
         view(view) {
           let frame = 0
@@ -361,6 +379,7 @@ export const Pagination = Extension.create<PaginationOptions>({
             frame = 0
             const m = opts.metrics()
             if (!m || view.isDestroyed) return
+            const before = view.hasFocus() ? view.coordsAtPos(view.state.selection.head) : null
             const result = measure(view, m, opts.firstPageOffset())
             if (!result) return
             opts.onCount?.(result.breaks.length + 1)
@@ -372,20 +391,19 @@ export const Pagination = Extension.create<PaginationOptions>({
             }
             // Never loop: a layout that does not settle stops after a few rounds.
             if (++rounds > 4) return
-            const added = fromEdit && cur ? result.breaks.length - cur.breaks.length : 0
-            const animate = added > 0 && !reducedMotion()
-            // A page that still opens ends now: the new growth starts from the pages as they are.
-            if (animate) settle(view, m)
+            const arrive = fromEdit && cur && before && !reducedMotion() ? newPage(cur.breaks, result.breaks, view.state.selection.head) : -1
+            // A page that still comes in is done now.
+            if (arrive >= 0) settle(view)
             const tr = view.state.tr
-              .setMeta(paginationKey, { ...result, metrics: m, animate, floor: parseFloat(getComputedStyle(view.dom as HTMLElement).lineHeight) || 0 })
+              .setMeta(paginationKey, { ...result, metrics: m, arrive: arrive >= 0 ? arrive : undefined })
               .setMeta('addToHistory', false)
               .setMeta('allowDuringReview', true)
-            // Typing moved the cursor onto a new page: keep it on screen.
-            if (fromEdit && view.hasFocus()) tr.scrollIntoView()
+            // Typing moved the cursor onto another page: keep it on screen. A new page scrolls itself.
+            if (fromEdit && view.hasFocus() && arrive < 0) tr.scrollIntoView()
             view.dispatch(tr)
             height = (view.dom as HTMLElement).offsetHeight
-            const grow = paginationKey.getState(view.state)?.grow
-            if (animate && grow) growPages(view, grow, m)
+            const arrival = paginationKey.getState(view.state)?.arrival
+            if (arrive >= 0 && arrival && before) arriveAt(view, arrival, before.top)
           }
           const schedule = (delay: number): void => {
             clearTimeout(timer)
@@ -408,9 +426,12 @@ export const Pagination = Extension.create<PaginationOptions>({
               // Our own gap updates do not change the text.
               if (v.state.doc === prevState.doc) return
               rounds = 0
-              // A new line (Enter, or a word that wraps): measure before the browser paints, so a
-              // new page shows at once, like a word processor. Other typing: after a short pause.
-              if ((v.dom as HTMLElement).offsetHeight !== height && !queued) {
+              // A new line (Enter, or a word that wraps) or a new or removed block (a page break):
+              // measure before the browser paints, so a new page shows at once, like a word
+              // processor. Other typing: after a short pause.
+              const lines = (v.dom as HTMLElement).offsetHeight !== height
+              const blocks = v.state.doc.childCount !== prevState.doc.childCount
+              if ((lines || blocks) && !queued) {
                 queued = true
                 queueMicrotask(() => {
                   queued = false
@@ -421,8 +442,8 @@ export const Pagination = Extension.create<PaginationOptions>({
               }
             },
             destroy() {
-              const grow = paginationKey.getState(view.state)?.grow
-              if (grow) grow.p = 1
+              const arrival = paginationKey.getState(view.state)?.arrival
+              if (arrival) arrival.p = 1
               triggers.delete(view)
               clearTimeout(timer)
               if (frame) cancelAnimationFrame(frame)
@@ -440,66 +461,74 @@ function reducedMotion(): boolean {
   return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 }
 
+/**
+ * The break before a page that an edit just made, or -1. It is the last break before the cursor,
+ * and it is new: a page break (Ctrl+Enter), or a new last page (the text grew past the end). A line
+ * that goes to a page that was there before is not a new page.
+ */
+export function newPage(old: Array<Pick<Break, 'pos' | 'inline'>>, next: Array<Pick<Break, 'pos' | 'inline' | 'forced'>>, head: number): number {
+  let index = -1
+  next.forEach((b, i) => {
+    if (b.pos <= head) index = i
+  })
+  if (index < 0) return -1
+  const b = next[index]
+  if (old.some((o) => o.pos === b.pos && o.inline === b.inline)) return -1
+  const atEnd = index === next.length - 1 && next.length > old.length
+  return b.forced || atEnd ? index : -1
+}
+
 /** Space under the cursor, in screen pixels, that a new page keeps on screen */
 const FOLLOW_ROOM = 90
 
-/** The height of a growing gap at a progress: from its start height to its full height */
-function heightAt(el: HTMLElement, p: number): number {
-  const start = Number(el.dataset.start) || 0
-  return start + (Number(el.dataset.height) - start) * p
-}
+const veils = (view: EditorView): HTMLElement[] => Array.from((view.dom as HTMLElement).querySelectorAll<HTMLElement>('.pm-page-veil'))
 
-const growing = (view: EditorView): HTMLElement[] => Array.from((view.dom as HTMLElement).querySelectorAll<HTMLElement>('.pm-page-gap.is-growing'))
-
-/** Stop a growth: its pages get their full height at once. */
-function settle(view: EditorView, m: PageMetrics): void {
-  const grow = paginationKey.getState(view.state)?.grow
-  if (grow) grow.p = 1
-  for (const el of growing(view)) {
-    el.classList.remove('is-growing')
-    el.style.height = zoomed(Number(el.dataset.height), m)
-  }
+/** End an arrival: the veil goes. */
+function settle(view: EditorView): void {
+  const arrival = paginationKey.getState(view.state)?.arrival
+  if (arrival) arrival.p = 1
+  for (const el of veils(view)) el.remove()
 }
 
 /**
- * A new page opens like a sheet that slides in: its gap grows from nothing to its full height, so
- * the words that go to the new page slide down to it without a jump. One frame loop sets the height
- * of the gap and, when the cursor is under the gap and would end low on the screen, the scroll of
- * the desk, with the same progress: the cursor moves on one smooth path. The progress is in the
- * plugin state, so a gap that ProseMirror draws again starts where the growth is now.
+ * A new page comes in, like a new sheet on the desk. The page before it has its full size at once
+ * (every page has the size of the book page, also while a page comes in). A veil in the color of the
+ * desk covers the new sheet and fades out, so the sheet comes out of the desk with the words that
+ * go to it. When the cursor is now low on the screen or under it, the desk scrolls to it in the same
+ * movement. One frame loop sets the veil and the scroll; the progress is in the plugin state, so a
+ * gap that ProseMirror draws again (each key on the new page) starts where the arrival is now.
+ * `from`: the top of the cursor on screen before the new page.
  */
-function growPages(view: EditorView, grow: Growth, m: PageMetrics): void {
+function arriveAt(view: EditorView, arrival: Arrival, from: number): void {
   const root = view.dom as HTMLElement
   const desk = root.closest('.desk') as HTMLElement | null
   const duration = parseFloat(getComputedStyle(root).getPropertyValue('--dur-page')) || 0
-  if (!duration) return settle(view, m)
-  // How far the desk scrolls during the growth: the cursor goes down by the gaps above it.
-  let scroll = 0
-  if (desk && view.hasFocus()) {
-    const caret = view.coordsAtPos(view.state.selection.head)
-    const z = scaleOf(root)
-    const down = growing(view)
-      .filter((el) => el.getBoundingClientRect().top <= caret.top)
-      .reduce((sum, el) => sum + (Number(el.dataset.height) - (Number(el.dataset.start) || 0)) * z, 0)
-    scroll = Math.max(0, caret.bottom + down - (desk.getBoundingClientRect().bottom - FOLLOW_ROOM))
+  if (!duration) {
+    settle(view)
+    if (view.hasFocus()) view.dispatch(view.state.tr.scrollIntoView().setMeta('addToHistory', false).setMeta('allowDuringReview', true))
+    return
   }
+  // The desk scrolls when the cursor would end low: it ends at the room above the bottom, or where
+  // it was before when that is lower.
+  let scroll = 0
+  if (desk) {
+    const caret = view.coordsAtPos(view.state.selection.head)
+    const room = Math.max(desk.getBoundingClientRect().bottom - FOLLOW_ROOM - (caret.bottom - caret.top), from)
+    scroll = Math.max(0, caret.top - room)
+  }
+  const top = desk?.scrollTop ?? 0
   const start = performance.now()
-  let done = 0
   const step = (now: number): void => {
-    if (view.isDestroyed || grow.p >= 1) return
+    if (view.isDestroyed || arrival.p >= 1) return
     // The time of the first frame can be a little before the start.
     const t = Math.min(1, Math.max(0, (now - start) / duration))
     // Fast at first, then slow: the page answers the key at once and comes to rest softly.
-    grow.p = 1 - Math.pow(1 - t, 3)
-    for (const el of growing(view)) el.style.height = zoomed(heightAt(el, grow.p), m)
-    if (desk && scroll) {
-      // The scroll snaps to device pixels: count what moved, the rest goes in the next frames.
-      const before = desk.scrollTop
-      desk.scrollTop = before + scroll * grow.p - done
-      done += desk.scrollTop - before
-    }
+    arrival.p = 1 - Math.pow(1 - t, 3)
+    for (const el of veils(view)) el.style.opacity = String(1 - arrival.p)
+    // Never back: a scroll of the author (or of the browser) that goes further stays.
+    if (desk && scroll) desk.scrollTop = Math.max(desk.scrollTop, top + scroll * arrival.p)
     if (t < 1) requestAnimationFrame(step)
-    else settle(view, m)
+    else settle(view)
   }
   requestAnimationFrame(step)
 }

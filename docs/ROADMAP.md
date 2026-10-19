@@ -5,7 +5,7 @@ This file is the source of truth for progress. Update it after each task. Mark a
 ## Current focus
 
 > **Milestone:** Version 0.8 — the fifth feedback of the author (9 items) is done
-> **Next task:** Collect feedback on 0.8.3. Then fix what the author finds.
+> **Next task:** Collect feedback on 0.8.4. Then fix what the author finds.
 > **Not verified:** Codex and the two API transports. The user has no Codex account, and no API keys are set. The scripted provider (`WORDELIA_MOCK_AI=1`) covers their UI flows.
 
 ## M0 — Foundation
@@ -294,6 +294,12 @@ This file is the source of truth for progress. Update it after each task. Mark a
 
 - [x] A page that an edit removes goes back into the desk: its space stays for a moment, a veil comes over its sheet, and then the space closes. The page before it keeps its size (scenario `ctrlenter` counts a departure for each Backspace that removes a page)
 - [x] A removed page is seen also when the pages around it look the same (two empty pages): the measure compares the number of pages of the last measure
+
+### Version 0.8.4: pages that go, smoothly
+
+- [x] The space of a page that goes closes during the whole movement, not after the fade: what is under it (the next chapter, "Start the next chapter") moves up at once and softly, with no jump at the end. Before, it waited 270 ms and then moved 736 px in about 220 ms
+- [x] Backspace on an empty page no longer scrolls the desk at once: the desk scrolls to the cursor in the same movement as the page that goes
+- [x] Scenario `ctrlenter` records what is under the chapter in each frame: it starts to move within 100 ms of the key, and no frame moves it faster than the whole way in 250 ms
 
 ## Tests and CI
 

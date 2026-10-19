@@ -2,6 +2,12 @@
 
 Each version has its Windows installer in GitHub Releases. The release workflow copies the section of the version from this file to the release notes.
 
+## 0.8.4 (2026-10-19)
+
+### Changed
+- When a page goes, its space closes softly from the start: the next chapter and "Start the next chapter" move up at once, with no wait and no jump.
+- Backspace on an empty page scrolls the screen to the cursor softly, in the same movement.
+
 ## 0.8.3 (2026-10-19)
 
 ### New

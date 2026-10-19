@@ -2,6 +2,11 @@
 
 Each version has its Windows installer in GitHub Releases. The release workflow copies the section of the version from this file to the release notes.
 
+## 0.8.3 (2026-10-19)
+
+### New
+- A page that you remove goes back into the desk: its sheet fades into the desk, and then the space closes softly. The page before it keeps its size.
+
 ## 0.8.2 (2026-10-19)
 
 ### Changed

@@ -5,7 +5,7 @@ This file is the source of truth for progress. Update it after each task. Mark a
 ## Current focus
 
 > **Milestone:** Version 0.8 — the fifth feedback of the author (9 items) is done
-> **Next task:** Collect feedback on 0.8.2. Then fix what the author finds.
+> **Next task:** Collect feedback on 0.8.3. Then fix what the author finds.
 > **Not verified:** Codex and the two API transports. The user has no Codex account, and no API keys are set. The scripted provider (`WORDELIA_MOCK_AI=1`) covers their UI flows.
 
 ## M0 — Foundation
@@ -289,6 +289,11 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] A new page comes in every time (also a second page break on the same place), and the page before it never changes its size: a veil over the new sheet fades out, and the desk scrolls with it
 - [x] A removed page break no longer leaves a page that is too tall: a gap whose place is deleted leaves the list of breaks too
 - Scenarios: `ctrlenter` (the author's steps: Ctrl+Enter, Backspace, Ctrl+Enter two times, Backspace two times; pages, cursor and new pages after each step), `newpage` (each frame: the gap keeps its height, the veil only fades, the desk never scrolls back); unit tests for `newPage`
+
+### Version 0.8.3: pages that go
+
+- [x] A page that an edit removes goes back into the desk: its space stays for a moment, a veil comes over its sheet, and then the space closes. The page before it keeps its size (scenario `ctrlenter` counts a departure for each Backspace that removes a page)
+- [x] A removed page is seen also when the pages around it look the same (two empty pages): the measure compares the number of pages of the last measure
 
 ## Tests and CI
 

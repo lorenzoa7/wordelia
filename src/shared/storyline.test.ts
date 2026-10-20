@@ -250,12 +250,10 @@ describe('changes', () => {
   })
 
   it('renames the column of a chapter that gets a new title', () => {
-    const next = renameChapterInBody(BODY, 'The Storm', 'The Great Storm')
-    expect(next).toContain('## The Great Storm ^k1')
-    expect(next.replace('The Great Storm', 'The Storm')).toBe(BODY)
+    const night = [{ ...chapters[0], title: 'Night', file: 'Night.md' }, chapters[1]]
     // Not in "By order", and old links follow too.
-    expect(renameChapterInBody('# By order\n## The Storm ^k1', 'The Storm', 'Night')).toBe('# By order\n## The Storm ^k1')
-    expect(renameChapterInBody('## 1\n- a → [[the storm]]', 'The Storm', 'Night')).toBe('## 1\n- a → [[Night]]')
+    expect(renameChapterInBody('# By order\n## The Storm ^k1', 'ch1', chapters, night)).toBe('# By order\n## The Storm ^k1')
+    expect(renameChapterInBody('## 1\n- a → [[the storm]]', 'ch1', chapters, night)).toBe('## 1\n- a → [[Night]]')
   })
 })
 
@@ -321,6 +319,75 @@ describe('diffView', () => {
     after = placeCard(after, 'order', 'c1', 'k4', 0, chapters)
     after = updateCard(after, 'c2', 'tea')
     expect(boardStats(parseBoard(BODY), after, chapters)).toEqual({ added: 1, removed: 1, moved: 1, changed: 1 })
+  })
+})
+
+describe('fixes from the review', () => {
+  it('does not hang on a long line of ids with a word at its end', () => {
+    const refs = Array.from({ length: 40 }, (_, i) => `^c${i + 1}`).join(' ')
+    const start = Date.now()
+    parseBoard(`# Cards\n- ^c1 a\n\n# By order\n## Night ^k1\n${refs}.`)
+    parseBoard(`# Cards\n- ^c1 a\n\n# By order\n## Night ^k1\n${refs} (flashback)`)
+    expect(Date.now() - start).toBeLessThan(200)
+  })
+
+  it('reads an id of a card that comes later in the body', () => {
+    const b = parseBoard('# By chapter\n## The Storm ^k1\n^c1 ^c2\n\n# By order\n## Night ^k2\n^c2 ^c1\n## Morning ^k3\n- ^c2 Two\n\n# Cards\n- ^c1 One')
+    expect(b.cards.map((c) => [c.id, c.text])).toEqual([
+      ['c1', 'One'],
+      ['c2', 'Two']
+    ])
+    expect(ids(b, 'chapter', 'ch:ch1')).toEqual(['c1', 'c2'])
+    expect(ids(b, 'order', 'k2')).toEqual(['c2', 'c1'])
+    expect(ids(b, 'order', 'k3')).toEqual([])
+  })
+
+  it('keeps two chapters with one title apart', () => {
+    const twins = [
+      { id: 'a', title: 'Chapter Three', file: 'Chapter Three.md' },
+      { id: 'b', title: 'Chapter Three', file: 'Chapter Three (2).md' }
+    ]
+    let b = addCard(parseBoard(''), 'chapter', 'ch:a', 'one', twins).board
+    b = addCard(b, 'chapter', 'ch:b', 'two', twins).board
+    const cols = boardView(b, 'chapter', twins)
+    expect(cols.map((c) => [c.key, c.cards.map((x) => x.text)])).toEqual([
+      ['ch:a', ['one']],
+      ['ch:b', ['two']]
+    ])
+    // The second one is written with its file name, which is unique.
+    expect(serializeBoard(b, twins)).toContain('## Chapter Three (2) ^')
+  })
+
+  it('renames the column of one chapter, by its id', () => {
+    const before = [...chapters]
+    const after = [{ ...chapters[0], title: 'The Great Storm', file: 'The Great Storm.md' }, chapters[1]]
+    const next = renameChapterInBody(BODY, 'ch1', before, after)
+    expect(next).toContain('## The Great Storm ^k1')
+    expect(next.replace('The Great Storm', 'The Storm')).toBe(BODY)
+  })
+
+  it('keeps an arrow in the text of a card of the new format', () => {
+    const b = parseBoard('# Cards\n- ^c1 reads the map -> [[Old Map]]\n\n# By order\n## Night ^k1\n^c1')
+    expect(b.cards[0].text).toBe('reads the map -> [[Old Map]]')
+    expect(b.chapters).toEqual([])
+  })
+
+  it('shows a deleted card of the tray when the new board has no tray', () => {
+    const after = deleteCard(parseBoard(BODY), 'c5')
+    const tray = diffView(parseBoard(BODY), after, 'order', chapters).find((c) => c.key === 'tray')
+    expect(tray?.cards.map((c) => [c.card.id, c.removed])).toEqual([['c5', true]])
+  })
+
+  it('is fast with many chapters', () => {
+    const many = Array.from({ length: 80 }, (_, i) => ({ id: `x${i}`, title: `Chapter ${i}`, file: `Chapter ${i}.md` }))
+    const body = ['# Cards', ...many.map((_, i) => `- ^c${i + 1} card ${i}`), '', '# By chapter', ...many.flatMap((c, i) => [`## ${c.title} ^k${i + 1}`, `^c${i + 1}`])].join('\n')
+    const b = parseBoard(body)
+    const start = Date.now()
+    for (let i = 0; i < 5; i++) {
+      boardView(b, 'chapter', many)
+      serializeBoard(b, many)
+    }
+    expect(Date.now() - start).toBeLessThan(150)
   })
 })
 

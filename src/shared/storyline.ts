@@ -65,11 +65,26 @@ function fold(s: string): string {
   return s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim()
 }
 
-/** The chapter that a link names: by its title or its file name, ignoring case and accents. */
+/** The chapter that a name means: its file name (unique), else its title. Case and accents do not matter. */
+type ChapterFinder = (name: string) => string | null
+
+function chapterFinder(chapters: ChapterRef[]): ChapterFinder {
+  const byFile = new Map<string, string>()
+  const byTitle = new Map<string, string>()
+  for (const c of chapters) {
+    byFile.set(fold(c.file).replace(/\.md$/, ''), c.id)
+    const title = fold(c.title)
+    if (!byTitle.has(title)) byTitle.set(title, c.id)
+  }
+  return (name) => {
+    const want = fold(name).replace(/\.md$/, '')
+    return byFile.get(want) ?? byTitle.get(want) ?? null
+  }
+}
+
+/** The chapter that a link names: by its file name or its title, ignoring case and accents. */
 export function chapterOf(link: string, chapters: ChapterRef[]): string | null {
-  const want = fold(link).replace(/\.md$/, '')
-  const ch = chapters.find((c) => fold(c.title) === want || fold(c.file).replace(/\.md$/, '') === want)
-  return ch?.id ?? null
+  return chapterFinder(chapters)(link)
 }
 
 /** A heading of "By chapter" without `[[ ]]` and without a number in front ("3. ", "3 · "). */
@@ -80,9 +95,16 @@ function headingName(title: string): string {
     .trim()
 }
 
-/** The chapter of a "By chapter" column, or null for a planned chapter. */
-function columnChapter(title: string, chapters: ChapterRef[]): string | null {
-  return chapterOf(title, chapters) ?? chapterOf(headingName(title), chapters)
+/** The chapter of a "By chapter" column, or null for a planned chapter. Make it once for many columns. */
+function columnChapters(chapters: ChapterRef[]): (title: string) => string | null {
+  const find = chapterFinder(chapters)
+  return (title) => find(title) ?? find(headingName(title))
+}
+
+/** The heading of the column of a chapter: its title, or its file name when another chapter has the same title. */
+function headingOf(ch: ChapterRef, chapters: ChapterRef[]): string {
+  const twin = chapters.some((c) => c.id !== ch.id && fold(c.title) === fold(ch.title))
+  return twin ? ch.file.replace(/\.md$/i, '') : ch.title
 }
 
 /** One line of text: no line breaks, no runs of spaces. */
@@ -110,7 +132,6 @@ const COLUMN_RE = /^\s*##(?!#)\s*(.*?)\s*$/
 const ITEM_RE = /^\s*[-*+]\s+(.*?)\s*$/
 const ID_RE = /^\^([A-Za-z0-9_-]+)(?:\s+|$)/
 const TRAILING_ID_RE = /\s*\^([A-Za-z0-9_-]+)\s*$/
-const REFS_RE = /^(?:\s*[,·]?\s*\^[A-Za-z0-9_-]+)+\s*[,·]?\s*$/
 const LINKS_RE = /\s*(?:→|->)\s*(\[\[[^\]]+\]\](?:\s*,\s*\[\[[^\]]+\]\])*)\s*$/
 const LANES_RE = /^\s*(?:lanes|trilhas|carriles)\s*:/i
 
@@ -138,10 +159,18 @@ function idMaker(used: Iterable<string>, prefix: string): () => string {
   }
 }
 
-function readDef(raw: string): { id: string | null; text: string; links: string[] } {
+/** The ids of a line that has only ids ("^c1 ^c2", also with commas), or null. */
+function refsOf(line: string): string[] | null {
+  const tokens = line.trim().split(/[\s,·]+/).filter(Boolean)
+  if (!tokens.length || !tokens.every((t) => /^\^[A-Za-z0-9_-]+$/.test(t))) return null
+  return tokens.map((t) => t.slice(1))
+}
+
+/** A card line. Only the old format has "→ [[Chapter]]" links: in the new one, an arrow is text. */
+function readDef(raw: string, legacy: boolean): { id: string | null; text: string; links: string[] } {
   let rest = raw
   let links: string[] = []
-  const l = LINKS_RE.exec(rest)
+  const l = legacy ? LINKS_RE.exec(rest) : null
   if (l) {
     links = [...l[1].matchAll(/\[\[([^\]]+)\]\]/g)].map((m) => m[1].trim())
     rest = rest.slice(0, l.index)
@@ -154,6 +183,10 @@ export function parseBoard(body: string): Board {
   const lines = body.split(/\r?\n/)
   // The old format has no sections: its "## " headings are moments.
   let section: Section = 'order'
+  const legacy = !lines.some((l) => {
+    const m = !COLUMN_RE.test(l) && SECTION_RE.exec(l)
+    return m && SECTION.some(([re]) => re.test(m[1]))
+  })
   const defs: Array<{ id: string | null; text: string; links: string[] }> = []
   const views: Record<'chapter' | 'order', RawColumn[]> = { chapter: [], order: [] }
   let column: RawColumn | null = null
@@ -176,17 +209,18 @@ export function parseBoard(body: string): Board {
     }
     if (section === 'cards') {
       const item = ITEM_RE.exec(line)
-      if (item?.[1]) defs.push(readDef(item[1]))
+      if (item?.[1]) defs.push(readDef(item[1], legacy))
       continue
     }
     if (!column) continue
-    if (REFS_RE.test(line)) {
-      for (const m of line.matchAll(/\^([A-Za-z0-9_-]+)/g)) column.entries.push({ ref: m[1] })
+    const refs = refsOf(line)
+    if (refs) {
+      for (const ref of refs) column.entries.push({ ref })
       continue
     }
     const item = ITEM_RE.exec(line)
     if (!item?.[1]) continue
-    const def = readDef(item[1])
+    const def = readDef(item[1], legacy)
     if (def.id && !def.text) column.entries.push({ ref: def.id })
     else if (def.text) column.entries.push({ def })
   }
@@ -210,6 +244,11 @@ export function parseBoard(body: string): Board {
     // The same id two times in "Cards": the second card gets a new id.
     define(d.id && known.has(d.id) ? { ...d, id: cardId() } : d)
   }
+  // Every card is known before the columns read their ids: a card can come after its places
+  // (for example a card that the AI adds at the end of the body).
+  for (const view of [views.chapter, views.order]) {
+    for (const c of view) c.entries = c.entries.map((e) => ('def' in e ? { ref: define(e.def) } : e))
+  }
   const build = (raw: RawColumn[]): LineColumn[] => {
     const seenColumns = new Set<string>()
     const placed = new Set<string>()
@@ -218,7 +257,7 @@ export function parseBoard(body: string): Board {
       seenColumns.add(id)
       const ids: string[] = []
       for (const e of c.entries) {
-        const card = 'ref' in e ? (known.has(e.ref) ? e.ref : null) : define(e.def)
+        const card = 'ref' in e && known.has(e.ref) ? e.ref : null
         if (!card || placed.has(card)) continue
         placed.add(card)
         ids.push(card)
@@ -226,7 +265,6 @@ export function parseBoard(body: string): Board {
       return { id, title: c.title, cards: ids }
     })
   }
-  // "By chapter" first: inline cards there are defined before the moments read them.
   const chapters = build(views.chapter)
   const moments = build(views.order)
   // Old links: a card with "→ [[Chapter]]" and no chapter goes to the column of that chapter.
@@ -259,13 +297,14 @@ export function serializeBoard(board: Board, chapters?: ChapterRef[]): string {
   const clean = (c: LineColumn): LineColumn => ({ ...c, cards: c.cards.filter((id) => known.has(id)) })
   let byChapter = board.chapters.map(clean)
   if (chapters) {
+    const chapterOfColumn = columnChapters(chapters)
     const real = chapters.flatMap((ch) => {
-      const own = byChapter.filter((c) => columnChapter(c.title, chapters) === ch.id)
+      const own = byChapter.filter((c) => chapterOfColumn(c.title) === ch.id)
       if (!own.length) return []
       const cards = [...new Set(own.flatMap((c) => c.cards))]
       return cards.length ? [{ ...own[0], cards }] : []
     })
-    byChapter = [...real, ...byChapter.filter((c) => !columnChapter(c.title, chapters))]
+    byChapter = [...real, ...byChapter.filter((c) => !chapterOfColumn(c.title))]
   }
   const parts: string[] = []
   if (board.cards.length) parts.push(`# Cards\n${board.cards.map((c) => `- ^${c.id} ${c.text}`).join('\n')}`)
@@ -307,12 +346,13 @@ export function boardView(board: Board, view: LineView, chapters: ChapterRef[]):
     })
   let cols: ViewColumn[]
   if (view === 'chapter') {
+    const chapterOfColumn = columnChapters(chapters)
     const real = chapters.map((ch, i): ViewColumn => {
-      const own = board.chapters.filter((c) => columnChapter(c.title, chapters) === ch.id)
+      const own = board.chapters.filter((c) => chapterOfColumn(c.title) === ch.id)
       return { key: `ch:${ch.id}`, kind: 'chapter', title: ch.title, number: i + 1, chapterId: ch.id, columnId: own[0]?.id, cards: take(own.flatMap((c) => c.cards)) }
     })
     const planned = board.chapters
-      .filter((c) => !columnChapter(c.title, chapters))
+      .filter((c) => !chapterOfColumn(c.title))
       .map((c, i): ViewColumn => ({ key: c.id, kind: 'planned', title: c.title, number: chapters.length + i + 1, columnId: c.id, cards: take(c.cards) }))
     cols = [...real, ...planned]
   } else {
@@ -378,12 +418,13 @@ export function placeCard(board: Board, view: LineView, cardId: string, toKey: s
       const ch = chapters.find((c) => c.id === chapterId)
       if (!ch) return board
       // The columns of one chapter become one.
-      const own = cols.filter((c) => columnChapter(c.title, chapters) === chapterId)
+      const chapterOfColumn = columnChapters(chapters)
+      const own = cols.filter((c) => chapterOfColumn(c.title) === chapterId)
       if (own.length) {
         target = { ...own[0], cards: [...new Set(own.flatMap((c) => c.cards))] }
         cols = cols.filter((c) => !own.includes(c) || c === own[0]).map((c) => (c === own[0] ? target! : c))
       } else {
-        target = { id: idMaker(allIds(board), 'k')(), title: ch.title, cards: [] }
+        target = { id: idMaker(allIds(board), 'k')(), title: headingOf(ch, chapters), cards: [] }
         cols = [...cols, target]
       }
     } else {
@@ -442,7 +483,8 @@ export function deleteColumn(board: Board, view: LineView, id: string): Board {
  */
 export function moveColumn(board: Board, view: LineView, id: string, index: number, chapters: ChapterRef[]): Board {
   const cols = columnsOf(board, view)
-  const movable = view === 'chapter' ? cols.filter((c) => !columnChapter(c.title, chapters)) : cols
+  const chapterOfColumn = columnChapters(chapters)
+  const movable = view === 'chapter' ? cols.filter((c) => !chapterOfColumn(c.title)) : cols
   const col = movable.find((c) => c.id === id)
   if (!col) return board
   const rest = movable.filter((c) => c !== col)
@@ -451,9 +493,17 @@ export function moveColumn(board: Board, view: LineView, id: string, index: numb
   return withColumns(board, view, view === 'chapter' ? [...cols.filter((c) => !movable.includes(c)), ...moved] : moved)
 }
 
-/** A chapter got a new title: its "By chapter" heading follows (and links of the old format). */
-export function renameChapterInBody(body: string, oldTitle: string, newTitle: string): string {
-  const old = fold(oldTitle)
+/**
+ * A chapter got a new title: the "By chapter" headings of that chapter follow (and the links of the
+ * old format). `before` and `after` are the chapters of the book before and after the rename.
+ */
+export function renameChapterInBody(body: string, chapterId: string, before: ChapterRef[], after: ChapterRef[]): string {
+  const was = before.find((c) => c.id === chapterId)
+  const now = after.find((c) => c.id === chapterId)
+  if (!was || !now) return body
+  const chapterOfColumn = columnChapters(before)
+  const heading = headingOf(now, after)
+  const old = fold(was.title)
   let section: Section = 'order'
   return body
     .split('\n')
@@ -462,12 +512,11 @@ export function renameChapterInBody(body: string, oldTitle: string, newTitle: st
       if (head && section === 'chapter') {
         const id = TRAILING_ID_RE.exec(head[1])
         const title = id ? head[1].slice(0, id.index) : head[1]
-        if (fold(title) === old || fold(headingName(title)) === old) return `## ${newTitle}${id ? ` ^${id[1]}` : ''}`
-        return line
+        return chapterOfColumn(title) === chapterId ? `## ${heading}${id ? ` ^${id[1]}` : ''}` : line
       }
       const sec = !head && SECTION_RE.exec(line)
       if (sec) section = SECTION.find(([re]) => re.test(sec[1]))?.[1] ?? null
-      return line.replace(/\[\[([^\]]+)\]\]/g, (all, inner: string) => (fold(inner) === old ? `[[${newTitle}]]` : all))
+      return line.replace(/\[\[([^\]]+)\]\]/g, (all, inner: string) => (fold(inner) === old ? `[[${now.title}]]` : all))
     })
     .join('\n')
 }
@@ -607,8 +656,10 @@ export function diffView(before: Board, after: Board, view: LineView, chapters: 
   // Deleted columns stay where they were, with their deleted cards.
   const used = new Set(colMap.values())
   b.forEach((col, i) => {
-    if (used.has(col.key) || col.kind === 'tray') return
+    if (used.has(col.key)) return
     const cards = col.cards.filter((c) => !kept.has(c.id)).map((card): DiffCard => ({ card, added: false, removed: true, moved: false, otherMoved: false, changed: false }))
+    // A tray that is gone shows only for its deleted cards.
+    if (col.kind === 'tray' && !cards.length) return
     const prevKey = b
       .slice(0, i)
       .reverse()

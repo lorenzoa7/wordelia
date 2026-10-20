@@ -42,17 +42,20 @@ export function StoryLineCard(): React.JSX.Element | null {
         <Path size={12} />
         {t.plan.line.inLine(info.number)}
       </span>
-      <ul className="line-mini-list">
+      {/* A button holds only phrasing content: spans, shown as blocks. */}
+      <span className="line-mini-list">
         {info.cards.slice(0, SHOWN).map((c) => (
-          <li key={c.id}>{plainText(c.text)}</li>
+          <span key={c.id} className="line-mini-item">
+            {plainText(c.text)}
+          </span>
         ))}
-      </ul>
-      {info.cards.length > SHOWN && <p className="line-mini-more">{t.plan.line.more(info.cards.length - SHOWN)}</p>}
+      </span>
+      {info.cards.length > SHOWN && <span className="line-mini-more">{t.plan.line.more(info.cards.length - SHOWN)}</span>}
       {info.moments.length > 0 && (
-        <p className="line-mini-moments" title={info.moments.join(' · ')}>
+        <span className="line-mini-moments" title={info.moments.join(' · ')}>
           <Clock size={11} aria-label={t.plan.line.momentField} />
           <span>{info.moments.join(' · ')}</span>
-        </p>
+        </span>
       )}
     </button>
   )

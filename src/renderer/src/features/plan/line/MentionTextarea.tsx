@@ -111,6 +111,8 @@ export const MentionTextarea = forwardRef<MentionTextareaHandle, Props>(function
     setCaret(pos)
     setActive(0)
     caretAfter.current = pos
+    // The list closes after a pick: a longer name ("Ana Lúcia" after "Ana") shows again only when the author types.
+    setClosed(true)
   }
 
   return (
@@ -124,7 +126,7 @@ export const MentionTextarea = forwardRef<MentionTextareaHandle, Props>(function
         spellCheck
         role="combobox"
         aria-expanded={open}
-        aria-controls={listId}
+        aria-controls={open ? listId : undefined}
         aria-autocomplete="list"
         aria-activedescendant={open ? `${listId}-${active}` : undefined}
         {...rest}

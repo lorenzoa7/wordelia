@@ -779,7 +779,7 @@
   padding: 0;
   list-style: none;
 }
-.line-mini-list li {
+.line-mini-item {
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
@@ -792,6 +792,7 @@
   color: var(--ink);
 }
 .line-mini-more {
+  display: block;
   margin: 4px 0 0;
   color: var(--ink-4);
 }

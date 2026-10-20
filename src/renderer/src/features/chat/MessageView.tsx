@@ -22,7 +22,9 @@ import { sliceFromMarkdown } from '@/features/editor/review'
 import type { ChatMessage, Thread } from '@shared/types'
 import { ProposalCard } from './ProposalCard'
 import { acceptPending, pendingKeys, resolveTarget, segmentKeys, setHunkStates } from './applyProposal'
-import { isLineSegment } from '@/features/plan/line/proposal'
+import { acceptLineProposal, isLineSegment, messageLineProposal } from '@/features/plan/line/proposal'
+import { findStoryLine } from '@shared/storyline'
+import { useBook } from '@/stores/book'
 import { Button, Spinner, Tooltip } from '@/ui'
 import { typesetForBook } from '@/lib/typeset'
 import { getT, useT } from '@/lib/i18n'
@@ -277,7 +279,12 @@ function ReplyReview({ segments, message, thread }: { segments: Segment[]; messa
   const applyAll = async (): Promise<void> => {
     setBusy(true)
     try {
-      const { states: result, replaced } = await acceptPending(segments, message.hunks)
+      // The story line takes its change in one piece, as its board showed it.
+      const story = findStoryLine(useBook.getState().entries)
+      const line = messageLineProposal(thread, message, story ? story.body : null)
+      if (line) await acceptLineProposal(line)
+      const others = segments.filter((s) => s.kind === 'text' || !isLineSegment(s))
+      const { states: result, replaced } = await acceptPending(others, message.hunks)
       setHunkStates(thread, message.id, result, replaced)
       const states = Object.values(result)
       const ok = states.filter((s) => s === 'accepted').length

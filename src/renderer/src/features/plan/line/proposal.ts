@@ -7,14 +7,14 @@ import { PLANNING_DIR, entryToFile } from '@shared/book'
 import { readFrontmatter, writeFrontmatter } from '@shared/markdown/frontmatter'
 import { applyHunk } from '@shared/proposals/apply'
 import { hunkKey, parseProposals, type Segment } from '@shared/proposals/parse'
-import { STORY_LINE_TYPE, findStoryLine, isStoryLine } from '@shared/storyline'
+import { STORY_LINE_TYPE, findStoryLine, isStoryLine, parseBoard, serializeBoard } from '@shared/storyline'
 import type { ChatMessage, HunkState, Thread } from '@shared/types'
 import { getT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
 import { toast } from '@/stores/ui'
 import { useChat } from '@/features/chat/chatStore'
 import { latestThread } from '@/features/chat/threads'
-import { applyCreate, applyEditHunk, createdPath, markAfter, resolveTarget, restoreSnapshot, setHunkStates, snapshotOf, type Snapshot } from '@/features/chat/applyProposal'
+import { applyCreate, createdPath, markAfter, resolveTarget, restoreSnapshot, setHunkStates, snapshotOf } from '@/features/chat/applyProposal'
 
 export type LineSegment = Extract<Segment, { kind: 'edit' }> | Extract<Segment, { kind: 'create' }>
 
@@ -116,73 +116,68 @@ export function useLineWriting(): boolean {
   }, [text, entries])
 }
 
-/** The text of a new story line, with its type (the AI can forget it). */
-function withType(content: string): string {
-  const { data, body } = readFrontmatter(content)
-  return data.type === STORY_LINE_TYPE ? content : writeFrontmatter({ ...data, type: STORY_LINE_TYPE }, body)
-}
-
 /** Accept a proposal for the story line: all its changes, with an Undo toast. */
 export async function acceptLineProposal(p: LineProposal): Promise<void> {
   const t = getT()
   const book = useBook.getState()
   const story = findStoryLine(book.entries)
-  const states: Record<string, HunkState> = {}
-  const replaced: Record<string, string> = {}
-  const todo = new Set(p.keys)
-  let snap: Snapshot | null = null
-  let created: string | null = null
-  for (const s of p.segments) {
-    if (s.kind === 'create') {
-      const key = hunkKey(s.index, 0)
-      if (!todo.has(key)) continue
-      const now = findStoryLine(useBook.getState().entries)
-      if (now) {
-        // A new text for the story line: keep the entry (its id, its summary), change its body.
-        snap ??= snapshotOf(`${PLANNING_DIR}/${now.file}`)
-        replaced[key] = entryToFile(now)
-        useBook.getState().updateEntry(now.id, { body: readFrontmatter(s.content).body })
-        states[key] = 'accepted'
-      } else {
-        const res = await applyCreate(s.file, withType(s.content))
-        states[key] = res.ok ? 'accepted' : 'failed'
-        if (res.ok) created = createdPath(s.file).slice(PLANNING_DIR.length + 1)
-      }
-      continue
-    }
-    snap ??= snapshotOf(s.file)
-    for (let i = s.hunks.length - 1; i >= 0; i--) {
-      const key = hunkKey(s.index, i)
-      if (!todo.has(key)) continue
-      const res = applyEditHunk(s.file, s.hunks[i])
-      states[key] = res.ok ? 'accepted' : 'failed'
-    }
-  }
-  setHunkStates(p.thread, p.message.id, states, replaced)
-  markAfter(snap)
-  if (Object.values(states).some((s) => s === 'failed')) {
+  const keys = Object.fromEntries(p.keys.map((k) => [k, 'accepted' as const]))
+  // The text that the board showed, in the canonical form: its parts are applied in the same order
+  // as for the preview, and the ids that the parser gives are written.
+  if (p.after === null || (story ? story.body !== p.before : p.before !== '')) {
+    setHunkStates(p.thread, p.message.id, Object.fromEntries(p.keys.map((k) => [k, 'failed' as const])))
     toast(t.plan.line.reviewStale, { kind: 'error' })
     return
   }
+  const body = serializeBoard(parseBoard(p.after), book.chapters)
   const back = (): void => {
     const latest = useBook.getState().threads.find((x) => x.id === p.thread.id)
-    if (latest) setHunkStates(latest, p.message.id, Object.fromEntries(Object.keys(states).map((k) => [k, 'pending' as const])))
+    if (latest) setHunkStates(latest, p.message.id, Object.fromEntries(p.keys.map((k) => [k, 'pending' as const])))
   }
-  toast(story ? t.plan.line.accepted : t.plan.line.created, {
+
+  if (story) {
+    const snap = snapshotOf(`${PLANNING_DIR}/${story.file}`)
+    // A rewind of the thread puts back the file that a <create> replaced.
+    const replaced: Record<string, string> = {}
+    for (const s of p.segments) if (s.kind === 'create' && p.keys.includes(hunkKey(s.index, 0))) replaced[hunkKey(s.index, 0)] = entryToFile(story)
+    useBook.getState().updateEntry(story.id, { body })
+    setHunkStates(p.thread, p.message.id, keys, replaced)
+    markAfter(snap)
+    toast(t.plan.line.accepted, {
+      ms: 8000,
+      action: {
+        label: t.common.undo,
+        run: () => {
+          if (snap && !restoreSnapshot(snap)) {
+            toast(t.chat.undoUnsafe, { kind: 'error' })
+            return
+          }
+          back()
+        }
+      }
+    })
+    return
+  }
+
+  // A new story line: the <create> of the proposal, with its type and the canonical body.
+  const create = p.segments.find((s): s is Extract<LineSegment, { kind: 'create' }> => s.kind === 'create')
+  if (!create) return
+  const { data } = readFrontmatter(create.content)
+  const res = await applyCreate(create.file, writeFrontmatter({ ...data, type: STORY_LINE_TYPE }, body))
+  if (!res.ok) {
+    setHunkStates(p.thread, p.message.id, Object.fromEntries(p.keys.map((k) => [k, 'failed' as const])))
+    toast(res.reason, { kind: 'error' })
+    return
+  }
+  setHunkStates(p.thread, p.message.id, keys)
+  const file = createdPath(create.file).slice(PLANNING_DIR.length + 1)
+  toast(t.plan.line.created, {
     ms: 8000,
     action: {
       label: t.common.undo,
       run: () => {
-        if (created) {
-          const e = useBook.getState().entries.find((x) => x.file === created)
-          if (e) void useBook.getState().deleteEntry(e.id)
-          back()
-          return
-        }
-        if (snap && !restoreSnapshot(snap)) {
-          toast(t.chat.undoUnsafe, { kind: 'error' })
-          return
-        }
+        const e = useBook.getState().entries.find((x) => x.file === file)
+        if (e) void useBook.getState().deleteEntry(e.id)
         back()
       }
     }

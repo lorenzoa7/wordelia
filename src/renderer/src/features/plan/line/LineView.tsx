@@ -2,7 +2,7 @@
 // hand or asks the AI (the banner opens a new chat thread with a draft). A proposal of the AI for
 // the line shows on the board with its changes, with Accept and Reject.
 
-import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { BookOpenText, ChatCircleText, Check, Clock, Sparkle } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { boardStats, boardView, hereKey, parseBoard, type LineView as View } from '@shared/storyline'
@@ -62,6 +62,11 @@ export function LineView(): React.JSX.Element {
   const writing = useLineWriting()
   const [openCard, setOpenCard] = useState<string | null>(null)
   const scroll = useRef<HTMLDivElement>(null)
+  // A proposal shows: a card that was open closes (the board cannot change until the decision).
+  const reviewing = Boolean(proposal)
+  useEffect(() => {
+    if (reviewing) setOpenCard(null)
+  }, [reviewing])
 
   const review = useMemo(
     () => (proposal && proposal.after !== null ? { before: parseBoard(proposal.before), after: parseBoard(proposal.after) } : null),

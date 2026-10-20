@@ -105,7 +105,7 @@ Rules for the story line:
 - Each card is one line in "# Cards" with its id (^c and a number). The columns list the ids of their cards, in order, on the line under the heading. A card has one place in each view, or no place (it then waits in a tray of that view).
 - Each column heading ends with its id (^k and a number). A new card or a new column gets a new id that the line does not have yet.
 - Write the cards and the moments in the language of the book. Write @ and the exact name of a planning entry to mention it. Do not write the chapter in the text of a card: its column says it.
-- Change it with <edit> on whole lines: to move a card, change the id lines of the two columns; to change a text, change its line in "# Cards". Keep the ids.
+- Change it with <edit> on whole lines: to move a card, change the id lines of the two columns; to change a text, change its line in "# Cards"; to add a card, add its line after the last line of "# Cards". Never use an empty <find> on the story line. Keep the ids.
 - To fill or rebuild the whole line, replace it with <create> on its file. Keep the ids of the cards that stay.
 - When the author asks for a story line and the book has none, create it with <create> in the plot category, with "type: story-line" and a summary in the front matter. Put each card in its chapter and in its moment.
 

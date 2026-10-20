@@ -6,6 +6,7 @@ import { STORY_LINE_TYPE, findStoryLine, isStoryLine, parseBoard, serializeBoard
 import type { Entry } from '@shared/types'
 import { getT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
+import { toast } from '@/stores/ui'
 
 const VIEW_KEY = 'wordelia.lineView'
 
@@ -77,4 +78,18 @@ export function changeBoard(change: (board: Board) => Board): void {
   const before = parseBoard(story?.body ?? '')
   const next = change(before)
   if (next !== before) saveBoard(next)
+}
+
+/**
+ * Undo a change of the board (from a toast): put `before` back, but only while the line is still
+ * as the change left it. Else a later change would be lost.
+ */
+export function undoBoard(before: Board, after: Board): void {
+  const book = useBook.getState()
+  const now = findStoryLine(book.entries)?.body ?? ''
+  if (now !== serializeBoard(after, book.chapters)) {
+    toast(getT().chat.undoUnsafe, { kind: 'error' })
+    return
+  }
+  saveBoard(before)
 }

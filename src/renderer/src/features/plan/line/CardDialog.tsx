@@ -12,7 +12,7 @@ import { toast } from '@/stores/ui'
 import { MentionIcon } from '@/features/chat/MentionPill'
 import { MentionTextarea } from './MentionTextarea'
 import { mentionedNotes } from './CardText'
-import { saveBoard } from './model'
+import { saveBoard, undoBoard } from './model'
 
 interface Props {
   cardId: string | null
@@ -25,8 +25,9 @@ interface Props {
 export function CardDialog({ cardId, board, chapters, notes, onClose }: Props): React.JSX.Element {
   const t = useT()
   const card = board.cards.find((c) => c.id === cardId) ?? null
-  const chapterCols = useMemo(() => boardView(board, 'chapter', chapters).filter((c) => c.kind !== 'tray'), [board, chapters])
-  const momentCols = useMemo(() => boardView(board, 'order', chapters).filter((c) => c.kind !== 'tray'), [board, chapters])
+  // Only while a card is open: they read the whole board.
+  const chapterCols = useMemo(() => (card ? boardView(board, 'chapter', chapters).filter((c) => c.kind !== 'tray') : []), [board, chapters, card])
+  const momentCols = useMemo(() => (card ? boardView(board, 'order', chapters).filter((c) => c.kind !== 'tray') : []), [board, chapters, card])
   const placeNow = useMemo(
     () => (card ? { chapter: placesOf(board, 'chapter', chapters).get(card.id)?.key ?? TRAY, moment: placesOf(board, 'order', chapters).get(card.id)?.key ?? TRAY } : null),
     [board, chapters, card]
@@ -63,9 +64,10 @@ export function CardDialog({ cardId, board, chapters, notes, onClose }: Props): 
   const remove = (): void => {
     if (!card) return
     const before = board
-    saveBoard(deleteCard(board, card.id))
+    const after = deleteCard(board, card.id)
+    saveBoard(after)
     onClose()
-    toast(t.plan.line.cardDeleted, { ms: 8000, action: { label: t.common.undo, run: () => saveBoard(before) } })
+    toast(t.plan.line.cardDeleted, { ms: 8000, action: { label: t.common.undo, run: () => undoBoard(before, after) } })
   }
 
   const option = (key: string, label: string): { value: string; label: string } => ({ value: key, label })
@@ -84,6 +86,10 @@ export function CardDialog({ cardId, board, chapters, notes, onClose }: Props): 
       title={t.plan.line.cardTitle}
       width={520}
       className="line-dialog"
+      // Escape first closes the list of notes of the text box.
+      onEscapeKeyDown={(e) => {
+        if ((e.target as HTMLElement | null)?.getAttribute?.('aria-expanded') === 'true') e.preventDefault()
+      }}
       footer={
         <>
           <Button variant="ghost" className="line-dialog-delete" icon={<Trash size={14} />} onClick={remove}>

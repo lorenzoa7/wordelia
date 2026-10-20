@@ -36,7 +36,7 @@ import { useBook } from '@/stores/book'
 import { toast } from '@/stores/ui'
 import { CardText } from './CardText'
 import { MentionTextarea } from './MentionTextarea'
-import { saveBoard } from './model'
+import { saveBoard, undoBoard } from './model'
 
 const CARD = 'card:'
 const COL = 'col:'
@@ -227,8 +227,9 @@ export const ColumnShell = forwardRef<HTMLElement, ShellProps>(function ColumnSh
             </h3>
           </Tooltip>
         )}
-        <span className="line-col-count" aria-label={t.plan.line.cards(count)}>
-          {count}
+        <span className="line-col-count">
+          <span aria-hidden>{count}</span>
+          <span className="sr-only">{t.plan.line.cards(count)}</span>
         </span>
         {menu}
       </header>
@@ -458,10 +459,11 @@ function ColumnInner({
     movable(col) && col.columnId
       ? (): void => {
           const before = board
-          saveBoard(deleteColumn(board, view, col.columnId!))
+          const after = deleteColumn(board, view, col.columnId!)
+          saveBoard(after)
           toast(t.plan.line.columnDeleted(col.title || t.plan.line.untitled, col.cards.length, columnName(t, { kind: 'tray', title: '' }, view)), {
             ms: 8000,
-            action: { label: t.common.undo, run: () => saveBoard(before) }
+            action: { label: t.common.undo, run: () => undoBoard(before, after) }
           })
         }
       : undefined

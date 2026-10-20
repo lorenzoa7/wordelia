@@ -275,7 +275,7 @@ export const useBook = create<BookState>((set, get) => {
       // The column of the chapter in the story line follows the new title.
       const story = findStoryLine(get().entries)
       if (story && clean !== ch.title) {
-        const body = renameChapterInBody(story.body, ch.title, clean)
+        const body = renameChapterInBody(story.body, id, chapters, get().chapters)
         if (body !== story.body) get().updateEntry(story.id, { body })
       }
     },

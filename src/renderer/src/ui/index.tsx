@@ -183,7 +183,8 @@ export function Dialog({
   children,
   footer,
   width = 520,
-  className
+  className,
+  onEscapeKeyDown
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -193,6 +194,8 @@ export function Dialog({
   footer?: ReactNode
   width?: number
   className?: string
+  /** Escape closes the dialog; `preventDefault()` keeps it open (for example while a list of a field is open) */
+  onEscapeKeyDown?: (e: KeyboardEvent) => void
 }): React.JSX.Element {
   const t = useT()
   return (
@@ -208,6 +211,7 @@ export function Dialog({
             ;(e.currentTarget as HTMLElement).focus()
           }}
           tabIndex={-1}
+          onEscapeKeyDown={onEscapeKeyDown}
           {...(description ? {} : { 'aria-describedby': undefined })}
         >
           <header className="dialog-head">

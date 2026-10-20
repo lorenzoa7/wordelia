@@ -13,7 +13,8 @@ import { useBook } from '@/stores/book'
 import { useUi } from '@/stores/ui'
 import { useChat } from '@/features/chat/chatStore'
 import { useApp } from '@/stores/app'
-import { MAP_PAGE, MapView, PlanViewSwitch, mapBack, useReturnsToMap } from '@/features/graph'
+import { LINE_PAGE, MAP_PAGE, MapView, PlanViewSwitch, mapBack, useReturnsToMap } from '@/features/graph'
+import { StoryLineView } from './StoryLineView'
 import { NoteEditor } from './NoteEditor'
 import { CategoryIcon } from './PlanSidebar'
 import { importNotes } from './importNotes'
@@ -63,6 +64,8 @@ export function PlanView(): React.JSX.Element {
         <EntryEditor key={activeEntry.id} entry={activeEntry} />
       ) : activeCategory === MAP_PAGE ? (
         <MapView />
+      ) : activeCategory === LINE_PAGE ? (
+        <StoryLineView />
       ) : (
         <CategoryGrid key={activeCategory ?? ''} folder={activeCategory} />
       )}

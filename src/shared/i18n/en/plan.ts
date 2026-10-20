@@ -43,11 +43,43 @@ export const plan = {
     newCard: 'New'
   },
   /** The map: a graph of the entries and the links between them */
+  /** The story line: the events of the story in lanes and moments (StoryLineView.tsx) */
+  line: {
+    title: 'Story line',
+    stats: (lanes: number, events: number): string => `${lanes === 1 ? '1 lane' : `${lanes} lanes`} · ${events === 1 ? '1 event' : `${events} events`}`,
+    hint: 'Ask the chat to change it, for example: “put the storm before the visit”.',
+    editText: 'Edit as text',
+    here: 'you are here',
+    other: 'Other',
+    past: 'Past',
+    openChapter: (title: string): string => `Open the chapter “${title}”`,
+    planned: 'Planned: no chapter tells it yet',
+    dragHint: 'Drag a card to another moment or lane',
+    emptyTitle: 'See the events of your story side by side',
+    emptyText: 'Groups of characters in lanes, moments in columns, meetings where the lanes cross. The AI builds it from a summary, a text or your chapters, and changes it when you ask in the chat.',
+    build: 'Build the story line',
+    buildTitle: 'Build the story line',
+    buildText: 'The AI reads the source and proposes the story line in the chat. Nothing changes until you accept it.',
+    fromEntry: 'A planning note',
+    fromText: 'A text',
+    fromChapters: 'The written chapters',
+    pickEntry: 'Choose a note',
+    pastePlaceholder: 'Paste a summary of the story',
+    threadTitle: 'Story line',
+    askFromEntry: (name: string): string => `Build the story line of the book from the note @${name}.`,
+    askFromText: 'Build the story line of the book from this summary.',
+    askFromChapters: 'Build the story line of the book from the chapters that exist.',
+    card: 'Story line',
+    moment: (label: string): string => `Moment ${label}`,
+    sameTime: 'At the same time',
+    next: 'Next'
+  },
   map: {
     /** The switch on the overview: the cards or the map */
     views: 'Planning views',
     cards: 'Cards',
     map: 'Map',
+    line: 'Line',
     /** Under the title of the map */
     stats: (entries: number, links: number): string =>
       `${entries === 1 ? '1 entry' : `${entries} entries`} · ${links === 1 ? '1 link' : `${links} links`}`,

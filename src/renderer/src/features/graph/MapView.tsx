@@ -1,9 +1,10 @@
 // The map page of the Plan view: all entries as a graph, linked by their mentions.
 
 import { useMemo, useRef, useState } from 'react'
-import { BookOpenText, Graph, MagnifyingGlass, SquaresFour, X } from '@phosphor-icons/react'
+import { BookOpenText, Graph, MagnifyingGlass, Path, SquaresFour, X } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { markdownToPlain } from '@shared/book'
+import { isStoryLine } from '@shared/storyline'
 import { buildPlanningMap, filterMap, searchMap, type MapNode } from '@shared/planning/graph'
 import { Button, Tooltip } from '@/ui'
 import { categoryName, folderCategoryName, useT } from '@/lib/i18n'
@@ -11,7 +12,7 @@ import { useBook } from '@/stores/book'
 import { CategoryIcon } from '@/features/plan/PlanSidebar'
 import { BuildPlanningButton } from '@/features/plan/SyncPanel'
 import { MapCanvas } from './MapCanvas'
-import { openCards, openEntryFromMap, openMap } from './nav'
+import { openCards, openEntryFromMap, openLine, openMap } from './nav'
 import './graph.css'
 
 interface MapUi {
@@ -25,7 +26,7 @@ interface MapUi {
 const uiMemory = new Map<string, MapUi>()
 
 /** "Cards | Map" on the Plan overview and on the map. */
-export function PlanViewSwitch({ active }: { active: 'cards' | 'map' }): React.JSX.Element {
+export function PlanViewSwitch({ active }: { active: 'cards' | 'map' | 'line' }): React.JSX.Element {
   const t = useT()
   return (
     <div className="plan-switch" role="group" aria-label={t.plan.map.views}>
@@ -36,6 +37,10 @@ export function PlanViewSwitch({ active }: { active: 'cards' | 'map' }): React.J
       <button className={clsx('plan-switch-btn', active === 'map' && 'is-active')} aria-pressed={active === 'map'} onClick={openMap}>
         <Graph size={14} />
         <span>{t.plan.map.map}</span>
+      </button>
+      <button className={clsx('plan-switch-btn', active === 'line' && 'is-active')} aria-pressed={active === 'line'} onClick={openLine}>
+        <Path size={14} />
+        <span>{t.plan.map.line}</span>
       </button>
     </div>
   )
@@ -50,7 +55,9 @@ function firstSentence(md: string): string {
 export function MapView(): React.JSX.Element {
   const t = useT()
   const root = useBook((s) => s.root) ?? ''
-  const entries = useBook((s) => s.entries)
+  // The story line links to everyone: it is not a node of the map.
+  const all = useBook((s) => s.entries)
+  const entries = useMemo(() => all.filter((e) => !isStoryLine(e)), [all])
   const chapters = useBook((s) => s.chapters)
   const categories = useBook((s) => s.manifest?.planning.categories) ?? []
   const [ui, setUiState] = useState<MapUi>(() => uiMemory.get(root) ?? { hidden: [], chapters: false, query: '' })

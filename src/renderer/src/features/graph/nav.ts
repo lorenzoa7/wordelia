@@ -9,6 +9,8 @@ import { create } from 'zustand'
 import { useBook } from '@/stores/book'
 
 export const MAP_PAGE = ':map'
+/** The story line, the third view of the Plan overview */
+export const LINE_PAGE = ':line'
 
 interface MapNav {
   /** The entry that the user opened from the map, while it is open */
@@ -25,6 +27,10 @@ useBook.subscribe((s) => {
 
 export function openMap(): void {
   useBook.getState().selectCategory(MAP_PAGE)
+}
+
+export function openLine(): void {
+  useBook.getState().selectCategory(LINE_PAGE)
 }
 
 export function openCards(): void {
@@ -49,7 +55,7 @@ export function mapBack(): boolean {
     openMap()
     return true
   }
-  if (!s.activeEntryId && s.activeCategory === MAP_PAGE) {
+  if (!s.activeEntryId && (s.activeCategory === MAP_PAGE || s.activeCategory === LINE_PAGE)) {
     openCards()
     return true
   }

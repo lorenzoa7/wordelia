@@ -525,26 +525,6 @@ export function renameChapterInBody(body: string, chapterId: string, before: Cha
 /* Differences, for a proposal of the AI                                */
 /* ------------------------------------------------------------------ */
 
-export interface DiffCard {
-  card: LineCard
-  added: boolean
-  /** A card that the proposal deletes: it shows where it was */
-  removed: boolean
-  /** In another column, or in another place of its column */
-  moved: boolean
-  /** Its place in the other view changed (the line at the bottom of the card) */
-  otherMoved: boolean
-  changed: boolean
-  /** The text before the change */
-  before?: string
-}
-
-export interface DiffColumn extends Omit<ViewColumn, 'cards'> {
-  mark: 'same' | 'added' | 'removed' | 'renamed'
-  oldTitle?: string
-  cards: DiffCard[]
-}
-
 /** For each card of `after`, the id of the same card in `before`: by id, else by its text. */
 function matchCards(before: Board, after: Board): Map<string, string> {
   const beforeIds = new Set(before.cards.map((c) => c.id))
@@ -611,86 +591,330 @@ function outOfOrder(ids: string[], oldIndex: Map<string, number>): Set<string> {
   return new Set(seq.filter((id) => !keep.has(id)))
 }
 
-/** The proposed view with marks: new, deleted (where they were), moved and changed cards and columns. */
-export function diffView(before: Board, after: Board, view: LineView, chapters: ChapterRef[]): DiffColumn[] {
-  const cardMap = matchCards(before, after)
-  const beforeCards = new Map(before.cards.map((c) => [c.id, c]))
-  const kept = new Set(cardMap.values())
-  const b = boardView(before, view, chapters)
-  const a = boardView(after, view, chapters)
-  const colMap = matchColumns(b, a)
-  const beforeCol = new Map<string, ViewColumn>(b.map((c) => [c.key, c]))
-  const columnOfCard = new Map<string, string>()
-  for (const col of b) for (const c of col.cards) columnOfCard.set(c.id, col.key)
-  const otherView: LineView = view === 'chapter' ? 'order' : 'chapter'
-  const otherBefore = placesOf(before, otherView, chapters)
-  const otherAfter = placesOf(after, otherView, chapters)
+/* ------------------------------------------------------------------ */
+/* Changes of a proposal of the AI                                      */
+/* ------------------------------------------------------------------ */
 
-  const out: DiffColumn[] = a.map((col) => {
-    const oldKey = colMap.get(col.key)
-    const old = oldKey ? beforeCol.get(oldKey) : undefined
-    const oldIndex = new Map((old?.cards ?? []).map((c, i) => [c.id, i]))
-    const mapped = col.cards.map((c) => cardMap.get(c.id) ?? '')
-    const shuffled = outOfOrder(
-      mapped.filter((id) => id && columnOfCard.get(id) === oldKey),
-      oldIndex
-    )
-    const cards: DiffCard[] = col.cards.map((card, i) => {
-      const was = mapped[i] ? beforeCards.get(mapped[i]) : undefined
-      if (!was) return { card, added: true, removed: false, moved: false, otherMoved: false, changed: false }
-      const moved = columnOfCard.get(was.id) !== oldKey || shuffled.has(was.id)
-      const otherMoved = otherBefore.get(was.id)?.key !== otherAfter.get(card.id)?.key
-      const changed = fold(was.text) !== fold(card.text)
-      return { card, added: false, removed: false, moved, otherMoved, changed, ...(changed ? { before: was.text } : {}) }
-    })
-    // Deleted cards stay where they were, among the cards of their old column.
-    if (old) {
-      old.cards.forEach((c, i) => {
-        if (kept.has(c.id)) return
-        cards.splice(Math.min(i, cards.length), 0, { card: c, added: false, removed: true, moved: false, otherMoved: false, changed: false })
-      })
-    }
-    const mark: DiffColumn['mark'] = !old ? 'added' : fold(old.title) !== fold(col.title) && col.kind !== 'tray' ? 'renamed' : 'same'
-    return { ...col, mark, ...(mark === 'renamed' ? { oldTitle: old!.title } : {}), cards }
-  })
-  // Deleted columns stay where they were, with their deleted cards.
-  const used = new Set(colMap.values())
-  b.forEach((col, i) => {
-    if (used.has(col.key)) return
-    const cards = col.cards.filter((c) => !kept.has(c.id)).map((card): DiffCard => ({ card, added: false, removed: true, moved: false, otherMoved: false, changed: false }))
-    // A tray that is gone shows only for its deleted cards.
-    if (col.kind === 'tray' && !cards.length) return
-    const prevKey = b
-      .slice(0, i)
-      .reverse()
-      .find((x) => used.has(x.key))?.key
-    const afterKey = prevKey ? [...colMap.entries()].find(([, v]) => v === prevKey)?.[0] : undefined
-    const at = afterKey ? out.findIndex((x) => x.key === afterKey) + 1 : out[0]?.kind === 'tray' ? 1 : 0
-    out.splice(at, 0, { ...col, mark: 'removed', cards })
-  })
-  return out
+// A proposal is a whole board (the board now with the changes of the AI). The board shows its
+// changes one by one, and the author applies or rejects each one: a card that goes away is red
+// where it is, a card that comes is green where it goes. A move is two changes: the card leaves
+// its column (red) and goes to the other column (green). After a change, the changes are found
+// again between the board now and the proposed board, so an applied change is gone.
+
+export type ChangeKind = 'card-add' | 'card-delete' | 'card-text' | 'place' | 'unplace' | 'column-add' | 'column-delete' | 'column-rename' | 'column-move'
+
+export interface BoardChange {
+  /** The same while the proposed board stays the same: the decisions of the author use it */
+  id: string
+  kind: ChangeKind
+  view?: LineView
+  /** The card in the board now (card-delete, card-text, unplace) */
+  cardId?: string
+  /** The card in the proposed board (place, card-add, card-text) */
+  afterCardId?: string
+  /** place, column-add: a column of the proposed board. unplace, column-delete, -rename, -move: a column of the board now */
+  column?: string
 }
 
-/** The counts of a proposal: new, deleted, moved (in either view) and changed cards. */
-export function boardStats(before: Board, after: Board, chapters: ChapterRef[]): { added: number; removed: number; moved: number; changed: number } {
-  const cardMap = matchCards(before, after)
-  const kept = new Set(cardMap.values())
-  const moved = new Set<string>()
-  let changed = 0
-  for (const view of ['chapter', 'order'] as const) {
-    for (const col of diffView(before, after, view, chapters)) for (const c of col.cards) if (c.moved) moved.add(c.card.id)
+const VIEWS: LineView[] = ['chapter', 'order']
+
+function isMovable(c: Pick<ViewColumn, 'kind'>): boolean {
+  return c.kind === 'planned' || c.kind === 'moment'
+}
+
+interface ViewMatch {
+  /** The columns now and in the proposal */
+  now: ViewColumn[]
+  next: ViewColumn[]
+  /** A column of the proposal → the same column now */
+  cols: Map<string, string>
+}
+
+function matchView(cur: Board, after: Board, view: LineView, chapters: ChapterRef[]): ViewMatch {
+  const now = boardView(cur, view, chapters)
+  const next = boardView(after, view, chapters)
+  return { now, next, cols: matchColumns(now, next) }
+}
+
+/** The column of the board now just after which a column (or a card) of the proposal goes: its nearest earlier neighbor that is there now. */
+function anchorBefore<T>(list: T[], at: number, here: (t: T) => string | undefined): string | undefined {
+  for (let i = at - 1; i >= 0; i--) {
+    const k = here(list[i])
+    if (k) return k
   }
-  const beforeCards = new Map(before.cards.map((c) => [c.id, c]))
+  return undefined
+}
+
+export function boardChanges(cur: Board, after: Board, chapters: ChapterRef[]): BoardChange[] {
+  const cards = matchCards(cur, after)
+  const kept = new Set(cards.values())
+  const nowText = new Map(cur.cards.map((c) => [c.id, c.text]))
+  const out: BoardChange[] = []
+  const placedSomewhere = new Set<string>()
+  for (const view of VIEWS) {
+    const { now, next, cols } = matchView(cur, after, view, chapters)
+    const used = new Set(cols.values())
+    // Columns
+    const nextMovable = next.filter(isMovable)
+    const nowMovable = now.filter(isMovable)
+    for (const col of nextMovable) if (!cols.has(col.key)) out.push({ id: `col-add:${view}:${col.key}`, kind: 'column-add', view, column: col.key })
+    for (const col of nowMovable) if (!used.has(col.key)) out.push({ id: `col-delete:${view}:${col.key}`, kind: 'column-delete', view, column: col.key })
+    for (const col of nextMovable) {
+      const k = cols.get(col.key)
+      const old = k ? nowMovable.find((c) => c.key === k) : undefined
+      if (old && old.title !== col.title) out.push({ id: `col-rename:${view}:${old.key}`, kind: 'column-rename', view, column: old.key })
+    }
+    const nowOrder = new Map(nowMovable.map((c, i) => [c.key, i]))
+    const seq = nextMovable.map((c) => cols.get(c.key)).filter((k): k is string => Boolean(k && nowOrder.has(k)))
+    for (const k of outOfOrder(seq, nowOrder)) out.push({ id: `col-move:${view}:${k}`, kind: 'column-move', view, column: k })
+    // Cards
+    const place = new Map<string, string>()
+    for (const col of now) if (col.kind !== 'tray') for (const c of col.cards) place.set(c.id, col.key)
+    const placedNext = new Set<string>()
+    for (const col of next) {
+      if (col.kind === 'tray') continue
+      const target = cols.get(col.key)
+      const old = target ? now.find((c) => c.key === target) : undefined
+      const oldIndex = new Map((old?.cards ?? []).map((c, i) => [c.id, i]))
+      const stay = col.cards.map((c) => cards.get(c.id)).filter((id): id is string => Boolean(id && place.get(id) === target))
+      const shuffled = outOfOrder(stay, oldIndex)
+      for (const c of col.cards) {
+        placedSomewhere.add(c.id)
+        const id = cards.get(c.id)
+        if (id) placedNext.add(id)
+        const at = id ? place.get(id) : undefined
+        // In the same column (not a new one) and in the same order: no change.
+        if (id && target && at === target && !shuffled.has(id)) continue
+        out.push({ id: `place:${view}:${c.id}:${col.key}`, kind: 'place', view, cardId: id, afterCardId: c.id, column: col.key })
+        if (id && at) out.push({ id: `unplace:${view}:${id}:${at}`, kind: 'unplace', view, cardId: id, column: at })
+      }
+    }
+    // A card that leaves its column for the tray (a deleted card has its own change)
+    for (const [id, at] of place) {
+      if (kept.has(id) && !placedNext.has(id)) out.push({ id: `unplace:${view}:${id}:${at}`, kind: 'unplace', view, cardId: id, column: at })
+    }
+  }
   for (const c of after.cards) {
-    const was = cardMap.get(c.id)
-    if (was && fold(beforeCards.get(was)!.text) !== fold(c.text)) changed++
+    const id = cards.get(c.id)
+    if (id && nowText.get(id) !== c.text) out.push({ id: `text:${id}`, kind: 'card-text', cardId: id, afterCardId: c.id })
+    if (!id && !placedSomewhere.has(c.id)) out.push({ id: `add:${c.id}`, kind: 'card-add', afterCardId: c.id })
   }
-  return {
-    added: after.cards.filter((c) => !cardMap.has(c.id)).length,
-    removed: before.cards.filter((c) => !kept.has(c.id)).length,
-    moved: moved.size,
-    changed
+  for (const c of cur.cards) if (!kept.has(c.id)) out.push({ id: `delete:${c.id}`, kind: 'card-delete', cardId: c.id })
+  const seen = new Set<string>()
+  return out.filter((c) => !seen.has(c.id) && Boolean(seen.add(c.id)))
+}
+
+/** The changes that wait for a decision: all changes but the rejected ones. */
+export function pendingChanges(cur: Board, after: Board, chapters: ChapterRef[], rejected: Set<string>): BoardChange[] {
+  return boardChanges(cur, after, chapters).filter((c) => !rejected.has(c.id))
+}
+
+/** The card of the proposal in the board now; a new card is made (with its id, when it is free). */
+function ensureCard(cur: Board, afterCardId: string, after: Board): { board: Board; id: string } | null {
+  const id = matchCards(cur, after).get(afterCardId)
+  if (id) return { board: cur, id }
+  const card = after.cards.find((c) => c.id === afterCardId)
+  if (!card) return null
+  const fresh = cur.cards.some((c) => c.id === afterCardId) ? idMaker(allIds(cur), 'c')() : afterCardId
+  return { board: { ...cur, cards: [...cur.cards, { id: fresh, text: card.text }] }, id: fresh }
+}
+
+/** The place among the moving columns now where a column of the proposal goes: after its nearest earlier neighbor. */
+function columnIndex(m: ViewMatch, afterKey: string, skip?: string): number {
+  const nextMovable = m.next.filter(isMovable)
+  const nowMovable = m.now.filter(isMovable).filter((c) => c.key !== skip)
+  const anchor = anchorBefore(
+    nextMovable,
+    nextMovable.findIndex((c) => c.key === afterKey),
+    (c) => {
+      const k = m.cols.get(c.key)
+      return k && k !== skip ? k : undefined
+    }
+  )
+  return anchor ? nowMovable.findIndex((c) => c.key === anchor) + 1 : 0
+}
+
+/** The column of the proposal in the board now (written chapters are always there); a new column is made. */
+function ensureColumn(cur: Board, view: LineView, afterKey: string, after: Board, chapters: ChapterRef[]): { board: Board; key: string } | null {
+  const m = matchView(cur, after, view, chapters)
+  if (afterKey.startsWith('ch:')) {
+    // A written chapter is always there. Its first card makes its column: with the id of the proposal, when it is free.
+    const now = m.now.find((c) => c.key === afterKey)
+    const next = m.next.find((c) => c.key === afterKey)
+    const ch = chapters.find((c) => `ch:${c.id}` === afterKey)
+    if (ch && now && !now.columnId && next?.columnId && !allIds(cur).includes(next.columnId)) {
+      return { board: withColumns(cur, view, [...columnsOf(cur, view), { id: next.columnId, title: headingOf(ch, chapters), cards: [] }]), key: afterKey }
+    }
+    return { board: cur, key: afterKey }
   }
+  const mapped = m.cols.get(afterKey)
+  if (mapped) return { board: cur, key: mapped }
+  const col = m.next.find((c) => c.key === afterKey)
+  if (!col) return null
+  const index = columnIndex(m, afterKey)
+  const taken = allIds(cur).includes(afterKey)
+  const id = taken ? idMaker(allIds(cur), 'k')() : afterKey
+  let board = withColumns(cur, view, [...columnsOf(cur, view), { id, title: col.title, cards: [] }])
+  board = moveColumn(board, view, id, index, chapters)
+  return { board, key: id }
+}
+
+/** Apply one change to the board now. */
+export function applyBoardChange(cur: Board, change: BoardChange, after: Board, chapters: ChapterRef[]): Board {
+  const view = change.view ?? 'chapter'
+  switch (change.kind) {
+    case 'card-text': {
+      const text = after.cards.find((c) => c.id === change.afterCardId)?.text
+      return text !== undefined && change.cardId ? updateCard(cur, change.cardId, text) : cur
+    }
+    case 'card-delete':
+      return change.cardId ? deleteCard(cur, change.cardId) : cur
+    case 'card-add':
+      return change.afterCardId ? (ensureCard(cur, change.afterCardId, after)?.board ?? cur) : cur
+    case 'unplace':
+      return change.cardId ? placeCard(cur, view, change.cardId, TRAY, 0, chapters) : cur
+    case 'column-delete': {
+      const id = boardView(cur, view, chapters).find((c) => c.key === change.column)?.columnId
+      return id ? deleteColumn(cur, view, id) : cur
+    }
+    case 'column-rename': {
+      const m = matchView(cur, after, view, chapters)
+      const next = [...m.cols.entries()].find(([, k]) => k === change.column)?.[0]
+      const title = m.next.find((c) => c.key === next)?.title
+      const id = m.now.find((c) => c.key === change.column)?.columnId
+      return title !== undefined && id ? renameColumn(cur, view, id, title) : cur
+    }
+    case 'column-add':
+      return change.column ? (ensureColumn(cur, view, change.column, after, chapters)?.board ?? cur) : cur
+    case 'column-move': {
+      const m = matchView(cur, after, view, chapters)
+      const next = [...m.cols.entries()].find(([, k]) => k === change.column)?.[0]
+      const id = m.now.find((c) => c.key === change.column)?.columnId
+      return next && id ? moveColumn(cur, view, id, columnIndex(m, next, change.column), chapters) : cur
+    }
+    case 'place': {
+      if (!change.afterCardId || !change.column) return cur
+      const card = ensureCard(cur, change.afterCardId, after)
+      if (!card) return cur
+      const col = ensureColumn(card.board, view, change.column, after, chapters)
+      if (!col) return cur
+      // After the nearest earlier card of the proposed column that is in the column now.
+      const m = matchView(col.board, after, view, chapters)
+      const ids = matchCards(col.board, after)
+      const next = m.next.find((c) => c.key === change.column)?.cards ?? []
+      const there = (m.now.find((c) => c.key === col.key)?.cards ?? []).map((c) => c.id).filter((id) => id !== card.id)
+      const anchor = anchorBefore(
+        next,
+        next.findIndex((c) => c.id === change.afterCardId),
+        (c) => {
+          const id = ids.get(c.id)
+          return id && there.includes(id) ? id : undefined
+        }
+      )
+      return placeCard(col.board, view, card.id, col.key, anchor ? there.indexOf(anchor) + 1 : 0, chapters)
+    }
+  }
+}
+
+export type Tone = 'same' | 'add' | 'remove'
+
+export interface ReviewSlot {
+  card: LineCard
+  tone: Tone
+  /** The changes that this card on screen applies or rejects */
+  changes: string[]
+  /** The text now, when the change gives a new text */
+  before?: string
+}
+
+export interface ReviewColumn extends Omit<ViewColumn, 'cards'> {
+  tone: Tone
+  changes: string[]
+  /** A new title (a rename) */
+  newTitle?: string
+  /** The column changes its place */
+  moves?: boolean
+  slots: ReviewSlot[]
+}
+
+/**
+ * A view of the board now with the changes that wait for a decision: red where a card or a column
+ * goes away, green where one comes, a new text on its card.
+ */
+export function reviewView(cur: Board, after: Board, view: LineView, chapters: ChapterRef[], rejected: Set<string>): ReviewColumn[] {
+  const changes = pendingChanges(cur, after, chapters, rejected)
+  const m = matchView(cur, after, view, chapters)
+  const ids = matchCards(cur, after)
+  const nowText = new Map(cur.cards.map((c) => [c.id, c.text]))
+  const nextCards = new Map(after.cards.map((c) => [c.id, c]))
+  const mine = changes.filter((c) => !c.view || c.view === view)
+  const ghosts = new Set(mine.filter((c) => c.kind === 'place').map((c) => c.afterCardId))
+  const textOf = (afterCardId: string | undefined): BoardChange | undefined => changes.find((c) => c.kind === 'card-text' && c.afterCardId === afterCardId)
+
+  const out: ReviewColumn[] = m.now.map((col) => {
+    const slots: ReviewSlot[] = col.cards.map((card) => {
+      const gone = changes.find((c) => c.kind === 'card-delete' && c.cardId === card.id)
+      if (gone) return { card, tone: 'remove', changes: [gone.id] }
+      const leaves = mine.find((c) => c.kind === 'unplace' && c.cardId === card.id && c.column === col.key)
+      if (leaves) return { card, tone: 'remove', changes: [leaves.id] }
+      const after = [...ids.entries()].find(([, id]) => id === card.id)?.[0]
+      const text = after && !ghosts.has(after) ? textOf(after) : undefined
+      if (text) return { card: { id: card.id, text: nextCards.get(after!)!.text }, tone: 'add', changes: [text.id], before: card.text }
+      return { card, tone: 'same', changes: [] }
+    })
+    const own = mine.filter((c) => c.column === col.key && c.kind.startsWith('column-'))
+    const rename = own.find((c) => c.kind === 'column-rename')
+    const next = rename ? [...m.cols.entries()].find(([, k]) => k === col.key)?.[0] : undefined
+    return {
+      ...col,
+      tone: own.some((c) => c.kind === 'column-delete') ? 'remove' : 'same',
+      changes: own.map((c) => c.id),
+      ...(rename ? { newTitle: m.next.find((c) => c.key === next)?.title } : {}),
+      ...(own.some((c) => c.kind === 'column-move') ? { moves: true } : {}),
+      slots
+    }
+  })
+  // New columns, after their nearest earlier neighbor.
+  for (const c of mine.filter((x) => x.kind === 'column-add')) {
+    const col = m.next.find((x) => x.key === c.column)
+    if (!col) continue
+    const at = m.next.indexOf(col)
+    const anchor = anchorBefore(m.next, at, (x) => (out.some((o) => o.key === (m.cols.get(x.key) ?? x.key)) ? (m.cols.get(x.key) ?? x.key) : undefined))
+    const index = anchor ? out.findIndex((o) => o.key === anchor) + 1 : out[0]?.kind === 'tray' ? 1 : 0
+    out.splice(index, 0, { ...col, tone: 'add', changes: [c.id], slots: [] })
+  }
+  // New places of cards, after their nearest earlier neighbor in the proposed column.
+  for (const col of m.next) {
+    if (col.kind === 'tray') continue
+    const target = out.find((o) => o.key === (m.cols.get(col.key) ?? col.key))
+    if (!target) continue
+    col.cards.forEach((card, i) => {
+      const place = mine.find((c) => c.kind === 'place' && c.afterCardId === card.id && c.column === col.key)
+      if (!place) return
+      const id = ids.get(card.id)
+      const text = id ? textOf(card.id) : undefined
+      const slot: ReviewSlot = { card, tone: 'add', changes: [place.id, ...(text ? [text.id] : [])], ...(text && id ? { before: nowText.get(id) } : {}) }
+      const anchor = anchorBefore(col.cards, i, (x) => {
+        const k = target.slots.findIndex((s) => s.tone !== 'remove' && (s.card.id === x.id || s.card.id === ids.get(x.id)))
+        return k >= 0 ? String(k) : undefined
+      })
+      target.slots.splice(anchor !== undefined ? Number(anchor) + 1 : 0, 0, slot)
+    })
+  }
+  // New cards with no place: in the tray.
+  const adds = changes.filter((c) => c.kind === 'card-add')
+  if (adds.length) {
+    let tray = out.find((o) => o.kind === 'tray')
+    if (!tray) {
+      tray = { key: TRAY, kind: 'tray', title: '', tone: 'same', changes: [], slots: [] }
+      out.unshift(tray)
+    }
+    for (const c of adds) {
+      const card = nextCards.get(c.afterCardId!)
+      if (card) tray.slots.push({ card, tone: 'add', changes: [c.id] })
+    }
+  }
+  return out
 }
 
 /* ------------------------------------------------------------------ */

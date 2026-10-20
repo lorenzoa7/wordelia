@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { motion } from 'motion/react'
-import { ArrowLeft, BookOpenText, CaretRight, ChatCircleText, DownloadSimple, Graph, ImageSquare, Plus, Trash, X } from '@phosphor-icons/react'
+import { ArrowLeft, BookOpenText, CaretRight, ChatCircleText, DownloadSimple, Graph, ImageSquare, Path, Plus, SquaresFour, Trash, X } from '@phosphor-icons/react'
 import { markdownToPlain } from '@shared/book'
 import { entryNames } from '@shared/prompts/context'
 import type { Entry } from '@shared/types'
@@ -14,21 +14,17 @@ import { useNotes } from './line/model'
 import { useUi } from '@/stores/ui'
 import { useChat } from '@/features/chat/chatStore'
 import { useApp } from '@/stores/app'
-import { LINE_PAGE, MAP_PAGE, MapView, PlanViewSwitch, mapBack, useReturnsToMap } from '@/features/graph'
+import { LINE_PAGE, MAP_PAGE, MapView, PlanViewSwitch, planBack, useBackPlace } from '@/features/graph'
 import { LineView } from './line/LineView'
 import { NoteEditor } from './NoteEditor'
-import { CategoryIcon } from './PlanSidebar'
+import { CategoryIcon, CategoryMenu } from './PlanSidebar'
 import { importNotes } from './importNotes'
 import { BuildPlanningButton } from './SyncPanel'
 import './plan.css'
 
-/** One level up: from an entry to its category, from a category or the map to the overview. An entry opened from the map goes back to the map. */
+/** Back to the page before, as in a browser (features/graph/nav.ts); with no page before, one level up. */
 function goBack(): void {
-  if (mapBack()) return
-  const s = useBook.getState()
-  const entry = s.entries.find((e) => e.id === s.activeEntryId)
-  if (entry) s.selectCategory(entry.category)
-  else if (s.activeCategory) s.selectCategory(null)
+  planBack()
 }
 
 function isTyping(el: EventTarget | null): boolean {
@@ -74,9 +70,30 @@ export function PlanView(): React.JSX.Element {
   )
 }
 
-/** "← Characters" at the top of a Plan page: back to the page above. */
-function BackLink({ label, icon }: { label: string; icon?: ReactNode }): React.JSX.Element {
+/** "← Story line" at the top of a Plan page: back to the page before (or one level up), with its name. */
+function BackLink(): React.JSX.Element | null {
   const t = useT()
+  const place = useBackPlace()
+  const entry = useBook((s) => (place?.entry ? s.entries.find((e) => e.id === place.entry) : undefined))
+  const categories = useBook((s) => s.manifest?.planning.categories ?? [])
+  if (!place) return null
+  const folder = entry ? entry.category : place.category
+  const category = categories.find((c) => c.folder === folder)
+  let label: string = t.plan.sidebar.overview
+  let icon: ReactNode = <SquaresFour size={13} />
+  if (entry) {
+    label = entry.name
+    icon = <CategoryIcon name={category?.icon ?? 'Folder'} size={13} />
+  } else if (place.category === MAP_PAGE) {
+    label = t.plan.map.map
+    icon = <Graph size={13} />
+  } else if (place.category === LINE_PAGE) {
+    label = t.plan.line.title
+    icon = <Path size={13} />
+  } else if (place.category) {
+    label = category ? categoryName(t, category) : place.category
+    icon = <CategoryIcon name={category?.icon ?? 'Folder'} size={13} />
+  }
   return (
     <Tooltip label={t.plan.backTo(label)} shortcut="Alt+←">
       <button className="plan-back" onClick={goBack} aria-label={t.plan.backTo(label)}>
@@ -136,7 +153,7 @@ function CategoryGrid({ folder }: { folder: string | null }): React.JSX.Element 
       <div className="plan-inner">
         {category ? (
           <header className="plan-hero plan-hero-category">
-            <BackLink label={t.plan.sidebar.overview} />
+            <BackLink />
             <h1>
               <CategoryIcon name={category.icon} size={26} />
               <span>{categoryName(t, category)}</span>
@@ -150,6 +167,7 @@ function CategoryGrid({ folder }: { folder: string | null }): React.JSX.Element 
                 <Button size="sm" icon={<Plus size={14} weight="bold" />} onClick={() => void add(category.folder)}>
                   {t.plan.category.newEntry}
                 </Button>
+                <CategoryMenu category={category} notes={count(category.folder)} />
               </div>
             </div>
           </header>
@@ -224,10 +242,8 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
   const root = useBook((s) => s.root)
   const chapters = useBook((s) => s.chapters)
   const rev = useBook((s) => s.externalRev[entry.id] ?? 0)
-  const category = useBook((s) => s.manifest?.planning.categories.find((c) => c.folder === entry.category))
   const [name, setName] = useState(entry.name)
   const [aliasDraft, setAliasDraft] = useState('')
-  const fromMap = useReturnsToMap(entry.id)
   useEffect(() => setName(entry.name), [entry.name])
 
   const mentions = useMemo(() => {
@@ -279,11 +295,7 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
         transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
       >
         <div className="entry-crumbs">
-          {fromMap ? (
-            <BackLink label={t.plan.map.map} icon={<Graph size={13} />} />
-          ) : (
-            <BackLink label={category ? categoryName(t, category) : entry.category} icon={<CategoryIcon name={category?.icon ?? 'Folder'} size={13} />} />
-          )}
+          <BackLink />
           <span className="entry-tools">
             <IconButton
               label={t.plan.entry.askChat}

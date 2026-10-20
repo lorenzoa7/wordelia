@@ -2,24 +2,27 @@ import { describe, expect, it } from 'vitest'
 import {
   addCard,
   addColumn,
-  boardStats,
+  applyBoardChange,
+  boardChanges,
   boardView,
   chapterOf,
   deleteCard,
   deleteColumn,
-  diffView,
   findStoryLine,
   hereKey,
   isStoryLine,
   mentionPieces,
   moveColumn,
   parseBoard,
+  pendingChanges,
   placeCard,
   renameChapterInBody,
   renameColumn,
+  reviewView,
   serializeBoard,
   updateCard,
-  type Board
+  type Board,
+  type ReviewColumn
 } from './storyline'
 import type { Entry } from './types'
 
@@ -257,68 +260,144 @@ describe('changes', () => {
   })
 })
 
-describe('diffView', () => {
-  it('marks every card and column of a first fill as new', () => {
-    const cols = diffView(parseBoard(''), parseBoard(BODY), 'order', chapters)
-    expect(cols.map((c) => c.mark)).toEqual(['added', 'added', 'added'])
-    expect(cols.flatMap((c) => c.cards.map((x) => x.added))).toEqual([true, true, true, true, true])
-    // The written chapters exist before: their columns are not new.
-    expect(diffView(parseBoard(''), parseBoard(BODY), 'chapter', chapters).map((c) => c.mark)).toEqual(['same', 'same', 'added'])
+describe('changes of a proposal', () => {
+  const kinds = (cur: Board, after: Board): string[] =>
+    boardChanges(cur, after, chapters)
+      .map((c) => c.id)
+      .sort()
+
+  it('a move is a removal from one column and an addition to another', () => {
+    const after = placeCard(parseBoard(BODY), 'order', 'c1', 'k4', 0, chapters)
+    expect(kinds(parseBoard(BODY), after)).toEqual(['place:order:c1:k4', 'unplace:order:c1:k5'])
   })
 
-  it('marks moved, changed and deleted cards, and renamed and deleted columns', () => {
-    let after = placeCard(parseBoard(BODY), 'order', 'c1', 'k4', 0, chapters)
-    after = updateCard(after, 'c2', '@Marta climbs the stairs with tea.')
-    after = deleteCard(after, 'c4')
+  it('a new card goes to its places; a deleted card and a new text are one change each', () => {
+    let after = addCard(parseBoard(BODY), 'chapter', 'ch:ch2', 'new', chapters).board
+    after = placeCard(after, 'order', 'c6', 'k4', 1, chapters)
+    after = deleteCard(after, 'c5')
+    after = updateCard(after, 'c2', 'tea')
+    expect(kinds(parseBoard(BODY), after)).toEqual(['delete:c5', 'place:chapter:c6:ch:ch2', 'place:order:c6:k4', 'text:c2'])
+  })
+
+  it('a card that changes its place in its column is a removal and an addition', () => {
+    const after = placeCard(parseBoard(BODY), 'chapter', 'c3', 'ch:ch1', 0, chapters)
+    expect(kinds(parseBoard(BODY), after)).toEqual(['place:chapter:c3:ch:ch1', 'unplace:chapter:c3:ch:ch1'])
+  })
+
+  it('columns: new, deleted, renamed', () => {
+    let after = addColumn(parseBoard(BODY), 'order', 'Dawn').board
     after = renameColumn(after, 'order', 'k4', 'Long ago')
     after = deleteColumn(after, 'order', 'k5')
-    const cols = diffView(parseBoard(BODY), after, 'order', chapters)
-    const k4 = cols.find((c) => c.key === 'k4')!
-    expect(k4.mark).toBe('renamed')
-    expect(k4.oldTitle).toBe('Twenty-two years before')
-    expect(k4.cards.map((c) => [c.card.id, c.moved, c.added])).toEqual([
-      ['c1', true, false],
-      ['c3', false, false]
-    ])
-    const k5 = cols.find((c) => c.key === 'k5')!
-    expect(k5.mark).toBe('removed')
-    expect(k5.cards.map((c) => [c.card.id, c.removed])).toEqual([['c4', true]])
-    const tray = cols.find((c) => c.key === 'tray')!
-    expect(tray.cards.find((c) => c.card.id === 'c2')).toMatchObject({ moved: true, changed: true, before: '@Marta climbs the stairs with coffee.' })
+    expect(kinds(parseBoard(BODY), after).filter((k) => k.startsWith('col'))).toEqual(['col-add:order:k6', 'col-delete:order:k5', 'col-rename:order:k4'])
   })
 
-  it('marks a card that changed its place in its column', () => {
-    const after = placeCard(parseBoard(BODY), 'chapter', 'c3', 'ch:ch1', 0, chapters)
-    const col = diffView(parseBoard(BODY), after, 'chapter', chapters).find((c) => c.key === 'ch:ch1')!
-    expect(col.cards.map((c) => [c.card.id, c.moved])).toEqual([
-      ['c3', true],
-      ['c1', false],
-      ['c2', false]
-    ])
+  it('nothing changes: no change', () => {
+    expect(boardChanges(parseBoard(BODY), parseBoard(BODY), chapters)).toEqual([])
+    // A rebuild with new ids is the same board.
+    expect(boardChanges(parseBoard(BODY), parseBoard(BODY.replace(/\^c(\d)/g, '^n$1')), chapters)).toEqual([])
   })
 
-  it('marks a card whose place in the other view changed', () => {
+  it('applies the addition of a move alone: the card moves, and the removal is done too', () => {
     const after = placeCard(parseBoard(BODY), 'order', 'c1', 'k4', 0, chapters)
-    const col = diffView(parseBoard(BODY), after, 'chapter', chapters).find((c) => c.key === 'ch:ch1')!
-    expect(col.cards.map((c) => [c.card.id, c.moved, c.otherMoved])).toEqual([
-      ['c1', false, true],
-      ['c2', false, false],
-      ['c3', false, false]
+    let cur = parseBoard(BODY)
+    const place = boardChanges(cur, after, chapters).find((c) => c.kind === 'place')!
+    cur = applyBoardChange(cur, place, after, chapters)
+    expect(ids(cur, 'order', 'k4')).toEqual(['c1', 'c3'])
+    expect(boardChanges(cur, after, chapters)).toEqual([])
+  })
+
+  it('applies the removal of a move alone: the card goes to the tray', () => {
+    const after = placeCard(parseBoard(BODY), 'order', 'c1', 'k4', 0, chapters)
+    let cur = parseBoard(BODY)
+    cur = applyBoardChange(cur, boardChanges(cur, after, chapters).find((c) => c.kind === 'unplace')!, after, chapters)
+    expect(ids(cur, 'order', 'tray')).toEqual(['c1', 'c5'])
+    expect(boardChanges(cur, after, chapters).map((c) => c.id)).toEqual(['place:order:c1:k4'])
+  })
+
+  it('puts a new card after the card that comes before it', () => {
+    const after = addCard(parseBoard(BODY), 'chapter', 'ch:ch1', 'between', chapters, 1).board
+    let cur = parseBoard(BODY)
+    for (const c of boardChanges(cur, after, chapters)) cur = applyBoardChange(cur, c, after, chapters)
+    expect(ids(cur, 'chapter', 'ch:ch1')).toEqual(['c1', 'c6', 'c2', 'c3'])
+  })
+
+  it('makes the column of a new card when the card goes there first', () => {
+    let after = addColumn(parseBoard(BODY), 'order', 'Dawn').board
+    after = placeCard(after, 'order', 'c5', 'k6', 0, chapters)
+    let cur = parseBoard(BODY)
+    cur = applyBoardChange(cur, boardChanges(cur, after, chapters).find((c) => c.kind === 'place')!, after, chapters)
+    expect(boardView(cur, 'order', chapters).map((c) => c.title)).toEqual(['Twenty-two years before', 'The night of the storm', 'Dawn'])
+    expect(ids(cur, 'order', 'k6')).toEqual(['c5'])
+    expect(boardChanges(cur, after, chapters)).toEqual([])
+  })
+
+  it('applies every change of a first fill to an empty line', () => {
+    let cur = parseBoard('')
+    const after = parseBoard(BODY)
+    for (const c of boardChanges(cur, after, chapters)) cur = applyBoardChange(cur, c, after, chapters)
+    expect(boardChanges(cur, after, chapters)).toEqual([])
+    expect(boardView(cur, 'order', chapters).map((c) => [c.key, c.cards.map((x) => x.id)])).toEqual([
+      ['tray', ['c5']],
+      ['k4', ['c3']],
+      ['k5', ['c2', 'c1', 'c4']]
+    ])
+  })
+})
+
+describe('reviewView', () => {
+  const cols = (cur: Board, after: Board, view: 'chapter' | 'order', skip: string[] = []) => reviewView(cur, after, view, chapters, new Set(skip))
+  const slots = (c: ReviewColumn | undefined): string[][] => (c?.slots ?? []).map((s) => [s.card.id, s.tone])
+
+  it('shows a move as a red card in the old column and a green card in the new one', () => {
+    const after = placeCard(parseBoard(BODY), 'order', 'c1', 'k4', 0, chapters)
+    const view = cols(parseBoard(BODY), after, 'order')
+    expect(slots(view.find((c) => c.key === 'k4'))).toEqual([
+      ['c1', 'add'],
+      ['c3', 'same']
+    ])
+    expect(slots(view.find((c) => c.key === 'k5'))).toEqual([
+      ['c2', 'same'],
+      ['c1', 'remove'],
+      ['c4', 'same']
+    ])
+    expect(view.find((c) => c.key === 'k4')!.slots[0].changes).toEqual(['place:order:c1:k4'])
+  })
+
+  it('leaves out a change that the author rejected', () => {
+    const after = placeCard(parseBoard(BODY), 'order', 'c1', 'k4', 0, chapters)
+    const view = cols(parseBoard(BODY), after, 'order', ['place:order:c1:k4'])
+    expect(slots(view.find((c) => c.key === 'k4'))).toEqual([['c3', 'same']])
+    expect(slots(view.find((c) => c.key === 'k5'))).toEqual([
+      ['c2', 'same'],
+      ['c1', 'remove'],
+      ['c4', 'same']
     ])
   })
 
-  it('matches cards by their text when a rebuild has new ids', () => {
-    const rebuilt = BODY.replace(/\^c(\d)/g, '^n$1')
-    const cols = diffView(parseBoard(BODY), parseBoard(rebuilt), 'order', chapters)
-    expect(cols.flatMap((c) => c.cards.filter((x) => x.added || x.removed || x.moved))).toEqual([])
+  it('shows a new text on the card, with the text before', () => {
+    const after = updateCard(parseBoard(BODY), 'c2', 'tea')
+    const slot = cols(parseBoard(BODY), after, 'order')
+      .flatMap((c) => c.slots)
+      .find((s) => s.card.id === 'c2')!
+    expect(slot).toMatchObject({ tone: 'add', changes: ['text:c2'], before: '@Marta climbs the stairs with coffee.' })
+    expect(slot.card.text).toBe('tea')
   })
 
-  it('counts the changes', () => {
-    let after = addCard(parseBoard(BODY), 'chapter', 'ch:ch1', 'new', chapters).board
-    after = deleteCard(after, 'c5')
-    after = placeCard(after, 'order', 'c1', 'k4', 0, chapters)
-    after = updateCard(after, 'c2', 'tea')
-    expect(boardStats(parseBoard(BODY), after, chapters)).toEqual({ added: 1, removed: 1, moved: 1, changed: 1 })
+  it('shows a new column with its new cards, and a deleted column in red', () => {
+    let after = addColumn(parseBoard(BODY), 'order', 'Dawn').board
+    after = addCard(after, 'order', 'k6', 'morning', chapters).board
+    after = deleteColumn(after, 'order', 'k4')
+    const view = cols(parseBoard(BODY), after, 'order')
+    const dawn = view.find((c) => c.key === 'k6')!
+    expect([dawn.tone, dawn.changes, slots(dawn)]).toEqual(['add', ['col-add:order:k6'], [['c6', 'add']]])
+    expect(view.find((c) => c.key === 'k4')).toMatchObject({ tone: 'remove', changes: ['col-delete:order:k4'] })
+    expect(view.map((c) => c.key)).toEqual(['tray', 'k4', 'k5', 'k6'])
+  })
+
+  it('counts the changes that wait for a decision', () => {
+    const after = placeCard(updateCard(parseBoard(BODY), 'c2', 'tea'), 'order', 'c1', 'k4', 0, chapters)
+    expect(pendingChanges(parseBoard(BODY), after, chapters, new Set()).length).toBe(3)
+    expect(pendingChanges(parseBoard(BODY), after, chapters, new Set(['text:c2'])).length).toBe(2)
   })
 })
 
@@ -372,10 +451,10 @@ describe('fixes from the review', () => {
     expect(b.chapters).toEqual([])
   })
 
-  it('shows a deleted card of the tray when the new board has no tray', () => {
+  it('shows a deleted card of the tray', () => {
     const after = deleteCard(parseBoard(BODY), 'c5')
-    const tray = diffView(parseBoard(BODY), after, 'order', chapters).find((c) => c.key === 'tray')
-    expect(tray?.cards.map((c) => [c.card.id, c.removed])).toEqual([['c5', true]])
+    const tray = reviewView(parseBoard(BODY), after, 'order', chapters, new Set()).find((c) => c.key === 'tray')
+    expect(tray?.slots.map((c) => [c.card.id, c.tone, c.changes])).toEqual([['c5', 'remove', ['delete:c5']]])
   })
 
   it('is fast with many chapters', () => {

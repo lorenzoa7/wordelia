@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { CaretRight, DownloadSimple, Plus, SquaresFour } from '@phosphor-icons/react'
+import { CaretRight, DotsThree, DownloadSimple, PencilSimple, Plus, SquaresFour, Trash } from '@phosphor-icons/react'
 import clsx from 'clsx'
-import { IconButton } from '@/ui'
-import { askText } from '@/ui/prompt'
+import { IconButton, Menu, MenuItem } from '@/ui'
+import { askConfirm, askText } from '@/ui/prompt'
+import type { CategoryDef } from '@shared/types'
 import { categoryName, useT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
 import { useNotes } from './line/model'
@@ -109,6 +110,7 @@ export function PlanSidebar(): React.JSX.Element {
                   <IconButton label={t.plan.sidebar.newIn(label)} onClick={() => void addEntry(c.folder)}>
                     <Plus size={13} />
                   </IconButton>
+                  <CategoryMenu category={c} notes={list.length} />
                 </span>
               </div>
               {isOpen && (
@@ -144,5 +146,38 @@ export function PlanSidebar(): React.JSX.Element {
         <Plus size={13} /> {t.plan.sidebar.addCategory}
       </button>
     </div>
+  )
+}
+
+/** Rename or delete a category (the sidebar row, the category page). */
+export function CategoryMenu({ category, notes }: { category: CategoryDef; notes: number }): React.JSX.Element {
+  const t = useT()
+  const count = useBook((s) => s.manifest?.planning.categories.length ?? 0)
+  const label = categoryName(t, category)
+  const rename = (): void => {
+    void askText({ title: t.plan.sidebar.renameCategory, label: t.plan.name, initial: label, confirm: t.plan.sidebar.rename }).then(
+      (name) => name && useBook.getState().renameCategory(category.id, name)
+    )
+  }
+  const remove = async (): Promise<void> => {
+    const ok = await askConfirm({ title: t.plan.sidebar.deleteCategoryTitle(label), message: t.plan.sidebar.deleteCategoryMessage(notes), confirm: t.common.delete, danger: true })
+    if (ok) await useBook.getState().deleteCategory(category.id)
+  }
+  return (
+    <Menu
+      align="end"
+      trigger={
+        <IconButton label={t.plan.sidebar.categoryMenu(label)}>
+          <DotsThree size={14} weight="bold" />
+        </IconButton>
+      }
+    >
+      <MenuItem icon={<PencilSimple size={14} />} onSelect={rename}>
+        {t.plan.sidebar.renameCategory}
+      </MenuItem>
+      <MenuItem icon={<Trash size={14} />} danger disabled={count < 2} onSelect={() => void remove()}>
+        {count < 2 ? t.plan.sidebar.lastCategory : t.plan.sidebar.deleteCategory}
+      </MenuItem>
+    </Menu>
   )
 }

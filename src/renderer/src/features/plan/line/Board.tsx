@@ -65,8 +65,6 @@ export interface CardLook {
 interface CardViewProps extends CardLook {
   view: LineView
   notes: Entry[]
-  /** The mark of a proposal, at the end of the bottom line */
-  tag?: ReactNode
   /** The text of a changed card, as a word diff */
   text?: ReactNode
   /** The names of the mentions open their notes */
@@ -75,7 +73,7 @@ interface CardViewProps extends CardLook {
 
 /** The look of a card: the text, cut to its lines, and its place in the other view. */
 export const CardView = forwardRef<HTMLDivElement, CardViewProps & React.HTMLAttributes<HTMLDivElement>>(function CardView(
-  { card, other, planned, view, notes, className, tag, text, links = true, ...rest },
+  { card, other, planned, view, notes, className, text, links = true, ...rest },
   ref
 ) {
   const t = useT()
@@ -86,11 +84,10 @@ export const CardView = forwardRef<HTMLDivElement, CardViewProps & React.HTMLAtt
       <span className="line-card-meta">
         {meta && (
           <>
-            {view === 'chapter' ? <Clock size={11} /> : <BookOpenText size={11} />}
+            {view === 'chapter' ? <Clock size={11} /> : <BookOpenText className="is-book" size={11} />}
             <span className="line-card-place">{meta}</span>
           </>
         )}
-        {tag}
       </span>
     </div>
   )
@@ -140,6 +137,8 @@ export interface ShellProps {
   /** The mark of a proposal on the column */
   mark?: 'added' | 'removed' | 'renamed'
   oldTitle?: string
+  /** A bar under the header (the decision on a change of the column) */
+  notice?: ReactNode
   children: ReactNode
   className?: string
   style?: React.CSSProperties
@@ -153,7 +152,7 @@ export function columnName(t: ReturnType<typeof useT>, col: Pick<ViewColumn, 'ki
 
 /** The look of a column: the header (grip, number, title, count, menu) and the cards. */
 export const ColumnShell = forwardRef<HTMLElement, ShellProps>(function ColumnShell(
-  { col, view, here, count, grip, editing = false, onEditing, onRename, menu, mark, oldTitle, children, className, style },
+  { col, view, here, count, grip, editing = false, onEditing, onRename, menu, mark, oldTitle, notice, children, className, style },
   ref
 ) {
   const t = useT()
@@ -193,7 +192,7 @@ export const ColumnShell = forwardRef<HTMLElement, ShellProps>(function ColumnSh
     <section ref={ref} className={clsx('line-col', `is-${col.kind}`, here && 'is-here', mark && `is-${mark}`, className)} style={style} data-column={col.key} aria-label={name}>
       <header className="line-col-head">
         {grip}
-        {col.kind === 'chapter' && <BookOpenText className="line-col-icon" size={13} aria-hidden />}
+        {col.kind === 'chapter' && <BookOpenText className="line-col-icon is-book" size={13} aria-hidden />}
         {col.kind === 'tray' && <Tray className="line-col-icon" size={13} aria-hidden />}
         {col.number !== undefined && <span className="line-col-number">{col.number}</span>}
         {editing ? (
@@ -238,6 +237,7 @@ export const ColumnShell = forwardRef<HTMLElement, ShellProps>(function ColumnSh
           <span className="line-here">{t.plan.line.here}</span>
         </Tooltip>
       )}
+      {notice}
       <div className="line-col-body">{children}</div>
     </section>
   )
@@ -262,7 +262,7 @@ function ColumnMenu({ col, onRename, onDelete }: { col: ViewColumn; onRename(): 
       }
     >
       {col.chapterId && (
-        <MenuItem icon={<BookOpenText size={14} />} onSelect={() => useBook.getState().selectChapter(col.chapterId!)}>
+        <MenuItem icon={<BookOpenText className="is-book" size={14} />} onSelect={() => useBook.getState().selectChapter(col.chapterId!)}>
           {t.plan.line.openChapter}
         </MenuItem>
       )}

@@ -5,16 +5,30 @@
 .line-wrap {
   --line-col-w: 256px;
   --line-card-h: 96px;
+  /* The header of a column; an empty column is this, a card and its padding. */
+  --line-head-h: 38px;
+  /* The width of a scrollbar (base.css): the header keeps it free, as the other Plan pages do. */
+  --line-gutter: 10px;
   display: flex;
   flex-direction: column;
   height: 100%;
   overflow: hidden;
 }
 
-/* The header lines up with the other Plan pages; the board uses the full width. */
+/* The open book draws low in its box: it has its own lift (tokens.css). */
+.line-wrap svg.is-book,
+.line-dialog svg.is-book {
+  translate: 0 var(--icon-lift-book);
+}
+
+/* The header has the place of the header of the other Plan pages (Cards, Map): the same top
+   (their page padding and their header padding) and the same scrollbar gutter. The board uses the
+   full width. */
 .line-head {
   flex-shrink: 0;
-  padding: var(--s-6) var(--s-8) var(--s-4);
+  padding: calc(var(--s-6) * 2) var(--s-8) var(--s-4);
+  overflow: hidden;
+  scrollbar-gutter: stable;
 }
 .line-head > * {
   max-width: var(--plan-w);
@@ -128,6 +142,13 @@
   border-color: color-mix(in srgb, var(--strike) 30%, var(--rule));
   background: var(--strike-soft);
 }
+/* The banner of an empty line: its own tint, and room around its button */
+.line-bar.is-banner {
+  gap: var(--s-3);
+  padding: 8px 8px 8px 14px;
+  border-color: color-mix(in srgb, var(--ribbon) 24%, var(--rule));
+  background: color-mix(in srgb, var(--ribbon) 6%, var(--paper));
+}
 .line-bar.is-banner .line-bar-text {
   font-size: var(--text-xs);
   line-height: 1.45;
@@ -152,7 +173,7 @@
   min-width: 100%;
   height: 100%;
   /* The first column starts where the header starts. Room at the top for "You are here". */
-  padding: 10px max(var(--s-8), calc((100% - var(--plan-w)) / 2)) var(--s-5);
+  padding: 10px max(var(--s-8), calc((100% - var(--line-gutter) - var(--plan-w)) / 2)) var(--s-5);
 }
 
 /* A column: a header, then the cards. Planned chapters and moments move by their grip. */
@@ -192,7 +213,7 @@
   flex-shrink: 0;
   align-items: center;
   gap: 6px;
-  min-height: 38px;
+  min-height: var(--line-head-h);
   padding: 4px 6px 2px 10px;
 }
 .line-col-grip {
@@ -341,8 +362,8 @@
   gap: var(--s-2);
   min-height: 0;
   padding: 2px var(--s-2) var(--s-2);
+  /* The scrollbar of the app (base.css): no scrollbar-width here, it would hide that style. */
   overflow-y: auto;
-  scrollbar-width: thin;
 }
 
 /* ---------- A card ---------- */
@@ -478,23 +499,61 @@
 }
 .line-input-wrap {
   position: relative;
-}
-.line-input {
-  display: block;
-  width: 100%;
-  padding: 0;
-  border: 0;
-  background: transparent;
   font-family: var(--font-prose);
   font-size: var(--text-sm);
   line-height: 1.42;
   color: var(--ink);
+}
+/* The layer and the box have the same font, padding and wrap, so the words meet. */
+.line-input,
+.line-input-back {
+  padding: 0;
+  font: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.line-input-back {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: inherit;
+  pointer-events: none;
+}
+.line-input {
+  position: relative;
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--ink);
   resize: none;
   outline: none;
   overflow: hidden;
 }
+.line-input::selection {
+  background: var(--selection);
+  color: transparent;
+}
 .line-input::placeholder {
   color: var(--ink-4);
+}
+/* A mention that names a note: it will be a link on the card */
+.line-input-mention {
+  border-radius: 3px;
+  background: var(--ribbon-wash);
+  color: var(--ribbon);
+}
+/* A box of a fixed height scrolls inside; the layer keeps the same room for the scrollbar. */
+.line-input-wrap.is-fixed .line-input {
+  height: 100%;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+.line-input-wrap.is-fixed .line-input-back {
+  scrollbar-gutter: stable;
 }
 
 /* The notes that "@" finds */
@@ -544,19 +603,20 @@
 }
 
 /* "+" after the last column, and the box of a new column */
+/* As high as an empty column: its header, one card and the padding of its cards. */
 .line-add-col {
   display: flex;
   flex: 0 0 var(--line-col-w);
   min-width: 0;
   align-items: center;
   justify-content: center;
-  min-height: 148px;
+  height: calc(var(--line-head-h) + var(--line-card-h) + 10px);
   border: 1px dashed var(--ink-5);
   border-radius: var(--radius-md);
 }
 .line-add-col.is-open {
   align-items: flex-start;
-  min-height: 0;
+  height: auto;
   border-color: var(--ink-4);
   background: var(--desk-2);
 }
@@ -566,7 +626,6 @@
   flex: 1;
   align-items: center;
   justify-content: center;
-  min-height: 146px;
   border: 0;
   border-radius: var(--radius-md);
   background: transparent;
@@ -605,33 +664,29 @@
 }
 
 /* ---------- A proposal of the AI on the board ---------- */
+/* Only green (comes) and red (goes). A bar on each change: what it does, Reject and Apply. */
 .line-board.is-review .line-card {
   cursor: default;
+}
+.line-slot {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+}
+.line-slot:not(.is-same) .line-card {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
 }
 .line-card.is-added {
   border-color: color-mix(in srgb, var(--pen) 55%, var(--rule));
   border-style: solid;
   background: color-mix(in srgb, var(--pen) 8%, var(--paper));
 }
-.line-card.is-moved {
-  box-shadow: inset 3px 0 0 var(--map-2);
-}
-.line-card.is-changed {
-  box-shadow: inset 3px 0 0 var(--map-3);
-}
-.line-card.is-other-moved:not(.is-moved, .is-changed, .is-added) {
-  box-shadow: inset 3px 0 0 var(--map-2);
-}
-.line-card.is-other-moved .line-card-meta {
-  color: var(--map-2);
-  font-weight: 700;
-}
 .line-card.is-removed {
   border-color: color-mix(in srgb, var(--strike) 45%, var(--rule));
   border-style: solid;
   background: var(--strike-soft);
   box-shadow: none;
-  opacity: 0.8;
 }
 .line-card.is-removed .line-card-text {
   color: var(--ink-3);
@@ -647,30 +702,69 @@
   color: var(--strike);
   text-decoration: line-through;
 }
-.line-tag {
+.line-decide {
+  display: flex;
   flex-shrink: 0;
-  margin-left: auto;
-  padding: 0 6px;
-  border-radius: var(--radius-pill);
+  align-items: center;
+  gap: 2px;
+  height: 26px;
+  padding: 0 3px 0 9px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
   font-size: var(--text-2xs);
   font-weight: 700;
-  line-height: 16px;
 }
-.line-tag.is-added {
-  background: var(--pen-wash);
+.line-decide.is-add {
+  background: color-mix(in srgb, var(--pen) 16%, var(--paper));
   color: var(--pen);
 }
-.line-tag.is-moved {
-  background: color-mix(in srgb, var(--map-2) 14%, transparent);
-  color: var(--map-2);
-}
-.line-tag.is-changed {
-  background: color-mix(in srgb, var(--map-3) 16%, transparent);
-  color: var(--map-3);
-}
-.line-tag.is-removed {
-  background: color-mix(in srgb, var(--strike) 14%, transparent);
+.line-decide.is-remove {
+  background: color-mix(in srgb, var(--strike) 14%, var(--paper));
   color: var(--strike);
+}
+.line-decide-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  letter-spacing: var(--tracking-caps);
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.line-decide-btn {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 3px;
+  height: 20px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.line-decide-btn svg {
+  translate: 0 var(--icon-lift);
+}
+.line-decide-btn:hover {
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+.line-decide.is-add .line-decide-btn.is-apply {
+  background: var(--pen);
+  color: var(--paper);
+}
+.line-decide.is-remove .line-decide-btn.is-apply {
+  background: var(--strike);
+  color: var(--paper);
+}
+.line-decide-btn.is-apply:hover {
+  filter: brightness(1.08);
+}
+/* The decision on a column: under its header */
+.line-col > .line-decide {
+  margin: 0 8px 6px;
+  border-radius: var(--radius-sm);
 }
 .line-col.is-added {
   box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--pen) 60%, transparent);
@@ -681,7 +775,6 @@
     inset 0 0 0 1.5px color-mix(in srgb, var(--pen) 60%, transparent);
 }
 .line-col.is-removed {
-  opacity: 0.75;
   box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--strike) 50%, transparent);
 }
 .line-col.is-removed .line-col-title span {
@@ -694,8 +787,12 @@
   overflow: hidden;
   font-weight: 400;
   color: var(--strike);
+  text-decoration: line-through;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.line-col.is-renamed .line-col-title span {
+  color: var(--pen);
 }
 
 /* ---------- The dialog of a card ---------- */
@@ -707,35 +804,65 @@
   flex-direction: column;
   gap: var(--s-4);
 }
+/* The dialog has one size for every card: the text box has a fixed height and scrolls, and the
+   line of the error and the list of the notes keep their room. */
 .line-dialog-text {
-  min-height: 72px;
-  padding: 10px 12px;
+  height: 168px;
   border: 1px solid var(--rule);
   border-radius: var(--radius-sm);
   background: var(--paper-2);
   font-size: var(--text-md);
   line-height: 1.55;
 }
-.line-dialog-text:focus {
+.line-dialog-text:focus-within {
   border-color: var(--ink-4);
 }
+.line-dialog-text .line-input,
+.line-dialog-text .line-input-back {
+  padding: 10px 12px;
+}
 .line-dialog-error {
-  margin: calc(var(--s-2) * -1) 0 0;
+  height: 16px;
+  margin: calc(var(--s-3) * -1) 0 calc(var(--s-1) * -1);
   font-size: var(--text-xs);
   color: var(--strike);
 }
+/* Two selects of one width: a long moment is cut with "…", it does not go out of the dialog. */
 .line-dialog-places {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--s-4);
+}
+.line-dialog-places .field,
+.line-dialog-places .field-main {
+  min-width: 0;
+  margin-bottom: 0;
+}
+.line-dialog-places .field-control {
+  display: flex;
+  min-width: 0;
 }
 .line-dialog-places .select {
   width: 100%;
+  min-width: 0;
+}
+.line-dialog-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 .line-dialog-links {
   display: flex;
   flex-wrap: wrap;
+  align-content: flex-start;
   gap: 6px;
+  height: 58px;
+  overflow-y: auto;
+}
+.line-dialog-none {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--ink-4);
 }
 .line-dialog-links .mention-link span {
   color: var(--ink-2);

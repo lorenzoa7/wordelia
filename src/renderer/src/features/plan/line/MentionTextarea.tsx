@@ -1,12 +1,18 @@
 // A text box for the text of a card. "@" and some letters show the notes whose names match; Enter
 // or Tab puts "@Name" in the text. The text is one line: Enter submits.
+// A mention that names a note shows in color: a layer under the text box draws the same text,
+// and the text of the box itself is transparent (only its caret and selection show).
 
 import { forwardRef, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import clsx from 'clsx'
+import { mentionPieces } from '@shared/storyline'
 import type { Entry } from '@shared/types'
 import { useT } from '@/lib/i18n'
 import { MentionIcon } from '@/features/chat/MentionPill'
+
+/** A zero-width space: an empty last line of the layer keeps its height. */
+const ZERO_WIDTH = String.fromCharCode(0x200b)
 
 function fold(s: string): string {
   return s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
@@ -33,6 +39,8 @@ interface Props {
   autoFocus?: boolean
   /** The list floats over the page (for a box in a column that scrolls); else it is under the box */
   floating?: boolean
+  /** The box keeps its height and scrolls; else it grows with its text */
+  fixed?: boolean
   'aria-label'?: string
 }
 
@@ -41,11 +49,13 @@ export interface MentionTextareaHandle {
 }
 
 export const MentionTextarea = forwardRef<MentionTextareaHandle, Props>(function MentionTextarea(
-  { value, onChange, onSubmit, onCancel, onBlur, notes, placeholder, className, autoFocus, floating = false, ...rest },
+  { value, onChange, onSubmit, onCancel, onBlur, notes, placeholder, className, autoFocus, floating = false, fixed = false, ...rest },
   ref
 ) {
   const t = useT()
   const box = useRef<HTMLTextAreaElement>(null)
+  const back = useRef<HTMLDivElement>(null)
+  const pieces = useMemo(() => mentionPieces(value, notes), [value, notes])
   const listId = useId()
   const [caret, setCaret] = useState(value.length)
   const [active, setActive] = useState(0)
@@ -80,17 +90,20 @@ export const MentionTextarea = forwardRef<MentionTextareaHandle, Props>(function
   // After a pick, the caret goes after the name, right when the new text is in the box (before
   // the next key).
   const caretAfter = useRef<number | null>(null)
-  // The box grows with its text.
+  // The box grows with its text (unless it has a fixed height).
   useLayoutEffect(() => {
     const el = box.current
     if (!el) return
-    el.style.height = 'auto'
-    el.style.height = `${el.scrollHeight}px`
+    if (!fixed) {
+      el.style.height = 'auto'
+      el.style.height = `${el.scrollHeight}px`
+    }
+    if (back.current) back.current.scrollTop = el.scrollTop
     if (caretAfter.current !== null) {
       el.setSelectionRange(caretAfter.current, caretAfter.current)
       caretAfter.current = null
     }
-  }, [value])
+  }, [value, fixed])
 
   useLayoutEffect(() => {
     if (!autoFocus) return
@@ -116,11 +129,24 @@ export const MentionTextarea = forwardRef<MentionTextareaHandle, Props>(function
   }
 
   return (
-    <div className="line-input-wrap">
+    <div className={clsx('line-input-wrap', fixed && 'is-fixed', className)}>
+      <div className="line-input-back" ref={back} aria-hidden>
+        {pieces.map((p, i) =>
+          p.kind === 'text' ? (
+            <span key={i}>{p.text}</span>
+          ) : (
+            <mark key={i} className="line-input-mention">
+              {p.text}
+            </mark>
+          )
+        )}
+        {/* The last line of the layer keeps its height, also when it is empty. */}
+        {ZERO_WIDTH}
+      </div>
       <textarea
         ref={box}
         rows={1}
-        className={clsx('line-input', className)}
+        className="line-input"
         value={value}
         placeholder={placeholder}
         spellCheck
@@ -137,6 +163,9 @@ export const MentionTextarea = forwardRef<MentionTextareaHandle, Props>(function
           setActive(0)
         }}
         onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
+        onScroll={(e) => {
+          if (back.current) back.current.scrollTop = e.currentTarget.scrollTop
+        }}
         onBlur={onBlur}
         onKeyDown={(e) => {
           if (e.nativeEvent.isComposing) return

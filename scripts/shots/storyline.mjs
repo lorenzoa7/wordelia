@@ -33,6 +33,21 @@ export default async function ({ page, shot, openBook }) {
   if (!empty[1].here || empty[0].here) fail('you are here is not on the last chapter')
   if (!(await page.locator('.line-bar.is-banner').isVisible())) fail('no banner')
   await shot('empty')
+  // The "+" column is as high as an empty column; the title and the switches are where the other modes have them.
+  const geo = () =>
+    page.evaluate(() => {
+      const r = (s) => document.querySelector(s)?.getBoundingClientRect()
+      return { col: r('.line-col')?.height, add: r('.line-add-col')?.height, h1: r('.plan-desk h1').top, sw: r('.plan-desk .plan-switch').left }
+    })
+  const line = await geo()
+  await page.locator('.plan-switch-btn').nth(1).click()
+  await page.waitForSelector('.map-stats', { timeout: 5000 })
+  const map = await geo()
+  await page.locator('.plan-switch-btn').nth(2).click()
+  await page.waitForSelector('.line-board', { timeout: 5000 })
+  console.log(JSON.stringify({ line, map }))
+  if (Math.abs(line.col - line.add) > 0.5) fail(`the "+" column is ${line.add} high, a column ${line.col}`)
+  if (Math.abs(line.h1 - map.h1) > 0.5 || Math.abs(line.sw - map.sw) > 0.5) fail(`the header of the line moved: ${JSON.stringify({ line, map })}`)
   await view('order')
   await page.waitForTimeout(200)
   if ((await board()).length) fail('the empty board by time has columns')
@@ -90,29 +105,65 @@ export default async function ({ page, shot, openBook }) {
     return null
   }
 
-  // 5. Ask the chat to move a card: the board shows the move; the card moves when the author accepts in the chat.
+  // 5. Ask the chat to move a card. By time, the card is red where it is and green where it goes,
+  // each with Apply and Reject. One card in the chat for the reply. Apply the green one: the card moves.
   await page.locator('.composer-input').click()
   await page.keyboard.type('Mova o último acontecimento para o começo.')
   await page.keyboard.press('Enter')
   await idle()
-  // By chapter, the card stays in its chapter: its new moment is marked on it.
-  await page.waitForSelector('.line-board.is-review .line-card.is-other-moved', { timeout: 10000 })
-  if ((await momentOf('c6')) !== 'A manhã seguinte') fail('the card moved before the author accepted')
-  await shot('review-move-chapter')
+  await page.waitForSelector('.line-bar.is-review', { timeout: 10000 })
+  if ((await momentOf('c6')) !== 'A manhã seguinte') fail('the card moved before the author decided')
+  const cards = await page.locator('.msg-ai').last().locator('.proposal.is-line').count()
+  if (cards !== 1) fail(`${cards} story line cards in the chat for one reply`)
   await view('order')
   await page.waitForTimeout(200)
-  const moved = await page.locator('.line-board.is-review .line-card.is-moved').allInnerTexts()
-  if (moved.length !== 1 || !moved[0].includes('O visitante acorda')) fail(`moved cards: ${moved.join(' / ')}`)
+  const slots = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll('.line-board.is-review .line-slot:not(.is-same)')].map((s) => ({
+        column: s.closest('.line-col').dataset.column,
+        tone: s.classList.contains('is-add') ? 'add' : 'remove',
+        text: s.querySelector('.line-card-text').textContent
+      }))
+    )
+  const move = await slots()
+  console.log(JSON.stringify(move))
+  if (move.length !== 2 || !move.every((s) => s.text.startsWith('O visitante acorda'))) fail(`the move shows ${JSON.stringify(move)}`)
+  if (!move.some((s) => s.tone === 'add' && s.column === 'k4') || !move.some((s) => s.tone === 'remove' && s.column === 'k6')) fail(`the move shows ${JSON.stringify(move)}`)
+  if (await page.locator('.line-card.is-moved, .line-tag').count()) fail('a "moved" mark is still there')
   await shot('review-move')
-  await page.locator('.proposal.is-line .proposal-btn.is-accept').click()
-  await page.waitForTimeout(600)
+  await page.locator('.line-slot.is-add .line-decide-btn.is-apply').click()
+  await page.waitForTimeout(500)
   if ((await momentOf('c6')) !== 'Vinte e dois anos antes') fail(`the card is in ${await momentOf('c6')}`)
   if (await page.locator('.line-board.is-review').count()) fail('the board still shows the proposal')
+  const applied = await page.locator('.msg-ai').last().locator('.proposal.is-line').innerText()
+  if (!/applied|aplicad/i.test(applied)) fail(`the chat card says "${applied}"`)
 
-  // 6. Ask again, and reject on the board: nothing changes.
-  const before = (await story()).body
+  // 6. Ask again: reject the green card, apply the red one. The card leaves its moment and waits in
+  // "No moment"; the rest stays.
   await page.locator('.composer-input').click()
   await page.keyboard.type('Mova o último acontecimento de novo.')
+  await page.keyboard.press('Enter')
+  await idle()
+  await page.waitForSelector('.line-slot.is-add', { timeout: 10000 })
+  const second = await slots()
+  console.log(JSON.stringify(second))
+  await page.locator('.line-slot.is-add .line-decide-btn:not(.is-apply)').click()
+  await page.waitForTimeout(300)
+  if (await page.locator('.line-slot.is-add').count()) fail('the rejected card still shows')
+  if (!(await page.locator('.line-slot.is-remove').count())) fail('the other change went away with the rejected one')
+  await shot('review-half')
+  await page.locator('.line-slot.is-remove .line-decide-btn.is-apply').click()
+  await page.waitForTimeout(500)
+  if (await page.locator('.line-board.is-review').count()) fail('the board still shows the proposal')
+  // The mock moves the last card of the last moment with cards: "Um estranho…" (c5).
+  if (!second.every((s) => s.text.startsWith('Um estranho'))) fail(`the second move shows ${JSON.stringify(second)}`)
+  if ((await momentOf('c5')) !== null) fail(`the card is still in ${await momentOf('c5')}`)
+  if (!(await page.locator('.line-col.is-tray').count())) fail('no "No moment" column')
+
+  // 7. Ask again, and reject all on the board: nothing changes.
+  const before = (await story()).body
+  await page.locator('.composer-input').click()
+  await page.keyboard.type('Mova o último acontecimento mais uma vez.')
   await page.keyboard.press('Enter')
   await idle()
   await page.waitForSelector('.line-bar.is-review', { timeout: 10000 })
@@ -123,7 +174,7 @@ export default async function ({ page, shot, openBook }) {
   const badge = await page.locator('.proposal.is-line').last().innerText()
   if (!/rejected|rejeitad/i.test(badge)) fail(`the chat card says "${badge}"`)
 
-  // 7. A chapter gets a new title: its column follows.
+  // 8. A chapter gets a new title: its column follows.
   await page.evaluate(async () => {
     const s = window.__wordelia.book.getState()
     await s.renameChapter(s.chapters.find((c) => c.title === 'O Visitante').id, 'O Bote Azul')
@@ -131,7 +182,7 @@ export default async function ({ page, shot, openBook }) {
   await page.waitForTimeout(400)
   if (!(await story()).body.includes('## O Bote Azul ^k2')) fail('the column did not follow the new title')
 
-  // 8. The Write view: the cards of the open chapter.
+  // 9. The Write view: the cards of the open chapter.
   await page.evaluate(() => {
     const s = window.__wordelia.book.getState()
     s.selectChapter(s.chapters[0].id)
@@ -144,7 +195,7 @@ export default async function ({ page, shot, openBook }) {
   await page.locator('.line-mini').click()
   await page.waitForSelector('.line-board', { timeout: 3000 })
 
-  // 9. The story line is not a note: not in the lists of Plan, not on the map.
+  // 10. The story line is not a note: not in the lists of Plan, not on the map.
   const plot = await page.evaluate(() => document.querySelector('.plan-nav')?.innerText ?? '')
   if (/linha da história/i.test(plot)) fail('the sidebar lists the story line')
   await page.locator('.plan-switch-btn').nth(1).click()

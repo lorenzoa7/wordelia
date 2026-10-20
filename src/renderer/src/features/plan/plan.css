@@ -346,11 +346,13 @@
   height: 24px;
 }
 .plan-item:hover .plan-item-add,
-.plan-item:focus-within .plan-item-add {
+.plan-item:focus-within .plan-item-add,
+.plan-item-add:has([data-state='open']) {
   display: inline-flex;
 }
 .plan-item:hover .plan-item-count,
-.plan-item:focus-within .plan-item-count {
+.plan-item:focus-within .plan-item-count,
+.plan-item:has(.plan-item-add [data-state='open']) .plan-item-count {
   display: none;
 }
 /* The tree line runs under the category icon; the entry names line up with the category name. */

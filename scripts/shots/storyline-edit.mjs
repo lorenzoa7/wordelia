@@ -141,7 +141,8 @@ export default async function ({ page, shot, openBook }) {
   if ((await textOf(added)) !== '@Marta encontra um anel de prata no bolso do visitante.') fail('the dialog did not save the text')
   if ((await refs('A noite da tempestade')).at(-1) !== `^${added}`) fail('the dialog did not put the card in the moment')
 
-  // 4. A click on a mention opens its note.
+  // 4. A click on a mention opens its note. Its back link goes back to the line, by time, as it was.
+  await view('order')
   await card('Um estranho está deitado').locator('.line-mention', { hasText: 'Santa Ilha' }).click()
   await page.waitForTimeout(300)
   const opened = await page.evaluate(() => {
@@ -149,8 +150,14 @@ export default async function ({ page, shot, openBook }) {
     return s.entries.find((e) => e.id === s.activeEntryId)?.name ?? null
   })
   if (opened !== 'Santa Ilha') fail(`the mention opened "${opened}"`)
-  await page.evaluate(() => window.__wordelia.book.getState().selectCategory(':line'))
+  const backTo = await page.locator('.entry-crumbs .plan-back').innerText()
+  if (!/story line|linha da hist/i.test(backTo)) fail(`the back link says "${backTo}"`)
+  await shot('back-link')
+  await page.locator('.entry-crumbs .plan-back').click()
   await page.waitForSelector('.line-board .line-card', { timeout: 3000 })
+  const backView = await page.locator('.line-switch .plan-switch-btn.is-active').innerText()
+  if (!/time|ordem/i.test(backView)) fail(`back opened the line ${backView}`)
+  await view('chapter')
 
   // 5. Drag a card up in its column. The drag image has the size of the card.
   let lifted = null
@@ -256,4 +263,61 @@ export default async function ({ page, shot, openBook }) {
   await page.keyboard.press('Enter')
   await page.waitForSelector('.line-dialog', { timeout: 2000 })
   await page.keyboard.press('Escape')
+
+  // 11. A planned chapter becomes the next chapter of the book: the new chapter takes its title,
+  // and the column becomes the column of the chapter, with its cards.
+  await view('chapter')
+  await page.locator('.line-add-col-btn').click()
+  await page.keyboard.type('O farol apagado')
+  await page.keyboard.press('Enter')
+  await page.keyboard.press('Escape')
+  await col('O farol apagado').locator('.line-add-card').click()
+  await page.keyboard.type('Elias apaga a lâmpada pela primeira vez.')
+  await page.keyboard.press('Enter')
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  const kinds = async () => page.evaluate(() => [...document.querySelectorAll('.line-board .line-col')].map((c) => `${c.className.match(/is-(chapter|planned|tray)/)?.[1]}:${c.querySelector('.line-col-title span').textContent}`))
+  if (!(await kinds()).includes('planned:O farol apagado')) fail(`columns: ${(await kinds()).join(', ')}`)
+  await page.evaluate(async () => {
+    const s = window.__wordelia.book.getState()
+    await s.addChapter(s.chapters.at(-1).id)
+  })
+  await page.waitForTimeout(400)
+  const newTitle = await page.evaluate(() => window.__wordelia.book.getState().chapters.at(-1).title)
+  if (newTitle !== 'O farol apagado') fail(`the new chapter is "${newTitle}"`)
+  await page.keyboard.press('Control+2')
+  await page.waitForTimeout(300)
+  await page.evaluate(() => window.__wordelia.book.getState().selectCategory(':line'))
+  await page.waitForSelector('.line-board .line-card', { timeout: 3000 })
+  if (!(await kinds()).includes('chapter:O farol apagado')) fail(`the planned chapter did not become the chapter: ${(await kinds()).join(', ')}`)
+  if ((await col('O farol apagado').locator('.line-card').count()) !== 1) fail('the chapter lost the cards of the planned chapter')
+
+  // 12. Rename a category, and delete the category of the story line: the line moves, its notes go to the trash.
+  const plotRow = page.locator('.plan-cat', { hasText: /^\s*Plot|Trama/ })
+  await plotRow.hover()
+  await plotRow.locator('.plan-item-add button').last().click()
+  await page.locator('.menu .menu-item', { hasText: /rename the category|renomear a categoria/i }).click()
+  await page.waitForSelector('.dialog input', { timeout: 2000 })
+  await page.locator('.dialog input').fill('Enredo')
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(300)
+  const names = await page.evaluate(() => window.__wordelia.book.getState().manifest.planning.categories.map((c) => c.name))
+  if (!names.includes('Enredo')) fail(`categories: ${names.join(', ')}`)
+  const row = page.locator('.plan-cat', { hasText: 'Enredo' })
+  await row.hover()
+  await row.locator('.plan-item-add button').last().click()
+  await page.locator('.menu .menu-item.is-danger').click()
+  await page.waitForSelector('.dialog', { timeout: 2000 })
+  await shot('delete-category')
+  await page.locator('.dialog .dialog-foot .btn-ribbon').click()
+  await page.waitForTimeout(600)
+  const gone = await page.evaluate(() => {
+    const s = window.__wordelia.book.getState()
+    return { cats: s.manifest.planning.categories.map((c) => c.folder), line: s.entries.find((e) => e.meta?.type === 'story-line')?.file ?? null }
+  })
+  console.log(JSON.stringify(gone))
+  if (gone.cats.includes('Plot')) fail('the category was not deleted')
+  if (!gone.line || gone.line.startsWith('Plot/')) fail(`the story line is ${gone.line}`)
+  await page.evaluate(() => window.__wordelia.book.getState().selectCategory(':line'))
+  await page.waitForSelector('.line-board .line-card', { timeout: 3000 })
 }

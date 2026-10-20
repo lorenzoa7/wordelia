@@ -20,7 +20,7 @@ import {
 } from '@shared/book'
 import type { AiAction, BookManifest, BookSnapshot, CategoryDef, Chapter, Entry, SyncState, Thread } from '@shared/types'
 import { bookActionsFile, parseBookActions } from '@shared/ai/scopes'
-import { findStoryLine, isStoryLine, renameChapterInBody } from '@shared/storyline'
+import { boardView, findStoryLine, isStoryLine, parseBoard, renameChapterInBody } from '@shared/storyline'
 import { invoke, on } from '@/lib/api'
 import { saver } from './saver'
 import { chapterWord } from '@shared/export/model'
@@ -74,6 +74,12 @@ interface BookState {
   renameEntry(id: string, name: string): Promise<void>
   deleteEntry(id: string): Promise<void>
   addCategory(name: string): CategoryDef
+  /** A new name for a category. Its folder stays: the files do not move. */
+  renameCategory(id: string, name: string): void
+  /** Delete a category: its notes go to the trash; the story line moves to another category. */
+  deleteCategory(id: string): Promise<void>
+  /** Move a planning entry to another category folder */
+  moveEntry(id: string, category: string): Promise<void>
 
   saveThread(thread: Thread, immediate?: boolean): void
   deleteThread(id: string): Promise<void>
@@ -283,10 +289,14 @@ export const useBook = create<BookState>((set, get) => {
     async addChapter(afterId, title, body = '') {
       const { chapters, root } = get()
       if (!root) throw new Error('No book is open')
-      const t = title ?? chapterWord(get().manifest?.language ?? 'en', chapters.length + 1)
+      const idx = afterId ? chapters.findIndex((c) => c.id === afterId) + 1 : chapters.length
+      // A new last chapter takes the title of the first planned chapter of the story line: its column
+      // becomes the column of the chapter, with its cards.
+      const story = idx === chapters.length && !title ? findStoryLine(get().entries) : null
+      const planned = story ? boardView(parseBoard(story.body), 'chapter', chapters).find((c) => c.kind === 'planned')?.title.trim() : undefined
+      const t = title ?? (planned || chapterWord(get().manifest?.language ?? 'en', chapters.length + 1))
       const file = uniqueName(fileNameFromTitle(t), chapters.map((c) => c.file))
       const ch: Chapter = { id: newId('ch'), file, title: t, body, meta: {} }
-      const idx = afterId ? chapters.findIndex((c) => c.id === afterId) + 1 : chapters.length
       const next = [...chapters.slice(0, idx), ch, ...chapters.slice(idx)]
       set({ chapters: next, activeChapterId: ch.id, view: 'write', chapterJump: { id: ch.id, n: (get().chapterJump?.n ?? 0) + 1, focus: true } })
       saver.write(root, chapterRel(ch), chapterToFile(ch), true)
@@ -416,6 +426,47 @@ export const useBook = create<BookState>((set, get) => {
       const cat: CategoryDef = { id: newId('cat'), name: name.trim() || folder, folder, icon: 'Folder' }
       get().updateManifest({ planning: { categories: [...m.planning.categories, cat] } })
       return cat
+    },
+
+    renameCategory(id, name) {
+      const m = get().manifest
+      const clean = name.trim()
+      if (!m || !clean) return
+      get().updateManifest({ planning: { ...m.planning, categories: m.planning.categories.map((c) => (c.id === id ? { ...c, name: clean } : c)) } })
+    },
+
+    async deleteCategory(id) {
+      const m = get().manifest
+      const cat = m?.planning.categories.find((c) => c.id === id)
+      const rest = m?.planning.categories.filter((c) => c.id !== id) ?? []
+      if (!m || !cat || !rest.length) return
+      // The story line does not show in the categories: it lives on in another one.
+      const story = findStoryLine(get().entries)
+      if (story && story.category === cat.folder) {
+        const to = rest.find((c) => c.id === 'plot') ?? rest.find((c) => c.id === 'notes') ?? rest[0]
+        await get().moveEntry(story.id, to.folder)
+      }
+      for (const e of get().entries.filter((x) => x.category === cat.folder)) await get().deleteEntry(e.id)
+      const now = get().manifest!
+      get().updateManifest({ planning: { ...now.planning, categories: now.planning.categories.filter((c) => c.id !== id) } })
+      if (get().activeCategory === cat.folder) get().selectCategory(null)
+    },
+
+    async moveEntry(id, category) {
+      runFlushers()
+      await saver.flush()
+      const { entries, root } = get()
+      const e = entries.find((x) => x.id === id)
+      if (!e || !root || e.category === category) return
+      const inCat = entries.filter((x) => x.category === category).map((x) => x.file.slice(category.length + 1))
+      const fileName = uniqueName(`${e.name}.md`, inCat)
+      const next = { ...e, category, file: `${category}/${fileName}` }
+      const oldRel = entryRel(e)
+      set({ entries: get().entries.map((x) => (x.id === id ? next : x)) })
+      saver.cancel(root, oldRel)
+      saver.write(root, entryRel(next), entryToFile(next), true)
+      await saver.flush()
+      await invoke('book:deleteFile', root, oldRel)
     },
 
     saveThread(thread, immediate = false) {

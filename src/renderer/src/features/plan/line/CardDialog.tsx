@@ -79,12 +79,18 @@ export function CardDialog({ cardId, board, chapters, notes, onClose }: Props): 
   const mentioned = mentionedNotes(text, notes)
   const chapterId = chapterCols.find((c) => c.key === chapter)?.chapterId
 
+  const openChapter = (): void => {
+    if (!chapterId) return
+    onClose()
+    useBook.getState().selectChapter(chapterId)
+  }
+
   return (
     <Dialog
       open={Boolean(card)}
       onOpenChange={(v) => !v && onClose()}
       title={t.plan.line.cardTitle}
-      width={520}
+      width={560}
       className="line-dialog"
       // Escape first closes the list of notes of the text box.
       onEscapeKeyDown={(e) => {
@@ -94,6 +100,9 @@ export function CardDialog({ cardId, board, chapters, notes, onClose }: Props): 
         <>
           <Button variant="ghost" className="line-dialog-delete" icon={<Trash size={14} />} onClick={remove}>
             {t.plan.line.deleteCard}
+          </Button>
+          <Button variant="ghost" icon={<BookOpenText className="is-book" size={14} />} onClick={openChapter} disabled={!chapterId}>
+            {t.plan.line.openChapter}
           </Button>
           <span className="line-dialog-spacer" />
           <Button variant="ghost" onClick={onClose}>
@@ -116,11 +125,14 @@ export function CardDialog({ cardId, board, chapters, notes, onClose }: Props): 
             onSubmit={save}
             notes={notes}
             autoFocus
+            fixed
             className="line-dialog-text"
             placeholder={t.plan.line.cardPlaceholder}
             aria-label={t.plan.line.cardTitle}
           />
-          {error && <p className="line-dialog-error">{t.plan.line.textRequired}</p>}
+          <p className="line-dialog-error" aria-live="polite">
+            {error ? t.plan.line.textRequired : ''}
+          </p>
           <div className="line-dialog-places">
             <Field label={t.plan.line.chapter}>
               <Select value={chapter} onValueChange={setChapter} options={chapterOptions} />
@@ -129,35 +141,28 @@ export function CardDialog({ cardId, board, chapters, notes, onClose }: Props): 
               <Select value={moment} onValueChange={setMoment} options={momentOptions} />
             </Field>
           </div>
-          {(mentioned.length > 0 || chapterId) && (
+          <div className="line-dialog-notes">
+            <span className="field-label">{t.plan.line.mentions}</span>
             <div className="line-dialog-links">
-              {chapterId && (
-                <button
-                  className="mention-link"
-                  onClick={() => {
-                    onClose()
-                    useBook.getState().selectChapter(chapterId)
-                  }}
-                >
-                  <BookOpenText size={13} />
-                  <span>{t.plan.line.openChapter}</span>
-                </button>
+              {mentioned.length ? (
+                mentioned.map((n) => (
+                  <button
+                    key={n.id}
+                    className="mention-link"
+                    onClick={() => {
+                      onClose()
+                      useBook.getState().selectEntry(n.id)
+                    }}
+                  >
+                    <MentionIcon kind="entry" id={n.id} size={13} />
+                    <span>{n.name}</span>
+                  </button>
+                ))
+              ) : (
+                <p className="line-dialog-none">{t.plan.line.noMentions}</p>
               )}
-              {mentioned.map((n) => (
-                <button
-                  key={n.id}
-                  className="mention-link"
-                  onClick={() => {
-                    onClose()
-                    useBook.getState().selectEntry(n.id)
-                  }}
-                >
-                  <MentionIcon kind="entry" id={n.id} size={13} />
-                  <span>{n.name}</span>
-                </button>
-              ))}
             </div>
-          )}
+          </div>
         </div>
       )}
     </Dialog>

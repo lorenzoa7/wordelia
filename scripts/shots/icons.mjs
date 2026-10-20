@@ -160,6 +160,17 @@ export default async function ({ app, page, openBook }) {
   await page.keyboard.press('Escape')
   await page.waitForTimeout(200)
 
+  // The menu of a selection: Reply.
+  await page.locator('.ProseMirror p').first().dblclick()
+  await page.waitForSelector('.sel-btn', { timeout: 3000 })
+  await page.waitForTimeout(300)
+  // Reply: the icon of an action (Polish) is the icon that the author chose for it.
+  await measure('.sel-btn:not(.sel-primary):not(.sel-more)')
+  await crop('selection-menu', page.locator('.sel-btn').first())
+  await crop('selection-primary', page.locator('.sel-primary'))
+  await page.keyboard.press('ArrowRight')
+  await page.waitForTimeout(200)
+
   // Plan. The sync button is left out: its icon centers on two lines of text.
   await page.keyboard.press('Control+2')
   await page.waitForTimeout(700)
@@ -167,6 +178,12 @@ export default async function ({ app, page, openBook }) {
   // '.plan-cat' measures the caret of each category row: it shares the middle of the icon and the name.
   await measure('.view-tab:not(.is-active)', '.sidebar-head', '.plan-item-top', '.plan-item-main', '.plan-cat')
   await crop('plan-sidebar', page.locator('.plan-nav'))
+  // The story line: the button of the banner and the switch of the views.
+  await page.locator('.plan-switch-btn').nth(2).click()
+  await page.waitForTimeout(500)
+  await away()
+  await measure('.line-bar .btn', '.line-switch .plan-switch-btn')
+  await crop('line-banner', page.locator('.line-bar'))
 
   // Settings
   await page.keyboard.press('Control+,')

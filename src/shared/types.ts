@@ -301,8 +301,16 @@ export interface ChatMessage {
   mentions?: Mention[]
   /** Images that the writer added to the message */
   images?: ChatImage[]
-  /** Proposal hunk key to state */
+  /**
+   * Proposal hunk key to state. The changes of a story line proposal have their own keys,
+   * `line:<change id>` (features/plan/line/proposal.ts).
+   */
   hunks?: Record<string, HunkState>
+  /**
+   * The story line that the proposals of this message make (the body), kept at the first decision on
+   * one of its changes: later decisions compare the line with it, also after the line changed.
+   */
+  lineAfter?: string
   /**
    * For accepted `<create>` proposals that replaced an entry: the entry file from before, by hunk key.
    * For accepted `<portrait>` proposals: the image from before ('' for none).

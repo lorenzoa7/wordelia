@@ -28,7 +28,15 @@ export const plan: typeof en = {
     newCategory: 'Nueva categoría',
     categoryPlaceholder: 'Objetos, Facciones, Cronología…',
     add: 'Agregar',
-    addCategory: 'Agregar categoría'
+    addCategory: 'Agregar categoría',
+    categoryMenu: (category) => `Acciones de ${category}`,
+    renameCategory: 'Renombrar la categoría',
+    rename: 'Renombrar',
+    deleteCategory: 'Borrar la categoría',
+    deleteCategoryTitle: (category) => `¿Borrar «${category}»?`,
+    deleteCategoryMessage: (notes) =>
+      notes ? `${notes === 1 ? 'Su nota va' : `Sus ${notes} notas van`} a la papelera del libro.` : 'La categoría no tiene notas.',
+    lastCategory: 'La planificación necesita una categoría.'
   },
   overview: {
     title: 'El universo de la historia',
@@ -78,6 +86,7 @@ export const plan: typeof en = {
     momentField: 'Momento',
     none: 'Ninguno',
     mentions: 'Notas mencionadas',
+    noMentions: 'Escribe @ en el texto para mencionar una nota.',
     deleteCard: 'Borrar la tarjeta',
     cardDeleted: 'La tarjeta se borró.',
     textRequired: 'Escribe lo que pasa.',
@@ -87,24 +96,25 @@ export const plan: typeof en = {
     bannerDraft: 'Llena mi línea de la historia con esta información: ',
     threadTitle: 'Línea de la historia',
     reviewTitle: 'Propuesta de la IA',
-    reviewStats: (s) =>
-      [
-        s.added && `${s.added} ${s.added === 1 ? 'nueva' : 'nuevas'}`,
-        s.moved && `${s.moved} ${s.moved === 1 ? 'movida' : 'movidas'}`,
-        s.changed && `${s.changed} ${s.changed === 1 ? 'cambiada' : 'cambiadas'}`,
-        s.removed && `${s.removed} ${s.removed === 1 ? 'borrada' : 'borradas'}`
-      ]
-        .filter(Boolean)
-        .join(' · ') || 'Ningún cambio en las tarjetas',
+    changes: (n) => (n === 1 ? '1 cambio' : `${n} cambios`),
+    fromAi: (n) => (n === 1 ? '1 cambio de la IA' : `${n} cambios de la IA`),
+    apply: 'Aplicar',
+    rejectOne: 'Rechazar',
+    applyAll: 'Aplicar todo',
+    rejectAll: 'Rechazar todo',
+    slotAdd: 'Entra aquí',
+    slotRemove: 'Sale de aquí',
+    slotDelete: 'Borrada',
+    slotText: 'Texto nuevo',
+    columnAdd: 'Columna nueva',
+    columnDelete: 'Columna borrada',
+    columnRename: 'Título nuevo',
+    columnMove: 'Cambia de lugar',
     reviewLocked: 'Acepta o rechaza la propuesta antes de cambiar la línea.',
     reviewStale: 'Esta propuesta de la IA ya no cabe en la línea.',
     writing: 'La IA está escribiendo una propuesta para la línea…',
     showInChat: 'Mostrar en el chat',
     showInLine: 'Mostrar en la línea',
-    markNew: 'Nueva',
-    markMoved: 'Movida',
-    markChanged: 'Cambiada',
-    markDeleted: 'Borrada',
     accepted: 'La línea se actualizó.',
     created: 'La línea de la historia está lista.',
     summary: 'Los sucesos de la historia, por capítulo y por orden.',

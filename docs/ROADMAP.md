@@ -4,8 +4,8 @@ This file is the source of truth for progress. Update it after each task. Mark a
 
 ## Current focus
 
-> **Milestone:** Version 0.11 — the story line board
-> **Next task:** Collect feedback on 0.11.0. Then fix what the author finds.
+> **Milestone:** Version 0.12 — story line review and Plan navigation
+> **Next task:** Collect feedback on 0.12.0. Then fix what the author finds.
 > **Not verified:** Codex and the two API transports. The user has no Codex account, and no API keys are set. The scripted provider (`WORDELIA_MOCK_AI=1`) covers their UI flows.
 
 ## M0 — Foundation
@@ -333,6 +333,16 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] AI proposals on the board: new, deleted, moved and changed cards and columns, Accept and Reject; a short chat card
 - [x] Prompts, sync and the scripted AI use the new format; the Write card shows the cards of the open chapter
 - [x] Scenarios `storyline` (the AI) and `storyline-edit` (by hand, the layout, the keyboard)
+
+## Version 0.12 — story line review and Plan navigation
+
+- [x] AI proposals for the line: only green and red, a move is a removal and an addition, Apply and Reject on each change, one chat card for a reply (`boardChanges`, `reviewView`, `applyBoardChange`; 49 unit tests)
+- [x] Back in Plan goes to the page before (history), with its name; the line keeps its view and its scroll
+- [x] The card dialog has one size; mentions show in color in the text box; the selects stay in the dialog
+- [x] The header of the line has the place of the other modes; the "+" column is as high as a column; the scrollbar of the app in the columns; a new banner
+- [x] A new last chapter takes the title of the first planned chapter; the AI names planned chapters in the style of the book
+- [x] Rename and delete categories
+- [x] The icon of Reply in the selection menu is on the middle of its text (the `icons` scenario measures it)
 
 ## Tests and CI
 

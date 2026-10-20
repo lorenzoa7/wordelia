@@ -1,15 +1,17 @@
-// A proposal of the AI on the board: the proposed columns and cards, with marks. New cards and
-// columns are green; deleted ones stay where they were, red and struck; moved cards have a mark;
-// a changed text shows its word diff. Nothing here can change: the author accepts or rejects.
+// A proposal of the AI on the board: the board now with the changes that wait for a decision. A card
+// that goes away is red where it is; a card that comes is green where it goes; a move is both. A
+// bar on each change has Apply and Reject. Nothing else on the board can change until the author
+// decides.
 
-import { useMemo } from 'react'
-import { DotsSixVertical } from '@phosphor-icons/react'
+import { useMemo, type ReactNode } from 'react'
+import { Check, DotsSixVertical, X } from '@phosphor-icons/react'
 import clsx from 'clsx'
-import { diffView, placesOf, plainText, type Board, type DiffCard, type LineView } from '@shared/storyline'
+import { parseBoard, placesOf, plainText, reviewView, type LineView, type ReviewColumn, type ReviewSlot } from '@shared/storyline'
 import { wordDiff } from '@shared/text/diff'
 import type { Chapter, Entry } from '@shared/types'
 import { useT } from '@/lib/i18n'
 import { CardView, ColumnShell, movable } from './Board'
+import { applyLineChanges, rejectLineChanges, type LineProposal } from './proposal'
 
 function Diff({ before, after }: { before: string; after: string }): React.JSX.Element {
   const ops = useMemo(() => wordDiff(plainText(before), plainText(after)), [before, after])
@@ -20,38 +22,65 @@ function Diff({ before, after }: { before: string; after: string }): React.JSX.E
   )
 }
 
-function Tag({ c }: { c: DiffCard }): React.JSX.Element | null {
+/** The bar of a change: what it does, Reject and Apply. */
+function Decision({ tone, label, ids, p }: { tone: 'add' | 'remove'; label: string; ids: string[]; p: LineProposal }): React.JSX.Element {
   const t = useT()
-  const moved = c.moved || c.otherMoved
-  const label = c.removed ? t.plan.line.markDeleted : c.added ? t.plan.line.markNew : c.changed ? t.plan.line.markChanged : moved ? t.plan.line.markMoved : ''
-  if (!label) return null
-  const kind = c.removed ? 'removed' : c.added ? 'added' : c.changed ? 'changed' : 'moved'
-  return <span className={clsx('line-tag', `is-${kind}`)}>{label}</span>
+  return (
+    <div className={clsx('line-decide', `is-${tone}`)}>
+      <span className="line-decide-label">{label}</span>
+      <button className="line-decide-btn" onClick={() => rejectLineChanges(p, ids)}>
+        <X size={11} weight="bold" />
+        {t.plan.line.rejectOne}
+      </button>
+      <button className="line-decide-btn is-apply" onClick={() => applyLineChanges(p, ids)}>
+        <Check size={11} weight="bold" />
+        {t.plan.line.apply}
+      </button>
+    </div>
+  )
 }
 
 interface Props {
-  before: Board
-  after: Board
+  p: LineProposal
   view: LineView
   chapters: Chapter[]
   notes: Entry[]
   here: string | null
 }
 
-export function ReviewBoard({ before, after, view, chapters, notes, here }: Props): React.JSX.Element {
-  const cols = useMemo(() => diffView(before, after, view, chapters), [before, after, view, chapters])
-  const other = useMemo(() => placesOf(after, view === 'chapter' ? 'order' : 'chapter', chapters), [after, view, chapters])
+export function ReviewBoard({ p, view, chapters, notes, here }: Props): React.JSX.Element {
+  const t = useT()
+  const before = useMemo(() => parseBoard(p.before), [p.before])
+  const after = useMemo(() => parseBoard(p.after ?? ''), [p.after])
+  const cols = useMemo(() => reviewView(before, after, view, chapters, p.rejected), [before, after, view, chapters, p.rejected])
+  // The line at the bottom of a card: its place in the other view, now (or in the proposal, for a card that comes).
+  const other = useMemo(() => placesOf(before, view === 'chapter' ? 'order' : 'chapter', chapters), [before, view, chapters])
+  const otherNext = useMemo(() => placesOf(after, view === 'chapter' ? 'order' : 'chapter', chapters), [after, view, chapters])
+  const otherOf = (s: ReviewSlot) => (s.tone === 'add' ? otherNext.get(s.card.id) : undefined) ?? other.get(s.card.id)
+
+  const slotLabel = (s: ReviewSlot): string => {
+    if (s.tone === 'remove') return s.changes.some((c) => c.startsWith('delete:')) ? t.plan.line.slotDelete : t.plan.line.slotRemove
+    return s.changes.some((c) => c.startsWith('place:') || c.startsWith('add:')) ? t.plan.line.slotAdd : t.plan.line.slotText
+  }
+  const columnNotice = (col: ReviewColumn): ReactNode => {
+    if (!col.changes.length) return null
+    const label =
+      col.tone === 'add' ? t.plan.line.columnAdd : col.tone === 'remove' ? t.plan.line.columnDelete : col.newTitle !== undefined ? t.plan.line.columnRename : t.plan.line.columnMove
+    return <Decision tone={col.tone === 'remove' ? 'remove' : 'add'} label={label} ids={col.changes} p={p} />
+  }
+
   return (
     <div className="line-board is-review" data-view={view}>
       {cols.map((col) => (
         <ColumnShell
-          key={`${col.key}:${col.mark}`}
-          col={{ ...col, cards: [] }}
+          key={`${col.key}:${col.tone}`}
+          col={{ ...col, title: col.newTitle ?? col.title, cards: [] }}
           view={view}
-          here={col.key === here && col.mark !== 'removed'}
-          count={col.cards.filter((c) => !c.removed).length}
-          mark={col.mark === 'same' ? undefined : col.mark}
-          oldTitle={col.oldTitle}
+          here={col.key === here && col.tone !== 'add'}
+          count={col.slots.filter((s) => s.tone !== 'remove').length}
+          mark={col.tone === 'add' ? 'added' : col.tone === 'remove' ? 'removed' : col.newTitle !== undefined ? 'renamed' : undefined}
+          oldTitle={col.newTitle !== undefined ? col.title : undefined}
+          notice={columnNotice(col)}
           grip={
             movable(col) ? (
               <span className="line-col-grip is-still">
@@ -60,21 +89,21 @@ export function ReviewBoard({ before, after, view, chapters, notes, here }: Prop
             ) : undefined
           }
         >
-          {col.cards.map((c) => (
-            <CardView
-              key={`${c.card.id}${c.removed ? ':x' : ''}`}
-              card={c.card}
-              other={c.removed ? undefined : other.get(c.card.id)}
-              planned={view === 'chapter' ? col.kind !== 'chapter' : other.get(c.card.id)?.kind !== 'chapter'}
-              view={view}
-              notes={notes}
-              links={false}
-              // A card that moved in the other view shows its new place there, in the line at the bottom.
-              className={clsx(c.added && 'is-added', c.removed && 'is-removed', c.moved && 'is-moved', c.otherMoved && 'is-other-moved', c.changed && 'is-changed')}
-              text={c.changed && c.before !== undefined ? <Diff before={c.before} after={c.card.text} /> : undefined}
-              tag={<Tag c={c} />}
-              data-card={c.card.id}
-            />
+          {col.slots.map((s, i) => (
+            <div key={`${s.card.id}:${s.tone}:${i}`} className={clsx('line-slot', `is-${s.tone}`)}>
+              {s.tone !== 'same' && <Decision tone={s.tone} label={slotLabel(s)} ids={s.changes} p={p} />}
+              <CardView
+                card={s.card}
+                other={otherOf(s)}
+                planned={view === 'chapter' ? col.kind !== 'chapter' : otherOf(s)?.kind !== 'chapter'}
+                view={view}
+                notes={notes}
+                links={false}
+                className={clsx(s.tone === 'add' && 'is-added', s.tone === 'remove' && 'is-removed')}
+                text={s.before !== undefined ? <Diff before={s.before} after={s.card.text} /> : undefined}
+                data-card={s.card.id}
+              />
+            </div>
           ))}
         </ColumnShell>
       ))}

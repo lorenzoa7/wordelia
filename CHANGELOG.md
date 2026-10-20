@@ -2,6 +2,24 @@
 
 Each version has its Windows installer in GitHub Releases. The release workflow copies the section of the version from this file to the release notes.
 
+## 0.12.0 (2026-10-20)
+
+### Changed
+- A proposal of the AI for the story line shows only green and red: a card that comes is green where it goes, a card that goes away is red where it is. A move is both. Each change has Apply and Reject on the board; "Apply all" and "Reject all" are on the board and in the chat. The chat shows one card for the changes of a reply.
+- Back in Plan goes to the page that you came from: from a note that you opened on the story line, back goes to the line, in the same view and at the same place.
+- The card dialog has one size for every card. Its text box has a fixed height and scrolls; mentions of notes show in color as you type.
+- The title and the switches of the story line are in the same place as in Cards and Map.
+- The columns of the story line have the scrollbar of the app. The "+" column is as high as the other columns.
+- A new banner on an empty line, with its own color and the icon of Reply.
+- A new last chapter takes the title of the first planned chapter of the story line, and gets its cards. The AI names planned chapters in the style of your chapter titles.
+
+### New
+- Rename and delete categories, from the "…" menu of a category. The notes of a deleted category go to the trash of the book.
+
+### Fixed
+- The icon of Reply in the selection menu is on the middle of its text.
+- A long moment name no longer goes out of the card dialog.
+
 ## 0.11.0 (2026-10-20)
 
 ### Changed

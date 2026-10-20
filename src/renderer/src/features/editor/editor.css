@@ -539,6 +539,10 @@
   font-weight: 700;
   transition: background-color var(--dur-fast) var(--ease-out);
 }
+.sel-btn svg {
+  flex-shrink: 0;
+  translate: 0 var(--icon-lift);
+}
 .sel-btn:hover {
   background: rgba(255, 255, 255, 0.12);
 }

@@ -1,0 +1,813 @@
+/* ---------- The story line (features/plan/line) ---------- */
+
+/* The page does not scroll: the board takes the space under the header. The board scrolls
+   sideways; each column scrolls down. */
+.line-wrap {
+  --line-col-w: 240px;
+  --line-card-h: 96px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* The header lines up with the other Plan pages; the board uses the full width. */
+.line-head {
+  flex-shrink: 0;
+  padding: var(--s-6) var(--s-8) var(--s-4);
+}
+.line-head > * {
+  max-width: var(--plan-w);
+  margin-inline: auto;
+}
+.line-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s-2) var(--s-4);
+}
+.line-title {
+  min-width: 0;
+}
+.line-title h1 {
+  margin: 0;
+  white-space: nowrap;
+  font-family: var(--font-prose);
+  font-size: var(--text-3xl);
+  font-weight: 600;
+  font-style: italic;
+  letter-spacing: var(--tracking-tight);
+}
+.line-stats {
+  margin: 4px 0 0;
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.line-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2) var(--s-4);
+  min-height: 38px;
+  margin-top: var(--s-4);
+}
+.line-tools-left {
+  display: flex;
+  flex: 1 1 320px;
+  min-width: 0;
+}
+.line-switch {
+  margin-top: 0;
+  margin-left: auto;
+}
+
+/* The bar over the board: the banner of an empty line, a proposal of the AI, or the AI at work */
+.line-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+  max-width: 100%;
+  min-height: 36px;
+  padding: 4px 6px 4px 12px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+.line-bar-icon {
+  flex-shrink: 0;
+  color: var(--ribbon);
+  translate: 0 var(--icon-lift);
+}
+.line-bar-text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px var(--s-2);
+  min-width: 0;
+  margin-right: var(--s-2);
+}
+.line-bar-text b {
+  color: var(--ink);
+}
+/* A proposal: the title and the counts on one line; the title is cut first. */
+.line-bar-text.is-one-line {
+  flex: 1;
+  flex-wrap: nowrap;
+}
+.line-bar-text.is-one-line b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.line-bar-text.is-one-line span {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.line-bar.is-review {
+  flex: 1;
+}
+.line-bar .btn {
+  flex-shrink: 0;
+}
+.line-bar-text span {
+  color: var(--ink-3);
+}
+.line-bar.is-review {
+  border-color: color-mix(in srgb, var(--pen) 35%, var(--rule));
+  background: color-mix(in srgb, var(--pen) 7%, var(--paper));
+}
+.line-bar.is-review .line-bar-icon {
+  color: var(--pen);
+}
+.line-bar.is-stale {
+  border-color: color-mix(in srgb, var(--strike) 30%, var(--rule));
+  background: var(--strike-soft);
+}
+.line-bar.is-writing {
+  padding-right: 12px;
+  background: var(--desk-2);
+}
+
+/* ---------- The board ---------- */
+.line-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.line-board {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  width: max-content;
+  min-width: 100%;
+  height: 100%;
+  /* The first column starts where the header starts. Room at the top for "You are here". */
+  padding: 10px max(var(--s-8), calc((100% - var(--plan-w)) / 2)) var(--s-5);
+}
+
+/* A column: a header, then the cards. Planned chapters and moments move by their grip. */
+.line-col {
+  position: relative;
+  display: flex;
+  flex: 0 0 var(--line-col-w);
+  flex-direction: column;
+  max-height: 100%;
+  border-radius: var(--radius-md);
+  background: var(--desk-2);
+}
+.line-col.is-tray {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--rule);
+  outline: 1px dashed transparent;
+}
+.line-col.is-planned {
+  background: color-mix(in srgb, var(--desk-2) 55%, transparent);
+  box-shadow: inset 0 0 0 1px var(--rule-soft);
+}
+.line-col.is-here {
+  background: color-mix(in srgb, var(--ribbon) 5%, var(--desk-2));
+  box-shadow: inset 0 2px 0 var(--ribbon);
+}
+.line-col.is-ghost {
+  opacity: 0.35;
+}
+.line-col.is-lifted {
+  box-shadow: var(--shadow-pop);
+  cursor: grabbing;
+}
+.line-col-head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 4px 6px 2px 10px;
+}
+.line-col-grip {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 24px;
+  margin-left: -6px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: none;
+  color: var(--ink-4);
+  cursor: grab;
+  touch-action: none;
+}
+.line-col-grip:hover {
+  background: var(--desk-3);
+  color: var(--ink-2);
+}
+.line-col-grip:active {
+  cursor: grabbing;
+}
+.line-col-grip.is-still {
+  cursor: default;
+}
+.line-col-grip.is-still:hover {
+  background: none;
+  color: var(--ink-4);
+}
+.line-col-icon {
+  flex-shrink: 0;
+  color: var(--ink-4);
+  translate: 0 var(--icon-lift);
+}
+.line-col-number {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+}
+.line-col-title {
+  display: flex;
+  flex: 1;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--ink);
+  cursor: default;
+}
+.line-col-title span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The tooltip of a title: the whole name (a long title is cut), then what the column is */
+.line-col-tip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 280px;
+}
+.line-col-tip span {
+  opacity: 0.8;
+}
+.line-col.is-planned .line-col-title {
+  font-style: italic;
+  color: var(--ink-2);
+}
+.line-col.is-tray .line-col-title {
+  font-weight: 600;
+  color: var(--ink-3);
+}
+.line-col-input {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--ink-4);
+  border-radius: var(--radius-xs);
+  background: var(--paper);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--ink);
+  outline: none;
+}
+.line-col-input:focus {
+  border-color: var(--focus);
+}
+.line-col-count {
+  flex-shrink: 0;
+  min-width: 18px;
+  font-size: var(--text-xs);
+  color: var(--ink-4);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.line-col-menu {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: none;
+  color: var(--ink-4);
+  cursor: pointer;
+}
+.line-col-menu:hover,
+.line-col-menu[data-state='open'] {
+  background: var(--desk-3);
+  color: var(--ink);
+}
+/* "You are here" sits on the top edge of its column: the columns keep one line. */
+.line-here {
+  position: absolute;
+  z-index: 1;
+  top: -8px;
+  right: 10px;
+  padding: 0 7px;
+  border-radius: var(--radius-pill);
+  background: var(--ribbon);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  line-height: 16px;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--on-ribbon);
+  cursor: default;
+}
+/* The cards: the same size, the same gap. The column scrolls down when they do not fit. */
+.line-col-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  min-height: 0;
+  padding: 2px var(--s-2) var(--s-2);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+/* ---------- A card ---------- */
+.line-card {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  height: var(--line-card-h);
+  padding: 9px 11px 8px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 7%, transparent);
+  cursor: grab;
+  touch-action: manipulation;
+  user-select: none;
+}
+.line-card:hover {
+  border-color: var(--ink-5);
+}
+.line-card:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+.line-card.is-planned {
+  border-style: dashed;
+  border-color: var(--ink-5);
+  background: color-mix(in srgb, var(--paper) 70%, transparent);
+  box-shadow: none;
+}
+/* The place of the card while it moves */
+.line-card.is-ghost {
+  opacity: 0.4;
+  border-style: dashed;
+  box-shadow: none;
+}
+/* The card under the pointer, while it moves: the same size as on the board. The box that the
+   drag measures stays straight; the card in it tilts. */
+.line-lift {
+  display: flex;
+  flex-direction: column;
+}
+.line-card.is-lifted {
+  rotate: 1.5deg;
+  border-color: var(--ink-4);
+  box-shadow: var(--shadow-pop);
+  cursor: grabbing;
+}
+.line-card-text {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  font-family: var(--font-prose);
+  font-size: var(--text-sm);
+  line-height: 1.42;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.line-card.is-planned .line-card-text {
+  color: var(--ink-2);
+}
+.line-card-meta {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  height: 16px;
+  font-size: var(--text-2xs);
+  color: var(--ink-4);
+}
+.line-card-meta svg {
+  flex-shrink: 0;
+  translate: 0 var(--icon-lift);
+}
+.line-card-place {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* A mention: the name, underlined, in one color. A click opens the note. */
+.line-mention {
+  color: var(--ribbon);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--ribbon) 45%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.line-mention:hover {
+  text-decoration-color: var(--ribbon);
+}
+.line-mention.is-static {
+  cursor: inherit;
+}
+
+/* "+" under the last card, and the box of a new card */
+.line-add-card {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  height: var(--line-card-h);
+  border: 1px dashed var(--ink-5);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-4);
+  cursor: pointer;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.line-add-card:hover {
+  border-color: var(--ink-4);
+  background: color-mix(in srgb, var(--paper) 60%, transparent);
+  color: var(--ink-2);
+}
+.line-card.is-new {
+  height: auto;
+  min-height: var(--line-card-h);
+  border-color: var(--ink-4);
+  cursor: text;
+  user-select: text;
+}
+.line-card.is-new .line-card-meta {
+  white-space: nowrap;
+}
+.line-input-wrap {
+  position: relative;
+}
+.line-input {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: var(--font-prose);
+  font-size: var(--text-sm);
+  line-height: 1.42;
+  color: var(--ink);
+  resize: none;
+  outline: none;
+  overflow: hidden;
+}
+.line-input::placeholder {
+  color: var(--ink-4);
+}
+
+/* The notes that "@" finds */
+.line-suggest {
+  position: absolute;
+  z-index: 90;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 200px;
+  max-width: 280px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  box-shadow: var(--shadow-pop);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+}
+.line-suggest.is-floating {
+  position: fixed;
+  top: auto;
+}
+.line-suggest-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: var(--radius-xs);
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.line-suggest-item svg {
+  flex-shrink: 0;
+  color: var(--ink-4);
+  translate: 0 var(--icon-lift);
+}
+.line-suggest-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.line-suggest-item.is-active {
+  background: var(--desk-2);
+  color: var(--ink);
+}
+
+/* "+" after the last column, and the box of a new column */
+.line-add-col {
+  display: flex;
+  flex: 0 0 var(--line-col-w);
+  align-items: center;
+  justify-content: center;
+  min-height: 148px;
+  border: 1px dashed var(--ink-5);
+  border-radius: var(--radius-md);
+}
+.line-add-col.is-open {
+  align-items: flex-start;
+  min-height: 0;
+  border-color: var(--ink-4);
+  background: var(--desk-2);
+}
+.line-add-col-btn {
+  display: flex;
+  align-self: stretch;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-height: 146px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--ink-4);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.line-add-col-btn {
+  flex-direction: column;
+  gap: 6px;
+}
+.line-add-col-label {
+  font-size: var(--text-xs);
+}
+.line-add-col-btn:hover {
+  background: color-mix(in srgb, var(--desk-2) 60%, transparent);
+  color: var(--ink-2);
+}
+.line-add-col-form {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+}
+.line-add-col-form .line-col-input {
+  flex: none;
+  height: 30px;
+}
+.line-add-col-keys {
+  padding-left: 2px;
+  font-size: var(--text-2xs);
+  color: var(--ink-4);
+}
+
+/* ---------- A proposal of the AI on the board ---------- */
+.line-board.is-review .line-card {
+  cursor: default;
+}
+.line-card.is-added {
+  border-color: color-mix(in srgb, var(--pen) 55%, var(--rule));
+  border-style: solid;
+  background: color-mix(in srgb, var(--pen) 8%, var(--paper));
+}
+.line-card.is-moved {
+  box-shadow: inset 3px 0 0 var(--map-2);
+}
+.line-card.is-changed {
+  box-shadow: inset 3px 0 0 var(--map-3);
+}
+.line-card.is-other-moved:not(.is-moved, .is-changed, .is-added) {
+  box-shadow: inset 3px 0 0 var(--map-2);
+}
+.line-card.is-other-moved .line-card-meta {
+  color: var(--map-2);
+  font-weight: 700;
+}
+.line-card.is-removed {
+  border-color: color-mix(in srgb, var(--strike) 45%, var(--rule));
+  border-style: solid;
+  background: var(--strike-soft);
+  box-shadow: none;
+  opacity: 0.8;
+}
+.line-card.is-removed .line-card-text {
+  color: var(--ink-3);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--strike) 70%, transparent);
+}
+.line-card-text ins {
+  background: var(--pen-wash);
+  color: var(--pen);
+  text-decoration: none;
+}
+.line-card-text del {
+  color: var(--strike);
+  text-decoration: line-through;
+}
+.line-tag {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  line-height: 16px;
+}
+.line-tag.is-added {
+  background: var(--pen-wash);
+  color: var(--pen);
+}
+.line-tag.is-moved {
+  background: color-mix(in srgb, var(--map-2) 14%, transparent);
+  color: var(--map-2);
+}
+.line-tag.is-changed {
+  background: color-mix(in srgb, var(--map-3) 16%, transparent);
+  color: var(--map-3);
+}
+.line-tag.is-removed {
+  background: color-mix(in srgb, var(--strike) 14%, transparent);
+  color: var(--strike);
+}
+.line-col.is-added {
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--pen) 60%, transparent);
+}
+.line-col.is-added.is-here {
+  box-shadow:
+    inset 0 2px 0 var(--ribbon),
+    inset 0 0 0 1.5px color-mix(in srgb, var(--pen) 60%, transparent);
+}
+.line-col.is-removed {
+  opacity: 0.75;
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--strike) 50%, transparent);
+}
+.line-col.is-removed .line-col-title span {
+  color: var(--strike);
+  text-decoration: line-through;
+}
+.line-col-old {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 400;
+  color: var(--strike);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- The dialog of a card ---------- */
+.line-dialog .dialog-body {
+  overflow: visible;
+}
+.line-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+.line-dialog-text {
+  min-height: 72px;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--paper-2);
+  font-size: var(--text-md);
+  line-height: 1.55;
+}
+.line-dialog-text:focus {
+  border-color: var(--ink-4);
+}
+.line-dialog-error {
+  margin: calc(var(--s-2) * -1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--strike);
+}
+.line-dialog-places {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-4);
+}
+.line-dialog-places .select {
+  width: 100%;
+}
+.line-dialog-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.line-dialog-links .mention-link span {
+  color: var(--ink-2);
+}
+.line-dialog .dialog-foot {
+  align-items: center;
+}
+.line-dialog-spacer {
+  flex: 1;
+}
+.line-dialog-delete {
+  color: var(--strike);
+}
+
+/* ---------- The card of the open chapter in the Write view (StoryLineCard.tsx) ---------- */
+.line-mini {
+  display: block;
+  width: calc(100% - var(--s-3) * 2);
+  margin: var(--s-3) var(--s-3) 0;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  font-size: var(--text-xs);
+  text-align: left;
+  cursor: pointer;
+}
+.line-mini:hover {
+  border-color: var(--ink-4);
+}
+.line-mini-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  color: var(--ink-3);
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.line-mini-head svg {
+  translate: 0 var(--icon-lift);
+}
+.line-mini-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.line-mini-list li {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  padding-left: 9px;
+  border-left: 2px solid var(--rule);
+  font-family: var(--font-prose);
+  font-size: var(--text-sm);
+  line-height: 1.38;
+  color: var(--ink);
+}
+.line-mini-more {
+  margin: 4px 0 0;
+  color: var(--ink-4);
+}
+.line-mini-moments {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 8px 0 0;
+  color: var(--ink-3);
+}
+.line-mini-moments svg {
+  flex-shrink: 0;
+  translate: 0 var(--icon-lift);
+}
+.line-mini-moments span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

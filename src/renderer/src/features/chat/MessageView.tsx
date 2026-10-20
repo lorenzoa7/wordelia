@@ -22,6 +22,7 @@ import { sliceFromMarkdown } from '@/features/editor/review'
 import type { ChatMessage, Thread } from '@shared/types'
 import { ProposalCard } from './ProposalCard'
 import { acceptPending, pendingKeys, resolveTarget, segmentKeys, setHunkStates } from './applyProposal'
+import { isLineSegment } from '@/features/plan/line/proposal'
 import { Button, Spinner, Tooltip } from '@/ui'
 import { typesetForBook } from '@/lib/typeset'
 import { getT, useT } from '@/lib/i18n'
@@ -258,7 +259,20 @@ function ReplyReview({ segments, message, thread }: { segments: Segment[]; messa
     }
     return labels
   }, [segments, pending.join(',')])
-  if (pending.length < 2) return null
+  // A change of the story line is one proposal, also when it has many parts.
+  const count = useMemo(() => {
+    const keys = new Set(pending)
+    let line = 0
+    const inLine = new Set<string>()
+    for (const s of segments) {
+      if (s.kind === 'text' || !isLineSegment(s)) continue
+      const mine = segmentKeys(s).filter((k) => keys.has(k))
+      mine.forEach((k) => inLine.add(k))
+      if (mine.length) line++
+    }
+    return pending.filter((k) => !inLine.has(k)).length + line
+  }, [segments, pending.join(',')])
+  if (count < 2) return null
 
   const applyAll = async (): Promise<void> => {
     setBusy(true)
@@ -281,13 +295,13 @@ function ReplyReview({ segments, message, thread }: { segments: Segment[]; messa
   const more = files.length - named.length
 
   return (
-    <div className="msg-bulk" role="group" aria-label={t.chat.replyProposals(pending.length)}>
+    <div className="msg-bulk" role="group" aria-label={t.chat.replyProposals(count)}>
       <div className="msg-bulk-main">
         <span className="msg-bulk-icon" aria-hidden>
           <ListChecks size={18} />
         </span>
         <div className="msg-bulk-info">
-          <span className="msg-bulk-count">{t.chat.replyProposals(pending.length)}</span>
+          <span className="msg-bulk-count">{t.chat.replyProposals(count)}</span>
           {files.length > 0 && (
             <Tooltip label={<span className="msg-bulk-tip">{files.join(' · ')}</span>} side="top">
               <span className="msg-bulk-files">
@@ -308,7 +322,7 @@ function ReplyReview({ segments, message, thread }: { segments: Segment[]; messa
         </button>
         <Tooltip label={t.chat.applyAllHint} side="top">
           <button className="proposal-btn is-accept msg-bulk-apply" onClick={() => void applyAll()} disabled={busy}>
-            {busy ? <Spinner size={12} /> : <Checks size={14} weight="bold" />} {t.chat.applyAll(pending.length)}
+            {busy ? <Spinner size={12} /> : <Checks size={14} weight="bold" />} {t.chat.applyAll(count)}
           </button>
         </Tooltip>
       </div>

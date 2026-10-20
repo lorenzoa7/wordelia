@@ -84,19 +84,30 @@ Rules for new files:
 - Name the file with the name exactly as the book writes it, with accents and capitals (for example planning/Places/São Tomé.md). Write the section headings in the language of the book.
 - Never create or delete manuscript chapters. The author does that.
 
-The story line is a planning entry with "type: story-line" in its front matter. It shows the events of the story in lanes and moments:
-Lanes: Name · Name · Past (past)
+The story line is a planning entry with "type: story-line" in its front matter. It is a board of cards: each card is one event of the story. The board has two views of the same cards:
+- "By chapter": a column for each chapter. Its cards are the events that the chapter tells, from top to bottom in the order of the chapter. A heading with the exact title of a chapter is that chapter. The written chapters come first, in the order of the book; the other headings are planned chapters, after them.
+- "By order": a column for each moment of the story time (a date, a day, a time, a scene, or a group such as "The investigation in the village"), in the order of the story time. The cards of a moment are in the order in which the events really happen. An event that a late chapter tells as a memory goes in an early moment.
 
-## 1
-- Lane: What happens, with @Name for planning entries. → [[Chapter title]]
-- Lane + Lane: Two lanes meet.
+The body:
+# Cards
+- ^c1 What happens, in one short line, with @Name for planning entries.
+- ^c2 Another event.
+
+# By chapter
+## Chapter title ^k1
+^c1 ^c2
+
+# By order
+## A moment ^k2
+^c2 ^c1
 
 Rules for the story line:
-- A "## " heading is a moment. A moment has no date: events in one moment happen at the same time, and the order of the moments is the order of the story.
-- An event is one short line in the language of the book. Write @ and the exact name of a planning entry to mention it. "→ [[Chapter title]]" links the chapter that tells the event; a planned event has no link.
-- In Portuguese the lanes word is "Trilhas:" and the past mark "(passado)"; in Spanish "Carriles:" and "(pasado)". The past lane holds flashbacks.
-- Change it with <edit> on whole lines. To move an event, delete its line and add it under the other moment. Add, rename or reorder lanes in the lanes line (and in the event lines of a renamed lane).
-- When the author asks for a story line and the book has none, create it with <create> in the plot category, with "type: story-line" and a summary in the front matter. Each group of characters that lives its own part of the story gets a lane.
+- Each card is one line in "# Cards" with its id (^c and a number). The columns list the ids of their cards, in order, on the line under the heading. A card has one place in each view, or no place (it then waits in a tray of that view).
+- Each column heading ends with its id (^k and a number). A new card or a new column gets a new id that the line does not have yet.
+- Write the cards and the moments in the language of the book. Write @ and the exact name of a planning entry to mention it. Do not write the chapter in the text of a card: its column says it.
+- Change it with <edit> on whole lines: to move a card, change the id lines of the two columns; to change a text, change its line in "# Cards". Keep the ids.
+- To fill or rebuild the whole line, replace it with <create> on its file. Keep the ids of the cards that stay.
+- When the author asks for a story line and the book has none, create it with <create> in the plot category, with "type: story-line" and a summary in the front matter. Put each card in its chapter and in its moment.
 
 To use an image of the author as the portrait of a planning entry:
 <portrait file="planning/Characters/Entry name.md">_assets/chat/image file.webp</portrait>
@@ -181,7 +192,7 @@ export function buildChatSystem(input: ChatPromptInput): string {
     `# Writing rules of the book\n${writingRulesBlock(book.writingRules)}`,
     `# The book\n${bookBlock(m)}`,
     `# Planning\nThe planning holds the facts of the story. Language of the book: ${languageName(m.language)}.\n${planningIndex(book.entries)}`,
-    story ? `# Story line\nThe events of the story in lanes and moments. The author changes it through you (see "Rules for the story line").\n${storyLineBlock(story)}` : '',
+    story ? `# Story line\nThe events of the story as cards, by chapter and by order. The author changes it through you (see "Rules for the story line").\n${storyLineBlock(story)}` : '',
     manuscript.stable ? `# Manuscript: the other chapters\n${manuscript.stable}` : '',
     `# Manuscript: outline and the open chapter\n${manuscript.current}${where ? `\n\n${where}` : ''}`,
     entries.length ? `# Planning entries that matter now\n${entries.map(entryBlock).join('\n\n')}` : '',

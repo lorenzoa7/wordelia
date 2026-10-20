@@ -20,7 +20,7 @@ import {
 } from '@shared/book'
 import type { AiAction, BookManifest, BookSnapshot, CategoryDef, Chapter, Entry, SyncState, Thread } from '@shared/types'
 import { bookActionsFile, parseBookActions } from '@shared/ai/scopes'
-import { findStoryLine, renameLinks } from '@shared/storyline'
+import { findStoryLine, isStoryLine, renameChapterInBody } from '@shared/storyline'
 import { invoke, on } from '@/lib/api'
 import { saver } from './saver'
 import { chapterWord } from '@shared/export/model'
@@ -219,6 +219,8 @@ export const useBook = create<BookState>((set, get) => {
     },
     selectEntry(id) {
       const e = get().entries.find((x) => x.id === id)
+      // The story line has its own page: the Line view (features/graph/nav.ts, LINE_PAGE).
+      if (e && isStoryLine(e)) return set({ activeEntryId: null, view: 'plan', activeCategory: ':line' })
       set({ activeEntryId: id, view: 'plan', activeCategory: e?.category ?? get().activeCategory })
     },
     selectCategory(folder) {
@@ -270,10 +272,10 @@ export const useBook = create<BookState>((set, get) => {
         await invoke('book:deleteFile', root, oldRel)
       }
       get().updateManifest({ chapters: get().chapters.map((c) => ({ id: c.id, file: c.file })) })
-      // The links of the story line follow the new title.
+      // The column of the chapter in the story line follows the new title.
       const story = findStoryLine(get().entries)
       if (story && clean !== ch.title) {
-        const body = renameLinks(story.body, ch.title, clean)
+        const body = renameChapterInBody(story.body, ch.title, clean)
         if (body !== story.body) get().updateEntry(story.id, { body })
       }
     },

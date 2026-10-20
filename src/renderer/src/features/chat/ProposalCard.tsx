@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'motion/react'
-import { BookOpenText, Check, Columns, Crosshair, FilePlus, Notebook, Rows, UserCircle, WarningCircle, X } from '@phosphor-icons/react'
+import { BookOpenText, Check, Columns, Crosshair, FilePlus, Notebook, Path, Rows, UserCircle, WarningCircle, X } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import ReactMarkdown from 'react-markdown'
 import { markdownToPlain } from '@shared/book'
 import { readFrontmatter } from '@shared/markdown/frontmatter'
 import { hunkKey, type Hunk, type Segment } from '@shared/proposals/parse'
 import { wordDiff, diffStats, type DiffOp } from '@shared/text/diff'
+import { boardStats, findStoryLine, parseBoard } from '@shared/storyline'
 import type { ChatMessage, HunkState, Thread } from '@shared/types'
 import { Spinner, Tooltip } from '@/ui'
 import { useBook } from '@/stores/book'
@@ -15,6 +16,9 @@ import { useAssetUrl } from '@/lib/assets'
 import { toast } from '@/stores/ui'
 import { folderCategoryName, useT } from '@/lib/i18n'
 import { inlineProposalId, revealProposal } from '@/features/editor/inlineProposals'
+import { openLine } from '@/features/graph'
+import { acceptLineProposal, isLineSegment, messageLineProposal, rejectLineProposal, type LineSegment } from '@/features/plan/line/proposal'
+import { useChat } from './chatStore'
 import { applyCreate, applyEditHunk, applyPortrait, markAfter, resolveTarget, restoreSnapshot, setHunkStates, snapshotOf, type Snapshot } from './applyProposal'
 
 type EditSeg = Extract<Segment, { kind: 'edit' }>
@@ -34,6 +38,8 @@ function setHunkState(thread: Thread, messageId: string, key: string, state: Hun
 
 export function ProposalCard(props: Props): React.JSX.Element {
   if (props.segment.kind === 'portrait') return <PortraitCard {...props} segment={props.segment} />
+  // The story line shows its changes on its board: the card has the counts and the decision.
+  if (isLineSegment(props.segment)) return <LineCard {...props} segment={props.segment as LineSegment} />
   return props.segment.kind === 'edit' ? <EditCard {...props} segment={props.segment} /> : <CreateCard {...props} segment={props.segment} />
 }
 
@@ -397,6 +403,67 @@ function PortraitCard({ segment, message, thread, streaming }: Props & { segment
         </div>
       </header>
       <div className="proposal-body">{url && <img className="proposal-portrait" src={url} alt={t.chat.portraitAlt(target.label)} />}</div>
+    </motion.div>
+  )
+}
+
+/** A proposal for the story line: the counts of its changes, "Show in the line", and the decision. */
+function LineCard({ segment, message, thread, streaming }: Props & { segment: LineSegment }): React.JSX.Element {
+  const t = useT()
+  const entries = useBook((s) => s.entries)
+  const chapters = useBook((s) => s.chapters)
+  const story = findStoryLine(entries)
+  const states = message?.hunks ?? {}
+  const keys = segment.kind === 'create' ? [hunkKey(segment.index, 0)] : segment.hunks.map((_, i) => hunkKey(segment.index, i))
+  const open = keys.some((k) => !states[k] || states[k] === 'pending')
+  const done = keys.map((k) => states[k])
+  const state: HunkState = open ? 'pending' : done.includes('failed') ? 'failed' : done.includes('accepted') ? 'accepted' : 'rejected'
+  const p = thread && message && !streaming && segment.complete && open ? messageLineProposal(thread, message, story ? story.body : null) : null
+  const before = p?.before
+  const after = p?.after
+  const stats = useMemo(() => (before !== undefined && after != null ? boardStats(parseBoard(before), parseBoard(after), chapters) : null), [before, after, chapters])
+  const show = (): void => {
+    if (thread) useChat.getState().setActiveThread(thread.id)
+    openLine()
+  }
+  return (
+    <motion.div className="proposal is-line" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+      <header className="proposal-head">
+        <div className="proposal-title">
+          <button className="proposal-file" onClick={show} title={t.plan.line.showInLine}>
+            <Path size={14} />
+            <span>{t.plan.line.title}</span>
+          </button>
+          {stats && <span className="proposal-cat">{t.plan.line.reviewStats(stats)}</span>}
+        </div>
+        <div className="proposal-tools">
+          {streaming || !segment.complete ? (
+            <Spinner size={12} />
+          ) : p ? (
+            <>
+              <button className="proposal-btn" onClick={() => rejectLineProposal(p)}>
+                {t.common.reject}
+              </button>
+              <button className="proposal-btn is-accept" onClick={() => void acceptLineProposal(p)} disabled={p.after === null}>
+                <Check size={12} weight="bold" /> {t.common.accept}
+              </button>
+            </>
+          ) : (
+            <HunkBadge state={state} />
+          )}
+        </div>
+      </header>
+      {p && (
+        <div className="proposal-line">
+          {p.after === null ? (
+            <span className="proposal-line-stale">{t.plan.line.reviewStale}</span>
+          ) : (
+            <button className="hunk-reveal" onClick={show}>
+              <Crosshair size={12} /> {t.plan.line.showInLine}
+            </button>
+          )}
+        </div>
+      )}
     </motion.div>
   )
 }

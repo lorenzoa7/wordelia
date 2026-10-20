@@ -10,11 +10,12 @@ import { invoke } from '@/lib/api'
 import { useAssetUrl } from '@/lib/assets'
 import { categoryName, useT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
+import { useNotes } from './line/model'
 import { useUi } from '@/stores/ui'
 import { useChat } from '@/features/chat/chatStore'
 import { useApp } from '@/stores/app'
 import { LINE_PAGE, MAP_PAGE, MapView, PlanViewSwitch, mapBack, useReturnsToMap } from '@/features/graph'
-import { StoryLineView } from './StoryLineView'
+import { LineView } from './line/LineView'
 import { NoteEditor } from './NoteEditor'
 import { CategoryIcon } from './PlanSidebar'
 import { importNotes } from './importNotes'
@@ -65,7 +66,7 @@ export function PlanView(): React.JSX.Element {
       ) : activeCategory === MAP_PAGE ? (
         <MapView />
       ) : activeCategory === LINE_PAGE ? (
-        <StoryLineView />
+        <LineView />
       ) : (
         <CategoryGrid key={activeCategory ?? ''} folder={activeCategory} />
       )}
@@ -115,7 +116,7 @@ function Portrait({ entry, size }: { entry: Entry; size: 'card' | 'large' }): Re
 function CategoryGrid({ folder }: { folder: string | null }): React.JSX.Element {
   const t = useT()
   const manifest = useBook((s) => s.manifest)
-  const entries = useBook((s) => s.entries)
+  const entries = useNotes()
   const categories = manifest?.planning.categories ?? []
   // An unknown folder (a deleted category, an old link) shows the overview.
   const category = categories.find((c) => c.folder === folder)

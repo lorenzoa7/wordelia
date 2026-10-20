@@ -42,7 +42,7 @@ export function buildSyncSystem(input: SyncPromptInput): string {
     `- Categories that exist: ${input.categories.join(', ')}.`,
     ...(story
       ? [
-          `- The story line (planning/${story.file}) shows the events of the story in lanes and moments ("## " headings). Link its events to the chapters that tell them: add "→ [[Chapter title]]" at the end of the line. Add the events of the changed chapters that it does not have, as one short line each, in the right moment and lane. Edit whole lines with <edit>.`
+          `- The story line (planning/${story.file}) has the events of the story as cards: one line for each card in "# Cards" (^c and a number, then the text), and two views that list the ids of the cards in columns: "# By chapter" (a "## " heading for each chapter, with its title) and "# By order" (a "## " heading for each moment of the story time). Add the events of the changed chapters that it does not have: one short line each in "# Cards" with a new id, the id in the column of its chapter, and the id in its moment when the text says when it happens. Edit whole lines with <edit>. Keep the ids.`
         ]
       : []),
     '',

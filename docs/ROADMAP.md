@@ -4,8 +4,8 @@ This file is the source of truth for progress. Update it after each task. Mark a
 
 ## Current focus
 
-> **Milestone:** Version 0.10 — the story line
-> **Next task:** Collect feedback on 0.10.0. Then fix what the author finds.
+> **Milestone:** Version 0.11 — the story line board
+> **Next task:** Collect feedback on 0.11.0. Then fix what the author finds.
 > **Not verified:** Codex and the two API transports. The user has no Codex account, and no API keys are set. The scripted provider (`WORDELIA_MOCK_AI=1`) covers their UI flows.
 
 ## M0 — Foundation
@@ -323,6 +323,16 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] The chat reads the story line and the moment of the open chapter, and changes it with proposals; the sync links events to chapters
 - [x] A card of the open chapter in the Write view; chapter renames update the links; the map leaves the story line out
 - [x] Scenario `storyline`: build, view, a move through the chat, a drag, a rename, the Write card, the map
+
+## Version 0.11 — story line board
+
+- [x] A new model: cards with a place by chapter and by time (`src/shared/storyline.ts`, 33 unit tests): parse, write, views, "you are here", changes, diff
+- [x] The Line view: two views with a switch, the written chapters always there, planned chapters, moments, the trays; no page scroll; cards of one size with "…"; mentions as underlined names
+- [x] Editing like a board: "+" for cards and columns, drag cards and columns (dnd-kit, also with the keyboard), rename, delete with Undo, the card dialog with "@" suggestions
+- [x] The empty line: a banner that opens a new chat thread with a draft; the build dialog is gone
+- [x] AI proposals on the board: new, deleted, moved and changed cards and columns, Accept and Reject; a short chat card
+- [x] Prompts, sync and the scripted AI use the new format; the Write card shows the cards of the open chapter
+- [x] Scenarios `storyline` (the AI) and `storyline-edit` (by hand, the layout, the keyboard)
 
 ## Tests and CI
 

@@ -2,6 +2,20 @@
 
 Each version has its Windows installer in GitHub Releases. The release workflow copies the section of the version from this file to the release notes.
 
+## 0.11.0 (2026-10-20)
+
+### Changed
+- The story line is a board now, like Trello, with two views of the same cards. "By chapter": a column for each chapter, with the events in the order of the chapter. "By time": a column for each moment of the story, with the events in the order in which they happen. A switch at the top right changes the view.
+- Fill it by hand: "+" under the last card makes a card, "+" after the last column makes a column. Drag cards and columns, rename and delete them. A click on a card opens it; type @ to mention a note.
+- All cards have the same size; a long text ends with "…". Mentions are underlined names; a click opens the note.
+- "You are here" is the last chapter of the book.
+- The page does not scroll; the board scrolls sideways, and each column scrolls down.
+- An empty line has a small banner: it opens a new chat with a draft. Add a summary, a note or an image, and send it. The build dialog is gone.
+- A proposal of the AI for the line shows on the board: new cards in green, deleted cards in red, moved and changed cards marked. Accept or reject it on the board or in the chat.
+
+### Removed
+- Lanes (rows for groups of characters) and "Edit as text".
+
 ## 0.10.0 (2026-10-20)
 
 ### New

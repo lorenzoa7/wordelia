@@ -1,0 +1,194 @@
+// Chat proposals for the story line. The Line view shows the proposed board with its changes and
+// asks for a decision; the chat card shows the counts. A decision in one place updates the other:
+// the states of the proposals are in the thread, as for all proposals.
+
+import { useMemo } from 'react'
+import { PLANNING_DIR, entryToFile } from '@shared/book'
+import { readFrontmatter, writeFrontmatter } from '@shared/markdown/frontmatter'
+import { applyHunk } from '@shared/proposals/apply'
+import { hunkKey, parseProposals, type Segment } from '@shared/proposals/parse'
+import { STORY_LINE_TYPE, findStoryLine, isStoryLine } from '@shared/storyline'
+import type { ChatMessage, HunkState, Thread } from '@shared/types'
+import { getT } from '@/lib/i18n'
+import { useBook } from '@/stores/book'
+import { toast } from '@/stores/ui'
+import { useChat } from '@/features/chat/chatStore'
+import { latestThread } from '@/features/chat/threads'
+import { applyCreate, applyEditHunk, createdPath, markAfter, resolveTarget, restoreSnapshot, setHunkStates, snapshotOf, type Snapshot } from '@/features/chat/applyProposal'
+
+export type LineSegment = Extract<Segment, { kind: 'edit' }> | Extract<Segment, { kind: 'create' }>
+
+/** True when a proposal changes the story line: an edit of it, or a new text for it (or a new story line). */
+export function isLineSegment(seg: Segment): boolean {
+  if (seg.kind !== 'edit' && seg.kind !== 'create') return false
+  const target = resolveTarget(seg.file)
+  if (target.kind === 'entry') return isStoryLine(target.entry)
+  return seg.kind === 'create' && target.kind === 'new-entry' && readFrontmatter(seg.content).data.type === STORY_LINE_TYPE
+}
+
+/** The keys of a segment that wait for a decision. */
+function pendingOf(seg: LineSegment, states: Record<string, HunkState>): string[] {
+  const keys = seg.kind === 'create' ? (seg.complete ? [hunkKey(seg.index, 0)] : []) : seg.hunks.flatMap((h, i) => (h.complete ? [hunkKey(seg.index, i)] : []))
+  return keys.filter((k) => !states[k] || states[k] === 'pending')
+}
+
+export interface LineProposal {
+  /** `thread:message`, to know when the proposal on screen changes */
+  id: string
+  thread: Thread
+  message: ChatMessage
+  segments: LineSegment[]
+  /** The keys that wait for a decision */
+  keys: string[]
+  /** The body now ('' when the book has no story line) */
+  before: string
+  /** The body after the proposal; null when an edit does not fit the body any more */
+  after: string | null
+}
+
+/** The proposals of one message for the story line that wait for a decision, or null. */
+export function messageLineProposal(thread: Thread, message: ChatMessage, body: string | null): LineProposal | null {
+  if (message.role !== 'assistant' || !/<(edit|create)\s/.test(message.content)) return null
+  const states = message.hunks ?? {}
+  const segments = parseProposals(message.content)
+    .filter((s): s is LineSegment => isLineSegment(s))
+    .filter((s) => pendingOf(s, states).length)
+  if (!segments.length) return null
+  let after: string | null = body ?? ''
+  for (const s of segments) {
+    if (after === null) break
+    if (s.kind === 'create') {
+      after = readFrontmatter(s.content).body
+      continue
+    }
+    for (let i = 0; i < s.hunks.length && after !== null; i++) {
+      if (!pendingOf(s, states).includes(hunkKey(s.index, i))) continue
+      const res = applyHunk(after, s.hunks[i].find, s.hunks[i].replace)
+      after = res.ok ? res.text : null
+    }
+  }
+  return {
+    id: `${thread.id}:${message.id}`,
+    thread,
+    message,
+    segments,
+    keys: segments.flatMap((s) => pendingOf(s, states)),
+    before: body ?? '',
+    after
+  }
+}
+
+/** The newest message of a thread with proposals for the story line that wait for a decision. */
+export function lineProposalOf(thread: Thread | undefined, body: string | null): LineProposal | null {
+  if (!thread) return null
+  for (let m = thread.messages.length - 1; m >= 0; m--) {
+    const p = messageLineProposal(thread, thread.messages[m], body)
+    if (p) return p
+  }
+  return null
+}
+
+/** The thread whose proposals show in the book: the open thread, else the newest one. */
+function proposalThread(threads: Thread[], activeId: string | null): Thread | undefined {
+  return threads.find((t) => t.id === activeId) ?? latestThread(threads)
+}
+
+/** The proposal for the story line that waits for a decision, if any. */
+export function useLineProposal(): LineProposal | null {
+  const threads = useBook((s) => s.threads)
+  const entries = useBook((s) => s.entries)
+  const activeId = useChat((s) => s.activeThreadId)
+  return useMemo(() => {
+    const story = findStoryLine(entries)
+    return lineProposalOf(proposalThread(threads, activeId), story ? story.body : null)
+  }, [threads, entries, activeId])
+}
+
+/** The AI writes a proposal for the story line now. */
+export function useLineWriting(): boolean {
+  const activeId = useChat((s) => s.activeThreadId)
+  const text = useChat((s) => (activeId ? s.streaming[activeId]?.text : undefined))
+  const entries = useBook((s) => s.entries)
+  return useMemo(() => {
+    if (!text || !/<(edit|create)\s/.test(text) || !entries) return false
+    // A text that is still coming can have a front matter that is cut.
+    return parseProposals(text).some((s) => isLineSegment(s) || (s.kind === 'create' && /^type:\s*["']?story-line/m.test(s.content)))
+  }, [text, entries])
+}
+
+/** The text of a new story line, with its type (the AI can forget it). */
+function withType(content: string): string {
+  const { data, body } = readFrontmatter(content)
+  return data.type === STORY_LINE_TYPE ? content : writeFrontmatter({ ...data, type: STORY_LINE_TYPE }, body)
+}
+
+/** Accept a proposal for the story line: all its changes, with an Undo toast. */
+export async function acceptLineProposal(p: LineProposal): Promise<void> {
+  const t = getT()
+  const book = useBook.getState()
+  const story = findStoryLine(book.entries)
+  const states: Record<string, HunkState> = {}
+  const replaced: Record<string, string> = {}
+  const todo = new Set(p.keys)
+  let snap: Snapshot | null = null
+  let created: string | null = null
+  for (const s of p.segments) {
+    if (s.kind === 'create') {
+      const key = hunkKey(s.index, 0)
+      if (!todo.has(key)) continue
+      const now = findStoryLine(useBook.getState().entries)
+      if (now) {
+        // A new text for the story line: keep the entry (its id, its summary), change its body.
+        snap ??= snapshotOf(`${PLANNING_DIR}/${now.file}`)
+        replaced[key] = entryToFile(now)
+        useBook.getState().updateEntry(now.id, { body: readFrontmatter(s.content).body })
+        states[key] = 'accepted'
+      } else {
+        const res = await applyCreate(s.file, withType(s.content))
+        states[key] = res.ok ? 'accepted' : 'failed'
+        if (res.ok) created = createdPath(s.file).slice(PLANNING_DIR.length + 1)
+      }
+      continue
+    }
+    snap ??= snapshotOf(s.file)
+    for (let i = s.hunks.length - 1; i >= 0; i--) {
+      const key = hunkKey(s.index, i)
+      if (!todo.has(key)) continue
+      const res = applyEditHunk(s.file, s.hunks[i])
+      states[key] = res.ok ? 'accepted' : 'failed'
+    }
+  }
+  setHunkStates(p.thread, p.message.id, states, replaced)
+  markAfter(snap)
+  if (Object.values(states).some((s) => s === 'failed')) {
+    toast(t.plan.line.reviewStale, { kind: 'error' })
+    return
+  }
+  const back = (): void => {
+    const latest = useBook.getState().threads.find((x) => x.id === p.thread.id)
+    if (latest) setHunkStates(latest, p.message.id, Object.fromEntries(Object.keys(states).map((k) => [k, 'pending' as const])))
+  }
+  toast(story ? t.plan.line.accepted : t.plan.line.created, {
+    ms: 8000,
+    action: {
+      label: t.common.undo,
+      run: () => {
+        if (created) {
+          const e = useBook.getState().entries.find((x) => x.file === created)
+          if (e) void useBook.getState().deleteEntry(e.id)
+          back()
+          return
+        }
+        if (snap && !restoreSnapshot(snap)) {
+          toast(t.chat.undoUnsafe, { kind: 'error' })
+          return
+        }
+        back()
+      }
+    }
+  })
+}
+
+export function rejectLineProposal(p: LineProposal): void {
+  setHunkStates(p.thread, p.message.id, Object.fromEntries(p.keys.map((k) => [k, 'rejected' as const])))
+}

@@ -1722,3 +1722,12 @@ button.proposal-file:hover span {
   width: 64px;
   margin: 0 0 6px 10px;
 }
+
+/* A proposal for the story line: the board shows the changes (features/plan/line) */
+.proposal-line {
+  padding: 6px 10px 8px;
+}
+.proposal-line-stale {
+  font-size: var(--text-xs);
+  color: var(--strike);
+}

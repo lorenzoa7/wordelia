@@ -1,18 +1,16 @@
-// The open chapter in the story line, under the chapter list: its moment, its events, the events
-// at the same time in other lanes, and the next events of its lanes. A click opens the Line view.
+// The open chapter in the story line, under the chapter list: the cards of the chapter, in order,
+// and their moments. A click opens the Line view, by chapter.
 
 import { useMemo } from 'react'
-import { Path } from '@phosphor-icons/react'
-import { chapterOf, findStoryLine, momentOfChapter, parseStoryLine, type StoryEvent } from '@shared/storyline'
+import { Clock, Path } from '@phosphor-icons/react'
+import { boardView, findStoryLine, parseBoard, placesOf, plainText } from '@shared/storyline'
 import { useT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
 import { openLine } from '@/features/graph'
-import '@/features/plan/storyline.css'
+import { useLineUi } from '@/features/plan/line/model'
+import '@/features/plan/line/line.css'
 
-/** The text of an event without the "@" of its mentions */
-function plain(e: StoryEvent): string {
-  return e.text.replace(/@(?=\p{L})/gu, '')
-}
+const SHOWN = 4
 
 export function StoryLineCard(): React.JSX.Element | null {
   const t = useT()
@@ -22,33 +20,38 @@ export function StoryLineCard(): React.JSX.Element | null {
   const story = useMemo(() => findStoryLine(entries), [entries])
   const info = useMemo(() => {
     if (!story || !activeId) return null
-    const line = parseStoryLine(story.body)
-    const m = momentOfChapter(line, activeId, chapters)
-    if (m < 0) return null
-    const moment = line.moments[m]
-    const mine = moment.events.filter((e) => e.links.some((l) => chapterOf(l, chapters) === activeId))
-    const lanes = new Set(mine.flatMap((e) => e.lanes))
-    const same = moment.events.filter((e) => !mine.includes(e))
-    const next = line.moments[m + 1]?.events.filter((e) => e.lanes.some((l) => lanes.has(l))) ?? []
-    return { label: moment.label, mine, same, next }
+    const board = parseBoard(story.body)
+    const col = boardView(board, 'chapter', chapters).find((c) => c.chapterId === activeId)
+    if (!col?.cards.length) return null
+    const moments = placesOf(board, 'order', chapters)
+    const names = [...new Set(col.cards.flatMap((c) => (moments.get(c.id) ? [moments.get(c.id)!.title] : [])))]
+    return { number: col.number ?? 0, cards: col.cards, moments: names }
   }, [story, activeId, chapters])
   if (!info) return null
 
   return (
-    <button className="line-mini" onClick={openLine} title={t.plan.line.card}>
+    <button
+      className="line-mini"
+      onClick={() => {
+        useLineUi.getState().setView('chapter')
+        openLine()
+      }}
+      title={t.plan.line.card}
+    >
       <span className="line-mini-head">
         <Path size={12} />
-        {t.plan.line.moment(info.label)}
+        {t.plan.line.inLine(info.number)}
       </span>
-      <p className="line-mini-now">{info.mine.map(plain).join(' ')}</p>
-      {info.same.length > 0 && (
-        <p className="line-mini-row">
-          <b>{t.plan.line.sameTime}:</b> {info.same.map(plain).join(' · ')}
-        </p>
-      )}
-      {info.next.length > 0 && (
-        <p className="line-mini-row">
-          <b>{t.plan.line.next}:</b> {info.next.map(plain).join(' · ')}
+      <ul className="line-mini-list">
+        {info.cards.slice(0, SHOWN).map((c) => (
+          <li key={c.id}>{plainText(c.text)}</li>
+        ))}
+      </ul>
+      {info.cards.length > SHOWN && <p className="line-mini-more">{t.plan.line.more(info.cards.length - SHOWN)}</p>}
+      {info.moments.length > 0 && (
+        <p className="line-mini-moments" title={info.moments.join(' · ')}>
+          <Clock size={11} aria-label={t.plan.line.momentField} />
+          <span>{info.moments.join(' · ')}</span>
         </p>
       )}
     </button>

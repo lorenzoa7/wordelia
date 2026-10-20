@@ -136,7 +136,7 @@ describe('story line in the prompts', () => {
     aliases: [],
     summary: 'Os acontecimentos.',
     image: null,
-    body: 'Trilhas: Elias · Marta\n\n## 1\n- Elias: A lâmpada acende. → [[Um]]\n\n## 2\n- Marta: Sobe a escada. → [[Dois]]',
+    body: '# Cards\n- ^c1 A lâmpada acende.\n- ^c2 Sobe a escada.\n\n# By chapter\n## Um ^k1\n^c1\n\n## Dois ^k2\n^c2\n\n# By order\n## Noite ^k3\n^c2 ^c1',
     meta: { type: 'story-line' }
   }
   const withLine = (currentChapterId: string, extra: Entry[] = []): string =>
@@ -152,16 +152,24 @@ describe('story line in the prompts', () => {
       manuscriptBudget: 100000
     })
 
-  it('sends the story line with the moment of the open chapter', () => {
+  it('sends the story line with the cards of the open chapter', () => {
     const s = withLine('c2')
     expect(s).toContain('# Story line')
     expect(s).toContain('planning/Plot/Linha da história.md')
-    expect(s).toContain('- Marta: Sobe a escada. → [[Dois]]')
-    expect(s).toContain('The open chapter "Dois" is in moment 2')
+    expect(s).toContain('- ^c2 Sobe a escada.')
+    expect(s).toContain('The open chapter "Dois" (chapter 2) has the cards ^c2.')
+    expect(s).toContain('The last written chapter is chapter 3, "Três"')
   })
 
-  it('says when the open chapter has no event', () => {
-    expect(withLine('c3')).toContain('The open chapter "Três" has no event in the story line')
+  it('says when the open chapter has no card', () => {
+    expect(withLine('c3')).toContain('The open chapter "Três" (chapter 3) has no card in the story line yet.')
+  })
+
+  it('explains the two views and the ids', () => {
+    const s = withLine('c1')
+    expect(s).toContain('# By chapter')
+    expect(s).toContain('# By order')
+    expect(s).toMatch(/new id/)
   })
 
   it('no story line, no section', () => {
@@ -171,12 +179,13 @@ describe('story line in the prompts', () => {
   it('sends the story line one time, also when the plot budget is full', () => {
     const big: Entry = { ...entries[0], id: 'big', category: 'Plot', file: 'Plot/Resumo.md', name: 'Resumo', body: 'palavra '.repeat(60000) }
     const s = withLine('c1', [big])
-    expect(s.split('- Elias: A lâmpada acende.').length - 1).toBe(1)
+    expect(s.split('- ^c1 A lâmpada acende.').length - 1).toBe(1)
   })
 
-  it('the sync prompt asks to link events to chapters when a story line exists', () => {
+  it('the sync prompt asks for the cards of the changed chapters when a story line exists', () => {
     const input = { book: { manifest, writingRules: '', chapters, entries: [...entries, line], threads: [] }, chapters, categories: ['Characters', 'Plot'], bootstrap: false }
     expect(buildSyncSystem(input)).toContain('story line')
+    expect(buildSyncSystem(input)).toContain('# Cards')
     expect(buildSyncSystem({ ...input, book: { ...input.book, entries } })).not.toContain('story line')
   })
 })
@@ -184,7 +193,7 @@ describe('story line in the prompts', () => {
 describe('story line and the plot budget', () => {
   it('the story line does not use the budget of the plot notes', () => {
     // "Linha…" comes before "Resumo…": it must not push the summary out of the prompt.
-    const line: Entry = { ...entries[0], id: 'sl', category: 'Plot', file: 'Plot/Linha da história.md', name: 'Linha da história', body: 'Trilhas: Elias\n\n## 1\n- Elias: ' + 'palavra '.repeat(4000), meta: { type: 'story-line' } }
+    const line: Entry = { ...entries[0], id: 'sl', category: 'Plot', file: 'Plot/Linha da história.md', name: 'Linha da história', body: '# Cards\n- ^c1 ' + 'palavra '.repeat(4000), meta: { type: 'story-line' } }
     const summary: Entry = { ...entries[0], id: 'rs', category: 'Plot', file: 'Plot/Resumo da História.md', name: 'Resumo da História', body: 'RESUMO ' + 'texto '.repeat(6000), meta: {} }
     const s = buildChatSystem({
       book: { manifest, writingRules: '', chapters, entries: [...entries, line, summary], threads: [] },

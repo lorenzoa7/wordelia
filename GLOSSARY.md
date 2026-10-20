@@ -21,9 +21,13 @@ This file is the ubiquitous language of Wordelia. Use these words in code, docs 
 | **Category** | A group of entries, for example Characters. One folder in `planning/`. | `Category` |
 | **Entry** | One planning note, for example one character. One Markdown file. | `Entry` |
 | **Portrait** | The image of an entry. It shows on the card of the entry. The file is in `planning/_assets/`. | `entry.image` |
-| **Story line** | The events of the story in lanes and moments. A planning entry with `type: story-line`. The Plan view shows it as "Line". | `StoryLine`, `storyline.ts` |
-| **Lane** | One row of the story line: a group of characters that lives its own part of the story. One lane can be the past lane, for flashbacks. | `StoryLine.lanes` |
-| **Moment** | One column of the story line: events that happen at the same time. A moment has no date. | `StoryMoment` |
+| **Story line** | The events of the story as a board of cards, in two views: by chapter and by time. A planning entry with `type: story-line`. The Plan view shows it as "Line". | `Board`, `storyline.ts` |
+| **Line card** | One event of the story on the story line. It has a place in each view, or none. | `LineCard` |
+| **By chapter** | The view of the story line with a column for each chapter: the written chapters, then the planned chapters. | `LineView = 'chapter'` |
+| **By time** | The view of the story line with a column for each moment of the story time, in order. ("Por ordem" in Portuguese.) | `LineView = 'order'` |
+| **Moment** | One column of the story line by time: a date, a time, a scene or a group of events. | `Board.moments` |
+| **Planned chapter** | A column of the story line by chapter for a chapter that is not in the book yet. | `ViewColumn.kind = 'planned'` |
+| **Tray** | The first column of a view of the story line: the cards that have no place in that view. | `TRAY` |
 | **Alias** | Another name for an entry. The app uses aliases to find mentions in the manuscript. | `aliases` |
 | **Sync** | The AI compares the manuscript with the planning and proposes changes to the planning. The button is "Update notes from the chapters". | `planningSync` |
 

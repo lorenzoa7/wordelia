@@ -55,49 +55,72 @@ function reply(req: AiRequest): string {
       ...(entry ? ['', `<portrait file="${entry[1]}">${images[0].file}</portrait>`] : [])
     ].join('\n')
   }
-  // The story line: build it from a source, or move its last event to the first moment.
+  // The story line: fill it (a new line), or move the last card of the last moment to the first moment.
   const story = /<story_line file="([^"]+)"[^>]*>\n([\s\S]*?)\n<\/story_line>/.exec(req.system)
   if (req.purpose === 'chat' && !story && /story line|linha da história|línea de la historia/i.test(last)) {
-    const [elias, marta, visitor, past] = english ? ['Elias', 'Marta', 'The visitor', 'Past'] : ['Elias', 'Marta', 'O visitante', 'Passado']
-    const [storm, visit] = english ? ['The Storm', 'The Visitor'] : ['A Tempestade', 'O Visitante']
+    const pt = !english
+    const [storm, visit] = pt ? ['A Tempestade', 'O Visitante'] : ['The Storm', 'The Visitor']
+    const isle = pt ? 'Santa Ilha' : 'Saint Isle'
     return [
-      english ? 'Here is the story line: three lanes, and the lanes meet in the lighthouse.' : 'Aqui está a linha da história: três trilhas, que se encontram no farol.',
+      pt ? 'Aqui está a linha da história: seis acontecimentos, nos capítulos e na ordem do tempo.' : 'Here is the story line: six events, by chapter and in the order of time.',
       '',
-      `<create file="planning/Plot/${english ? 'Story line' : 'Linha da história'}.md">`,
+      `<create file="planning/Plot/${pt ? 'Linha da história' : 'Story line'}.md">`,
       '---',
       'type: story-line',
-      english ? 'summary: The events of the story in lanes and moments.' : 'summary: Os acontecimentos da história em trilhas e momentos.',
+      pt ? 'summary: Os acontecimentos da história, por capítulo e por ordem.' : 'summary: The events of the story, by chapter and by time.',
       '---',
-      `${english ? 'Lanes' : 'Trilhas'}: ${elias} · ${marta} · ${visitor} · ${past} (${english ? 'past' : 'passado'})`,
+      '# Cards',
+      `- ^c1 ${pt ? '@Elias acende a lâmpada do farol; falta um barco no porto.' : '@Elias lights the lamp of the lighthouse; a boat is missing.'}`,
+      `- ^c2 ${pt ? '@Marta sobe a escada com café e conta da tempestade.' : '@Marta climbs the stairs with coffee and talks about the storm.'}`,
+      `- ^c3 ${pt ? 'Vinte e dois anos antes, a primeira noite de @Elias no farol.' : 'Twenty-two years before, the first night of @Elias at the lighthouse.'}`,
+      `- ^c4 ${pt ? 'Os dois veem o bote azul nas pedras.' : 'The two of them see the blue boat on the rocks.'}`,
+      `- ^c5 ${pt ? 'Um estranho está deitado no bote azul.' : 'A stranger lies in the blue boat.'}`,
+      `- ^c6 ${pt ? `O visitante acorda no farol e fala de ruas que não existem em @${isle}.` : `The visitor wakes up in the lighthouse and talks about streets that are not on @${isle}.`}`,
       '',
-      '## 1',
-      `- ${elias}: ${english ? '@Elias lights the lamp; a boat is missing.' : '@Elias acende a lâmpada; falta um barco.'} → [[${storm}]]`,
-      `- ${marta}: ${english ? '@Marta climbs the stairs with coffee.' : '@Marta sobe a escada com café.'} → [[${storm}]]`,
-      `- ${past}: ${english ? 'Twenty-two years ago, the first night of @Elias at the lighthouse.' : 'Vinte e dois anos antes, a primeira noite de @Elias no farol.'}`,
+      '# By chapter',
+      `## ${storm} ^k1`,
+      '^c1 ^c2 ^c3',
       '',
-      `## 2 · ${english ? 'The boat' : 'O bote'}`,
-      `- ${elias} + ${marta}: ${english ? 'They see the blue boat together.' : 'Os dois veem o bote azul.'} → [[${visit}]]`,
-      `- ${visitor}: ${english ? 'A stranger lies in the blue boat.' : 'Um estranho está deitado no bote azul.'}`,
+      `## ${visit} ^k2`,
+      '^c4 ^c5',
       '',
-      '## 3',
-      `- ${elias} + ${marta} + ${visitor}: ${english ? 'The visitor wakes up in the lighthouse.' : 'O visitante acorda no farol.'}`,
+      `## ${pt ? 'O nome do visitante' : 'The name of the visitor'} ^k3`,
+      '^c6',
+      '',
+      '# By order',
+      `## ${pt ? 'Vinte e dois anos antes' : 'Twenty-two years before'} ^k4`,
+      '^c3',
+      '',
+      `## ${pt ? 'A noite da tempestade' : 'The night of the storm'} ^k5`,
+      '^c1 ^c2 ^c4 ^c5',
+      '',
+      `## ${pt ? 'A manhã seguinte' : 'The morning after'} ^k6`,
+      '^c6',
       '</create>'
     ].join('\n')
   }
   if (req.purpose === 'chat' && story && /\b(move|mova|mueve)\b/i.test(last)) {
     const lines = story[2].split('\n')
-    const events = lines.filter((l) => /^- /.test(l))
-    const heading = lines.find((l) => /^## /.test(l))
-    const moved = events[events.length - 1]
-    if (moved && heading) {
+    const start = lines.findIndex((l) => /^# By order\s*$/.test(l))
+    const columns: Array<{ head: string; refs: string }> = []
+    for (let i = start + 1; start >= 0 && i < lines.length; i++) {
+      if (/^## /.test(lines[i])) columns.push({ head: lines[i], refs: /^\^/.test(lines[i + 1] ?? '') ? lines[i + 1] : '' })
+    }
+    const first = columns[0]
+    const lastCol = [...columns].reverse().find((c) => c.refs)
+    if (first && lastCol && lastCol !== first) {
+      const ids = lastCol.refs.split(/\s+/)
+      const moved = ids[ids.length - 1]
+      const rest = ids.slice(0, -1).join(' ')
+      const block = (c: { head: string; refs: string }): string => (c.refs ? `${c.head}\n${c.refs}` : c.head)
       return [
         english ? 'I moved the last event to the first moment.' : 'Movi o último acontecimento para o primeiro momento.',
         '',
         `<edit file="${story[1]}">`,
-        `<find>${heading}</find>`,
-        `<replace>${heading}\n${moved}</replace>`,
-        `<find>\n${moved}</find>`,
-        '<replace></replace>',
+        `<find>${block(first)}</find>`,
+        `<replace>${first.head}\n${[moved, first.refs].filter(Boolean).join(' ')}</replace>`,
+        `<find>${block(lastCol)}</find>`,
+        `<replace>${rest ? `${lastCol.head}\n${rest}` : lastCol.head}</replace>`,
         '</edit>'
       ].join('\n')
     }

@@ -1,5 +1,7 @@
 # Story line ("Linha da história") — design
 
+> **Replaced** by `2026-10-20-story-line-board-design.md` (version 0.11): a board of cards in two views, without lanes.
+
 Date: 2026-10-20. Approved by the author in chat (mockups in the conversation).
 
 ## Intent

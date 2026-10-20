@@ -5,6 +5,7 @@ import { IconButton } from '@/ui'
 import { askText } from '@/ui/prompt'
 import { categoryName, useT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
+import { useNotes } from './line/model'
 import { HideSidebarButton } from '@/features/book/SidebarToggle'
 import { SyncButton, SyncResultCard } from './SyncPanel'
 import { importNotes } from './importNotes'
@@ -20,7 +21,7 @@ export function CategoryIcon({ name, size = 15 }: { name: string; size?: number 
 export function PlanSidebar(): React.JSX.Element {
   const t = useT()
   const manifest = useBook((s) => s.manifest)
-  const entries = useBook((s) => s.entries)
+  const entries = useNotes()
   const activeCategory = useBook((s) => s.activeCategory)
   const activeEntry = useBook((s) => s.activeEntryId)
   const [open, setOpen] = useState<Record<string, boolean>>({})

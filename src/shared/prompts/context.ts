@@ -2,7 +2,7 @@
 
 import { countMarkdownWords } from '../book'
 import type { BookManifest, Chapter, Entry, Thread } from '../types'
-import { momentOfChapter, parseStoryLine } from '../storyline'
+import { boardView, parseBoard } from '../storyline'
 
 export interface BookContext {
   manifest: BookManifest
@@ -99,15 +99,22 @@ export function storyLineBlock(e: Entry): string {
   return `<story_line file="${escapeAttr(entryRef(e))}" name="${escapeAttr(e.name)}">\n${e.body.trim()}\n</story_line>`
 }
 
-/** Where the open chapter is in the story line, in one sentence. */
+/** Where the book is in the story line: the last written chapter, and the cards of the open chapter. */
 export function storyLineWhere(e: Entry, chapters: Chapter[], currentChapterId: string | null): string {
-  const current = chapters.find((c) => c.id === currentChapterId)
-  if (!current) return ''
-  const line = parseStoryLine(e.body)
-  const m = momentOfChapter(line, current.id, chapters)
-  if (m < 0) return `The open chapter "${current.title}" has no event in the story line yet.`
-  const events = line.moments[m].events.map((ev) => ev.text).join(' / ')
-  return `The open chapter "${current.title}" is in moment ${line.moments[m].label} of the story line (${events}).`
+  const parts: string[] = []
+  const last = chapters[chapters.length - 1]
+  if (last) parts.push(`The last written chapter is chapter ${chapters.length}, "${last.title}": in "By chapter", the columns after it are planned chapters.`)
+  const i = chapters.findIndex((c) => c.id === currentChapterId)
+  if (i >= 0) {
+    const current = chapters[i]
+    const col = boardView(parseBoard(e.body), 'chapter', chapters).find((c) => c.chapterId === current.id)
+    parts.push(
+      col?.cards.length
+        ? `The open chapter "${current.title}" (chapter ${i + 1}) has the cards ${col.cards.map((c) => `^${c.id}`).join(' ')}.`
+        : `The open chapter "${current.title}" (chapter ${i + 1}) has no card in the story line yet.`
+    )
+  }
+  return parts.join(' ')
 }
 
 export function entryBlock(e: Entry): string {

@@ -106,19 +106,22 @@ export function Menu({
   children,
   align = 'start',
   side = 'bottom',
-  className
+  className,
+  onCloseAutoFocus
 }: {
   trigger: ReactNode
   children: ReactNode
   align?: 'start' | 'center' | 'end'
   side?: 'top' | 'bottom' | 'left' | 'right'
   className?: string
+  /** The menu closes and gives the focus back to its button; `preventDefault()` keeps it where an item put it */
+  onCloseAutoFocus?: (e: Event) => void
 }): React.JSX.Element {
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>{trigger}</DropdownMenu.Trigger>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content align={align} side={side} sideOffset={6} className={clsx('menu', className)}>
+        <DropdownMenu.Content align={align} side={side} sideOffset={6} className={clsx('menu', className)} onCloseAutoFocus={onCloseAutoFocus}>
           {children}
         </DropdownMenu.Content>
       </DropdownMenu.Portal>

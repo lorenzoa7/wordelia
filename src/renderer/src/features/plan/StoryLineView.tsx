@@ -2,7 +2,7 @@
 // changes it through chat proposals; the author can drag a card to another cell. src/shared/storyline.ts
 // parses the entry and places the cards, so they never overlap.
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { BookOpenText, NotePencil } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { chapterOf, findStoryLine, isStoryLine, layoutStoryLine, mentionPieces, momentOfChapter, moveEvent, parseStoryLine, type StoryEvent } from '@shared/storyline'
@@ -97,6 +97,8 @@ interface GridProps {
 
 function LineGrid({ story, line, layout, here, chapters, entries, activeChapterId, drag, over, setDrag, setOver }: GridProps): React.JSX.Element {
   const t = useT()
+  // The card that the author drags now, also before the drop zones show
+  const dragging = useRef<StoryEvent | null>(null)
   // The first grid column of each moment: column 1 holds the lane names.
   const starts: number[] = []
   let col = 2
@@ -132,8 +134,14 @@ function LineGrid({ story, line, layout, here, chapters, entries, activeChapterI
       chapters={chapters}
       entries={entries}
       activeChapterId={activeChapterId}
-      onDragStart={() => setDrag(event)}
+      onDragStart={() => {
+        // Chromium cancels a drag when the page changes under the pointer while the drag starts:
+        // the drop zones come in the next task, and only if the drag goes on.
+        dragging.current = event
+        setTimeout(() => dragging.current === event && setDrag(event), 0)
+      }}
       onDragEnd={() => {
+        dragging.current = null
         setDrag(null)
         setOver(null)
       }}

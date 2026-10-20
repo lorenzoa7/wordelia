@@ -120,7 +120,8 @@ function selectEntries(input: ChatPromptInput): Entry[] {
   // The plot notes say where the story goes: always send them (up to a budget).
   let plotTokens = 0
   for (const e of book.entries) {
-    if (!/^(plot|enredo|trama)$/i.test(e.category)) continue
+    // The story line has its own section: it does not use the budget of the plot notes.
+    if (!/^(plot|enredo|trama)$/i.test(e.category) || isStoryLine(e)) continue
     plotTokens += estimateTokens(e.body)
     if (plotTokens > 12000) break
     ids.add(e.id)

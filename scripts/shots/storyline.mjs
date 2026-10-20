@@ -86,6 +86,18 @@ export default async function ({ page, shot, openBook }) {
 
   // 5. Drag a card to another moment and lane: only its line changes. The drag events go to the
   // page (a drag of the system mouse holds the hidden test window on Windows).
+  // Chromium cancels a drag when the page changes under the pointer while the drag starts: the drop
+  // zones must come after the drag start (the next task), not in the same one.
+  const early = await page.evaluate(async () => {
+    const card = [...document.querySelectorAll('.line-card')].find((c) => c.textContent.includes('Um estranho está deitado'))
+    card.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: new DataTransfer() }))
+    await Promise.resolve()
+    const zones = document.querySelectorAll('.line-drop').length
+    card.dispatchEvent(new DragEvent('dragend', { bubbles: true, dataTransfer: new DataTransfer() }))
+    await new Promise((r) => setTimeout(r, 50))
+    return zones
+  })
+  if (early) fail(`the drop zones came while the drag started (${early})`)
   const dt = await page.evaluateHandle(() => new DataTransfer())
   await page.locator('.line-card', { hasText: 'Um estranho está deitado' }).dispatchEvent('dragstart', { dataTransfer: dt })
   const zone = page.locator('.line-drop[aria-label="3 · Marta"]')

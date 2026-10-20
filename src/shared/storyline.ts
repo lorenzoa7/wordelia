@@ -217,6 +217,7 @@ function eventLine(lanes: string[], text: string, links: string[]): string {
 /**
  * Move one event to another moment and lane (a drag in the Line view). Only its line moves: it
  * goes after the last event of the target moment, with its new lane. The rest of the text stays.
+ * A meeting keeps its lanes: a drag moves it to another moment only.
  */
 export function moveEvent(body: string, line: StoryLine, event: StoryEvent, toMoment: number, toLane: string): string {
   const lines = body.split(/\r?\n/)
@@ -226,7 +227,8 @@ export function moveEvent(body: string, line: StoryLine, event: StoryEvent, toMo
   let at = (lastEvent ? lastEvent.line : target.line) + 1
   lines.splice(event.line, 1)
   if (event.line < at) at--
-  lines.splice(at, 0, eventLine(toLane ? [toLane] : [], event.text, event.links))
+  const lanes = event.lanes.length > 1 ? event.lanes : toLane ? [toLane] : []
+  lines.splice(at, 0, eventLine(lanes, event.text, event.links))
   return lines.join('\n')
 }
 

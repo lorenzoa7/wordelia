@@ -180,3 +180,23 @@ describe('story line in the prompts', () => {
     expect(buildSyncSystem({ ...input, book: { ...input.book, entries } })).not.toContain('story line')
   })
 })
+
+describe('story line and the plot budget', () => {
+  it('the story line does not use the budget of the plot notes', () => {
+    // "Linha…" comes before "Resumo…": it must not push the summary out of the prompt.
+    const line: Entry = { ...entries[0], id: 'sl', category: 'Plot', file: 'Plot/Linha da história.md', name: 'Linha da história', body: 'Trilhas: Elias\n\n## 1\n- Elias: ' + 'palavra '.repeat(4000), meta: { type: 'story-line' } }
+    const summary: Entry = { ...entries[0], id: 'rs', category: 'Plot', file: 'Plot/Resumo da História.md', name: 'Resumo da História', body: 'RESUMO ' + 'texto '.repeat(6000), meta: {} }
+    const s = buildChatSystem({
+      book: { manifest, writingRules: '', chapters, entries: [...entries, line, summary], threads: [] },
+      thread,
+      currentChapterId: 'c1',
+      currentEntryId: null,
+      mentions: [],
+      quotes: [],
+      message: 'O que vem depois?',
+      summaries: {},
+      manuscriptBudget: 100000
+    })
+    expect(s).toContain('RESUMO')
+  })
+})

@@ -171,3 +171,22 @@ describe('the open chapter and changes', () => {
     expect(renameLinks('- Elias: a → [[the storm]]', 'The Storm', 'Night')).toBe('- Elias: a → [[Night]]')
   })
 })
+
+describe('fixes from the review', () => {
+  it('moves a meeting and keeps its lanes', () => {
+    const line = parseStoryLine(BODY)
+    const meeting = line.moments[1].events[0]
+    const next = moveEvent(BODY, line, meeting, 2, 'Elias')
+    const moved = parseStoryLine(next).moments[2].events.find((e) => e.text === meeting.text)
+    expect(moved?.lanes).toEqual(['Elias', 'Marta'])
+    expect(moved?.links).toEqual(['The Visitor'])
+  })
+
+  it('keeps every other line as it is', () => {
+    const line = parseStoryLine(BODY)
+    const event = line.moments[0].events[1]
+    const next = moveEvent(BODY, line, event, 1, 'Marta')
+    const rest = (s: string): string[] => s.split('\n').filter((l) => !l.includes(event.text))
+    expect(rest(next)).toEqual(rest(BODY))
+  })
+})

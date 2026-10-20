@@ -5,7 +5,7 @@ This file is the source of truth for progress. Update it after each task. Mark a
 ## Current focus
 
 > **Milestone:** Version 0.9 — images in the chat
-> **Next task:** Collect feedback on 0.9.0. Then explain the story outline ("Roteiro") idea again, with an example.
+> **Next task:** Design the story line ("Linha da história") with the author: a diagram of events in story lanes, made by the AI from a summary, that the chat can change.
 > **Not verified:** Codex and the two API transports. The user has no Codex account, and no API keys are set. The scripted provider (`WORDELIA_MOCK_AI=1`) covers their UI flows.
 
 ## M0 — Foundation
@@ -313,6 +313,7 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] All four providers get the images (`src/main/ai/images.ts`, unit tests). Claude Code was checked with the real CLI (a red image: "Red"). Codex and the two APIs are not checked with a real account
 - [x] The AI can propose an image as the portrait of a note (`<portrait>`), or a new note with a portrait (`image:` in its front matter). The card shows the image with "Use as portrait"; a rewind puts the portrait from before back
 - [x] Scenario `chatimage`: button, paste, remove, send, the AI gets the image, the portrait goes to the note and shows in the Plan view, the rewind puts it back
+- [x] 0.9.1: a mention shows the icon of its category, as on the map (`categoryIcons.ts`)
 
 ## Tests and CI
 

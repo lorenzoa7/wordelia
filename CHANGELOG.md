@@ -2,6 +2,11 @@
 
 Each version has its Windows installer in GitHub Releases. The release workflow copies the section of the version from this file to the release notes.
 
+## 0.9.1 (2026-10-19)
+
+### Changed
+- A mention in the chat shows the icon of its category, the same as on the map of the Plan view: a person for a character, a pin for a place, a book for a chapter.
+
 ## 0.9.0 (2026-10-19)
 
 ### New

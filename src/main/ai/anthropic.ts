@@ -1,11 +1,12 @@
 // Anthropic API transport (API key of the user), with the official SDK.
 
 import Anthropic from '@anthropic-ai/sdk'
-import type { CompletionRequest, CompletionResult, ModelInfo, ProviderStatus, StreamEvent } from '@shared/types'
+import type { CompletionResult, ModelInfo, ProviderStatus, StreamEvent } from '@shared/types'
 import { EFFORT_ORDER, modelLabel } from '@shared/ai/effort'
 import { mainT } from '../i18n'
 import { getSecret } from '../settings'
 import { classifyError, type ProviderTransport } from './transport'
+import { anthropicContent, type AiRequest } from './images'
 
 /** Models that support the server-side refusal fallback chain. */
 const FALLBACK_MODELS = /^claude-(opus-5-5|opus-5|sonnet-5-5|fable-5-1)$/
@@ -75,7 +76,7 @@ export const anthropicApi: ProviderTransport = {
     return out
   },
 
-  async complete(req: CompletionRequest, onEvent: (e: StreamEvent) => void, signal: AbortSignal): Promise<CompletionResult> {
+  async complete(req: AiRequest, onEvent: (e: StreamEvent) => void, signal: AbortSignal): Promise<CompletionResult> {
     const c = await client()
     const t = (await mainT()).main.ai
     if (!c) return { ok: false, text: '', error: t.anthropicAddKey, errorKind: 'not-logged-in' }
@@ -86,7 +87,7 @@ export const anthropicApi: ProviderTransport = {
         model,
         max_tokens: req.maxTokens ?? 32000,
         system: [{ type: 'text' as const, text: req.system, cache_control: { type: 'ephemeral' as const } }],
-        messages: req.messages.map((m) => ({ role: m.role, content: m.content })),
+        messages: req.messages.map((m, i) => ({ role: m.role, content: m.role === 'user' && req.images?.[i]?.length ? anthropicContent(m.content, req.images[i]) : m.content })),
         ...(req.route.effort ? { output_config: { effort: req.route.effort === 'minimal' ? ('low' as const) : req.route.effort } } : {}),
         ...(THINKING_MODELS.test(model) ? { thinking: { type: 'adaptive' as const, display: 'summarized' as const } } : {})
       }

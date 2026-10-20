@@ -1,8 +1,9 @@
 // A scripted provider for end-to-end tests and screenshots (WORDELIA_MOCK_AI=1).
 // It never calls a real AI. Its replies follow the same protocols as real replies.
 
-import type { CompletionRequest, CompletionResult, ModelInfo, ProviderId, ProviderStatus, StreamEvent } from '@shared/types'
+import type { CompletionResult, ModelInfo, ProviderId, ProviderStatus, StreamEvent } from '@shared/types'
 import type { ProviderTransport } from './transport'
+import type { AiRequest } from './images'
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
@@ -35,9 +36,25 @@ function between(src: string, open: string, close: string): string | null {
   return b < 0 ? null : src.slice(a + open.length, b)
 }
 
-function reply(req: CompletionRequest): string {
+function reply(req: AiRequest): string {
   const last = req.messages[req.messages.length - 1]?.content ?? ''
   const english = /language="[^"]*English/.test(req.system)
+  // A message with images: describe the person, and propose the image as the portrait of the entry
+  // that the message names. The count is the images that the main process read from the book.
+  const images = req.messages[req.messages.length - 1]?.images ?? []
+  if (req.purpose === 'chat' && images.length) {
+    const seen = req.images?.[req.messages.length - 1]?.length ?? 0
+    const entry = [...req.system.matchAll(/^- (planning\/[^:]+\.md): ([^(—\n]+)/gm)].find((m) => last.includes(m[2].trim()))
+    const name = entry?.[2].trim() ?? (english ? 'this person' : 'esta pessoa')
+    return [
+      english ? `I see ${seen} image(s).` : `Vejo ${seen} imagem(ns).`,
+      '',
+      english
+        ? `**${name}** has a thin face and the dark eyes of someone who stays awake at night. Gray hair, tied low.`
+        : `**${name}** tem o rosto magro e os olhos escuros de quem passa a noite acordada. Cabelo grisalho, preso baixo.`,
+      ...(entry ? ['', `<portrait file="${entry[1]}">${images[0].file}</portrait>`] : [])
+    ].join('\n')
+  }
   if (req.purpose === 'action') {
     const sel = between(last, '<selection>\n', '\n</selection>') ?? between(last, '<selection>', '</selection>') ?? last
     return `<rewrite>\n${polish(sel.trim())}\n</rewrite>`
@@ -132,7 +149,7 @@ function reply(req: CompletionRequest): string {
 }
 
 /** A short thinking summary for chat replies, so the chat can show what the AI thinks about. */
-function thinking(req: CompletionRequest): string {
+function thinking(req: AiRequest): string {
   if (req.purpose !== 'chat') return ''
   const last = req.messages[req.messages.length - 1]?.content ?? ''
   const edit = /edit|change|improve|rewrite|melhor|mude|reescrev/i.test(last)
@@ -162,7 +179,7 @@ export function mockProvider(id: ProviderId): ProviderTransport {
         { id: 'haiku', label: 'Haiku 5.5', tier: 'fast', efforts: EFFORTS }
       ]
     },
-    async complete(req: CompletionRequest, onEvent: (e: StreamEvent) => void, signal: AbortSignal): Promise<CompletionResult> {
+    async complete(req: AiRequest, onEvent: (e: StreamEvent) => void, signal: AbortSignal): Promise<CompletionResult> {
       const text = reply(req)
       // Screenshot scenarios can slow the reply down (milliseconds for each piece).
       const delay = Number(process.env['WORDELIA_MOCK_DELAY'] ?? '') || 12

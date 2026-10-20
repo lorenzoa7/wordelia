@@ -2,7 +2,7 @@
 // Also: ask again for the last reply, and send an edited message again.
 
 import { newId } from '@shared/book'
-import { buildChatSystem, buildChatUserTurn } from '@shared/prompts/chat'
+import { buildChatSystem, buildChatUserTurn, imageLines } from '@shared/prompts/chat'
 import { buildDigestSystem, buildDigestUser, buildTitleSystem } from '@shared/prompts/background'
 import { proposalSummary } from '@shared/proposals/parse'
 import type { ChatMessage, ChatTurn, Mention, ModelChoice, Thread } from '@shared/types'
@@ -62,13 +62,13 @@ function connectFirst(): void {
   toast(t.chat.connectFirst, { action: { label: t.chat.openSettings, run: () => useUi.getState().openSettings('ai') } })
 }
 
-/** Send the text of the composer, with its quotes and mentions, in the active thread. */
+/** Send the text of the composer, with its quotes, mentions and images, in the active thread. */
 export async function sendMessage(text: string): Promise<void> {
   const chat = useChat.getState()
   const book = useBook.getState()
   if (!book.manifest) return
   const message = text.trim()
-  if (!message && !chat.quotes.length) return
+  if (!message && !chat.quotes.length && !chat.images.length) return
 
   // The blank thread (or a new one) is saved with its first message, not before.
   const saved = chat.blank ? undefined : book.threads.find((t) => t.id === chat.activeThreadId)
@@ -85,7 +85,8 @@ export async function sendMessage(text: string): Promise<void> {
     content: message,
     createdAt: new Date().toISOString(),
     ...(chat.quotes.length ? { quotes: chat.quotes } : {}),
-    ...(chat.mentions.length ? { mentions: chat.mentions } : {})
+    ...(chat.mentions.length ? { mentions: chat.mentions } : {}),
+    ...(chat.images.length ? { images: chat.images } : {})
   }
   const now = new Date().toISOString()
   useBook.getState().saveThread({ ...thread, messages: [...thread.messages, userMsg], updatedAt: now, ...(saved ? {} : { createdAt: now }) }, true)
@@ -110,6 +111,7 @@ export async function requestReply(threadId: string): Promise<void> {
   const fresh = useBook.getState()
   const quotes = last.quotes ?? []
   const mentions = last.mentions ?? []
+  const images = last.images ?? []
   const message = last.content
   const assistantId = newId('m')
 
@@ -155,13 +157,17 @@ export async function requestReply(threadId: string): Promise<void> {
   })
 
   // Thinking is never part of the history: only the text of each message goes back to the AI.
+  // The images of earlier messages go too (the main process keeps the most recent ones), so the AI
+  // can still talk about them.
   const history: ChatTurn[] = thread.messages.slice(0, -1).slice(-HISTORY_LIMIT).map((m) => ({
     role: m.role,
-    content: m.role === 'assistant' ? proposalSummary(m.content, m.hunks ?? {}) : renderUser(m)
+    content: m.role === 'assistant' ? proposalSummary(m.content, m.hunks ?? {}) : renderUser(m),
+    ...(m.role === 'user' && m.images?.length ? { images: m.images } : {})
   }))
-  history.push({ role: 'user', content: buildChatUserTurn(message || 'What do you think about this passage?', quotes, mentions, fresh.threads, fresh.chapters) })
+  const asked = message || (images.length ? 'Here is an image.' : 'What do you think about this passage?')
+  history.push({ role: 'user', content: buildChatUserTurn(asked, quotes, mentions, fresh.threads, fresh.chapters, images), ...(images.length ? { images } : {}) })
 
-  const handle = runCompletion({ route, purpose: 'chat', system, messages: history }, (e, soFar) => {
+  const handle = runCompletion({ route, purpose: 'chat', system, messages: history, ...(fresh.root ? { root: fresh.root } : {}) }, (e, soFar) => {
     if (e.type === 'text') patchStreaming(threadId, { text: soFar })
     else if (e.type === 'thinking') patchStreaming(threadId, (s) => ({ thinking: (s.thinking ?? '') + e.delta }))
     else if (e.type === 'status') patchStreaming(threadId, { status: e.message })
@@ -230,7 +236,7 @@ export async function resendEdited(threadId: string, messageId: string, text: st
 
 function renderUser(m: ChatMessage): string {
   const q = (m.quotes ?? []).map((x) => `> ${x.text.split('\n').join('\n> ')}`).join('\n\n')
-  return q ? `${q}\n\n${m.content}` : m.content
+  return [imageLines(m.images), q, m.content].filter(Boolean).join('\n\n')
 }
 
 /** Background work after a reply: a title for new threads, and the digest. */

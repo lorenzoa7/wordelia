@@ -9,6 +9,8 @@
 //   ...full Markdown...
 //   </create>
 //
+//   <portrait file="planning/Characters/Teresa.md">_assets/chat/teresa.webp</portrait>
+//
 // The parser works on partial text too, so the UI can show proposals while they stream.
 
 import type { HunkState } from '../types'
@@ -24,8 +26,10 @@ export type Segment =
   | { kind: 'text'; text: string }
   | { kind: 'edit'; file: string; hunks: Hunk[]; complete: boolean; index: number }
   | { kind: 'create'; file: string; content: string; complete: boolean; index: number }
+  /** An image of the chat as the portrait of an entry. `image` is relative to planning/. */
+  | { kind: 'portrait'; file: string; image: string; complete: boolean; index: number }
 
-const OPEN_RE = /<(edit|create)\s+file\s*=\s*"([^"]*)"\s*>/g
+const OPEN_RE = /<(edit|create|portrait)\s+file\s*=\s*"([^"]*)"\s*>/g
 
 /** Remove one leading and one trailing newline, the ones next to the tags. */
 function trimTagNewlines(s: string): string {
@@ -61,7 +65,7 @@ export function parseProposals(text: string): Segment[] {
   OPEN_RE.lastIndex = 0
   let m: RegExpExecArray | null
   while ((m = OPEN_RE.exec(text))) {
-    const kind = m[1] as 'edit' | 'create'
+    const kind = m[1] as 'edit' | 'create' | 'portrait'
     const file = m[2].trim()
     if (m.index > pos) segments.push({ kind: 'text', text: text.slice(pos, m.index) })
     const bodyStart = m.index + m[0].length
@@ -71,6 +75,8 @@ export function parseProposals(text: string): Segment[] {
     const body = text.slice(bodyStart, complete ? close : text.length)
     if (kind === 'edit') {
       segments.push({ kind, file, hunks: parseHunks(body, complete), complete, index: index++ })
+    } else if (kind === 'portrait') {
+      segments.push({ kind, file, image: body.trim(), complete, index: index++ })
     } else {
       segments.push({ kind, file, content: trimTagNewlines(body), complete, index: index++ })
     }
@@ -80,7 +86,7 @@ export function parseProposals(text: string): Segment[] {
   }
   // Hide a tag that is still being typed ("<ed", "<edit fi").
   let rest = text.slice(pos)
-  const partial = /<(?:e(?:d(?:i(?:t(?:\s[^>]*)?)?)?)?|c(?:r(?:e(?:a(?:t(?:e(?:\s[^>]*)?)?)?)?)?)?)?$/.exec(rest)
+  const partial = /<(?:e(?:d(?:i(?:t(?:\s[^>]*)?)?)?)?|c(?:r(?:e(?:a(?:t(?:e(?:\s[^>]*)?)?)?)?)?)?|p(?:o(?:r(?:t(?:r(?:a(?:i(?:t(?:\s[^>]*)?)?)?)?)?)?)?)?)?$/.exec(rest)
   if (partial && pos <= text.length) rest = rest.slice(0, partial.index)
   if (rest) segments.push({ kind: 'text', text: rest })
   return mergeText(segments)
@@ -117,6 +123,7 @@ export function proposalSummary(text: string, states?: Record<string, HunkState>
   return parseProposals(text)
     .map((s) => {
       if (s.kind === 'text') return s.text
+      if (s.kind === 'portrait') return `[Proposed the image ${s.image} as the portrait of ${s.file}${states ? `: ${STATE_WORDS[states[hunkKey(s.index, 0)] ?? 'pending']}` : ''}]`
       if (!states) return s.kind === 'edit' ? `[Proposed ${s.hunks.length} change(s) to ${s.file}]` : `[Proposed new file ${s.file}]`
       if (s.kind === 'create') return `[Proposed new file ${s.file}: ${STATE_WORDS[states[hunkKey(s.index, 0)] ?? 'pending']}]`
       return s.hunks

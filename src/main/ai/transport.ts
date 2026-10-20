@@ -1,12 +1,14 @@
 import { spawn, type ChildProcess } from 'node:child_process'
-import type { ChatTurn, CompletionRequest, CompletionResult, ModelInfo, ProviderId, ProviderStatus, StreamEvent } from '@shared/types'
+import type { ChatTurn, CompletionResult, ModelInfo, ProviderId, ProviderStatus, StreamEvent } from '@shared/types'
 import { cleanEnv, type ResolvedBin } from './resolve-bin'
+import type { AiRequest } from './images'
 
 export interface ProviderTransport {
   id: ProviderId
   status(): Promise<ProviderStatus>
   listModels(): Promise<ModelInfo[]>
-  complete(req: CompletionRequest, onEvent: (e: StreamEvent) => void, signal: AbortSignal): Promise<CompletionResult>
+  /** `req.images`: the images of the messages, read from the book (images.ts) */
+  complete(req: AiRequest, onEvent: (e: StreamEvent) => void, signal: AbortSignal): Promise<CompletionResult>
 }
 
 /**

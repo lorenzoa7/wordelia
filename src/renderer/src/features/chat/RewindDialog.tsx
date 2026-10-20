@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { create } from 'zustand'
-import { BookOpenText, FilePlus, Notebook } from '@phosphor-icons/react'
+import { BookOpenText, FilePlus, Notebook, UserCircle } from '@phosphor-icons/react'
 import { Button, Dialog } from '@/ui'
 import { useT } from '@/lib/i18n'
 import type { BookChanges } from './rewind'
@@ -51,6 +51,12 @@ export function RewindHost(): React.JSX.Element {
           icon: <FilePlus size={13} />,
           label: c.label,
           detail: c.previous ? t.chat.noteComesBack : t.chat.noteToTrash
+        })),
+        ...req.changes.portraits.map((p, i) => ({
+          key: `p-${i}`,
+          icon: <UserCircle size={13} />,
+          label: t.chat.portraitAlt(p.label),
+          detail: p.previous ? t.chat.portraitComesBack : t.chat.portraitGoes
         }))
       ]
     : []

@@ -51,6 +51,23 @@ export const chat = {
   /** aria-label of the button that starts a mention */
   mention: 'Mention',
   removeQuote: 'Remove quote',
+  /** Images in chat messages */
+  attachImage: 'Add an image',
+  removeImage: (name: string) => `Remove ${name}`,
+  openImage: (name: string) => `Open ${name}`,
+  dropImages: 'Drop the images to add them',
+  askImage: 'Ask about the image…',
+  tooManyImages: (max: number) => `A message can have up to ${max} images.`,
+  imageNotRead: (name: string) => `The app cannot read the image “${name}”.`,
+  /** A portrait that the AI proposes for a note */
+  portrait: 'Portrait',
+  usePortrait: 'Use as portrait',
+  portraitAlt: (name: string) => `Portrait of ${name}`,
+  portraitSet: (name: string) => `${name} has a new portrait.`,
+  portraitNoEntry: (name: string) => `There is no note “${name}”. Create the note first.`,
+  portraitBadImage: 'The AI named an image that is not in the book.',
+  portraitComesBack: 'the portrait from before comes back',
+  portraitGoes: 'the portrait goes',
   composer: 'Message to your editor',
   askQuote: 'Ask about the quote…',
   placeholder: 'Ask your editor. Type @ to mention a chapter, entry or thread.',

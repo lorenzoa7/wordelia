@@ -6,11 +6,12 @@ import { app } from 'electron'
 import { spawn } from 'node:child_process'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { CompletionRequest, CompletionResult, ModelInfo, ProviderStatus, StreamEvent } from '@shared/types'
+import type { CompletionResult, ModelInfo, ProviderStatus, StreamEvent } from '@shared/types'
 import { mainT } from '../i18n'
 import { getSettings } from '../settings'
 import { cleanEnv, codexCandidates, resolveBin, type ResolvedBin } from './resolve-bin'
 import { classifyError, flattenConversation, killTree, runCli, type ProviderTransport } from './transport'
+import { allImages, codexInput, type AiRequest } from './images'
 import { latestVersion } from './updates'
 import { parseEfforts } from '@shared/ai/effort'
 
@@ -273,7 +274,7 @@ export const codex: ProviderTransport = {
     }
   },
 
-  async complete(req: CompletionRequest, onEvent: (e: StreamEvent) => void, signal: AbortSignal): Promise<CompletionResult> {
+  async complete(req: AiRequest, onEvent: (e: StreamEvent) => void, signal: AbortSignal): Promise<CompletionResult> {
     const b = await bin()
     const t = (await mainT()).main.ai
     if (!b) return { ok: false, text: '', error: t.codexNotInstalled, errorKind: 'not-installed' }
@@ -291,7 +292,7 @@ export const codex: ProviderTransport = {
 async function completeWithAppServer(
   b: ResolvedBin,
   cwd: string,
-  req: CompletionRequest,
+  req: AiRequest,
   onEvent: (e: StreamEvent) => void,
   signal: AbortSignal
 ): Promise<CompletionResult | null> {
@@ -373,7 +374,8 @@ async function completeWithAppServer(
 
     const turnParams: Json = {
       threadId,
-      input: [{ type: 'text', text: flattenConversation(req.messages) }]
+      // Images go as files of the book (the app-server reads them).
+      input: codexInput(flattenConversation(req.messages), allImages(req))
     }
     if (req.route.effort) turnParams.effort = req.route.effort
     const turn = await server.request('turn/start', turnParams)
@@ -396,7 +398,7 @@ async function completeWithAppServer(
 async function completeWithExec(
   b: ResolvedBin,
   cwd: string,
-  req: CompletionRequest,
+  req: AiRequest,
   onEvent: (e: StreamEvent) => void,
   signal: AbortSignal
 ): Promise<CompletionResult> {
@@ -404,6 +406,7 @@ async function completeWithExec(
   const args = ['exec', '--json', '--skip-git-repo-check', '--ephemeral', '-s', 'read-only', '-C', cwd]
   if (req.route.model) args.push('-m', req.route.model)
   if (req.route.effort) args.push('-c', `model_reasoning_effort="${req.route.effort}"`)
+  for (const image of allImages(req)) args.push('-i', image.path)
   args.push('-')
   const prompt = `<instructions>\n${req.system}\n</instructions>\n\n${flattenConversation(req.messages)}`
   let text = ''

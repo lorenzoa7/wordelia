@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'motion/react'
-import { BookOpenText, Check, Columns, Crosshair, FilePlus, Notebook, Rows, WarningCircle, X } from '@phosphor-icons/react'
+import { BookOpenText, Check, Columns, Crosshair, FilePlus, Notebook, Rows, UserCircle, WarningCircle, X } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import ReactMarkdown from 'react-markdown'
 import { markdownToPlain } from '@shared/book'
@@ -11,16 +11,18 @@ import type { ChatMessage, HunkState, Thread } from '@shared/types'
 import { Spinner, Tooltip } from '@/ui'
 import { useBook } from '@/stores/book'
 import { typesetForBook } from '@/lib/typeset'
+import { useAssetUrl } from '@/lib/assets'
 import { toast } from '@/stores/ui'
 import { folderCategoryName, useT } from '@/lib/i18n'
 import { inlineProposalId, revealProposal } from '@/features/editor/inlineProposals'
-import { applyCreate, applyEditHunk, markAfter, resolveTarget, restoreSnapshot, setHunkStates, snapshotOf, type Snapshot } from './applyProposal'
+import { applyCreate, applyEditHunk, applyPortrait, markAfter, resolveTarget, restoreSnapshot, setHunkStates, snapshotOf, type Snapshot } from './applyProposal'
 
 type EditSeg = Extract<Segment, { kind: 'edit' }>
 type CreateSeg = Extract<Segment, { kind: 'create' }>
+type PortraitSeg = Extract<Segment, { kind: 'portrait' }>
 
 interface Props {
-  segment: EditSeg | CreateSeg
+  segment: EditSeg | CreateSeg | PortraitSeg
   message?: ChatMessage
   thread?: Thread
   streaming?: boolean
@@ -31,6 +33,7 @@ function setHunkState(thread: Thread, messageId: string, key: string, state: Hun
 }
 
 export function ProposalCard(props: Props): React.JSX.Element {
+  if (props.segment.kind === 'portrait') return <PortraitCard {...props} segment={props.segment} />
   return props.segment.kind === 'edit' ? <EditCard {...props} segment={props.segment} /> : <CreateCard {...props} segment={props.segment} />
 }
 
@@ -287,6 +290,8 @@ function CreateCard({ segment, message, thread, streaming }: Props & { segment: 
   const state = message?.hunks?.[key] ?? 'pending'
   const target = resolveTarget(segment.file)
   const { data, body } = readFrontmatter(segment.content)
+  // A new note can have a portrait: an image of the chat.
+  const portrait = useAssetUrl(typeof data.image === 'string' && data.image.startsWith('_assets/') ? data.image : null)
   const categories = useBook((s) => s.manifest?.planning.categories ?? [])
   const category = folderCategoryName(t, segment.file.replace(/^planning\//, '').split('/').slice(0, -1).join('/'), categories)
   // After the user creates the entry, it exists: the card still shows where it went.
@@ -329,6 +334,7 @@ function CreateCard({ segment, message, thread, streaming }: Props & { segment: 
         </div>
       </header>
       <div id={`create-${segment.index}`} className={clsx('proposal-body prose', !expanded && 'is-clamped')}>
+        {portrait && <img className="proposal-portrait is-small" src={portrait} alt={t.chat.portraitAlt(target.label)} />}
         {typeof data.summary === 'string' && <p className="proposal-summary">{data.summary}</p>}
         {Array.isArray(data.aliases) && data.aliases.length > 0 && (
           <p className="proposal-aliases">{t.chat.aliases((data.aliases as unknown[]).map(String).join(', '))}</p>
@@ -338,6 +344,59 @@ function CreateCard({ segment, message, thread, streaming }: Props & { segment: 
       <button className="proposal-more" aria-expanded={expanded} aria-controls={`create-${segment.index}`} onClick={() => setExpanded(!expanded)}>
         {expanded ? t.chat.showLess : t.chat.showAll}
       </button>
+    </motion.div>
+  )
+}
+
+/** An image of the chat as the portrait of a note: the image, and Use or Dismiss. */
+function PortraitCard({ segment, message, thread, streaming }: Props & { segment: PortraitSeg }): React.JSX.Element {
+  const t = useT()
+  const key = hunkKey(segment.index, 0)
+  const state = message?.hunks?.[key] ?? 'pending'
+  const target = resolveTarget(segment.file)
+  const url = useAssetUrl(segment.complete ? segment.image : null)
+
+  const use = (): void => {
+    if (!thread || !message) return
+    const res = applyPortrait(segment.file, segment.image)
+    // Keep the image from before, so a rewind of the thread can bring it back.
+    setHunkStates(thread, message.id, { [key]: res.ok ? 'accepted' : 'failed' }, res.ok ? { [key]: res.previous ?? '' } : undefined)
+    if (!res.ok) toast(res.reason, { kind: 'error' })
+    else toast(t.chat.portraitSet(target.label))
+  }
+
+  return (
+    <motion.div className="proposal is-portrait" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+      <header className="proposal-head">
+        <div className="proposal-title">
+          <button
+            className="proposal-file"
+            onClick={() => target.kind === 'entry' && useBook.getState().selectEntry(target.entry.id)}
+            title={t.common.open}
+          >
+            <UserCircle size={14} />
+            <span>{target.label}</span>
+          </button>
+          <span className="proposal-cat">{t.chat.portrait}</span>
+        </div>
+        <div className="proposal-tools">
+          {streaming || !segment.complete ? (
+            <Spinner size={12} />
+          ) : state === 'pending' ? (
+            <>
+              <button className="proposal-btn" onClick={() => thread && message && setHunkState(thread, message.id, key, 'rejected')}>
+                {t.chat.dismiss}
+              </button>
+              <button className="proposal-btn is-accept" onClick={use}>
+                <Check size={12} weight="bold" /> {t.chat.usePortrait}
+              </button>
+            </>
+          ) : (
+            <HunkBadge state={state} />
+          )}
+        </div>
+      </header>
+      <div className="proposal-body">{url && <img className="proposal-portrait" src={url} alt={t.chat.portraitAlt(target.label)} />}</div>
     </motion.div>
   )
 }

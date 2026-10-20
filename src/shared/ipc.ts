@@ -77,6 +77,8 @@ export interface IpcInvokeMap {
   'book:pickImage': [[], string | null]
   'book:reveal': [[root: string, rel?: string], void]
   'book:assetUrl': [[root: string, rel: string], string]
+  /** Save an image for a chat message (already made small, WebP). Returns its path relative to planning/. */
+  'chat:saveImage': [[root: string, data: Uint8Array, name: string], string]
 
   'history:save': [[root: string, chapterId: string, label: string, body: string], void]
   'history:list': [[root: string, chapterId: string], HistoryItem[]]
@@ -153,6 +155,7 @@ export const INVOKE_CHANNELS: InvokeChannel[] = [
   'book:pickImage',
   'book:reveal',
   'book:assetUrl',
+  'chat:saveImage',
   'history:save',
   'history:list',
   'history:read',

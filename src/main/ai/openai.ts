@@ -1,10 +1,11 @@
 // OpenAI API transport (API key of the user), with the official SDK and the Responses API.
 
 import OpenAI from 'openai'
-import type { CompletionRequest, CompletionResult, ModelInfo, ProviderStatus, StreamEvent } from '@shared/types'
+import type { CompletionResult, ModelInfo, ProviderStatus, StreamEvent } from '@shared/types'
 import { mainT } from '../i18n'
 import { getSecret } from '../settings'
 import { classifyError, type ProviderTransport } from './transport'
+import { openaiContent, type AiRequest } from './images'
 
 let modelCache: { at: number; models: ModelInfo[] } | null = null
 /** False after the API refused reasoning summaries for this key (the organization is not verified). */
@@ -61,7 +62,7 @@ export const openaiApi: ProviderTransport = {
     return models
   },
 
-  async complete(req: CompletionRequest, onEvent: (e: StreamEvent) => void, signal: AbortSignal): Promise<CompletionResult> {
+  async complete(req: AiRequest, onEvent: (e: StreamEvent) => void, signal: AbortSignal): Promise<CompletionResult> {
     const c = await client()
     const t = (await mainT()).main.ai
     if (!c) return { ok: false, text: '', error: t.openaiAddKey, errorKind: 'not-logged-in' }
@@ -73,7 +74,7 @@ export const openaiApi: ProviderTransport = {
           {
             model,
             instructions: req.system,
-            input: req.messages.map((m) => ({ role: m.role, content: m.content })),
+            input: req.messages.map((m, i) => (m.role === 'user' && req.images?.[i]?.length ? { role: m.role, content: openaiContent(m.content, req.images[i]) } : { role: m.role, content: m.content })),
             stream: true,
             // Reasoning summaries show what the model thinks about while it works.
             ...(req.route.effort ? { reasoning: { effort: req.route.effort, ...(summary ? { summary: 'auto' as const } : {}) } } : {})

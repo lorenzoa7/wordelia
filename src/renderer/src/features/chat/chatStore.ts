@@ -1,9 +1,9 @@
-// Chat UI state: active thread, composer draft, quotes, mentions and streaming replies.
+// Chat UI state: active thread, composer draft, quotes, mentions, images and streaming replies.
 
 import { create } from 'zustand'
 import type { Editor } from '@tiptap/core'
 import { newId } from '@shared/book'
-import type { Mention, Quote, Thread } from '@shared/types'
+import type { ChatImage, Mention, Quote, Thread } from '@shared/types'
 import { useApp } from '@/stores/app'
 import { appendMention, docFromText, readDraft, withoutMention, type DraftDoc } from './draft'
 
@@ -37,6 +37,10 @@ interface ChatState {
   quotes: Quote[]
   /** The mentions in the draft, each one once */
   mentions: Mention[]
+  /** Images for the next message, already saved in the book (images.ts) */
+  images: ChatImage[]
+  /** How many images are still being prepared */
+  imagesBusy: number
   /** Thread id to its reply in progress */
   streaming: Record<string, Streaming | undefined>
   /** Message id to the thinking of its reply, for this session only */
@@ -57,6 +61,8 @@ interface ChatState {
   /** Mention a chapter, an entry or a thread at the end of the draft, and show the composer */
   addMention(m: Mention): void
   removeMention(id: string): void
+  addImage(image: ChatImage): void
+  removeImage(file: string): void
   clearComposer(): void
   setEditing(id: string | null): void
 }
@@ -70,6 +76,8 @@ export const useChat = create<ChatState>((set, get) => ({
   draftRev: 0,
   quotes: [],
   mentions: [],
+  images: [],
+  imagesBusy: 0,
   streaming: {},
   thoughts: {},
   editingId: null,
@@ -104,8 +112,14 @@ export const useChat = create<ChatState>((set, get) => ({
     const { text, mentions } = readDraft(doc)
     set({ draftDoc: doc, draft: text, mentions, draftRev: get().draftRev + 1 })
   },
+  addImage(image) {
+    set({ images: [...get().images, image], listOpen: false })
+  },
+  removeImage(file) {
+    set({ images: get().images.filter((i) => i.file !== file) })
+  },
   clearComposer() {
-    set({ draft: '', draftDoc: null, quotes: [], mentions: [], draftRev: get().draftRev + 1 })
+    set({ draft: '', draftDoc: null, quotes: [], mentions: [], images: [], draftRev: get().draftRev + 1 })
   },
   setEditing(id) {
     set({ editingId: id })

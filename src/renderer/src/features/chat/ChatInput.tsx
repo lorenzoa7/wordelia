@@ -21,6 +21,7 @@ import { folderCategoryName, useT } from '@/lib/i18n'
 import { mentionLabel } from './send'
 import { MentionIcon, MentionPill } from './MentionPill'
 import type { DraftDoc } from './draft'
+import { imageFiles } from './images'
 
 /* ------------------------------------------------------------------ */
 /* The mention node                                                     */
@@ -158,9 +159,11 @@ export interface ChatInputProps {
   /** Esc, when the list of mentions is closed */
   onEscape?: () => void
   onReady?: (editor: Editor | null) => void
+  /** Images in a paste (the composer adds them to the message). Without it, a paste of images does nothing. */
+  onPasteImages?: (files: File[]) => void
 }
 
-export function ChatInput({ initial, className, ariaLabel, placeholder, autoFocus, onChange, onEnter, onEscape, onReady }: ChatInputProps): React.JSX.Element {
+export function ChatInput({ initial, className, ariaLabel, placeholder, autoFocus, onChange, onEnter, onEscape, onReady, onPasteImages }: ChatInputProps): React.JSX.Element {
   const t = useT()
   const listId = useId()
   const [query, setQuery] = useState<Query | null>(null)
@@ -171,8 +174,8 @@ export function ChatInput({ initial, className, ariaLabel, placeholder, autoFocu
   const open = query !== null && !dismissed && candidates.length > 0
 
   // The editor reads these when a key goes down, so they must be current.
-  const live = useRef({ open, candidates, highlight, query, onEnter, onEscape, onChange })
-  live.current = { open, candidates, highlight, query, onEnter, onEscape, onChange }
+  const live = useRef({ open, candidates, highlight, query, onEnter, onEscape, onChange, onPasteImages })
+  live.current = { open, candidates, highlight, query, onEnter, onEscape, onChange, onPasteImages }
   const pickRef = useRef<(c: Candidate | undefined) => void>(() => {})
 
   const editor = useEditor(
@@ -221,6 +224,12 @@ export function ChatInput({ initial, className, ariaLabel, placeholder, autoFocu
         },
         // A paste is plain text. Line breaks stay.
         handlePaste: (view, event) => {
+          // Images (a screenshot, a copied picture) go to the message.
+          const images = imageFiles(event.clipboardData?.files)
+          if (images.length && live.current.onPasteImages) {
+            live.current.onPasteImages(images)
+            return true
+          }
           const text = event.clipboardData?.getData('text/plain')
           if (text === undefined) return false
           // Images and other things without text: nothing to paste.

@@ -3,6 +3,7 @@
 import type { WebContents } from 'electron'
 import type { CompletionRequest, CompletionResult, ModelInfo, ProviderId, ProviderStatus } from '@shared/types'
 import { anthropicApi } from './anthropic'
+import { loadImages } from './images'
 import { claudeCode } from './claude-code'
 import { codex } from './codex'
 import { mockProvider } from './mock'
@@ -47,7 +48,7 @@ export async function complete(sender: WebContents, requestId: string, req: Comp
   running.set(requestId, ac)
   try {
     return await transport(req.route.provider).complete(
-      req,
+      await loadImages(req),
       (event) => {
         if (!sender.isDestroyed()) sender.send('ai:event', { requestId, event })
       },

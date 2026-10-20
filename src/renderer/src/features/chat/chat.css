@@ -1606,3 +1606,119 @@ button.proposal-file:hover span {
 .proposal-more:hover {
   color: var(--ink);
 }
+
+/* ---------- Images in the chat (images.ts, ChatImages.tsx) ---------- */
+/* The images of the next message: small pictures with a button that takes each one out. */
+.composer {
+  position: relative;
+}
+.composer-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 9px 10px 0;
+}
+.image-chip {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--desk-2);
+  box-shadow: inset 0 0 0 1px var(--rule-soft);
+}
+.image-chip img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.image-chip button {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ink) 72%, transparent);
+  color: var(--paper);
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.image-chip:hover button,
+.image-chip button:focus-visible {
+  opacity: 1;
+}
+/* Images dragged over the composer */
+.composer.is-dropping {
+  border-color: var(--ribbon);
+}
+.composer-drop {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  color: var(--ribbon);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  pointer-events: none;
+}
+
+/* The images of a sent message */
+.msg-images {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.msg-image {
+  display: block;
+  width: 132px;
+  max-height: 176px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--desk-2);
+  cursor: zoom-in;
+}
+.msg-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.msg-images:has(.msg-image:only-child) .msg-image {
+  width: 184px;
+  max-height: 240px;
+}
+.image-dialog-img {
+  display: block;
+  max-width: 100%;
+  max-height: 75vh;
+  margin: 0 auto;
+  border-radius: var(--radius-sm);
+}
+
+/* A portrait that the AI proposes for a note, and the portrait of a new note */
+.proposal-portrait {
+  display: block;
+  width: 112px;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  box-shadow: 0 1px 3px rgba(60, 44, 24, 0.18);
+}
+.proposal-portrait.is-small {
+  float: right;
+  width: 64px;
+  margin: 0 0 6px 10px;
+}

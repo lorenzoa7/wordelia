@@ -4,11 +4,12 @@
 import { app } from 'electron'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { CompletionRequest, CompletionResult, ModelInfo, ProviderStatus, StreamEvent } from '@shared/types'
+import type { CompletionResult, ModelInfo, ProviderStatus, StreamEvent } from '@shared/types'
 import { mainT } from '../i18n'
 import { getSettings } from '../settings'
 import { claudeCandidates, resolveBin, type ResolvedBin } from './resolve-bin'
 import { classifyError, flattenConversation, runCli, type ProviderTransport } from './transport'
+import { allImages, claudeStreamInput, type AiRequest } from './images'
 import { latestVersion } from './updates'
 import { claudeModels, rememberResolved } from './claude-models'
 
@@ -62,7 +63,7 @@ export const claudeCode: ProviderTransport = {
     return b ? claudeModels(b) : []
   },
 
-  async complete(req: CompletionRequest, onEvent: (e: StreamEvent) => void, signal: AbortSignal): Promise<CompletionResult> {
+  async complete(req: AiRequest, onEvent: (e: StreamEvent) => void, signal: AbortSignal): Promise<CompletionResult> {
     const b = await bin()
     const t = (await mainT()).main.ai
     if (!b) return { ok: false, text: '', error: t.claudeNotInstalled, errorKind: 'not-installed' }
@@ -93,12 +94,17 @@ export const claudeCode: ProviderTransport = {
     if (req.route.effort) baseArgs.push('--effort', req.route.effort)
 
     const prompt = flattenConversation(req.messages)
-    let args = baseArgs
+    // With images, the conversation goes as one JSON message with image blocks on stdin.
+    const images = allImages(req)
+    let input = images.length ? claudeStreamInput(prompt, images) : prompt
+    let args = images.length ? [...baseArgs, '--input-format', 'stream-json'] : baseArgs
     try {
       for (let attempt = 0; attempt < 4; attempt++) {
-        const res = await runOnce(b, args, prompt, cwd, onEvent, signal)
+        const res = await runOnce(b, args, input, cwd, onEvent, signal)
         if (res.retryWithout) {
           args = dropFlag(args, res.retryWithout)
+          // An old CLI without JSON input: the text only.
+          if (res.retryWithout === '--input-format') input = prompt
           continue
         }
         if (res.result.ok) await rememberResolved(b, req.route.model || 'sonnet', res.result.model).catch(() => {})
@@ -114,7 +120,7 @@ export const claudeCode: ProviderTransport = {
 function dropFlag(args: string[], flag: string): string[] {
   const i = args.indexOf(flag)
   if (i < 0) return args
-  const takesValue = flag === '--effort'
+  const takesValue = flag === '--effort' || flag === '--input-format'
   return [...args.slice(0, i), ...args.slice(i + (takesValue ? 2 : 1))]
 }
 

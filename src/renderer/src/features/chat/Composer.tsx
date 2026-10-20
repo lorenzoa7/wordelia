@@ -1,18 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
 import { DropdownMenu } from 'radix-ui'
-import { ArrowUp, At, CaretDown, CaretRight, Check, Quotes, Stop, X } from '@phosphor-icons/react'
+import { ArrowUp, At, CaretDown, CaretRight, Check, ImageSquare, Quotes, Stop, X } from '@phosphor-icons/react'
 import type { Editor } from '@tiptap/core'
 import clsx from 'clsx'
 import { effortChoices, nearestEffort } from '@shared/ai/effort'
 import { PROVIDER_LABELS } from '@shared/ai/routes'
 import type { Messages } from '@shared/i18n'
-import type { ModelChoice, ModelInfo, ProviderId, Thread } from '@shared/types'
+import type { ChatImage, ModelChoice, ModelInfo, ProviderId, Thread } from '@shared/types'
 import { useApp } from '@/stores/app'
 import { useT } from '@/lib/i18n'
+import { useAssetUrl } from '@/lib/assets'
+import { Spinner } from '@/ui'
 import { registerComposer, useChat } from './chatStore'
 import { sendMessage, stopReply } from './send'
 import { saveThreadChange } from './threads'
 import { ChatInput } from './ChatInput'
+import { attachImages, imageFiles } from './images'
 
 export function Composer({ thread }: { thread: Thread | null }): React.JSX.Element {
   const t = useT()
@@ -21,6 +24,11 @@ export function Composer({ thread }: { thread: Thread | null }): React.JSX.Eleme
   const syncDraft = useChat((s) => s.syncDraft)
   const quotes = useChat((s) => s.quotes)
   const removeQuote = useChat((s) => s.removeQuote)
+  const images = useChat((s) => s.images)
+  const imagesBusy = useChat((s) => s.imagesBusy)
+  const fileInput = useRef<HTMLInputElement>(null)
+  // Images dragged over the composer
+  const [dropping, setDropping] = useState(false)
   const streaming = useChat((s) => (thread ? s.streaming[thread.id] : undefined))
   const [editor, setEditor] = useState<Editor | null>(null)
   // The content of the store when the composer shows (for example after the thread list).
@@ -36,13 +44,45 @@ export function Composer({ thread }: { thread: Thread | null }): React.JSX.Eleme
   }, [draftRev, editor])
 
   const submit = (): void => {
-    if (useChat.getState().streaming[thread?.id ?? '']) return
-    void sendMessage(useChat.getState().draft)
+    const st = useChat.getState()
+    if (st.streaming[thread?.id ?? ''] || st.imagesBusy) return
+    void sendMessage(st.draft)
   }
+  const dragsFiles = (e: React.DragEvent): boolean => e.dataTransfer.types.includes('Files')
 
   return (
     <div className="composer-wrap">
-      <div className={clsx('composer', streaming && 'is-busy')}>
+      <div
+        className={clsx('composer', streaming && 'is-busy', dropping && 'is-dropping')}
+        onDragOver={(e) => {
+          if (!dragsFiles(e)) return
+          e.preventDefault()
+          e.dataTransfer.dropEffect = 'copy'
+          setDropping(true)
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropping(false)
+        }}
+        onDrop={(e) => {
+          if (!dragsFiles(e)) return
+          e.preventDefault()
+          setDropping(false)
+          void attachImages(imageFiles(e.dataTransfer.files))
+        }}
+      >
+        {dropping && <div className="composer-drop">{t.chat.dropImages}</div>}
+        {(images.length > 0 || imagesBusy > 0) && (
+          <div className="composer-images">
+            {images.map((img) => (
+              <ImageChip key={img.file} image={img} />
+            ))}
+            {Array.from({ length: imagesBusy }, (_, i) => (
+              <span key={`busy-${i}`} className="image-chip is-busy">
+                <Spinner size={14} />
+              </span>
+            ))}
+          </div>
+        )}
         {quotes.length > 0 && (
           <div className="composer-chips">
             {quotes.map((q) => (
@@ -60,9 +100,10 @@ export function Composer({ thread }: { thread: Thread | null }): React.JSX.Eleme
           initial={initial}
           className="composer-input"
           ariaLabel={t.chat.composer}
-          placeholder={quotes.length ? t.chat.askQuote : t.chat.placeholder}
+          placeholder={images.length ? t.chat.askImage : quotes.length ? t.chat.askQuote : t.chat.placeholder}
           onChange={syncDraft}
           onEnter={submit}
+          onPasteImages={(files) => void attachImages(files)}
           onReady={(e) => {
             setEditor(e)
             registerComposer(e)
@@ -82,6 +123,20 @@ export function Composer({ thread }: { thread: Thread | null }): React.JSX.Eleme
           >
             <At size={15} />
           </button>
+          <button className="composer-tool" onClick={() => fileInput.current?.click()} aria-label={t.chat.attachImage} title={t.chat.attachImage}>
+            <ImageSquare size={15} />
+          </button>
+          <input
+            ref={fileInput}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
+            multiple
+            hidden
+            onChange={(e) => {
+              void attachImages(imageFiles(e.target.files))
+              e.target.value = ''
+            }}
+          />
           <ModelPicker thread={thread} />
           <span className="composer-spacer" />
           {streaming ? (
@@ -89,13 +144,27 @@ export function Composer({ thread }: { thread: Thread | null }): React.JSX.Eleme
               <Stop size={14} weight="fill" />
             </button>
           ) : (
-            <button className="composer-send" onClick={submit} disabled={!hasText && !quotes.length} aria-label={t.chat.send}>
+            <button className="composer-send" onClick={submit} disabled={(!hasText && !quotes.length && !images.length) || imagesBusy > 0} aria-label={t.chat.send}>
               <ArrowUp size={15} weight="bold" />
             </button>
           )}
         </div>
       </div>
     </div>
+  )
+}
+
+/** An image of the next message: a small picture with a button that takes it out. */
+function ImageChip({ image }: { image: ChatImage }): React.JSX.Element {
+  const t = useT()
+  const url = useAssetUrl(image.file)
+  return (
+    <span className="image-chip" title={image.name}>
+      {url && <img src={url} alt={image.name} />}
+      <button onClick={() => useChat.getState().removeImage(image.file)} aria-label={t.chat.removeImage(image.name)}>
+        <X size={10} weight="bold" />
+      </button>
+    </span>
   )
 }
 

@@ -21,13 +21,14 @@ import { getActiveEditor } from '@/features/editor/registry'
 import { sliceFromMarkdown } from '@/features/editor/review'
 import type { ChatMessage, Thread } from '@shared/types'
 import { ProposalCard } from './ProposalCard'
-import { acceptPending, pendingKeys, resolveTarget, setHunkStates } from './applyProposal'
+import { acceptPending, pendingKeys, resolveTarget, segmentKeys, setHunkStates } from './applyProposal'
 import { Button, Spinner, Tooltip } from '@/ui'
 import { typesetForBook } from '@/lib/typeset'
 import { getT, useT } from '@/lib/i18n'
 import { resendEdited, retryLast } from './send'
 import { ChatInput } from './ChatInput'
 import { MentionPill } from './MentionPill'
+import { MessageImages } from './ChatImages'
 import { docFromParts, readDraft, splitMentions } from './draft'
 import { useChat, type Streaming } from './chatStore'
 import { confirmAndRewind } from './rewind'
@@ -81,6 +82,7 @@ function UserBubble({ message }: { message: ChatMessage }): React.JSX.Element {
   const { parts, rest } = useMemo(() => splitMentions(message.content, message.mentions ?? []), [message.content, message.mentions])
   return (
     <div className="msg msg-user">
+      {message.images?.length ? <MessageImages images={message.images} /> : null}
       {message.quotes?.map((q) => (
         <blockquote key={q.id} className="msg-quote">
           <span className="msg-quote-src">
@@ -157,7 +159,7 @@ function EditBox({ message, thread, after }: { message: ChatMessage; thread: Thr
   const [draft, setDraft] = useState(() => readDraft(initial))
   const [busy, setBusy] = useState(false)
 
-  const canSend = Boolean(draft.text.trim() || message.quotes?.length) && !busy
+  const canSend = Boolean(draft.text.trim() || message.quotes?.length || message.images?.length) && !busy
   const send = async (): Promise<void> => {
     if (!canSend) return
     setBusy(true)
@@ -250,7 +252,7 @@ function ReplyReview({ segments, message, thread }: { segments: Segment[]; messa
     const labels: string[] = []
     for (const s of segments) {
       if (s.kind === 'text') continue
-      const mine = s.kind === 'create' ? keys.has(`${s.index}:0`) : s.hunks.some((_, i) => keys.has(`${s.index}:${i}`))
+      const mine = segmentKeys(s).some((k) => keys.has(k))
       const label = resolveTarget(s.file).label
       if (mine && !labels.includes(label)) labels.push(label)
     }

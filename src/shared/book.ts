@@ -13,6 +13,8 @@ export const SYNC_STATE_FILE = 'ai/sync-state.json'
 /** The actions of this book (Settings → Actions → This book). The app settings keep the actions for all books. */
 export const ACTIONS_FILE = 'ai/actions.json'
 export const ASSETS_DIR = 'planning/_assets'
+/** Images that the writer adds to chat messages */
+export const CHAT_IMAGES_DIR = `${ASSETS_DIR}/chat`
 
 const ALPHABET = '0123456789abcdefghijkmnopqrstuvwxyz'
 

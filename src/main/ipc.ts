@@ -1,9 +1,9 @@
 // IPC handlers. The contract is in src/shared/ipc.ts.
 
 import { app, BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
-import { copyFile, mkdir, rename, rm } from 'node:fs/promises'
+import { copyFile, mkdir, rename, rm, writeFile } from 'node:fs/promises'
 import { basename, extname, join, resolve } from 'node:path'
-import { ASSETS_DIR, fileNameFromTitle, uniqueName } from '@shared/book'
+import { ASSETS_DIR, CHAT_IMAGES_DIR, fileNameFromTitle, uniqueName } from '@shared/book'
 import type { InvokeArgs, InvokeChannel, InvokeResult } from '@shared/ipc'
 import { cancel, complete, providerModels, providerStatus } from './ai'
 import { openLogin } from './ai/login'
@@ -32,6 +32,8 @@ function handle<C extends InvokeChannel>(channel: C, fn: Handler<C>): void {
 }
 
 const E2E = process.env['WORDELIA_E2E'] === '1'
+/** The largest image of a chat message, in bytes */
+const MAX_CHAT_IMAGE = 12 * 1024 * 1024
 
 function defaultBooksDir(): string {
   // Tests set WORDELIA_BOOKS_DIR, so they never write to the user's Documents folder.
@@ -167,6 +169,17 @@ export function registerIpc(): void {
   handle('book:assetUrl', (_e, root, rel) => {
     assertRoot(root)
     return assetUrl(root, rel)
+  })
+
+  handle('chat:saveImage', async (_e, root, data, name) => {
+    assertRoot(root)
+    // The renderer makes the image small first (chat/images.ts): a few hundred kilobytes.
+    if (!(data instanceof Uint8Array) || data.byteLength === 0 || data.byteLength > MAX_CHAT_IMAGE) throw new Error('This image cannot be added.')
+    const stem = String(name).replace(/\.[^.]*$/, '')
+    const rel = `${CHAT_IMAGES_DIR}/${Date.now().toString(36)}-${fileNameFromTitle(stem, '.webp')}`
+    await mkdir(safeJoin(root, CHAT_IMAGES_DIR), { recursive: true })
+    await writeFile(safeJoin(root, rel), data)
+    return rel.replace(/^planning\//, '')
   })
 
   handle('history:save', (_e, root, chapterId, label, body) => {

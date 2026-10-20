@@ -1,6 +1,6 @@
 // System prompt for the chat. Stable blocks first, for prompt caching.
 
-import type { Chapter, Entry, Mention, Quote, Thread } from '../types'
+import type { Chapter, ChatImage, Entry, Mention, Quote, Thread } from '../types'
 import {
   bookBlock,
   chapterBlock,
@@ -40,6 +40,7 @@ const ROLE = `You are Wordelia, an editor and writing partner inside a writing a
 - The planning and the manuscript below are the truth about the story. Do not invent facts that contradict them. When something is not known, say so or ask.
 - You cannot use tools, browse, or read files that are not in this prompt. Everything you know about the book is below.
 - "@Name" in a message of the author is a mention of a chapter, a planning entry or another conversation. Its text is in this prompt or in the message.
+- The author can add images to a message, for example a picture of a character or a place. You see them. Each image has a line <image file="_assets/chat/…" name="…"/> in the message.
 
 # How you reply
 The author reads your replies in a narrow side panel while they write. Short, direct replies help them most.
@@ -79,6 +80,14 @@ Rules for new files:
 - Create files only in planning/, in one of the categories of the planning index (or a new category folder if none fits).
 - Name the file with the name exactly as the book writes it, with accents and capitals (for example planning/Places/São Tomé.md). Write the section headings in the language of the book.
 - Never create or delete manuscript chapters. The author does that.
+
+To use an image of the author as the portrait of a planning entry:
+<portrait file="planning/Characters/Entry name.md">_assets/chat/image file.webp</portrait>
+
+Rules for images:
+- Use the file of an <image> line of the author exactly. Propose a portrait when the author asks for it or clearly wants it (for example "this is Marta").
+- For a new entry with a portrait, put "image: _assets/chat/…" in the front matter of the <create>, after the summary.
+- When you describe a person or a place from an image, write the description in the language of the book and follow the writing rules.
 
 Write one short sentence before each proposal to say what it does and why. Never put proposals inside code blocks.`
 
@@ -161,8 +170,14 @@ export function buildChatSystem(input: ChatPromptInput): string {
 }
 
 /** The user turn: quotes and mentions first, then the message. */
-export function buildChatUserTurn(message: string, quotes: Quote[], mentions: Mention[], threads: Thread[], chapters: Chapter[]): string {
+/** The lines that tell the AI which images a message has, so a proposal can use their files. */
+export function imageLines(images: ChatImage[] = []): string {
+  return images.map((i) => `<image file="${i.file.replace(/"/g, '')}" name="${i.name.replace(/"/g, "'")}"/>`).join('\n')
+}
+
+export function buildChatUserTurn(message: string, quotes: Quote[], mentions: Mention[], threads: Thread[], chapters: Chapter[], images: ChatImage[] = []): string {
   const parts: string[] = []
+  if (images.length) parts.push(imageLines(images))
   for (const q of quotes) {
     parts.push(`<quote from="${q.source.label.replace(/"/g, "'")}">\n${q.text}\n</quote>`)
   }

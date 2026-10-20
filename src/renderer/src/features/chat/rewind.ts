@@ -33,9 +33,20 @@ export interface CreatedEntry {
   previous?: string
 }
 
+/** A portrait that the chat set: the rewind puts the image from before back. */
+export interface SetPortrait {
+  entryId: string
+  label: string
+  /** The image of the chat */
+  image: string
+  /** The image from before ('' for none) */
+  previous: string
+}
+
 export interface BookChanges {
   edits: EditedFile[]
   creates: CreatedEntry[]
+  portraits: SetPortrait[]
   /** Number of accepted proposals */
   total: number
 }
@@ -44,6 +55,7 @@ export interface BookChanges {
 export function bookChangesIn(messages: ChatMessage[]): BookChanges {
   const edits = new Map<string, EditedFile>()
   const creates: CreatedEntry[] = []
+  const portraits: SetPortrait[] = []
   let total = 0
   for (const m of messages) {
     if (m.role !== 'assistant' || !m.hunks || !Object.values(m.hunks).includes('accepted')) continue
@@ -54,6 +66,14 @@ export function bookChangesIn(messages: ChatMessage[]): BookChanges {
         if (states[key] !== 'accepted') continue
         const file = createdPath(s.file)
         creates.push({ file, label: resolveTarget(file).label, content: s.content, ...(m.replaced?.[key] ? { previous: m.replaced[key] } : {}) })
+        total++
+        continue
+      }
+      if (s.kind === 'portrait') {
+        const key = hunkKey(s.index, 0)
+        const target = resolveTarget(s.file)
+        if (states[key] !== 'accepted' || target.kind !== 'entry') continue
+        portraits.push({ entryId: target.entry.id, label: target.label, image: s.image, previous: m.replaced?.[key] ?? '' })
         total++
         continue
       }
@@ -73,7 +93,7 @@ export function bookChangesIn(messages: ChatMessage[]): BookChanges {
       }
     }
   }
-  return { edits: [...edits.values()], creates, total }
+  return { edits: [...edits.values()], creates, portraits, total }
 }
 
 export interface UndoResult {
@@ -146,6 +166,16 @@ export async function undoBookChanges(changes: BookChanges): Promise<UndoResult>
     if (c.previous) await useBook.getState().writeRaw(c.file, c.previous)
     // A new note goes to the trash of the book, so nothing is lost for good.
     else await useBook.getState().deleteEntry(now.id)
+    undone++
+  }
+  // A portrait goes back only while the entry still shows the image of the chat.
+  for (const p of [...changes.portraits].reverse()) {
+    const e = useBook.getState().entries.find((x) => x.id === p.entryId)
+    if (!e || e.image !== p.image) {
+      failed++
+      continue
+    }
+    useBook.getState().updateEntry(e.id, { image: p.previous || null })
     undone++
   }
   return { undone, failed }

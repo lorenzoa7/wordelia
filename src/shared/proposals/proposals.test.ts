@@ -102,3 +102,22 @@ describe('wordDiff', () => {
     expect(ops.filter((o) => o.type === 'equal').map((o) => o.text)).toEqual([' dog'])
   })
 })
+
+describe('portrait proposals', () => {
+  const reply = 'This is her.\n\n<portrait file="planning/Characters/Marta.md">_assets/chat/marta.webp</portrait>\n\nDone.'
+
+  it('parses the entry and the image', () => {
+    const s = parseProposals(reply)
+    expect(s.map((x) => x.kind)).toEqual(['text', 'portrait', 'text'])
+    const p = s[1]
+    expect(p.kind === 'portrait' && [p.file, p.image, p.complete, p.index]).toEqual(['planning/Characters/Marta.md', '_assets/chat/marta.webp', true, 0])
+  })
+
+  it('hides a portrait tag that is still being typed', () => {
+    expect(parseProposals('This is her. <portr')).toEqual([{ kind: 'text', text: 'This is her. ' }])
+  })
+
+  it('says what the author did with it in the history', () => {
+    expect(proposalSummary(reply, { '0:0': 'accepted' })).toContain('[Proposed the image _assets/chat/marta.webp as the portrait of planning/Characters/Marta.md: accepted by the author]')
+  })
+})

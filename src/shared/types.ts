@@ -214,12 +214,26 @@ export interface ProviderStatus {
 export interface ChatTurn {
   role: 'user' | 'assistant'
   content: string
+  /** Images of a message of the writer. The main process reads them from the book (`root`). */
+  images?: ChatImage[]
+}
+
+/** An image that the writer added to a chat message. It is a file of the book. */
+export interface ChatImage {
+  /** Path relative to `planning/`, like the image of an entry: `_assets/chat/…` */
+  file: string
+  /** The name of the file that the writer added */
+  name: string
+  width: number
+  height: number
 }
 
 export interface CompletionRequest {
   route: ModelChoice
   system: string
   messages: ChatTurn[]
+  /** The folder of the open book, where the images of the messages are */
+  root?: string
   maxTokens?: number
   /** For logs and UI */
   purpose: TaskKind
@@ -285,11 +299,14 @@ export interface ChatMessage {
   createdAt: string
   quotes?: Quote[]
   mentions?: Mention[]
+  /** Images that the writer added to the message */
+  images?: ChatImage[]
   /** Proposal hunk key to state */
   hunks?: Record<string, HunkState>
   /**
    * For accepted `<create>` proposals that replaced an entry: the entry file from before, by hunk key.
-   * A rewind of the thread uses it to put the old entry back.
+   * For accepted `<portrait>` proposals: the image from before ('' for none).
+   * A rewind of the thread uses it to put the old entry or image back.
    */
   replaced?: Record<string, string>
   model?: string

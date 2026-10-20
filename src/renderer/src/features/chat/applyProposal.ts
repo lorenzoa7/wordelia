@@ -95,6 +95,20 @@ export function createdPath(file: string): string {
   return [PLANNING_DIR, ...safe].join('/')
 }
 
+/**
+ * An image of the chat as the portrait of an entry. The image is already a file of the book
+ * (`_assets/…`, relative to planning/). `previous`: the image from before ('' for none).
+ */
+export function applyPortrait(file: string, image: string): ApplyResult & { previous?: string } {
+  const t = resolveTarget(file)
+  const rel = norm(image)
+  if (!rel.startsWith('_assets/') || rel.split('/').some((seg) => seg === '..' || seg === '.' || seg === '')) return { ok: false, reason: getT().chat.portraitBadImage }
+  if (t.kind !== 'entry') return { ok: false, reason: getT().chat.portraitNoEntry(t.label) }
+  const previous = t.entry.image ?? ''
+  useBook.getState().updateEntry(t.entry.id, { image: rel })
+  return { ok: true, previous }
+}
+
 /* ------------------------------------------------------------------ */
 /* Undo for accepted proposals                                          */
 /* ------------------------------------------------------------------ */
@@ -162,11 +176,16 @@ export function setHunkStates(thread: Thread, messageId: string, updates: Record
   useBook.getState().saveThread({ ...latest, messages })
 }
 
+/** The keys of a proposal: one for a new entry or a portrait, one for each change of an edit. */
+export function segmentKeys(s: Exclude<Segment, { kind: 'text' }>): string[] {
+  return s.kind === 'edit' ? s.hunks.map((_, i) => hunkKey(s.index, i)) : [hunkKey(s.index, 0)]
+}
+
 /** The keys of the proposals in a message that wait for a decision. */
 export function pendingKeys(segments: Segment[], states: Record<string, HunkState> = {}): string[] {
   const keys: string[] = []
   for (const s of segments) {
-    if (s.kind === 'create') keys.push(hunkKey(s.index, 0))
+    if (s.kind === 'create' || s.kind === 'portrait') keys.push(hunkKey(s.index, 0))
     if (s.kind === 'edit') s.hunks.forEach((h, i) => h.complete && keys.push(hunkKey(s.index, i)))
   }
   return keys.filter((k) => !states[k] || states[k] === 'pending')
@@ -191,6 +210,12 @@ export async function acceptPending(
       const res = await applyCreate(s.file, s.content)
       out[key] = res.ok ? 'accepted' : 'failed'
       if (res.ok && res.previous) replaced[key] = res.previous
+    } else if (s.kind === 'portrait') {
+      const key = hunkKey(s.index, 0)
+      if (!todo.has(key)) continue
+      const res = applyPortrait(s.file, s.image)
+      out[key] = res.ok ? 'accepted' : 'failed'
+      if (res.ok) replaced[key] = res.previous ?? ''
     } else if (s.kind === 'edit') {
       const keys = s.hunks.map((_, i) => hunkKey(s.index, i))
       if (!keys.some((k) => todo.has(k))) continue

@@ -12,7 +12,7 @@ import { create } from 'zustand'
 import { hashText, newId } from '@shared/book'
 import { buildSyncSystem, buildSyncUser } from '@shared/prompts/sync'
 import { estimateTokens } from '@shared/prompts/context'
-import { hunkKey, parseProposals, type Segment } from '@shared/proposals/parse'
+import { parseProposals, type Segment } from '@shared/proposals/parse'
 import type { Chapter, ChatMessage, HunkState, Thread } from '@shared/types'
 import { friendlyError, runCompletion } from '@/lib/ai'
 import { getT } from '@/lib/i18n'
@@ -21,7 +21,7 @@ import { useBook } from '@/stores/book'
 import { toast, useUi } from '@/stores/ui'
 import { flushEditor } from '@/features/editor/registry'
 import { useChat } from '@/features/chat/chatStore'
-import { acceptPending, pendingKeys, resolveTarget, setHunkStates } from '@/features/chat/applyProposal'
+import { acceptPending, pendingKeys, resolveTarget, segmentKeys, setHunkStates } from '@/features/chat/applyProposal'
 import { messagesFor } from '@shared/i18n'
 
 const EN = messagesFor('en')
@@ -156,7 +156,7 @@ export function syncResult(thread: Thread | undefined, messageIds: string[]): Sy
     out.pending += pending.size
     for (const s of segments) {
       if (s.kind === 'text') continue
-      const mine = s.kind === 'create' ? pending.has(hunkKey(s.index, 0)) : s.hunks.some((_, i) => pending.has(hunkKey(s.index, i)))
+      const mine = segmentKeys(s).some((k) => pending.has(k))
       const label = resolveTarget(s.file).label
       if (mine && !out.notes.includes(label)) out.notes.push(label)
     }

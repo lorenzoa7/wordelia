@@ -7,6 +7,7 @@ import type { Entry } from '@shared/types'
 import { Button, IconButton, Tooltip } from '@/ui'
 import { askConfirm } from '@/ui/prompt'
 import { invoke } from '@/lib/api'
+import { useAssetUrl } from '@/lib/assets'
 import { categoryName, useT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
 import { useUi } from '@/stores/ui'
@@ -87,18 +88,7 @@ function BackLink({ label, icon }: { label: string; icon?: ReactNode }): React.J
 /* Images                                                               */
 /* ------------------------------------------------------------------ */
 
-export function useAssetUrl(rel: string | null): string | null {
-  const root = useBook((s) => s.root)
-  const [url, setUrl] = useState<string | null>(null)
-  useEffect(() => {
-    if (!rel || !root) {
-      setUrl(null)
-      return
-    }
-    void invoke('book:assetUrl', root, rel).then(setUrl)
-  }, [rel, root])
-  return url
-}
+export { useAssetUrl }
 
 function Portrait({ entry, size }: { entry: Entry; size: 'card' | 'large' }): React.JSX.Element {
   const url = useAssetUrl(entry.image)

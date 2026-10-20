@@ -2,6 +2,7 @@
 
 import { countMarkdownWords } from '../book'
 import type { BookManifest, Chapter, Entry, Thread } from '../types'
+import { momentOfChapter, parseStoryLine } from '../storyline'
 
 export interface BookContext {
   manifest: BookManifest
@@ -91,6 +92,22 @@ export function planningIndex(entries: Entry[]): string {
     return `- ${entryRef(e)}: ${e.name}${aliases}${summary}`
   })
   return `<planning_index>\n${lines.join('\n')}\n</planning_index>`
+}
+
+/** The story line, as the AI reads and changes it (the whole entry, with its front matter keys). */
+export function storyLineBlock(e: Entry): string {
+  return `<story_line file="${escapeAttr(entryRef(e))}" name="${escapeAttr(e.name)}">\n${e.body.trim()}\n</story_line>`
+}
+
+/** Where the open chapter is in the story line, in one sentence. */
+export function storyLineWhere(e: Entry, chapters: Chapter[], currentChapterId: string | null): string {
+  const current = chapters.find((c) => c.id === currentChapterId)
+  if (!current) return ''
+  const line = parseStoryLine(e.body)
+  const m = momentOfChapter(line, current.id, chapters)
+  if (m < 0) return `The open chapter "${current.title}" has no event in the story line yet.`
+  const events = line.moments[m].events.map((ev) => ev.text).join(' / ')
+  return `The open chapter "${current.title}" is in moment ${line.moments[m].label} of the story line (${events}).`
 }
 
 export function entryBlock(e: Entry): string {

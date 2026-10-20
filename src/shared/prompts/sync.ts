@@ -2,6 +2,7 @@
 
 import type { Chapter } from '../types'
 import { bookBlock, chapterBlock, entryBlock, languageName, planningHeadings, planningIndex, type BookContext } from './context'
+import { findStoryLine } from '../storyline'
 
 export interface SyncPromptInput {
   book: BookContext
@@ -19,6 +20,7 @@ export function buildSyncSystem(input: SyncPromptInput): string {
   const known = planningHeadings(m.language)
   const h = known ?? planningHeadings('en')!
   const translate = known ? '' : ` (translate the headings to ${lang})`
+  const story = findStoryLine(input.book.entries)
   return [
     'You maintain the planning (the reference notes) of a novel. The planning holds what the author needs to keep the story consistent: characters, places, the world and its rules, and the plot.',
     '',
@@ -38,6 +40,11 @@ export function buildSyncSystem(input: SyncPromptInput): string {
     `- Useful sections for a character${translate}: ## ${h.role}, ## ${h.appearance}, ## ${h.personality}, ## ${h.relationships}, ## ${h.story} (what happens to them, by chapter). For a place: ## ${h.description}, ## ${h.story}. Use these headings exactly.`,
     '- For an update, edit the existing file. Use an exact <find> from the entry and a <replace>, or an empty <find></find> to append a new section or bullet at the end.',
     `- Categories that exist: ${input.categories.join(', ')}.`,
+    ...(story
+      ? [
+          `- The story line (planning/${story.file}) shows the events of the story in lanes and moments ("## " headings). Link its events to the chapters that tell them: add "→ [[Chapter title]]" at the end of the line. Add the events of the changed chapters that it does not have, as one short line each, in the right moment and lane. Edit whole lines with <edit>.`
+        ]
+      : []),
     '',
     '# Output format',
     `First, a few short sentences in ${lang} that say what you found. Then the proposals:`,

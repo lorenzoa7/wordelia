@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { newManifest } from '../book'
 import type { Chapter, Entry, Thread } from '../types'
 import { buildChatSystem } from './chat'
+import { buildSyncSystem } from './sync'
 import { buildActionSystem, buildActionUser, extractRewrite } from './action'
 import { entriesMentionedIn } from './context'
 
@@ -123,5 +124,59 @@ describe('dialogue style', () => {
     // An old book file without the setting gets the style of its language.
     const old = normalizeManifest({ language: 'en-GB', typography: { fontSize: 11 } } as never)
     expect(old.typography.dialogueStyle).toBe('quotes')
+  })
+})
+
+describe('story line in the prompts', () => {
+  const line: Entry = {
+    id: 'sl',
+    category: 'Plot',
+    file: 'Plot/Linha da história.md',
+    name: 'Linha da história',
+    aliases: [],
+    summary: 'Os acontecimentos.',
+    image: null,
+    body: 'Trilhas: Elias · Marta\n\n## 1\n- Elias: A lâmpada acende. → [[Um]]\n\n## 2\n- Marta: Sobe a escada. → [[Dois]]',
+    meta: { type: 'story-line' }
+  }
+  const withLine = (currentChapterId: string, extra: Entry[] = []): string =>
+    buildChatSystem({
+      book: { manifest, writingRules: '', chapters, entries: [...entries, line, ...extra], threads: [] },
+      thread,
+      currentChapterId,
+      currentEntryId: null,
+      mentions: [],
+      quotes: [],
+      message: 'O que vem depois?',
+      summaries: {},
+      manuscriptBudget: 100000
+    })
+
+  it('sends the story line with the moment of the open chapter', () => {
+    const s = withLine('c2')
+    expect(s).toContain('# Story line')
+    expect(s).toContain('planning/Plot/Linha da história.md')
+    expect(s).toContain('- Marta: Sobe a escada. → [[Dois]]')
+    expect(s).toContain('The open chapter "Dois" is in moment 2')
+  })
+
+  it('says when the open chapter has no event', () => {
+    expect(withLine('c3')).toContain('The open chapter "Três" has no event in the story line')
+  })
+
+  it('no story line, no section', () => {
+    expect(system('c1')).not.toContain('# Story line')
+  })
+
+  it('sends the story line one time, also when the plot budget is full', () => {
+    const big: Entry = { ...entries[0], id: 'big', category: 'Plot', file: 'Plot/Resumo.md', name: 'Resumo', body: 'palavra '.repeat(60000) }
+    const s = withLine('c1', [big])
+    expect(s.split('- Elias: A lâmpada acende.').length - 1).toBe(1)
+  })
+
+  it('the sync prompt asks to link events to chapters when a story line exists', () => {
+    const input = { book: { manifest, writingRules: '', chapters, entries: [...entries, line], threads: [] }, chapters, categories: ['Characters', 'Plot'], bootstrap: false }
+    expect(buildSyncSystem(input)).toContain('story line')
+    expect(buildSyncSystem({ ...input, book: { ...input.book, entries } })).not.toContain('story line')
   })
 })

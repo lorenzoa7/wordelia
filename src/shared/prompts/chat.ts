@@ -1,6 +1,7 @@
 // System prompt for the chat. Stable blocks first, for prompt caching.
 
 import type { Chapter, ChatImage, Entry, Mention, Quote, Thread } from '../types'
+import { findStoryLine, isStoryLine } from '../storyline'
 import {
   bookBlock,
   chapterBlock,
@@ -10,6 +11,8 @@ import {
   languageName,
   outlineBlock,
   planningIndex,
+  storyLineBlock,
+  storyLineWhere,
   threadsBlock,
   writingRulesBlock,
   type BookContext
@@ -81,6 +84,20 @@ Rules for new files:
 - Name the file with the name exactly as the book writes it, with accents and capitals (for example planning/Places/São Tomé.md). Write the section headings in the language of the book.
 - Never create or delete manuscript chapters. The author does that.
 
+The story line is a planning entry with "type: story-line" in its front matter. It shows the events of the story in lanes and moments:
+Lanes: Name · Name · Past (past)
+
+## 1
+- Lane: What happens, with @Name for planning entries. → [[Chapter title]]
+- Lane + Lane: Two lanes meet.
+
+Rules for the story line:
+- A "## " heading is a moment. A moment has no date: events in one moment happen at the same time, and the order of the moments is the order of the story.
+- An event is one short line in the language of the book. Write @ and the exact name of a planning entry to mention it. "→ [[Chapter title]]" links the chapter that tells the event; a planned event has no link.
+- In Portuguese the lanes word is "Trilhas:" and the past mark "(passado)"; in Spanish "Carriles:" and "(pasado)". The past lane holds flashbacks.
+- Change it with <edit> on whole lines. To move an event, delete its line and add it under the other moment. Add, rename or reorder lanes in the lanes line (and in the event lines of a renamed lane).
+- When the author asks for a story line and the book has none, create it with <create> in the plot category, with "type: story-line" and a summary in the front matter. Each group of characters that lives its own part of the story gets a lane.
+
 To use an image of the author as the portrait of a planning entry:
 <portrait file="planning/Characters/Entry name.md">_assets/chat/image file.webp</portrait>
 
@@ -108,7 +125,8 @@ function selectEntries(input: ChatPromptInput): Entry[] {
     if (plotTokens > 12000) break
     ids.add(e.id)
   }
-  return book.entries.filter((e) => ids.has(e.id))
+  // The story line has its own section.
+  return book.entries.filter((e) => ids.has(e.id) && !isStoryLine(e))
 }
 
 /**
@@ -153,6 +171,8 @@ export function buildChatSystem(input: ChatPromptInput): string {
   const entries = selectEntries(input)
   const others = threadsBlock(book.threads, thread.id)
   const manuscript = manuscriptParts(input)
+  const story = findStoryLine(book.entries)
+  const where = story ? storyLineWhere(story, book.chapters, input.currentChapterId) : ''
   // Stable sections first, so providers can cache them between messages.
   const sections = [
     ROLE,
@@ -160,8 +180,9 @@ export function buildChatSystem(input: ChatPromptInput): string {
     `# Writing rules of the book\n${writingRulesBlock(book.writingRules)}`,
     `# The book\n${bookBlock(m)}`,
     `# Planning\nThe planning holds the facts of the story. Language of the book: ${languageName(m.language)}.\n${planningIndex(book.entries)}`,
+    story ? `# Story line\nThe events of the story in lanes and moments. The author changes it through you (see "Rules for the story line").\n${storyLineBlock(story)}` : '',
     manuscript.stable ? `# Manuscript: the other chapters\n${manuscript.stable}` : '',
-    `# Manuscript: outline and the open chapter\n${manuscript.current}`,
+    `# Manuscript: outline and the open chapter\n${manuscript.current}${where ? `\n\n${where}` : ''}`,
     entries.length ? `# Planning entries that matter now\n${entries.map(entryBlock).join('\n\n')}` : '',
     others ? `# Other conversations about this book\nThese are digests of the author's other chat threads. Stay consistent with their facts and decisions.\n${others}` : '',
     `# This conversation\nTitle: ${thread.title}${thread.brief ? `\nPurpose: ${thread.brief}` : ''}${thread.digest ? `\nDigest of the earlier messages:\n${thread.digest}` : ''}`
@@ -169,12 +190,12 @@ export function buildChatSystem(input: ChatPromptInput): string {
   return sections.filter(Boolean).join('\n\n')
 }
 
-/** The user turn: quotes and mentions first, then the message. */
 /** The lines that tell the AI which images a message has, so a proposal can use their files. */
 export function imageLines(images: ChatImage[] = []): string {
   return images.map((i) => `<image file="${i.file.replace(/"/g, '')}" name="${i.name.replace(/"/g, "'")}"/>`).join('\n')
 }
 
+/** The user turn: quotes and mentions first, then the message. */
 export function buildChatUserTurn(message: string, quotes: Quote[], mentions: Mention[], threads: Thread[], chapters: Chapter[], images: ChatImage[] = []): string {
   const parts: string[] = []
   if (images.length) parts.push(imageLines(images))

@@ -429,6 +429,20 @@ The Plan overview has a switch: "Cards | Map". The map shows the planning as a g
 - The layout, the view and the filters of each book stay in memory for the session. The app does not save them.
 - The colors of the categories are the tokens `--map-1` to `--map-8`, in the order of the categories. The palette was checked for color vision deficiency (adjacent pairs) and for 3:1 contrast on the paper, in the two themes. The other map tokens (`--map-ground`, `--map-dot`, `--map-glow`, `--map-vignette`, `--map-shade`, `--map-tint`, `--map-deep`, `--map-book`) have a light and a dark value.
 
+## 7b2. Story line
+
+The story line shows the events of the story in lanes (groups of characters) and moments (before, after, at the same time). Design: `docs/superpowers/specs/2026-10-20-story-line-design.md`.
+
+- **Storage.** A planning entry with `type: story-line` in its front matter (in `Entry.meta`). A book has one: the first entry with this type, by file name (`findStoryLine`). The build puts it in the plot category. Because it is an entry, the store, the watcher, the trash, proposals, undo and rewind work without new code.
+- **Format.** The body holds everything that a proposal can change: a lanes line (`Lanes:`, `Trilhas:` or `Carriles:`, names separated by ` · `, the past lane marked ` (past)`), `## ` headings for the moments, and one list item for each event: `- Lane + Lane: text with @Name. → [[Chapter title]]`. `src/shared/storyline.ts` parses it (pure, unit tests in `storyline.test.ts`). A prefix that is not a known lane becomes a lane only when it looks like a name (it starts with a letter, at most 5 words and 40 characters, no sentence punctuation); else the item goes to the row "Other". A mention is `@` and the longest entry name or alias that matches. A link matches a chapter by its title or its file name, ignoring case and accents.
+- **Layout.** `layoutStoryLine` places the cards: rows are the lanes, then the past lane, then "Other"; inside a moment, an event takes the first sub-column where its rows are free, single events of one cell stack, and a meeting spans from its first lane to its last lane. Cards never overlap.
+- **View** (`src/renderer/src/features/plan/StoryLineView.tsx`). The third button of the Plan overview ("Line", the page `:line`). Written cards (a link to a chapter) are paper; planned cards are dashed; meetings have a blue tint; the moment of the open chapter has a tint and "you are here". A mention opens its entry; a chapter name opens the chapter. A drag moves one card to another cell (`moveEvent` changes only its line). "Edit as text" opens the entry. The map leaves the story line out.
+- **Build** (`BuildStoryLine.tsx`). The source is a planning note, a pasted text or the written chapters. The app opens a new thread and sends a message; the AI replies with a `<create>` proposal. The draft of the composer stays.
+- **Chat.** The prompt has a section "# Story line" with the whole entry, and the outline section says where the open chapter is ("The open chapter … is in moment 2"). The protocol explains the format and how to change it with `<edit>` on whole lines. The entry does not go two times (it is not in "Planning entries that matter now").
+- **Sync.** When a story line exists, the sync rules ask to link its events to the chapters that tell them and to add the events that the changed chapters show.
+- **Write view.** `StoryLineCard.tsx` under the chapter list: the moment of the open chapter, its events, the events at the same time and the next events of its lanes.
+- **Renames.** When a chapter gets a new title, `renameLinks` changes its links in the story line.
+
 ## 7c. Shell and controls
 
 - **Title bar.** The wordmark is at the far left, then the book menu. The view tabs stay in the middle. On the right: the update badge, the AI warning, the chat button and the settings button.

@@ -4,8 +4,8 @@ This file is the source of truth for progress. Update it after each task. Mark a
 
 ## Current focus
 
-> **Milestone:** Version 0.9 — images in the chat
-> **Next task:** Design the story line ("Linha da história") with the author: a diagram of events in story lanes, made by the AI from a summary, that the chat can change.
+> **Milestone:** Version 0.10 — the story line
+> **Next task:** Collect feedback on 0.10.0. Then fix what the author finds.
 > **Not verified:** Codex and the two API transports. The user has no Codex account, and no API keys are set. The scripted provider (`WORDELIA_MOCK_AI=1`) covers their UI flows.
 
 ## M0 — Foundation
@@ -314,6 +314,15 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] The AI can propose an image as the portrait of a note (`<portrait>`), or a new note with a portrait (`image:` in its front matter). The card shows the image with "Use as portrait"; a rewind puts the portrait from before back
 - [x] Scenario `chatimage`: button, paste, remove, send, the AI gets the image, the portrait goes to the note and shows in the Plan view, the rewind puts it back
 - [x] 0.9.1: a mention shows the icon of its category, as on the map (`categoryIcons.ts`)
+
+## Version 0.10 — story line
+
+- [x] The story line: a planning entry with `type: story-line` whose body holds lanes, moments and events (`src/shared/storyline.ts`, 17 unit tests)
+- [x] The Line view in Plan: lanes in rows, moments in columns, meetings over their lanes, mentions with the icons of their categories, written and planned cards, "you are here", drag a card to another cell, "Edit as text"
+- [x] Build from a planning note, a text or the chapters, through the chat (a `<create>` proposal)
+- [x] The chat reads the story line and the moment of the open chapter, and changes it with proposals; the sync links events to chapters
+- [x] A card of the open chapter in the Write view; chapter renames update the links; the map leaves the story line out
+- [x] Scenario `storyline`: build, view, a move through the chat, a drag, a rename, the Write card, the map
 
 ## Tests and CI
 

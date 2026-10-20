@@ -2,6 +2,14 @@
 
 Each version has its Windows installer in GitHub Releases. The release workflow copies the section of the version from this file to the release notes.
 
+## 0.10.0 (2026-10-20)
+
+### New
+- The story line, in Plan → Line: the events of your story in lanes (groups of characters) and moments (what happens at the same time). Meetings span the lanes that meet, and a past lane holds flashbacks.
+- Build it from a planning note, a text or your chapters: the AI proposes it in the chat. Change it by asking the chat ("put the storm before the visit"), or drag a card.
+- Names in the events are mentions with the icon of their category; a click opens the note. A chapter name opens the chapter.
+- The AI knows where the open chapter is in the story line. The Write view shows a small card: this moment, what happens at the same time, and what comes next.
+
 ## 0.9.1 (2026-10-19)
 
 ### Changed

@@ -21,6 +21,9 @@ This file is the ubiquitous language of Wordelia. Use these words in code, docs 
 | **Category** | A group of entries, for example Characters. One folder in `planning/`. | `Category` |
 | **Entry** | One planning note, for example one character. One Markdown file. | `Entry` |
 | **Portrait** | The image of an entry. It shows on the card of the entry. The file is in `planning/_assets/`. | `entry.image` |
+| **Story line** | The events of the story in lanes and moments. A planning entry with `type: story-line`. The Plan view shows it as "Line". | `StoryLine`, `storyline.ts` |
+| **Lane** | One row of the story line: a group of characters that lives its own part of the story. One lane can be the past lane, for flashbacks. | `StoryLine.lanes` |
+| **Moment** | One column of the story line: events that happen at the same time. A moment has no date. | `StoryMoment` |
 | **Alias** | Another name for an entry. The app uses aliases to find mentions in the manuscript. | `aliases` |
 | **Sync** | The AI compares the manuscript with the planning and proposes changes to the planning. The button is "Update notes from the chapters". | `planningSync` |
 

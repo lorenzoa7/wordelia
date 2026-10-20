@@ -17,7 +17,7 @@ import { ArrowsIn, Minus, Plus } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { adjacency, type MapEdge, type MapNode, type PlanningMap } from '@shared/planning/graph'
 import { IconButton } from '@/ui'
-import { categoryIcon } from '@/features/plan/PlanSidebar'
+import { categoryIcon } from '@/features/plan/categoryIcons'
 import { MapLayout, clamp, dotGrid, edgeKey, fitView, nodeRadius, toWorld, zoomAt, type Point, type View } from './layout'
 
 interface Memory {

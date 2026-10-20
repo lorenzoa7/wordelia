@@ -1,17 +1,5 @@
 import { useState } from 'react'
-import {
-  CaretRight,
-  DownloadSimple,
-  Folder,
-  GlobeHemisphereWest,
-  MapPin,
-  Notebook,
-  Path,
-  Plus,
-  SquaresFour,
-  UserCircle,
-  type IconProps
-} from '@phosphor-icons/react'
+import { CaretRight, DownloadSimple, Plus, SquaresFour } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { IconButton } from '@/ui'
 import { askText } from '@/ui/prompt'
@@ -20,20 +8,9 @@ import { useBook } from '@/stores/book'
 import { HideSidebarButton } from '@/features/book/SidebarToggle'
 import { SyncButton, SyncResultCard } from './SyncPanel'
 import { importNotes } from './importNotes'
+import { categoryIcon } from './categoryIcons'
 
-const CATEGORY_ICONS: Record<string, React.ComponentType<IconProps>> = {
-  UserCircle,
-  MapPin,
-  GlobeHemisphereWest,
-  Path,
-  Notebook,
-  Folder
-}
-
-/** The icon of a category; an unknown name gets the folder. */
-export function categoryIcon(name: string): React.ComponentType<IconProps> {
-  return CATEGORY_ICONS[name] ?? Folder
-}
+export { categoryIcon }
 
 export function CategoryIcon({ name, size = 15 }: { name: string; size?: number }): React.JSX.Element {
   const Icon = categoryIcon(name)

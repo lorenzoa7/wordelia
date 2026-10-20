@@ -327,7 +327,7 @@ export function ChatInput({ initial, className, ariaLabel, placeholder, autoFocu
               }}
               onMouseEnter={() => setHighlight(i)}
             >
-              <MentionIcon kind={c.kind} />
+              <MentionIcon kind={c.kind} id={c.id} size={14} />
               <span className="mention-label">{c.label}</span>
               <span className="mention-sub">{c.sub}</span>
             </button>

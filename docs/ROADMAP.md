@@ -4,8 +4,8 @@ This file is the source of truth for progress. Update it after each task. Mark a
 
 ## Current focus
 
-> **Milestone:** Version 0.8 — the fifth feedback of the author (9 items) is done
-> **Next task:** Collect feedback on 0.8.5. Then fix what the author finds.
+> **Milestone:** Version 0.9 — images in the chat
+> **Next task:** Collect feedback on 0.9.0. Then explain the story outline ("Roteiro") idea again, with an example.
 > **Not verified:** Codex and the two API transports. The user has no Codex account, and no API keys are set. The scripted provider (`WORDELIA_MOCK_AI=1`) covers their UI flows.
 
 ## M0 — Foundation
@@ -305,6 +305,14 @@ This file is the source of truth for progress. Update it after each task. Mark a
 
 - [x] No movement for a page that goes: it goes at once, like Google Docs. At the end of the book the desk is at its bottom, and while the space closed the browser moved the whole page above down, so the button under the book stood still (measured: 812 px in 630 ms). The page count of the last measure stays (`measured`), so a removed page break never leaves a page that is too tall
 - [x] Scenario `ctrlenter`: after Backspace on an empty page, what is under the chapter does not move after the first frame
+
+## Version 0.9 — images in the chat
+
+- [x] The author adds images to a chat message: the image button, a paste (Ctrl+V) or a drop on the composer. Small pictures in the composer, each with a button that takes it out; at most 6 images in a message
+- [x] The renderer makes each image small (WebP, 1568 px on the long side) and the book keeps it in `planning/_assets/chat/`. The sent message shows its images; a click opens one at its size
+- [x] All four providers get the images (`src/main/ai/images.ts`, unit tests). Claude Code was checked with the real CLI (a red image: "Red"). Codex and the two APIs are not checked with a real account
+- [x] The AI can propose an image as the portrait of a note (`<portrait>`), or a new note with a portrait (`image:` in its front matter). The card shows the image with "Use as portrait"; a rewind puts the portrait from before back
+- [x] Scenario `chatimage`: button, paste, remove, send, the AI gets the image, the portrait goes to the note and shows in the Plan view, the rewind puts it back
 
 ## Tests and CI
 

@@ -20,6 +20,7 @@ This file is the ubiquitous language of Wordelia. Use these words in code, docs 
 | **Planning** | The notes about the book that are not the book: characters, places, world, plot. The AI reads it as the source of truth. | `Planning` |
 | **Category** | A group of entries, for example Characters. One folder in `planning/`. | `Category` |
 | **Entry** | One planning note, for example one character. One Markdown file. | `Entry` |
+| **Portrait** | The image of an entry. It shows on the card of the entry. The file is in `planning/_assets/`. | `entry.image` |
 | **Alias** | Another name for an entry. The app uses aliases to find mentions in the manuscript. | `aliases` |
 | **Sync** | The AI compares the manuscript with the planning and proposes changes to the planning. The button is "Update notes from the chapters". | `planningSync` |
 
@@ -38,6 +39,7 @@ This file is the ubiquitous language of Wordelia. Use these words in code, docs 
 | **Writing rules** | The rules of the author that apply to all AI work on this book. | `writingRules` |
 | **Proposal** | A change that the AI proposes. The user must accept or reject it. | `Proposal` |
 | **Hunk** | One part of a proposal: one find-and-replace on one file. | `Hunk` |
+| **Chat image** | An image that the author adds to a chat message. The app makes it small (WebP, at most 1568 px on the long side) and keeps it in the book, in `planning/_assets/chat/`. | `ChatImage` |
 | **Reply** | To quote selected text into the chat composer. | `reply` |
 | **Mention** | A chapter, an entry or a thread that the user names in a chat message with "@". It shows as a pill in the text. | `Mention` |
 

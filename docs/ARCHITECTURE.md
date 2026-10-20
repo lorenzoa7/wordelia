@@ -166,6 +166,21 @@ interface ProviderTransport {
 - **Codex:** the app runs the `codex` CLI of the user (`codex app-server`, JSON-RPC, read-only sandbox; `codex exec --json` as a fallback).
 - **Anthropic API / OpenAI API:** HTTPS streaming with the key of the user.
 
+#### Images in chat messages
+
+The author adds images to a message with the image button, a paste or a drop (`src/renderer/src/features/chat/images.ts`). The renderer makes each image small (WebP, at most 1568 px on the long side; the AIs make larger images smaller anyway, and pixels cost tokens) and sends the bytes to `chat:saveImage`, which writes `planning/_assets/chat/<time>-<name>.webp`. The message keeps `ChatMessage.images` (paths relative to `planning/`, names and sizes), so the conversation shows them later and a portrait can use the same file.
+
+A request has `root`, and each user turn has its `images`. Before the transport runs, `loadImages` (`src/main/ai/images.ts`) reads the files of the open book (never outside it) as Base64, at most 8 per request, the most recent. Each provider puts them in its own format:
+
+| Provider | Images |
+|---|---|
+| Claude Code | `--input-format stream-json`: one JSON line on stdin with image blocks and the text. An old CLI without this flag gets the text only. |
+| Codex | `localImage` items in `turn/start` (app-server), `-i <file>` for `codex exec`. Not tested with a real account. |
+| Anthropic API | `image` blocks with Base64 before the text. |
+| OpenAI API | `input_image` items with a data URL after the text. |
+
+The user turn also has a line `<image file="_assets/chat/…" name="…"/>` for each image, so the AI can name the file in a proposal.
+
 #### Models and effort
 
 The model lists come from the providers, so new models appear without an app update:
@@ -241,7 +256,11 @@ The AI writes changes as tags in its reply:
 <create file="planning/Characters/Teresa.md">
 ...full Markdown of the new file...
 </create>
+
+<portrait file="planning/Characters/Teresa.md">_assets/chat/teresa.webp</portrait>
 ```
+
+A `<portrait>` proposes an image of the chat as the portrait of an existing entry. Its card shows the image with "Use as portrait"; the entry gets `image`, and the message keeps the image from before in `replaced`, so a rewind puts it back. A new entry gets its portrait from `image:` in the front matter of its `<create>`.
 
 The renderer parses the tags while the reply streams. It shows each tag as a diff card. A hunk applies to the live editor when the chapter is open (one undo step). Else it applies to the file text. The match is exact first, then with whitespace and quote normalization.
 

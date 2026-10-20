@@ -2,6 +2,13 @@
 
 Each version has its Windows installer in GitHub Releases. The release workflow copies the section of the version from this file to the release notes.
 
+## 0.9.0 (2026-10-19)
+
+### New
+- Images in the chat. Add an image to a message with the image button, with Ctrl+V or by dropping it on the message box. Ask the AI to describe a character from a picture; it follows the writing rules of the book.
+- The AI can propose an image as the portrait of a note, or a new note with its portrait. "Use as portrait" sets it, and the card of the note shows it in Plan.
+- The book keeps the images of the chat, made small, in its folder.
+
 ## 0.8.5 (2026-10-19)
 
 ### Changed

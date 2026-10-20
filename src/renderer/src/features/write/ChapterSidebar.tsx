@@ -13,6 +13,7 @@ import { useApp } from '@/stores/app'
 import { useT } from '@/lib/i18n'
 import { HideSidebarButton } from '@/features/book/SidebarToggle'
 import { usePagesOf } from '@/features/editor/pageCounts'
+import { StoryLineCard } from './StoryLineCard'
 
 export function ChapterSidebar(): React.JSX.Element {
   const t = useT()
@@ -53,6 +54,7 @@ export function ChapterSidebar(): React.JSX.Element {
           </Reorder.Item>
         ))}
       </Reorder.Group>
+      <StoryLineCard />
       <button className="sidebar-add" onClick={() => void useBook.getState().addChapter(chapters[chapters.length - 1]?.id ?? null)}>
         <Plus size={13} /> {t.write.addChapter}
       </button>

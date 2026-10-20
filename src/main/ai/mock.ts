@@ -55,6 +55,53 @@ function reply(req: AiRequest): string {
       ...(entry ? ['', `<portrait file="${entry[1]}">${images[0].file}</portrait>`] : [])
     ].join('\n')
   }
+  // The story line: build it from a source, or move its last event to the first moment.
+  const story = /<story_line file="([^"]+)"[^>]*>\n([\s\S]*?)\n<\/story_line>/.exec(req.system)
+  if (req.purpose === 'chat' && !story && /story line|linha da história|línea de la historia/i.test(last)) {
+    const [elias, marta, visitor, past] = english ? ['Elias', 'Marta', 'The visitor', 'Past'] : ['Elias', 'Marta', 'O visitante', 'Passado']
+    const [storm, visit] = english ? ['The Storm', 'The Visitor'] : ['A Tempestade', 'O Visitante']
+    return [
+      english ? 'Here is the story line: three lanes, and the lanes meet in the lighthouse.' : 'Aqui está a linha da história: três trilhas, que se encontram no farol.',
+      '',
+      `<create file="planning/Plot/${english ? 'Story line' : 'Linha da história'}.md">`,
+      '---',
+      'type: story-line',
+      english ? 'summary: The events of the story in lanes and moments.' : 'summary: Os acontecimentos da história em trilhas e momentos.',
+      '---',
+      `${english ? 'Lanes' : 'Trilhas'}: ${elias} · ${marta} · ${visitor} · ${past} (${english ? 'past' : 'passado'})`,
+      '',
+      '## 1',
+      `- ${elias}: ${english ? '@Elias lights the lamp; a boat is missing.' : '@Elias acende a lâmpada; falta um barco.'} → [[${storm}]]`,
+      `- ${marta}: ${english ? '@Marta climbs the stairs with coffee.' : '@Marta sobe a escada com café.'} → [[${storm}]]`,
+      `- ${past}: ${english ? 'Twenty-two years ago, the first night of @Elias at the lighthouse.' : 'Vinte e dois anos antes, a primeira noite de @Elias no farol.'}`,
+      '',
+      `## 2 · ${english ? 'The boat' : 'O bote'}`,
+      `- ${elias} + ${marta}: ${english ? 'They see the blue boat together.' : 'Os dois veem o bote azul.'} → [[${visit}]]`,
+      `- ${visitor}: ${english ? 'A stranger lies in the blue boat.' : 'Um estranho está deitado no bote azul.'}`,
+      '',
+      '## 3',
+      `- ${elias} + ${marta} + ${visitor}: ${english ? 'The visitor wakes up in the lighthouse.' : 'O visitante acorda no farol.'}`,
+      '</create>'
+    ].join('\n')
+  }
+  if (req.purpose === 'chat' && story && /\b(move|mova|mueve)\b/i.test(last)) {
+    const lines = story[2].split('\n')
+    const events = lines.filter((l) => /^- /.test(l))
+    const heading = lines.find((l) => /^## /.test(l))
+    const moved = events[events.length - 1]
+    if (moved && heading) {
+      return [
+        english ? 'I moved the last event to the first moment.' : 'Movi o último acontecimento para o primeiro momento.',
+        '',
+        `<edit file="${story[1]}">`,
+        `<find>${heading}</find>`,
+        `<replace>${heading}\n${moved}</replace>`,
+        `<find>\n${moved}</find>`,
+        '<replace></replace>',
+        '</edit>'
+      ].join('\n')
+    }
+  }
   if (req.purpose === 'action') {
     const sel = between(last, '<selection>\n', '\n</selection>') ?? between(last, '<selection>', '</selection>') ?? last
     return `<rewrite>\n${polish(sel.trim())}\n</rewrite>`

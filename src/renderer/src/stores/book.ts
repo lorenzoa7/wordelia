@@ -20,6 +20,7 @@ import {
 } from '@shared/book'
 import type { AiAction, BookManifest, BookSnapshot, CategoryDef, Chapter, Entry, SyncState, Thread } from '@shared/types'
 import { bookActionsFile, parseBookActions } from '@shared/ai/scopes'
+import { findStoryLine, renameLinks } from '@shared/storyline'
 import { invoke, on } from '@/lib/api'
 import { saver } from './saver'
 import { chapterWord } from '@shared/export/model'
@@ -269,6 +270,12 @@ export const useBook = create<BookState>((set, get) => {
         await invoke('book:deleteFile', root, oldRel)
       }
       get().updateManifest({ chapters: get().chapters.map((c) => ({ id: c.id, file: c.file })) })
+      // The links of the story line follow the new title.
+      const story = findStoryLine(get().entries)
+      if (story && clean !== ch.title) {
+        const body = renameLinks(story.body, ch.title, clean)
+        if (body !== story.body) get().updateEntry(story.id, { body })
+      }
     },
 
     async addChapter(afterId, title, body = '') {

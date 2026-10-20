@@ -91,7 +91,7 @@ export const plan = {
     cardDeleted: 'The card is deleted.',
     textRequired: 'Write what happens.',
     suggestions: 'Notes to mention',
-    bannerText: 'Let the AI fill the line from a summary, a note or an image.',
+    bannerText: 'The AI can fill the line from a summary, a note or an image.',
     bannerAction: 'Fill with the AI',
     bannerDraft: 'Fill my story line from this information: ',
     threadTitle: 'Story line',

@@ -78,13 +78,21 @@ export function LineView(): React.JSX.Element {
   const cols = boardView(shown, view, chapters).filter((c) => c.kind !== 'tray')
   const count = view === 'chapter' ? t.plan.line.statsChapters(cols.length, shown.cards.length) : t.plan.line.statsMoments(cols.length, shown.cards.length)
 
-  // "You are here" is on screen when the view opens.
+  // "You are here" is on screen when the view opens. The board then starts at a column, so no
+  // column is cut at the left edge.
   useLayoutEffect(() => {
     const box = scroll.current
-    const col = box?.querySelector<HTMLElement>('.line-col.is-here')
-    if (!box || !col) return
-    const left = col.offsetLeft
-    if (left + col.offsetWidth > box.scrollLeft + box.clientWidth || left < box.scrollLeft) box.scrollLeft = Math.max(0, left - (box.clientWidth - col.offsetWidth) / 2)
+    const here = box?.querySelector<HTMLElement>('.line-col.is-here')
+    const board = box?.firstElementChild as HTMLElement | null
+    if (!box || !here || !board) return
+    const origin = box.getBoundingClientRect().left - box.scrollLeft
+    const at = (el: HTMLElement): number => el.getBoundingClientRect().left - origin
+    const right = at(here) + here.offsetWidth + 16
+    if (at(here) >= box.scrollLeft && right <= box.scrollLeft + box.clientWidth) return
+    const pad = parseFloat(getComputedStyle(board).paddingLeft) || 0
+    const cols = [...board.querySelectorAll<HTMLElement>(':scope > .line-col')]
+    const first = cols.find((c) => at(c) - pad >= right - box.clientWidth) ?? here
+    box.scrollLeft = Math.max(0, at(first) - pad)
   }, [view, Boolean(review)]) // eslint-disable-line react-hooks/exhaustive-deps
 
   let bar: React.ReactNode = null

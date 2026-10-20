@@ -82,7 +82,7 @@ export const plan: typeof en = {
     cardDeleted: 'O cartão foi apagado.',
     textRequired: 'Escreva o que acontece.',
     suggestions: 'Notas para mencionar',
-    bannerText: 'Deixe a IA preencher a linha a partir de um resumo, de uma nota ou de uma imagem.',
+    bannerText: 'A IA pode preencher a linha com um resumo, uma nota ou uma imagem.',
     bannerAction: 'Preencher com a IA',
     bannerDraft: 'Popule minha Linha da história baseado nessas informações aqui: ',
     threadTitle: 'Linha da história',

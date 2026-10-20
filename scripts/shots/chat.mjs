@@ -99,18 +99,35 @@ export default async function ({ app, page, shot, openBook }) {
   await page.waitForTimeout(200)
   await shot('edit-message')
   await page.keyboard.press('Enter')
-  await page.waitForSelector('.msg-ai', { timeout: 20000 })
+  // Wait for the state, not for a time: the edited message and its new reply are in the thread.
+  const edited = () =>
+    page.evaluate(() => {
+      const t = window.__wordelia.book.getState().threads.find((x) => x.messages[0]?.content.startsWith('What is the weakest'))
+      return t ? { count: t.messages.length, last: t.messages.at(-1)?.id ?? null, role: t.messages.at(-1)?.role ?? null } : null
+    })
+  await page.waitForFunction(
+    () => window.__wordelia.book.getState().threads.some((t) => t.messages[0]?.content.startsWith('What is the weakest') && t.messages.length === 2),
+    null,
+    { timeout: 20000 }
+  )
   await idle()
-  await page.waitForTimeout(400)
+  const first = await edited()
 
-  // 8. Retry the last reply.
+  // 8. Retry the last reply: a new reply takes its place.
   await page.locator('.msg-ai').last().hover()
   await page.locator('.msg-retry').click()
+  await page.waitForFunction(
+    (old) => {
+      const t = window.__wordelia.book.getState().threads.find((x) => x.messages[0]?.content.startsWith('What is the weakest'))
+      return Boolean(t && t.messages.length === 2 && t.messages[1].role === 'assistant' && t.messages[1].id !== old && t.messages[1].content)
+    },
+    first?.last,
+    { timeout: 20000 }
+  ).catch(() => {})
   await idle()
-  await page.waitForTimeout(400)
-  const count = (await threads()).find((t) => t.messages[0]?.content.startsWith('What is the weakest'))?.messages.length
-  console.log('messages after retry:', count)
-  if (count !== 2) fail('retry did not replace the last reply')
+  const retried = await edited()
+  console.log('messages after retry:', retried?.count)
+  if (retried?.count !== 2 || retried.last === first?.last) fail(`retry did not replace the last reply: ${JSON.stringify({ first, retried })}`)
   await shot('after-retry')
 
   // 9. Thread states: a reply with proposals that wait, a thread at work, then a new reply not seen yet.

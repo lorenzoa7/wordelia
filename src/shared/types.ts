@@ -311,6 +311,8 @@ export interface ChatMessage {
    * one of its changes: later decisions compare the line with it, also after the line changed.
    */
   lineAfter?: string
+  /** The story line when `lineAfter` was kept: the changes of the proposal are the changes between the two */
+  lineBefore?: string
   /**
    * For accepted `<create>` proposals that replaced an entry: the entry file from before, by hunk key.
    * For accepted `<portrait>` proposals: the image from before ('' for none).

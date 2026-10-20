@@ -552,12 +552,12 @@ function PageEnd(): React.JSX.Element {
 
 function EmptyManuscript(): React.JSX.Element {
   const t = useT()
-  // The first chapter title is book text: it follows the language of the book.
-  const language = useBook((s) => s.manifest?.language ?? 'en')
+  // The first chapter: its title is the first planned chapter of the story line, else the word of
+  // the language of the book ("Chapter One").
   return (
     <div className="empty-manuscript">
       <p>{t.editor.page.noChapters}</p>
-      <button className="btn btn-primary btn-md" onClick={() => void useBook.getState().addChapter(null, chapterWord(language, 1))}>
+      <button className="btn btn-primary btn-md" onClick={() => void useBook.getState().addChapter(null)}>
         <Plus size={14} /> {t.editor.page.addFirstChapter}
       </button>
     </div>

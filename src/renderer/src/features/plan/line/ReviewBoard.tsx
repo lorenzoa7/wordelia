@@ -11,7 +11,7 @@ import { wordDiff } from '@shared/text/diff'
 import type { Chapter, Entry } from '@shared/types'
 import { useT } from '@/lib/i18n'
 import { CardView, ColumnShell, movable } from './Board'
-import { applyLineChanges, rejectLineChanges, type LineProposal } from './proposal'
+import { applyLineChanges, proposedBoard, rejectLineChanges, type LineProposal } from './proposal'
 
 function Diff({ before, after }: { before: string; after: string }): React.JSX.Element {
   const ops = useMemo(() => wordDiff(plainText(before), plainText(after)), [before, after])
@@ -23,10 +23,10 @@ function Diff({ before, after }: { before: string; after: string }): React.JSX.E
 }
 
 /** The bar of a change: what it does, Reject and Apply. */
-function Decision({ tone, label, ids, p }: { tone: 'add' | 'remove'; label: string; ids: string[]; p: LineProposal }): React.JSX.Element {
+function Decision({ tone, label, subject, ids, p }: { tone: 'add' | 'remove'; label: string; subject: string; ids: string[]; p: LineProposal }): React.JSX.Element {
   const t = useT()
   return (
-    <div className={clsx('line-decide', `is-${tone}`)}>
+    <div className={clsx('line-decide', `is-${tone}`)} role="group" aria-label={`${label}: ${subject}`}>
       <span className="line-decide-label">{label}</span>
       <button className="line-decide-btn" onClick={() => rejectLineChanges(p, ids)}>
         <X size={11} weight="bold" />
@@ -51,8 +51,8 @@ interface Props {
 export function ReviewBoard({ p, view, chapters, notes, here }: Props): React.JSX.Element {
   const t = useT()
   const before = useMemo(() => parseBoard(p.before), [p.before])
-  const after = useMemo(() => parseBoard(p.after ?? ''), [p.after])
-  const cols = useMemo(() => reviewView(before, after, view, chapters, p.rejected), [before, after, view, chapters, p.rejected])
+  const after = useMemo(() => proposedBoard(p), [p])
+  const cols = useMemo(() => reviewView(before, after, view, chapters, p.changes), [before, after, view, chapters, p.changes])
   // The line at the bottom of a card: its place in the other view, now (or in the proposal, for a card that comes).
   const other = useMemo(() => placesOf(before, view === 'chapter' ? 'order' : 'chapter', chapters), [before, view, chapters])
   const otherNext = useMemo(() => placesOf(after, view === 'chapter' ? 'order' : 'chapter', chapters), [after, view, chapters])
@@ -66,7 +66,7 @@ export function ReviewBoard({ p, view, chapters, notes, here }: Props): React.JS
     if (!col.changes.length) return null
     const label =
       col.tone === 'add' ? t.plan.line.columnAdd : col.tone === 'remove' ? t.plan.line.columnDelete : col.newTitle !== undefined ? t.plan.line.columnRename : t.plan.line.columnMove
-    return <Decision tone={col.tone === 'remove' ? 'remove' : 'add'} label={label} ids={col.changes} p={p} />
+    return <Decision tone={col.tone === 'remove' ? 'remove' : 'add'} label={label} subject={col.newTitle ?? col.title} ids={col.changes} p={p} />
   }
 
   return (
@@ -91,7 +91,7 @@ export function ReviewBoard({ p, view, chapters, notes, here }: Props): React.JS
         >
           {col.slots.map((s, i) => (
             <div key={`${s.card.id}:${s.tone}:${i}`} className={clsx('line-slot', `is-${s.tone}`)}>
-              {s.tone !== 'same' && <Decision tone={s.tone} label={slotLabel(s)} ids={s.changes} p={p} />}
+              {s.tone !== 'same' && <Decision tone={s.tone} label={slotLabel(s)} subject={plainText(s.card.text)} ids={s.changes} p={p} />}
               <CardView
                 card={s.card}
                 other={otherOf(s)}

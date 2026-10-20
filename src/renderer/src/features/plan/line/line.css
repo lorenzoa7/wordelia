@@ -555,6 +555,14 @@
 .line-input-wrap.is-fixed .line-input-back {
   scrollbar-gutter: stable;
 }
+@media (forced-colors: active) {
+  .line-input {
+    color: CanvasText;
+  }
+  .line-input-back {
+    visibility: hidden;
+  }
+}
 
 /* The notes that "@" finds */
 .line-suggest {

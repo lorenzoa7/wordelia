@@ -20,7 +20,7 @@ import {
 } from '@shared/book'
 import type { AiAction, BookManifest, BookSnapshot, CategoryDef, Chapter, Entry, SyncState, Thread } from '@shared/types'
 import { bookActionsFile, parseBookActions } from '@shared/ai/scopes'
-import { boardView, findStoryLine, isStoryLine, parseBoard, renameChapterInBody } from '@shared/storyline'
+import { boardView, findStoryLine, headingName, isStoryLine, parseBoard, renameChapterInBody } from '@shared/storyline'
 import { invoke, on } from '@/lib/api'
 import { saver } from './saver'
 import { chapterWord } from '@shared/export/model'
@@ -283,6 +283,21 @@ export const useBook = create<BookState>((set, get) => {
       if (story && clean !== ch.title) {
         const body = renameChapterInBody(story.body, id, chapters, get().chapters)
         if (body !== story.body) get().updateEntry(story.id, { body })
+        // A story line proposal that the author decided in part keeps its two lines: they follow too.
+        const now = get().chapters
+        for (const th of get().threads) {
+          if (!th.messages.some((m) => m.lineAfter !== undefined)) continue
+          const messages = th.messages.map((m) =>
+            m.lineAfter === undefined
+              ? m
+              : {
+                  ...m,
+                  lineAfter: renameChapterInBody(m.lineAfter, id, chapters, now),
+                  ...(m.lineBefore !== undefined ? { lineBefore: renameChapterInBody(m.lineBefore, id, chapters, now) } : {})
+                }
+          )
+          get().saveThread({ ...th, messages })
+        }
       }
     },
 
@@ -293,7 +308,8 @@ export const useBook = create<BookState>((set, get) => {
       // A new last chapter takes the title of the first planned chapter of the story line: its column
       // becomes the column of the chapter, with its cards.
       const story = idx === chapters.length && !title ? findStoryLine(get().entries) : null
-      const planned = story ? boardView(parseBoard(story.body), 'chapter', chapters).find((c) => c.kind === 'planned')?.title.trim() : undefined
+      const heading = story ? boardView(parseBoard(story.body), 'chapter', chapters).find((c) => c.kind === 'planned')?.title : undefined
+      const planned = heading ? headingName(heading) : undefined
       const t = title ?? (planned || chapterWord(get().manifest?.language ?? 'en', chapters.length + 1))
       const file = uniqueName(fileNameFromTitle(t), chapters.map((c) => c.file))
       const ch: Chapter = { id: newId('ch'), file, title: t, body, meta: {} }
@@ -446,7 +462,9 @@ export const useBook = create<BookState>((set, get) => {
         const to = rest.find((c) => c.id === 'plot') ?? rest.find((c) => c.id === 'notes') ?? rest[0]
         await get().moveEntry(story.id, to.folder)
       }
-      for (const e of get().entries.filter((x) => x.category === cat.folder)) await get().deleteEntry(e.id)
+      // Notes in folders under the category go too: else they would stay on disk, out of sight.
+      const inside = (x: Entry): boolean => x.category === cat.folder || x.category.startsWith(`${cat.folder}/`)
+      for (const e of get().entries.filter(inside)) await get().deleteEntry(e.id)
       const now = get().manifest!
       get().updateManifest({ planning: { ...now.planning, categories: now.planning.categories.filter((c) => c.id !== id) } })
       if (get().activeCategory === cat.folder) get().selectCategory(null)
@@ -460,7 +478,7 @@ export const useBook = create<BookState>((set, get) => {
       if (!e || !root || e.category === category) return
       const inCat = entries.filter((x) => x.category === category).map((x) => x.file.slice(category.length + 1))
       const fileName = uniqueName(`${e.name}.md`, inCat)
-      const next = { ...e, category, file: `${category}/${fileName}` }
+      const next = { ...e, category, file: `${category}/${fileName}`, name: fileName.replace(/\.md$/, '') }
       const oldRel = entryRel(e)
       set({ entries: get().entries.map((x) => (x.id === id ? next : x)) })
       saver.cancel(root, oldRel)

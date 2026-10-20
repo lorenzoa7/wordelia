@@ -13,8 +13,11 @@ import {
   isStoryLine,
   mentionPieces,
   moveColumn,
+  applyOrder,
+  cascadeRejects,
+  impliedChanges,
+  liveChanges,
   parseBoard,
-  pendingChanges,
   placeCard,
   renameChapterInBody,
   renameColumn,
@@ -22,6 +25,7 @@ import {
   serializeBoard,
   updateCard,
   type Board,
+  type BoardChange,
   type ReviewColumn
 } from './storyline'
 import type { Entry } from './types'
@@ -345,7 +349,8 @@ describe('changes of a proposal', () => {
 })
 
 describe('reviewView', () => {
-  const cols = (cur: Board, after: Board, view: 'chapter' | 'order', skip: string[] = []) => reviewView(cur, after, view, chapters, new Set(skip))
+  const cols = (cur: Board, after: Board, view: 'chapter' | 'order', skip: string[] = []) =>
+    reviewView(cur, after, view, chapters, liveChanges(cur, after, boardChanges(cur, after, chapters).filter((c) => !skip.includes(c.id)), chapters))
   const slots = (c: ReviewColumn | undefined): string[][] => (c?.slots ?? []).map((s) => [s.card.id, s.tone])
 
   it('shows a move as a red card in the old column and a green card in the new one', () => {
@@ -394,10 +399,88 @@ describe('reviewView', () => {
     expect(view.map((c) => c.key)).toEqual(['tray', 'k4', 'k5', 'k6'])
   })
 
-  it('counts the changes that wait for a decision', () => {
+  it('counts the changes that the line still needs', () => {
     const after = placeCard(updateCard(parseBoard(BODY), 'c2', 'tea'), 'order', 'c1', 'k4', 0, chapters)
-    expect(pendingChanges(parseBoard(BODY), after, chapters, new Set()).length).toBe(3)
-    expect(pendingChanges(parseBoard(BODY), after, chapters, new Set(['text:c2'])).length).toBe(2)
+    const all = boardChanges(parseBoard(BODY), after, chapters)
+    expect(liveChanges(parseBoard(BODY), after, all, chapters).length).toBe(3)
+    // The text is the same now: that change is done.
+    expect(liveChanges(updateCard(parseBoard(BODY), 'c2', 'tea'), after, all, chapters).map((c) => c.id)).toEqual(['place:order:c1:k4', 'unplace:order:c1:k5'])
+  })
+})
+
+describe('a proposal and the decisions of the author', () => {
+  /** The changes that the line still needs, after some decisions. */
+  const left = (cur: Board, after: Board, all: BoardChange[], decided: string[]): string[] =>
+    liveChanges(
+      cur,
+      after,
+      all.filter((c) => !decided.includes(c.id)),
+      chapters
+    ).map((c) => c.id)
+
+  it('"Apply all" after a rejection keeps every move: the new place first, the removal after it', () => {
+    const before = parseBoard(BODY)
+    const after = placeCard(updateCard(parseBoard(BODY), 'c2', 'tea'), 'order', 'c1', 'k4', 0, chapters)
+    const all = boardChanges(before, after, chapters)
+    let cur = before
+    for (const c of applyOrder(liveChanges(cur, after, all.filter((x) => x.id !== 'text:c2'), chapters))) {
+      if (liveChanges(cur, after, [c], chapters).length) cur = applyBoardChange(cur, c, after, chapters)
+    }
+    expect(ids(cur, 'order', 'k4')).toEqual(['c1', 'c3'])
+    expect(ids(cur, 'order', 'tray')).toEqual(['c5'])
+    expect(cur.cards.find((c) => c.id === 'c2')?.text).toBe('@Marta climbs the stairs with coffee.')
+  })
+
+  it('a new place ends the old place in the same view', () => {
+    const after = placeCard(parseBoard(BODY), 'chapter', 'c3', 'ch:ch1', 0, chapters)
+    const all = boardChanges(parseBoard(BODY), after, chapters)
+    const place = all.find((c) => c.kind === 'place')!
+    expect(impliedChanges(place, all)).toEqual(['unplace:chapter:c3:ch:ch1'])
+  })
+
+  it('a rejected reorder does not come back as another card', () => {
+    const after = parseBoard(BODY.replace('^c1 ^c2 ^c3', '^c3 ^c2 ^c1'))
+    const before = parseBoard(BODY)
+    const all = boardChanges(before, after, chapters)
+    const moved = [...new Set(all.map((c) => c.cardId))]
+    expect(moved.length).toBe(2)
+    const [rejected, applied] = moved
+    const place = all.find((c) => c.kind === 'place' && c.cardId === applied)!
+    const cur = applyBoardChange(before, place, after, chapters)
+    const decided = [...all.filter((c) => c.cardId === rejected).map((c) => c.id), place.id, ...impliedChanges(place, all)]
+    expect(left(cur, after, all, decided)).toEqual([])
+  })
+
+  it('a rejected new column takes the new places in it', () => {
+    let after = addColumn(parseBoard(BODY), 'order', 'Dawn').board
+    after = placeCard(after, 'order', 'c5', 'k6', 0, chapters)
+    const all = boardChanges(parseBoard(BODY), after, chapters)
+    expect(cascadeRejects(all.find((c) => c.kind === 'column-add')!, all)).toEqual(['place:order:c5:k6'])
+  })
+
+  it('a card that the author makes after the first decision is not a change of the proposal', () => {
+    const before = parseBoard(BODY)
+    const after = placeCard(parseBoard(BODY), 'order', 'c1', 'k4', 0, chapters)
+    const all = boardChanges(before, after, chapters)
+    const cur = addCard(before, 'order', 'k5', 'my card', chapters).board
+    expect(left(cur, after, all, [])).toEqual(['place:order:c1:k4', 'unplace:order:c1:k5'])
+  })
+
+  it('a new card of the proposal does not take a card of the author with its id', () => {
+    const before = parseBoard(BODY)
+    const after = addCard(parseBoard(BODY), 'order', 'k4', 'the AI card', chapters).board
+    const all = boardChanges(before, after, chapters)
+    // The author makes c6 too, before the decision.
+    let cur = addCard(before, 'order', 'k5', 'my card', chapters).board
+    cur = applyBoardChange(cur, all.find((c) => c.kind === 'place')!, after, chapters)
+    expect(cur.cards.map((c) => c.text)).toContain('my card')
+    expect(cur.cards.map((c) => c.text)).toContain('the AI card')
+    expect(ids(cur, 'order', 'k5')).toContain('c6')
+  })
+
+  it('new ids of a proposal keep away from the ids of the line now', () => {
+    const b = parseBoard('# Cards\n- a new card', ['c1', 'c5'])
+    expect(b.cards[0].id).toBe('c6')
   })
 })
 
@@ -453,7 +536,7 @@ describe('fixes from the review', () => {
 
   it('shows a deleted card of the tray', () => {
     const after = deleteCard(parseBoard(BODY), 'c5')
-    const tray = reviewView(parseBoard(BODY), after, 'order', chapters, new Set()).find((c) => c.key === 'tray')
+    const tray = reviewView(parseBoard(BODY), after, 'order', chapters, boardChanges(parseBoard(BODY), after, chapters)).find((c) => c.key === 'tray')
     expect(tray?.slots.map((c) => [c.card.id, c.tone, c.changes])).toEqual([['c5', 'remove', ['delete:c5']]])
   })
 

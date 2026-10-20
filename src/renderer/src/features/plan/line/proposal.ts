@@ -11,7 +11,7 @@ import { PLANNING_DIR, entryToFile } from '@shared/book'
 import { readFrontmatter } from '@shared/markdown/frontmatter'
 import { applyHunk } from '@shared/proposals/apply'
 import { hunkKey, parseProposals, type Segment } from '@shared/proposals/parse'
-import { STORY_LINE_TYPE, applyBoardChange, findStoryLine, isStoryLine, parseBoard, pendingChanges, type Board, type BoardChange } from '@shared/storyline'
+import { STORY_LINE_TYPE, applyBoardChange, applyOrder, boardChanges, cascadeRejects, findStoryLine, impliedChanges, isStoryLine, liveChanges, parseBoard, type Board, type BoardChange } from '@shared/storyline'
 import type { ChatMessage, HunkState, Thread } from '@shared/types'
 import { getT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
@@ -49,12 +49,28 @@ export interface LineProposal {
   keys: string[]
   /** The body now ('' when the book has no story line) */
   before: string
+  /** The line from which the changes go: kept in the message at the first decision, else the line now */
+  base: string
   /** The proposed body; null when an edit does not fit the line any more */
   after: string | null
-  /** The changes that the author rejected */
-  rejected: Set<string>
-  /** The changes that wait for a decision */
+  /** The proposal was decided in part: its two lines are kept in the message */
+  kept: boolean
+  /** All the changes of the proposal (between `base` and `after`) */
+  all: BoardChange[]
+  /** The decisions of the author, by change id */
+  decided: Record<string, HunkState>
+  /** The changes that wait for a decision and that the line still needs */
   changes: BoardChange[]
+}
+
+/** The ids of a body: a new id of a proposal keeps away from them. */
+function idsIn(body: string): string[] {
+  return [...body.matchAll(/\^([A-Za-z0-9_-]+)/g)].map((m) => m[1])
+}
+
+/** The proposed board, parsed: its new ids keep away from the ids of the line it changes. */
+export function proposedBoard(p: Pick<LineProposal, 'after' | 'base' | 'before'>): Board {
+  return parseBoard(p.after ?? '', [...idsIn(p.base), ...idsIn(p.before)])
 }
 
 /** The proposals of one message for the story line that wait for a decision, or null. */
@@ -65,8 +81,10 @@ export function messageLineProposal(thread: Thread, message: ChatMessage, body: 
     .filter((s): s is LineSegment => isLineSegment(s))
     .filter((s) => pendingOf(s, states).length)
   if (!segments.length) return null
-  let after: string | null = message.lineAfter ?? body ?? ''
-  if (message.lineAfter === undefined) {
+  const kept = message.lineAfter !== undefined
+  const base = kept ? (message.lineBefore ?? body ?? '') : (body ?? '')
+  let after: string | null = kept ? message.lineAfter! : base
+  if (!kept) {
     for (const s of segments) {
       if (after === null) break
       if (s.kind === 'create') {
@@ -80,18 +98,24 @@ export function messageLineProposal(thread: Thread, message: ChatMessage, body: 
       }
     }
   }
-  const rejected = new Set(Object.entries(states).flatMap(([k, v]) => (k.startsWith(LINE) && v === 'rejected' ? [k.slice(LINE.length)] : [])))
+  const decided = Object.fromEntries(Object.entries(states).flatMap(([k, v]) => (k.startsWith(LINE) ? [[k.slice(LINE.length), v]] : [])))
   const chapters = useBook.getState().chapters
+  const p = { before: body ?? '', base, after }
+  const next = proposedBoard(p)
+  // The changes are the changes between the two kept lines: a later change of the line (a card of the
+  // author, another proposal, a new chapter title) is not a change of this proposal.
+  const all = after === null ? [] : boardChanges(parseBoard(base), next, chapters)
   return {
     id: `${thread.id}:${message.id}`,
     thread,
     message,
     segments,
     keys: segments.flatMap((s) => pendingOf(s, states)),
-    before: body ?? '',
-    after,
-    rejected,
-    changes: after === null ? [] : pendingChanges(parseBoard(body ?? ''), parseBoard(after), chapters, rejected)
+    ...p,
+    kept,
+    all,
+    decided,
+    changes: after === null ? [] : liveChanges(parseBoard(body ?? ''), next, all.filter((c) => !decided[c.id]), chapters)
   }
 }
 
@@ -138,8 +162,8 @@ export function useLineWriting(): boolean {
 /* Decisions                                                            */
 /* ------------------------------------------------------------------ */
 
-/** Change the message of a proposal in its thread: decisions, and the kept proposed line. */
-function updateMessage(p: LineProposal, hunks: Record<string, HunkState | undefined>, lineAfter?: string): void {
+/** Change the message of a proposal in its thread: decisions, and the two kept lines. */
+function updateMessage(p: LineProposal, hunks: Record<string, HunkState | undefined>, keep = false): void {
   const latest = useBook.getState().threads.find((x) => x.id === p.thread.id)
   // The thread was deleted meanwhile: do not bring it back.
   if (!latest) return
@@ -150,7 +174,8 @@ function updateMessage(p: LineProposal, hunks: Record<string, HunkState | undefi
       if (v) next[k] = v
       else delete next[k]
     }
-    return { ...m, hunks: next, ...(lineAfter !== undefined && m.lineAfter === undefined ? { lineAfter } : {}) }
+    const lines = keep && m.lineAfter === undefined && p.after !== null ? { lineBefore: p.base, lineAfter: p.after } : {}
+    return { ...m, hunks: next, ...lines }
   })
   useBook.getState().saveThread({ ...latest, messages })
 }
@@ -160,66 +185,74 @@ function boardNow(): Board {
   return parseBoard(findStoryLine(useBook.getState().entries)?.body ?? '')
 }
 
+/** The changes of a proposal that wait, after these decisions, on the line now. */
+function waiting(p: LineProposal, decided: Record<string, HunkState>): BoardChange[] {
+  if (p.after === null) return []
+  return liveChanges(boardNow(), proposedBoard(p), p.all.filter((c) => !decided[c.id]), useBook.getState().chapters)
+}
+
 /** When no change waits any more, the proposal is decided: accepted when the author applied a change of it. */
 function finishWhenDone(p: LineProposal, decided: Record<string, HunkState>): void {
-  if (p.after === null) return
-  const rejected = new Set([...p.rejected, ...Object.entries(decided).flatMap(([k, v]) => (v === 'rejected' ? [k.slice(LINE.length)] : []))])
-  const left = pendingChanges(boardNow(), parseBoard(p.after), useBook.getState().chapters, rejected)
-  if (left.length) return
-  const states = { ...(p.message.hunks ?? {}), ...decided }
-  const any = Object.entries(states).some(([k, v]) => k.startsWith(LINE) && v === 'accepted')
+  if (waiting(p, decided).length) return
+  const any = Object.values(decided).some((v) => v === 'accepted')
   updateMessage(p, Object.fromEntries(p.keys.map((k) => [k, any ? 'accepted' : 'rejected'])))
 }
 
-/** Apply some changes of a proposal (one card on the board, or all of them). */
-export function applyLineChanges(p: LineProposal, ids: string[]): void {
-  if (p.after === null) return
-  const after = parseBoard(p.after)
+/** Apply changes to the line now, in order. A change that the line does not need any more is left out. */
+function applyEach(p: LineProposal, changes: BoardChange[]): string[] {
+  const after = proposedBoard(p)
   const chapters = useBook.getState().chapters
   let board = boardNow()
-  for (const id of ids) {
-    // Find the change again on the board now: an earlier change can have done it already.
-    const change = pendingChanges(board, after, chapters, p.rejected).find((c) => c.id === id)
-    if (change) board = applyBoardChange(board, change, after, chapters)
+  const done: string[] = []
+  for (const c of applyOrder(changes)) {
+    if (!liveChanges(board, after, [c], chapters).length) continue
+    board = applyBoardChange(board, c, after, chapters)
+    done.push(c.id, ...impliedChanges(c, p.all))
   }
   saveBoard(board)
-  const decided = Object.fromEntries(ids.map((id) => [LINE + id, 'accepted' as const]))
-  updateMessage(p, decided, p.after)
+  return done
+}
+
+/** Apply some changes of a proposal (one card or one column on the board). */
+export function applyLineChanges(p: LineProposal, ids: string[]): void {
+  if (p.after === null) return
+  const done = applyEach(
+    p,
+    p.all.filter((c) => ids.includes(c.id))
+  )
+  const decided = { ...p.decided, ...Object.fromEntries([...ids, ...done].map((id) => [id, 'accepted' as const])) }
+  updateMessage(p, Object.fromEntries([...ids, ...done].map((id) => [LINE + id, 'accepted' as const])), true)
   finishWhenDone(p, decided)
 }
 
-/** Reject some changes of a proposal. */
+/** Reject some changes of a proposal. A rejected new column takes the new places in it. */
 export function rejectLineChanges(p: LineProposal, ids: string[]): void {
-  const decided = Object.fromEntries(ids.map((id) => [LINE + id, 'rejected' as const]))
-  updateMessage(p, decided, p.after ?? undefined)
+  const all = [...ids, ...p.all.filter((c) => ids.includes(c.id)).flatMap((c) => cascadeRejects(c, p.all))]
+  const decided = { ...p.decided, ...Object.fromEntries(all.map((id) => [id, 'rejected' as const])) }
+  updateMessage(p, Object.fromEntries(all.map((id) => [LINE + id, 'rejected' as const])), true)
   finishWhenDone(p, decided)
 }
 
 /**
- * Accept all the changes that wait (on the board, in the chat). With no rejected change, the line
- * becomes the proposed line, in the canonical form; else the changes are applied one by one.
- * An Undo toast puts the line back.
+ * Accept all the changes that wait (on the board, in the chat). Before any decision, the line
+ * becomes the proposed line. After a decision, the changes that wait are applied one by one: the
+ * proposed line never takes the place of a line that changed since. An Undo toast puts the line back.
  */
 export async function acceptLineProposal(p: LineProposal): Promise<void> {
   const t = getT()
   const book = useBook.getState()
   const story = findStoryLine(book.entries)
-  if (p.after === null || (story ? story.body !== p.before : p.before !== '')) {
+  if (p.after === null || (story ? story.body : '') !== p.before) {
     toast(t.plan.line.reviewStale, { kind: 'error' })
     return
   }
   const snap = story ? snapshotOf(`${PLANNING_DIR}/${story.file}`) : null
   const previous = story ? entryToFile(story) : null
   const ids = p.changes.map((c) => c.id)
-  if (!p.rejected.size) saveBoard(parseBoard(p.after))
-  else {
-    const after = parseBoard(p.after)
-    let board = boardNow()
-    for (const c of p.changes) board = applyBoardChange(board, c, after, book.chapters)
-    saveBoard(board)
-  }
-  const decided: Record<string, HunkState> = { ...Object.fromEntries(ids.map((id) => [LINE + id, 'accepted' as const])), ...Object.fromEntries(p.keys.map((k) => [k, 'accepted' as const])) }
-  updateMessage(p, decided, p.after)
+  let done = ids
+  if (!p.kept) saveBoard(proposedBoard(p))
+  else done = [...ids, ...applyEach(p, p.changes)]
+  updateMessage(p, { ...Object.fromEntries(done.map((id) => [LINE + id, 'accepted' as const])), ...Object.fromEntries(p.keys.map((k) => [k, 'accepted' as const])) })
   // A rewind of the thread puts back the file that a <create> replaced.
   if (previous) {
     const latest = useBook.getState().threads.find((x) => x.id === p.thread.id)
@@ -233,7 +266,7 @@ export async function acceptLineProposal(p: LineProposal): Promise<void> {
   }
   markAfter(snap)
   const back = (): void => {
-    updateMessage(p, { ...Object.fromEntries(ids.map((id) => [LINE + id, undefined])), ...Object.fromEntries(p.keys.map((k) => [k, 'pending' as const])) })
+    updateMessage(p, { ...Object.fromEntries(done.map((id) => [LINE + id, undefined])), ...Object.fromEntries(p.keys.map((k) => [k, 'pending' as const])) })
   }
   toast(story ? t.plan.line.accepted : t.plan.line.created, {
     ms: 8000,
@@ -256,13 +289,12 @@ export async function acceptLineProposal(p: LineProposal): Promise<void> {
   })
 }
 
-/** Reject all the changes that wait. */
+/** Reject all the changes that wait. A proposal with an applied change stays accepted (in part). */
 export function rejectLineProposal(p: LineProposal): void {
-  const decided = Object.fromEntries(p.changes.map((c) => [LINE + c.id, 'rejected' as const]))
-  // A proposal with an applied change stays accepted (in part).
-  const any = Object.entries(p.message.hunks ?? {}).some(([k, v]) => k.startsWith(LINE) && v === 'accepted')
+  const rejected = Object.fromEntries(p.changes.map((c) => [LINE + c.id, 'rejected' as const]))
+  const any = Object.values(p.decided).some((v) => v === 'accepted')
   const state: HunkState = any ? 'accepted' : 'rejected'
-  updateMessage(p, { ...decided, ...Object.fromEntries(p.keys.map((k) => [k, state])) }, p.after ?? undefined)
+  updateMessage(p, { ...rejected, ...Object.fromEntries(p.keys.map((k) => [k, state])) }, true)
 }
 
 /** The state of the story line proposal of a message, for its chat card. */

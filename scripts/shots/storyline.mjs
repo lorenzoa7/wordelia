@@ -152,9 +152,19 @@ export default async function ({ page, shot, openBook }) {
   if (await page.locator('.line-slot.is-add').count()) fail('the rejected card still shows')
   if (!(await page.locator('.line-slot.is-remove').count())) fail('the other change went away with the rejected one')
   await shot('review-half')
-  await page.locator('.line-slot.is-remove .line-decide-btn.is-apply').click()
+  // The line changes by another way meanwhile (for example another proposal): a new card. It is not
+  // a change of this proposal, and "Apply all" keeps it.
+  await page.evaluate(() => {
+    const s = window.__wordelia.book.getState()
+    const line = s.entries.find((e) => e.meta?.type === 'story-line')
+    s.updateEntry(line.id, { body: line.body.replace('# Cards\n', '# Cards\n- ^c99 Um cartão do autor.\n') })
+  })
+  await page.waitForTimeout(300)
+  if (await page.locator('.line-slot.is-remove', { hasText: 'Um cartão do autor' }).count()) fail('the card of the author shows as a change of the proposal')
+  await page.locator('.line-bar.is-review .btn-primary').click()
   await page.waitForTimeout(500)
   if (await page.locator('.line-board.is-review').count()) fail('the board still shows the proposal')
+  if (!(await story()).body.includes('Um cartão do autor.')) fail('"Apply all" deleted a card that the proposal does not have')
   // The mock moves the last card of the last moment with cards: "Um estranho…" (c5).
   if (!second.every((s) => s.text.startsWith('Um estranho'))) fail(`the second move shows ${JSON.stringify(second)}`)
   if ((await momentOf('c5')) !== null) fail(`the card is still in ${await momentOf('c5')}`)

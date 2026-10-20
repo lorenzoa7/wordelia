@@ -88,7 +88,7 @@ export function chapterOf(link: string, chapters: ChapterRef[]): string | null {
 }
 
 /** A heading of "By chapter" without `[[ ]]` and without a number in front ("3. ", "3 · "). */
-function headingName(title: string): string {
+export function headingName(title: string): string {
   return title
     .replace(/^\[\[(.*)\]\]$/, '$1')
     .replace(/^\d+\s*[.·:)\-–—]\s*/, '')
@@ -179,7 +179,11 @@ function readDef(raw: string, legacy: boolean): { id: string | null; text: strin
   return id ? { id: id[1], text: oneLine(rest.slice(id[0].length)), links } : { id: null, text: oneLine(rest), links }
 }
 
-export function parseBoard(body: string): Board {
+/**
+ * `taken`: ids that new ids must not have, besides the ids of the body (for a proposal: the ids of
+ * the line now, so a new card of the AI never gets the id of a card that it deleted).
+ */
+export function parseBoard(body: string, taken: Iterable<string> = []): Board {
   const lines = body.split(/\r?\n/)
   // The old format has no sections: its "## " headings are moments.
   let section: Section = 'order'
@@ -226,7 +230,7 @@ export function parseBoard(body: string): Board {
   }
 
   // Ids: every id of the body is taken, so a new id never meets an old one.
-  const used = [...body.matchAll(/\^([A-Za-z0-9_-]+)/g)].map((m) => m[1])
+  const used = [...[...body.matchAll(/\^([A-Za-z0-9_-]+)/g)].map((m) => m[1]), ...taken]
   const cardId = idMaker(used, 'c')
   const columnId = idMaker(used, 'k')
   const cards: LineCard[] = []
@@ -704,18 +708,78 @@ export function boardChanges(cur: Board, after: Board, chapters: ChapterRef[]): 
   return out.filter((c) => !seen.has(c.id) && Boolean(seen.add(c.id)))
 }
 
-/** The changes that wait for a decision: all changes but the rejected ones. */
-export function pendingChanges(cur: Board, after: Board, chapters: ChapterRef[], rejected: Set<string>): BoardChange[] {
-  return boardChanges(cur, after, chapters).filter((c) => !rejected.has(c.id))
+/**
+ * Of the changes of a proposal, the ones that the line now still needs. A card that left its column
+ * by another way, a column that is there already, a text that is the same: done. A new place is
+ * done only by a decision of the author.
+ */
+export function liveChanges(cur: Board, after: Board, changes: BoardChange[], chapters: ChapterRef[]): BoardChange[] {
+  const now = new Map(cur.cards.map((c) => [c.id, c]))
+  const next = new Map(after.cards.map((c) => [c.id, c]))
+  const places = { chapter: placesOf(cur, 'chapter', chapters), order: placesOf(cur, 'order', chapters) }
+  const views = { chapter: matchView(cur, after, 'chapter', chapters), order: matchView(cur, after, 'order', chapters) }
+  return changes.filter((c) => {
+    const view = c.view ?? 'chapter'
+    switch (c.kind) {
+      case 'card-text': {
+        const a = c.cardId ? now.get(c.cardId) : undefined
+        const b = c.afterCardId ? next.get(c.afterCardId) : undefined
+        return Boolean(a && b && a.text !== b.text)
+      }
+      case 'card-delete':
+        return Boolean(c.cardId && now.has(c.cardId))
+      case 'card-add':
+        return !cur.cards.some((x) => x.id === c.afterCardId && x.text === next.get(c.afterCardId!)?.text)
+      case 'unplace':
+        return Boolean(c.cardId && places[view].get(c.cardId)?.key === c.column)
+      case 'place':
+        return true
+      case 'column-add':
+        return !views[view].cols.has(c.column!)
+      case 'column-delete':
+      case 'column-move':
+        return views[view].now.some((x) => x.key === c.column)
+      case 'column-rename': {
+        const m = views[view]
+        const col = m.now.find((x) => x.key === c.column)
+        const key = [...m.cols.entries()].find(([, k]) => k === c.column)?.[0]
+        const title = m.next.find((x) => x.key === key)?.title
+        return Boolean(col && title !== undefined && col.title !== title)
+      }
+    }
+  })
 }
 
-/** The card of the proposal in the board now; a new card is made (with its id, when it is free). */
-function ensureCard(cur: Board, afterCardId: string, after: Board): { board: Board; id: string } | null {
-  const id = matchCards(cur, after).get(afterCardId)
-  if (id) return { board: cur, id }
+/** The changes that a decision on a change also makes: a new place in a view ends the old place there. */
+export function impliedChanges(change: BoardChange, all: BoardChange[]): string[] {
+  if (change.kind !== 'place') return []
+  return all.filter((c) => c.kind === 'unplace' && c.view === change.view && c.cardId !== undefined && c.cardId === change.cardId).map((c) => c.id)
+}
+
+/** The changes that go with a rejected change: the cards of a new column that the author rejected. */
+export function cascadeRejects(change: BoardChange, all: BoardChange[]): string[] {
+  if (change.kind !== 'column-add') return []
+  return all.filter((c) => c.kind === 'place' && c.view === change.view && c.column === change.column).map((c) => c.id)
+}
+
+const APPLY_ORDER: ChangeKind[] = ['column-add', 'column-rename', 'column-move', 'place', 'card-add', 'card-text', 'unplace', 'card-delete', 'column-delete']
+
+/** The changes in the order in which "Apply all" applies them: columns first, the places, then the removals. */
+export function applyOrder(changes: BoardChange[]): BoardChange[] {
+  return [...changes].sort((a, b) => APPLY_ORDER.indexOf(a.kind) - APPLY_ORDER.indexOf(b.kind))
+}
+
+/**
+ * The card of a change in the board now. A card that was there for the proposal keeps its id. A
+ * new card of the proposal is the card with its id and its text, when the author applied it before;
+ * else it is made (with its id, when that id is free).
+ */
+function ensureCard(cur: Board, afterCardId: string, after: Board, existing?: string): { board: Board; id: string } | null {
+  if (existing && cur.cards.some((c) => c.id === existing)) return { board: cur, id: existing }
   const card = after.cards.find((c) => c.id === afterCardId)
   if (!card) return null
-  const fresh = cur.cards.some((c) => c.id === afterCardId) ? idMaker(allIds(cur), 'c')() : afterCardId
+  if (!existing && cur.cards.some((c) => c.id === afterCardId && c.text === card.text)) return { board: cur, id: afterCardId }
+  const fresh = allIds(cur).includes(afterCardId) ? idMaker(allIds(cur), 'c')() : afterCardId
   return { board: { ...cur, cards: [...cur.cards, { id: fresh, text: card.text }] }, id: fresh }
 }
 
@@ -794,7 +858,7 @@ export function applyBoardChange(cur: Board, change: BoardChange, after: Board, 
     }
     case 'place': {
       if (!change.afterCardId || !change.column) return cur
-      const card = ensureCard(cur, change.afterCardId, after)
+      const card = ensureCard(cur, change.afterCardId, after, change.cardId)
       if (!card) return cur
       const col = ensureColumn(card.board, view, change.column, after, chapters)
       if (!col) return cur
@@ -841,15 +905,13 @@ export interface ReviewColumn extends Omit<ViewColumn, 'cards'> {
  * A view of the board now with the changes that wait for a decision: red where a card or a column
  * goes away, green where one comes, a new text on its card.
  */
-export function reviewView(cur: Board, after: Board, view: LineView, chapters: ChapterRef[], rejected: Set<string>): ReviewColumn[] {
-  const changes = pendingChanges(cur, after, chapters, rejected)
+export function reviewView(cur: Board, after: Board, view: LineView, chapters: ChapterRef[], changes: BoardChange[]): ReviewColumn[] {
   const m = matchView(cur, after, view, chapters)
   const ids = matchCards(cur, after)
   const nowText = new Map(cur.cards.map((c) => [c.id, c.text]))
   const nextCards = new Map(after.cards.map((c) => [c.id, c]))
   const mine = changes.filter((c) => !c.view || c.view === view)
   const ghosts = new Set(mine.filter((c) => c.kind === 'place').map((c) => c.afterCardId))
-  const textOf = (afterCardId: string | undefined): BoardChange | undefined => changes.find((c) => c.kind === 'card-text' && c.afterCardId === afterCardId)
 
   const out: ReviewColumn[] = m.now.map((col) => {
     const slots: ReviewSlot[] = col.cards.map((card) => {
@@ -857,9 +919,10 @@ export function reviewView(cur: Board, after: Board, view: LineView, chapters: C
       if (gone) return { card, tone: 'remove', changes: [gone.id] }
       const leaves = mine.find((c) => c.kind === 'unplace' && c.cardId === card.id && c.column === col.key)
       if (leaves) return { card, tone: 'remove', changes: [leaves.id] }
-      const after = [...ids.entries()].find(([, id]) => id === card.id)?.[0]
-      const text = after && !ghosts.has(after) ? textOf(after) : undefined
-      if (text) return { card: { id: card.id, text: nextCards.get(after!)!.text }, tone: 'add', changes: [text.id], before: card.text }
+      // A new text shows on the card, or on its new place when it moves.
+      const text = changes.find((c) => c.kind === 'card-text' && c.cardId === card.id)
+      const next = text?.afterCardId ? nextCards.get(text.afterCardId) : undefined
+      if (text && next && !ghosts.has(text.afterCardId)) return { card: { id: card.id, text: next.text }, tone: 'add', changes: [text.id], before: card.text }
       return { card, tone: 'same', changes: [] }
     })
     const own = mine.filter((c) => c.column === col.key && c.kind.startsWith('column-'))
@@ -891,8 +954,8 @@ export function reviewView(cur: Board, after: Board, view: LineView, chapters: C
     col.cards.forEach((card, i) => {
       const place = mine.find((c) => c.kind === 'place' && c.afterCardId === card.id && c.column === col.key)
       if (!place) return
-      const id = ids.get(card.id)
-      const text = id ? textOf(card.id) : undefined
+      const id = place.cardId
+      const text = id ? changes.find((c) => c.kind === 'card-text' && c.cardId === id) : undefined
       const slot: ReviewSlot = { card, tone: 'add', changes: [place.id, ...(text ? [text.id] : [])], ...(text && id ? { before: nowText.get(id) } : {}) }
       const anchor = anchorBefore(col.cards, i, (x) => {
         const k = target.slots.findIndex((s) => s.tone !== 'remove' && (s.card.id === x.id || s.card.id === ids.get(x.id)))

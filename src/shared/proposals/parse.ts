@@ -133,6 +133,25 @@ export function proposalSummary(text: string, states?: Record<string, HunkState>
     .join('')
 }
 
+/**
+ * The prose of a reply: its text without the proposals and without words about them. Copy and
+ * "Insert at cursor" use it, so no proposal marker goes into the book.
+ */
+export function replyProse(text: string): string {
+  return parseProposals(text)
+    .filter((s): s is Extract<Segment, { kind: 'text' }> => s.kind === 'text')
+    .map((s) => s.text)
+    .join('')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+/** True when a reply has at least one proposal. */
+export function hasProposals(text: string): boolean {
+  return parseProposals(text).some((s) => s.kind !== 'text')
+}
+
 /** Stable key for a hunk inside a message, for accept/reject state. */
 export function hunkKey(segmentIndex: number, hunkIndex: number): string {
   return `${segmentIndex}:${hunkIndex}`

@@ -12,7 +12,7 @@ export const chat = {
   pin: 'Pin',
   unpin: 'Unpin',
   deleteTitle: (title: string): string => `Delete “${title}”?`,
-  deleteMessage: 'The messages of this thread will be deleted. Other threads keep their own digests.',
+  deleteMessage: 'The thread goes to the trash of the book, and Undo can bring it back. Other threads keep their own digests.',
   deleteThread: 'Delete thread',
   purpose: 'Purpose',
   searchThreads: 'Search threads',
@@ -93,7 +93,7 @@ export const chat = {
   copyFailed: 'Could not copy.',
   openChapterFirst: 'Open a chapter first.',
   copyReply: 'Copy the reply',
-  insertHint: 'Put this reply into the open chapter, where the cursor is. Ctrl+Z undoes it.',
+  insertHint: 'Put the text of this reply into the open chapter, as new paragraphs after the cursor. Ctrl+Z undoes it.',
   insert: 'Insert at cursor',
   /** aria-label while the AI works */
   thinking: 'The editor is thinking',
@@ -181,5 +181,49 @@ export const chat = {
 
   // Sending
   connectFirst: 'Connect an AI first.',
-  openSettings: 'Open settings'
+  openSettings: 'Open settings',
+
+  // A reply that the author stopped, or that the AI did not finish
+  changeIncomplete: 'The reply stopped before this change was complete, so it cannot be applied.',
+  incompleteNote: 'The reply stopped before this note was complete, so it cannot be created.',
+  /** The mark under a reply that the author stopped */
+  stoppedMark: 'Stopped',
+  stoppedHint: 'You stopped this reply. Its text ends here.',
+  /** While a long book gets the summaries of its chapters */
+  summarizing: (done: number, total: number): string => `Summarizing chapters: ${done} of ${total}…`,
+  /** A reply with changes arrives while the author types: the app does not move the author */
+  changesReady: 'Changes ready',
+  show: 'Show',
+  /** Undo toasts after a rejection */
+  rejectedCount: (v: number): string => (v === 1 ? 'Rejected 1 proposal.' : `Rejected ${v} proposals.`),
+  /** The proposals of the earlier replies of a thread that wait */
+  dismissOld: (v: number): string => `Dismiss old proposals (${v})`,
+  dismissOldHint: 'Reject the proposals of the earlier replies that you did not decide.',
+  replacedByNewer: 'A newer proposal changes the same text.',
+  /** The thread list: a new thread that has no messages yet */
+  notStarted: 'No messages yet',
+  threadDeleted: (title: string): string => `Moved “${title}” to the trash of the book.`,
+  newThreadRemoved: 'Removed the new thread.',
+  /** A change that was not found */
+  tryAgain: 'Try again',
+  lookedFor: 'The text it looks for',
+  /** A change with no text to find adds its text at the end of the chapter */
+  atEnd: 'At the end of the chapter',
+  /** A change of punctuation or spaces only: no words added or removed */
+  smallChange: 'Small change',
+  /** A new text for a note that exists */
+  replaceTakesOut: (parts: string): string => `This replaces the whole note. It takes out ${parts}.`,
+  lostAliases: (names: string): string => `the other names ${names}`,
+  lostFields: (names: string): string => `the fields ${names}`,
+  lostSections: (names: string): string => `the sections ${names}`,
+  noteSummary: 'Summary',
+  noteAliases: 'Other names',
+  noteChanged: 'What changes in the note',
+  /** Tokens and cost of a reply, and of a thread */
+  usage: (input: string, output: string, cost: string | null): string =>
+    [`${input} tokens in`, `${output} out`, ...(cost ? [`about ${cost}`] : [])].join(' · '),
+  usageOfThread: 'Use of this thread',
+  usageReplies: (v: number): string => (v === 1 ? 'in 1 reply' : `in ${v} replies`),
+  /** A provider error that the settings can fix */
+  fixInSettings: 'Open Settings → AI'
 }

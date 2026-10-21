@@ -332,6 +332,12 @@ export interface ChatMessage {
   replaced?: Record<string, string>
   model?: string
   error?: string
+  /** What kind of error the reply had, so the chat can offer the right button (for example Open settings) */
+  errorKind?: CompletionResult['errorKind']
+  /** The author stopped the reply: the text is cut. Its proposals that are not complete cannot be applied. */
+  stopped?: boolean
+  /** The tokens of the reply, and its cost when the provider tells it */
+  usage?: CompletionResult['usage']
 }
 
 export interface Thread {

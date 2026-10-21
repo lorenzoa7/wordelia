@@ -40,10 +40,8 @@ function earlierLines(earlier: EditorComment[]): string[] {
       '',
       'Open comments from the earlier reads of this chapter. The author has not decided about them yet, and they are still in the margin: do not write them again.',
       ...open.map((c) => `${c.id} [${c.lens}] "${oneLine(c.passage, 160)}" — ${oneLine(c.text, 400)}`),
-      `If the new text fixed some of these comments, end your reply with <resolved ids="${open
-        .slice(0, 2)
-        .map((c) => c.id)
-        .join(' ')}"/>. Write the ids of the comments that look fixed, and no other id. The app asks the author before it closes a comment.`
+      // The example has neutral ids: a real id there would push the AI toward that comment.
+      'If the new text fixed some of these comments, end your reply with a tag that lists their ids, for example <resolved ids="cm_1 cm_2"/>. Write the ids of the comments that look fixed, taken from the list above, and no other id. The app asks the author before it closes a comment.'
     )
   }
   if (decided.length) {

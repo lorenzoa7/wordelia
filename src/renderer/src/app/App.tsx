@@ -18,6 +18,7 @@ import { Welcome } from '@/features/onboarding/Welcome'
 import { getActiveEditor } from '@/features/editor/registry'
 import { runAction } from '@/features/actions/runAction'
 import { findAction } from '@/features/actions/allActions'
+import { startRead } from '@/features/read/start'
 import { useComments } from '@/features/read/store'
 import { TitleBar } from './TitleBar'
 import { Toasts } from './Toasts'
@@ -60,6 +61,7 @@ export function App(): React.JSX.Element {
         book: useBook,
         app: useApp,
         comments: useComments,
+        startRead,
         editor: () => getActiveEditor()?.editor,
         runAction: (id: string) => {
           const a = findAction(id)

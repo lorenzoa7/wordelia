@@ -3,6 +3,7 @@
 
 import { newId, THREADS_DIR } from '@shared/book'
 import { buildChatSystem, buildChatUserTurn, chatHistory } from '@shared/prompts/chat'
+import { buildReadTurn } from '@shared/prompts/read'
 import type { ChatMessage, CompletionResult, Mention, ModelChoice, Thread } from '@shared/types'
 import { messagesFor, type Messages } from '@shared/i18n'
 import { describeError, runCompletion } from '@/lib/ai'
@@ -12,6 +13,7 @@ import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
 import { toast, useUi } from '@/stores/ui'
 import { flushEditor } from '@/features/editor/registry'
+import { useComments } from '@/features/read/store'
 import { NEW_THREAD_TITLE, patchStreaming, useChat } from './chatStore'
 import { afterReply } from './digest'
 import { portraitImages } from './portraits'
@@ -63,6 +65,13 @@ function connectFirst(): void {
   toast(t.chat.connectFirst, { action: { label: t.chat.openSettings, run: () => useUi.getState().openSettings('ai') } })
 }
 
+/** True when the thread has a model for its reply. Without one, the app says how to connect, and this is false. */
+export function ensureRoute(thread: Thread): boolean {
+  if (chatRoute(thread)) return true
+  connectFirst()
+  return false
+}
+
 /** Send the text of the composer, with its quotes, mentions and images, in the active thread. */
 export async function sendMessage(text: string): Promise<void> {
   const chat = useChat.getState()
@@ -94,6 +103,28 @@ export async function sendMessage(text: string): Promise<void> {
   if (!saved) useChat.getState().setActiveThread(thread.id)
   useChat.getState().clearComposer()
   await requestReply(thread.id)
+}
+
+/**
+ * Send a message of the author in a thread that the app picks, for example the thread of the reads of a
+ * chapter. The text does not come from the composer, so the draft of the author stays as it is. `extra`
+ * adds fields to the message (`read`). The thread is in the book, or it is the new thread that shows
+ * (`useChat.blank`): the first message saves it. Nothing happens while the thread has a reply in progress.
+ */
+export async function sendInThread(threadId: string, text: string, extra: Partial<ChatMessage> = {}): Promise<void> {
+  const chat = useChat.getState()
+  const book = useBook.getState()
+  if (!book.manifest) return
+  const saved = book.threads.find((t) => t.id === threadId)
+  const thread = saved ?? (chat.blank?.id === threadId ? chat.blank : undefined)
+  if (!thread || chat.streaming[threadId]) return
+  if (!ensureRoute(thread)) return
+
+  const now = new Date().toISOString()
+  const userMsg: ChatMessage = { ...extra, id: newId('m'), role: 'user', content: text.trim(), createdAt: now }
+  book.saveThread({ ...thread, messages: [...thread.messages, userMsg], updatedAt: now, ...(saved ? {} : { createdAt: now }) }, true)
+  if (!saved) useChat.getState().setActiveThread(thread.id)
+  await requestReply(threadId)
 }
 
 /** The tokens and the cost of a reply: from the result, else from the last `usage` event. */
@@ -150,6 +181,10 @@ export async function requestReply(threadId: string): Promise<void> {
   const mentions = last.mentions ?? []
   const images = last.images ?? []
   const message = last.content
+  // A read: the chapter of the read is the open chapter of this reply, whatever chapter the author has open now.
+  const read = last.read
+  const readChapter = read ? fresh.chapters.find((c) => c.id === read.chapterId) : undefined
+  const focusId = readChapter ? readChapter.id : fresh.activeChapterId
   const assistantId = newId('m')
   const t = getT()
 
@@ -174,7 +209,7 @@ export async function requestReply(threadId: string): Promise<void> {
   // Long books: summaries of the chapters that do not fit.
   const budget = budgetFor(route)
   const keepFull = new Set<string>()
-  const idx = fresh.chapters.findIndex((c) => c.id === fresh.activeChapterId)
+  const idx = fresh.chapters.findIndex((c) => c.id === focusId)
   for (const i of [idx - 1, idx, idx + 1]) if (fresh.chapters[i]) keepFull.add(fresh.chapters[i].id)
   for (const m of mentions) if (m.kind === 'chapter') keepFull.add(m.id)
   const settingsNow = useApp.getState().settings
@@ -190,7 +225,7 @@ export async function requestReply(threadId: string): Promise<void> {
   const system = buildChatSystem({
     book: { manifest: fresh.manifest!, writingRules: fresh.writingRules, chapters: fresh.chapters, entries: fresh.entries, threads: fresh.threads },
     thread,
-    currentChapterId: fresh.activeChapterId,
+    currentChapterId: focusId,
     currentEntryId: fresh.view === 'plan' ? fresh.activeEntryId : null,
     mentions,
     quotes,
@@ -213,9 +248,14 @@ export async function requestReply(threadId: string): Promise<void> {
     : []
   if (stop.signal.aborted) return
   const asked = message || (images.length ? 'Here is an image.' : 'What do you think about this passage?')
+  // The read block holds the earlier comments of this chapter only.
+  const content =
+    read && readChapter
+      ? buildReadTurn(asked, read, readChapter, idx, useComments.getState().list.filter((c) => c.chapterId === readChapter.id))
+      : buildChatUserTurn(asked, quotes, mentions, fresh.threads, fresh.chapters, images)
   const turn = {
     role: 'user' as const,
-    content: buildChatUserTurn(asked, quotes, mentions, fresh.threads, fresh.chapters, images),
+    content,
     ...(images.length ? { images } : {}),
     ...(portraits.length ? { portraits } : {})
   }

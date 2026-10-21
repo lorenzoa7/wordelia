@@ -128,7 +128,11 @@ describe('the read block', () => {
     // A line break inside a passage becomes a space: one comment is one line.
     expect(open).toContain('cm_open0002 [structure] "O vento entrava pelas frestas." — The scene has no goal.')
     expect(open).not.toContain('cm_done0001')
-    expect(open).toContain('<resolved ids="cm_open0001 cm_open0002"/>')
+    // The example of the tag has neutral ids. A real id in the example would bias the AI toward that comment.
+    expect(open).toContain('<resolved ids="cm_1 cm_2"/>')
+    expect(open.match(/<resolved[^>]*>/g)).toEqual(['<resolved ids="cm_1 cm_2"/>'])
+    expect(t.split('cm_open0001')).toHaveLength(2)
+    expect(t.split('cm_open0002')).toHaveLength(2)
     const decided = t.slice(t.indexOf('Do not repeat these'))
     expect(decided).toContain('[reader] "Marta subiu." — Who is Marta? (done)')
     expect(decided).toContain('[proofread] "um bote" — Check "bote". (ignored)')

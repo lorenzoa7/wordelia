@@ -22,8 +22,9 @@ import { toast } from '@/stores/ui'
 import { describeError } from '@/lib/ai'
 import { getActiveEditor } from '@/features/editor/registry'
 import { sliceFromMarkdown } from '@/features/editor/review'
-import type { ChatMessage, Thread } from '@shared/types'
+import type { ChatMessage, ReadRequest, Thread } from '@shared/types'
 import { ProposalCard } from './ProposalCard'
+import { ReadHead, ReadOfferCard } from '@/features/read/ReadOfferCard'
 import { acceptPending, pendingKeys, resolveTarget, segmentKeys, setHunkStates } from './applyProposal'
 import { acceptLineProposal, isLineSegment, messageLineProposal } from '@/features/plan/line/proposal'
 import { findStoryLine } from '@shared/storyline'
@@ -254,15 +255,18 @@ function ReplyError({ message }: { message: ChatMessage }): React.JSX.Element {
   )
 }
 
-function AssistantMessage({ message, thread, after, canAct }: Props): React.JSX.Element {
+function AssistantMessage({ message, thread, index, after, canAct }: Props): React.JSX.Element {
   const t = useT()
   const segments = useMemo(() => parseProposals(message.content), [message.content])
+  // The reply to a read has a card above its letter. The comments are in the margin, not in the chat.
+  const read = thread.messages[index - 1]?.role === 'user' ? thread.messages[index - 1].read : undefined
   const thought = useChat((s) => s.thoughts[message.id])
   // A reply that stopped or failed can end in the middle of a mark ("**bold"): close it.
   const cut = Boolean(message.stopped || message.error)
   return (
     <div className="msg msg-ai">
       {thought && <ThinkingLine thinking={thought} phase={{ kind: 'text' }} />}
+      {read && <ReadHead read={read} threadId={thread.id} messageId={message.id} />}
       {segments.map((s, i) =>
         s.kind === 'text' ? (
           <div key={i} className="msg-ai-text prose">
@@ -270,6 +274,8 @@ function AssistantMessage({ message, thread, after, canAct }: Props): React.JSX.
           </div>
         ) : isFileSegment(s) ? (
           <ProposalCard key={i} segment={s} message={message} thread={thread} />
+        ) : s.kind === 'read' ? (
+          <ReadOfferCard key={i} segment={s} />
         ) : null
       )}
       {message.stopped && (
@@ -406,12 +412,17 @@ function usageLabel(t: ReturnType<typeof useT>, u: NonNullable<ChatMessage['usag
   return t.chat.usage(t.common.number(u.inputTokens ?? 0), t.common.number(u.outputTokens ?? 0), typeof u.costUsd === 'number' ? formatCost(u.costUsd, t.common.locale) : null)
 }
 
+/** True when a reply has comments of a read, an offer of a read, or the ids of comments that look fixed. */
+function hasReadParts(content: string): boolean {
+  return parseProposals(content).some((s) => s.kind === 'note' || s.kind === 'read' || s.kind === 'resolved')
+}
+
 function MessageActions({ message, threadId, canRetry }: { message: ChatMessage; threadId: string; canRetry: boolean }): React.JSX.Element | null {
   const t = useT()
   // Copy and Insert take the prose of the reply: never the proposals, never the words about them.
   const text = message.content.trim() ? replyProse(message.content) : ''
-  // A reply with proposals is about changes: its text is not for the book.
-  const canInsert = Boolean(text) && !hasProposals(message.content)
+  // A reply with proposals is about changes, and the letter of a read is about the chapter: their text is not for the book.
+  const canInsert = Boolean(text) && !hasProposals(message.content) && !hasReadParts(message.content)
   if (!text && !canRetry && !message.model && !message.usage) return null
   const insert = (): void => {
     if (!insertParagraphs(text)) toast(t.chat.openChapterFirst)
@@ -501,7 +512,8 @@ function ThinkingLine({ thinking, status, phase }: { thinking?: string; status?:
   )
 }
 
-export function StreamingMessage({ streaming }: { streaming: Streaming }): React.JSX.Element {
+/** `read` is the request of the read that this reply answers (in the thread `threadId`), when it answers one. */
+export function StreamingMessage({ streaming, read, threadId }: { streaming: Streaming; read?: ReadRequest; threadId?: string }): React.JSX.Element {
   const segments = useMemo(() => parseProposals(streaming.text), [streaming.text])
   const phase = streamPhase(segments)
   const writing = phase.kind === 'edit' || phase.kind === 'create'
@@ -509,6 +521,7 @@ export function StreamingMessage({ streaming }: { streaming: Streaming }): React
     <div className="msg msg-ai is-streaming">
       {/* The thinking stays at the top. What the reply writes now shows at its end, where the text grows. */}
       <ThinkingLine thinking={streaming.thinking} status={streaming.status} phase={writing ? { kind: 'text' } : phase} />
+      {read && threadId && <ReadHead read={read} threadId={threadId} messageId={streaming.messageId} />}
       {segments.map((s, i) =>
         s.kind === 'text' ? (
           <div key={i} className="msg-ai-text prose">

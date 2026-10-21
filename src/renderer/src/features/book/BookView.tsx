@@ -14,6 +14,7 @@ import { PlanSidebar } from '@/features/plan/PlanSidebar'
 import { ExportDialog } from '@/features/export/ExportDialog'
 import { useActionShortcuts } from '@/features/actions/useActionShortcuts'
 import { useInlineProposalSync } from '@/features/editor/inlineProposals'
+import { useReadSync } from '@/features/read/useReadSync'
 import { HistoryDialog } from '@/features/history/HistoryDialog'
 import { startAutoSnapshots } from '@/features/history/snapshots'
 import { SidePanel } from './SidePanel'
@@ -68,6 +69,8 @@ export function BookView(): React.JSX.Element {
   useActionShortcuts()
   // Chat proposals in the text of chapters (Write) and notes (Plan)
   useInlineProposalSync()
+  // The comments of the editor's reads, from the replies in the chat
+  useReadSync()
 
   return (
     <div className="book">

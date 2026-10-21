@@ -1,0 +1,210 @@
+/* The editor's read: the popover of the toolbar, and the cards in the chat. */
+
+/* ---------- The popover of the toolbar (ReadPopover.tsx) ---------- */
+.read-pop {
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  width: 316px;
+  max-width: calc(100vw - var(--s-6));
+  padding: var(--s-3);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  box-shadow: var(--shadow-pop);
+  animation: pop-in var(--dur-med) var(--ease-out);
+}
+.read-pop-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  color: var(--ribbon);
+}
+.read-pop-head svg {
+  flex: none;
+  translate: 0 var(--icon-lift);
+}
+.read-pop-chapter {
+  overflow: hidden;
+  margin-top: calc(var(--s-1) * -1);
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.read-pop-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Two choices side by side (the chapter or the selection) */
+.read-seg {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--desk-2);
+  box-shadow: var(--shadow-inset);
+}
+.read-seg-btn {
+  min-width: 0;
+  height: 28px;
+  padding: 0 var(--s-2);
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.read-seg-btn:hover {
+  background: var(--desk-3);
+  color: var(--ink);
+}
+.read-seg-btn[data-state='checked'],
+.read-seg-btn[data-state='checked']:hover {
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 14%, transparent);
+}
+
+/* The lenses: one chip for each, they wrap in the width of the popover */
+.read-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.read-chip {
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--ink-2);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  white-space: nowrap;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.read-chip:hover {
+  border-color: var(--ink-4);
+  color: var(--ink);
+}
+.read-chip[data-state='checked'],
+.read-chip[data-state='checked']:hover {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.read-pop-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding-top: var(--s-3);
+  border-top: 1px dashed var(--rule-soft);
+}
+.read-pop-switch-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.read-pop-switch-title {
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+.read-pop-switch-hint {
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+.read-pop-run {
+  width: 100%;
+}
+.read-pop-note {
+  margin: calc(var(--s-1) * -1) 0 0;
+  color: var(--ink-4);
+  font-size: var(--text-2xs);
+  line-height: 1.4;
+  text-align: center;
+}
+
+/* ---------- The cards in the chat (ReadOfferCard.tsx) ---------- */
+.read-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 var(--s-3);
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+}
+.read-card-icon {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: var(--ribbon-wash);
+  color: var(--ribbon);
+}
+.read-card-icon svg {
+  translate: 0 var(--icon-lift);
+}
+.read-card-text {
+  flex: 1;
+  min-width: 0;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+/* The offer comes after the sentence of the AI */
+.read-offer {
+  margin: var(--s-3) 0 0;
+}
+.read-offer-run {
+  gap: 6px;
+}
+.read-head-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.read-head-title {
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+.read-head-place {
+  overflow: hidden;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.read-head-count {
+  flex: none;
+  color: var(--ink-3);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

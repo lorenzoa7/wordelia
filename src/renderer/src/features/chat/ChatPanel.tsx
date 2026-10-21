@@ -218,7 +218,7 @@ export function ChatPanel(): React.JSX.Element {
                 {thread.messages.map((m, i) => (
                   <MessageView key={m.id} message={m} thread={thread} index={i} after={thread.messages.length - 1 - i} canAct={canAct} />
                 ))}
-                {streaming && <StreamingMessage streaming={streaming} />}
+                {streaming && <StreamingMessage streaming={streaming} read={thread.messages[thread.messages.length - 1]?.read} threadId={thread.id} />}
               </div>
             )}
           </div>

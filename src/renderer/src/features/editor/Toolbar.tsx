@@ -21,6 +21,7 @@ import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
 import { useUi } from '@/stores/ui'
 import { useT } from '@/lib/i18n'
+import { ReadPopover } from '@/features/read/ReadPopover'
 import { ZoomControl } from './ZoomControl'
 
 const ALIGN_ICONS = {
@@ -163,6 +164,7 @@ export function Toolbar({ editor }: { editor: Editor }): React.JSX.Element {
         <IconButton label={tb.focusMode} active={ui?.focusMode} onClick={() => setUi({ focusMode: !ui?.focusMode })}>
           <CrosshairSimple size={17} />
         </IconButton>
+        <ReadPopover />
         <span className="toolbar-sep" />
         <ZoomControl />
       </div>

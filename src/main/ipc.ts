@@ -218,7 +218,10 @@ export function registerIpc(): void {
   handle('ai:models', (_e, provider) => providerModels(provider))
   handle('ai:complete', (e, requestId, req) => complete(e.sender, requestId, req))
   handle('ai:cancel', (_e, requestId) => cancel(requestId))
-  handle('ai:setKey', (_e, provider, key) => setSecret(provider, key))
+  handle('ai:setKey', async (_e, provider, key) => {
+    if (await setSecret(provider, key)) return { ok: true }
+    return { ok: false, error: (await mainT()).main.ai.noKeyStore }
+  })
   handle('ai:hasKey', async (_e, provider) => Boolean(await getSecret(provider)))
   handle('ai:openLogin', (_e, provider) => openLogin(provider))
   handle('ai:openUpdate', (_e, provider) => openLogin(provider, 'update'))

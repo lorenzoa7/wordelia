@@ -493,10 +493,13 @@
 .provider-row.is-ok .provider-line {
   color: var(--pen);
 }
-.provider-row.is-loggedOut .provider-dot,
-.provider-row.is-noKey .provider-dot,
-.provider-row.is-notInstalled .provider-dot {
+.provider-row.needs-you .provider-dot {
   background: var(--ribbon);
+}
+/* A newer version of the program: under the status line, so the status line keeps its words. */
+.provider-sub {
+  font-size: var(--text-2xs);
+  color: var(--ink-4);
 }
 .provider-more {
   display: inline-flex;
@@ -556,6 +559,25 @@
   color: var(--ink-4);
   overflow-wrap: anywhere;
 }
+.provider-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-4);
+  margin: 0;
+  font-size: var(--text-xs);
+}
+.provider-warn {
+  display: flex;
+  gap: 7px;
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.55;
+  color: var(--ribbon);
+}
+.provider-warn svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
 .provider-key {
   display: flex;
   gap: var(--s-2);
@@ -597,7 +619,7 @@
 }
 .route-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 104px 176px 150px;
+  grid-template-columns: minmax(0, 1fr) 156px 176px 150px;
   align-items: center;
   gap: var(--s-2);
   padding: 10px 0;

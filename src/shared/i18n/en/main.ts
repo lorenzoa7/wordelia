@@ -66,6 +66,8 @@ export const main = {
     openaiAddKey: 'Add an OpenAI API key in Settings.',
     requestFailed: 'The request failed.',
     /** A request to a provider that the writer turned off */
-    providerOff: (provider: string): string => `${provider} is off in Settings → AI.`
+    providerOff: (provider: string): string => `${provider} is off in Settings → AI.`,
+    /** Saving an API key without the key store of the system */
+    noKeyStore: 'This computer has no safe place for the key (the key store of the system is not available).'
   }
 }

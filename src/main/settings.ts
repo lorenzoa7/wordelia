@@ -91,6 +91,14 @@ function migrateRoutes(version: number | undefined, routes: ModelRoutes): ModelR
   return out
 }
 
+const listeners = new Set<(s: AppSettings) => void>()
+
+/** Call `fn` after each change of the settings (for example the updater, for "Download updates automatically"). */
+export function onSettingsChanged(fn: (s: AppSettings) => void): () => void {
+  listeners.add(fn)
+  return () => listeners.delete(fn)
+}
+
 export async function setSettings(patch: Partial<AppSettings>): Promise<AppSettings> {
   const current = await getSettings()
   const next: AppSettings = {
@@ -103,19 +111,22 @@ export async function setSettings(patch: Partial<AppSettings>): Promise<AppSetti
   }
   cache = next
   await atomicWrite(settingsFile(), JSON.stringify(next, null, 2))
+  for (const fn of listeners) fn(next)
   return next
 }
 
 type SecretStore = Partial<Record<ProviderId, string>>
 
-export async function setSecret(provider: ProviderId, value: string | null): Promise<void> {
+/** Save or remove (null) the API key of a provider. False: the system key store is not available, so the key is not saved. */
+export async function setSecret(provider: ProviderId, value: string | null): Promise<boolean> {
   const store = await readJson<SecretStore>(secretsFile(), {})
   if (value == null || value === '') delete store[provider]
   else {
-    if (!safeStorage.isEncryptionAvailable()) throw new Error('The system key store is not available.')
+    if (!safeStorage.isEncryptionAvailable()) return false
     store[provider] = safeStorage.encryptString(value).toString('base64')
   }
   await atomicWrite(secretsFile(), JSON.stringify(store))
+  return true
 }
 
 export async function getSecret(provider: ProviderId): Promise<string | null> {

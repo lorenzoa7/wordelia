@@ -143,10 +143,12 @@ export const settings = {
     /** How to connect each provider. Text in `backticks` shows as code. */
     help: {
       'claude-code':
-        'Uses your Claude Pro or Max plan. Install Claude Code, then run `claude auth login` in a terminal. Wordelia runs your own `claude` program; it never sees your password or tokens.',
-      codex: 'Uses your ChatGPT plan. Install the Codex CLI, then run `codex login` in a terminal. Wordelia runs your own `codex` program.',
-      anthropic: 'Pay per use with an API key from console.anthropic.com. The key is encrypted on this computer.',
-      openai: 'Pay per use with an API key from platform.openai.com. The key is encrypted on this computer.'
+        'Uses your Claude Pro or Max plan. Install Claude Code, then click “Log in…”. Wordelia runs your own `claude` program; it never sees your password.',
+      codex: 'Uses your ChatGPT plan. Install Codex, then click “Log in…”. Wordelia runs your own `codex` program.',
+      anthropic:
+        'Pay per use: Anthropic bills each request to your API account. A Claude Pro or Max plan does not pay for the API; to use your plan, use Claude Code. The key is encrypted on this computer.',
+      openai:
+        'Pay per use: OpenAI bills each request to your API account. A ChatGPT plan does not pay for the API; to use your plan, use Codex. The key is encrypted on this computer.'
     },
     /** The status line of a provider */
     connected: 'Connected',
@@ -155,22 +157,20 @@ export const settings = {
     expired: 'Login expired',
     off: 'Off',
     checking: 'Checking…',
-    updateAvailable: (version: string): string => `version ${version} is out`,
     /** The one button of a provider */
     logIn: 'Log in…',
     update: 'Update…',
-    install: 'Install…',
+    /** Opens the official install page of the program */
+    install: 'How to install',
     addKey: 'Add key',
     turnOn: 'Turn on',
     details: 'Details',
     checkAgain: 'Check again',
     use: (provider: string): string => `Use ${provider}`,
     providerConnected: (provider: string): string => `${provider} connected.`,
-    keyFailed: (detail: string): string => `The key did not work: ${detail}`,
     allTasksUse: (provider: string): string => `All tasks now use ${provider}.`,
     version: (version: string): string => `Version ${version}.`,
     newVersion: (version: string): string => `Version ${version} is out. New models often need the newest version.`,
-    updateCodex: 'Update Codex with the tool that installed it.',
     apiKey: 'API key',
     keyPlaceholderSaved: 'A key is saved. Paste a new one to replace it.',
     keyPlaceholder: 'Paste your API key',
@@ -186,14 +186,48 @@ export const settings = {
     effort: 'Effort',
     effortHelp: 'How long the model thinks. More effort gives better answers, but they are slower and use more of your plan.',
     connectFirst: 'Connect a provider above to choose models.',
-    cliDefault: 'CLI default',
+    /** The model choice of Codex that lets Codex choose */
+    cliDefault: 'Default model',
     providerAria: (task: string): string => `${task} provider`,
     modelAria: (task: string): string => `${task} model`,
     effortAria: (task: string): string => `${task} effort`,
     /** The "Default" effort choice: what happens when Wordelia sends no effort. `effort` is the name of the default level, if known. */
     defaultEffort: (effort: string | undefined, cli: boolean): string =>
-      effort ? `Default (${effort})` : cli ? 'Default (the CLI decides)' : 'Default (the model decides)',
-    noEffort: 'No effort setting'
+      effort ? `Default (${effort})` : cli ? 'Default (automatic)' : 'Default (the model decides)',
+    noEffort: 'No effort setting',
+    /** More status lines of a provider */
+    optional: 'Not installed (optional)',
+    notLoggedIn: 'Not logged in',
+    noKey: 'No key',
+    badKey: 'The key did not work',
+    noCredit: 'No credit left',
+    offline: 'Could not check now',
+    waitingLogin: 'Waiting for the login…',
+    waitingInstall: 'Waiting for the installation…',
+    waitingUpdate: 'Waiting for the update…',
+    /** Under the status line, when a newer version of the program is out */
+    newVersionShort: (version: string): string => `Version ${version} is out.`,
+    /** More buttons of a provider */
+    howToUpdate: 'How to update',
+    addCredit: 'Add credit',
+    getKey: 'Get a key',
+    removeKey: 'Remove key',
+    /** The accessible names of the buttons of a provider, for screen readers */
+    detailsAria: (provider: string): string => `${provider} details`,
+    actionAria: (action: string, provider: string): string => `${action}: ${provider}`,
+    /** The details of a program */
+    program: (path: string): string => `Program: ${path}`,
+    pathIgnored: 'Wordelia cannot use this path. Type the full path to the program file. Until then, Wordelia uses the program that it finds.',
+    /** Toasts */
+    connectedAll: (provider: string): string => `${provider} connected. All tasks use it now.`,
+    connectedSome: (provider: string, tasks: string): string => `${provider} connected. It now does: ${tasks}.`,
+    movedTo: (off: string, to: string): string => `${off} is off. The tasks use ${to} now.`,
+    noAiLeft: (off: string): string => `${off} is off. Connect an AI to use the chat and the actions.`,
+    keyRejected: (provider: string): string => `${provider} did not accept this key. Check that you copied all of it.`,
+    keyUnchecked: (provider: string): string => `Key saved. Wordelia could not reach ${provider} to check it.`,
+    keyRemoved: 'Key removed.',
+    keyNotSaved: (reason: string): string => `The key was not saved. ${reason}`,
+    nowOff: (provider: string): string => `${provider} is off.`
   },
   /** The Actions tab */
   actions: {

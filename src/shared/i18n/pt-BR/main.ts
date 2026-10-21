@@ -58,6 +58,7 @@ export const main: typeof en = {
     refusal: 'O modelo recusou este pedido.',
     openaiAddKey: 'Adicione uma chave da OpenAI API nas Configurações.',
     requestFailed: 'O pedido falhou.',
-    providerOff: (provider) => `O ${provider} está desligado em Configurações → IA.`
+    providerOff: (provider) => `O ${provider} está desligado em Configurações → IA.`,
+    noKeyStore: 'Este computador não tem um lugar seguro para a chave (o cofre de chaves do sistema não está disponível).'
   }
 }

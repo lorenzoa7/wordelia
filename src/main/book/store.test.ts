@@ -149,3 +149,57 @@ describe('the threads of a book', () => {
     expect(thread.messages.every((m) => !('read' in m))).toBe(true)
   })
 })
+
+describe('the comments of a book', () => {
+  const comment = {
+    id: 'cm_aaaaaaaa',
+    chapterId: 'ch_sample01',
+    lens: 'continuity',
+    rank: 1,
+    text: 'Elias não tem fósforos.',
+    passage: 'Elias acendeu o farol',
+    sources: [],
+    state: 'open',
+    threadId: 'th_read',
+    messageId: 'msg_read',
+    key: '1',
+    createdAt: '2026-10-21T10:00:00.000Z',
+    updatedAt: '2026-10-21T10:00:00.000Z'
+  }
+  const writeComments = async (text: string): Promise<void> => {
+    await mkdir(join(book, 'ai'), { recursive: true })
+    await writeFile(join(book, 'ai', 'comments.json'), text)
+  }
+
+  it('openBook reads ai/comments.json into the snapshot', async () => {
+    await writeComments(JSON.stringify({ version: 1, comments: [comment] }))
+    const snap = await openBook(book)
+    expect(snap.comments).toEqual([comment])
+    expect(snap.commentsVersion).toBe(1)
+  })
+
+  it('a book with no file, and a file that is bad, have no comments', async () => {
+    expect((await openBook(book)).comments).toEqual([])
+    await writeComments('{"version":1,"comments":[')
+    expect((await openBook(book)).comments).toEqual([])
+    await writeComments(JSON.stringify({ version: 1, comments: [{ ...comment, lens: 'plot' }, { id: 'x' }] }))
+    expect((await openBook(book)).comments).toEqual([])
+  })
+
+  it('a byte order mark is not damage, and the first of two comments with one id wins', async () => {
+    await writeComments('\uFEFF' + JSON.stringify({ version: 1, comments: [comment, { ...comment, text: 'Outro.' }] }))
+    expect((await openBook(book)).comments).toEqual([comment])
+  })
+
+  it('tells the version of a file that a newer Wordelia wrote', async () => {
+    await writeComments(JSON.stringify({ version: 2, comments: [comment] }))
+    const snap = await openBook(book)
+    expect(snap.comments).toEqual([comment])
+    expect(snap.commentsVersion).toBe(2)
+  })
+
+  it('does not write the file when it opens the book', async () => {
+    await openBook(book)
+    expect((await readdir(join(book, 'ai'))).includes('comments.json')).toBe(false)
+  })
+})

@@ -1,7 +1,7 @@
 // Domain types shared by the main process and the renderer.
 // Terms follow GLOSSARY.md.
 
-import type { LensChoice } from './comments'
+import type { EditorComment, LensChoice } from './comments'
 
 export type Id = string
 
@@ -139,6 +139,13 @@ export interface BookSnapshot {
   syncState: SyncState
   /** The actions of this book, from `ai/actions.json`. The app settings keep the actions for all books. */
   actions: AiAction[]
+  /** The comments of the editor's reads of this book, from `ai/comments.json`. A book without the file has none. */
+  comments?: EditorComment[]
+  /**
+   * The `version` of `ai/comments.json` (1 when the file is missing). A version newer than this Wordelia
+   * knows: the app shows the comments and never writes the file.
+   */
+  commentsVersion?: number
   /** What the writer must know about the files of the book when it opens */
   notices?: BookNotice[]
 }

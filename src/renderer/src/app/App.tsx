@@ -18,6 +18,7 @@ import { Welcome } from '@/features/onboarding/Welcome'
 import { getActiveEditor } from '@/features/editor/registry'
 import { runAction } from '@/features/actions/runAction'
 import { findAction } from '@/features/actions/allActions'
+import { useComments } from '@/features/read/store'
 import { TitleBar } from './TitleBar'
 import { Toasts } from './Toasts'
 import { useGlobalShortcuts } from './shortcuts'
@@ -58,6 +59,7 @@ export function App(): React.JSX.Element {
         openBook: async (path: string) => useBook.getState().open(await invoke('book:open', path)),
         book: useBook,
         app: useApp,
+        comments: useComments,
         editor: () => getActiveEditor()?.editor,
         runAction: (id: string) => {
           const a = findAction(id)

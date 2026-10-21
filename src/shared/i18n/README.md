@@ -6,7 +6,7 @@ The interface is in English (the default), Portuguese (Brazil) and Spanish. The 
 
 - `en/<namespace>.ts` holds the English texts. English is the source.
 - `pt-BR/<namespace>.ts` and `es/<namespace>.ts` hold the translations. Their type is `typeof en`, so TypeScript reports a missing or extra key.
-- Each namespace belongs to one part of the app: `common`, `app`, `library`, `editor`, `chat`, `plan`, `settings`, `exportDialog`, `write`, `history`, `onboarding`, `main` (main process).
+- Each namespace belongs to one part of the app: `common`, `app`, `library`, `editor`, `chat`, `plan`, `settings`, `exportDialog`, `write`, `history`, `onboarding`, `read` (the editor's read: comments in the margin), `main` (main process).
 
 ## Use
 

@@ -12,7 +12,8 @@ import { write } from './write'
 import { history } from './history'
 import { onboarding } from './onboarding'
 import { main } from './main'
+import { read } from './read'
 
-export const messages = { common, app, library, editor, chat, plan, settings, exportDialog, write, history, onboarding, main }
+export const messages = { common, app, library, editor, chat, plan, settings, exportDialog, write, history, onboarding, main, read }
 
 export type Messages = typeof messages

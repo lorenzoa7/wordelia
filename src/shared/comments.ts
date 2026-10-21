@@ -96,20 +96,49 @@ function parseComment(raw: unknown): EditorComment | null {
   }
 }
 
+/** The comments without the ones that repeat an id: the first comment of an id stays. */
+export function uniqueById(list: EditorComment[]): EditorComment[] {
+  const seen = new Set<string>()
+  return list.filter((c) => {
+    if (seen.has(c.id)) return false
+    seen.add(c.id)
+    return true
+  })
+}
+
+/** What the text of `ai/comments.json` holds. */
+export interface CommentsFile {
+  comments: EditorComment[]
+  /** The `version` of the file. A file with no version, and a missing file, are version 1. */
+  version: number
+  /** False when the text is not a comments file: a partial write of a sync client, or JSON of another shape. */
+  valid: boolean
+}
+
 /**
- * The comments in the text of `ai/comments.json`. The reader is tolerant: a missing file, text that is
- * not JSON and JSON of another shape give an empty list, and an item that is not a comment is dropped.
+ * The comments file in its text. The reader is tolerant: an item that is not a comment is dropped, the
+ * first of two comments with one id stays, and a byte order mark at the start (Notepad writes one) is
+ * not part of the JSON. A missing file (`null`) is a valid file with no comments.
  */
-export function parseCommentsFile(text: string | null): EditorComment[] {
-  if (text == null) return []
+export function readCommentsFile(text: string | null): CommentsFile {
+  if (text == null) return { comments: [], version: 1, valid: true }
   let raw: unknown
   try {
-    raw = JSON.parse(text)
+    raw = JSON.parse(text.replace(/^\uFEFF/, ''))
   } catch {
-    return []
+    return { comments: [], version: 1, valid: false }
   }
-  if (!isObject(raw) || !Array.isArray(raw.comments)) return []
-  return raw.comments.map(parseComment).filter((c): c is EditorComment => c !== null)
+  if (!isObject(raw) || !Array.isArray(raw.comments)) return { comments: [], version: 1, valid: false }
+  const version = typeof raw.version === 'number' && Number.isFinite(raw.version) ? raw.version : 1
+  return { comments: uniqueById(raw.comments.map(parseComment).filter((c): c is EditorComment => c !== null)), version, valid: true }
+}
+
+/**
+ * The comments in the text of `ai/comments.json`. A missing file, text that is not JSON and JSON of
+ * another shape give an empty list.
+ */
+export function parseCommentsFile(text: string | null): EditorComment[] {
+  return readCommentsFile(text).comments
 }
 
 /** The text of `ai/comments.json`: version 1, 2-space JSON, a line end at the end. */

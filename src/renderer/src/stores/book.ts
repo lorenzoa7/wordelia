@@ -3,6 +3,7 @@
 import { create } from 'zustand'
 import {
   ACTIONS_FILE,
+  COMMENTS_FILE,
   MANIFEST_FILE,
   MANUSCRIPT_DIR,
   PLANNING_DIR,
@@ -31,6 +32,7 @@ import { entryPath, inFolder, topFolder } from '@shared/planning/notes'
 import { runFlushers } from '@/lib/flush'
 import { getT } from '@/lib/i18n'
 import { openingPlace } from '@/features/write/place'
+import { commentsChangedOutside, loadComments, putBackComments, takeChapterComments } from '@/features/read/store'
 import { toast, useUi } from './ui'
 
 export type BookView = 'write' | 'plan'
@@ -217,6 +219,10 @@ export const useBook = create<BookState>((set, get) => {
       }
       return
     }
+    if (rel === COMMENTS_FILE) {
+      commentsChangedOutside(root, content)
+      return
+    }
     if (rel.startsWith(`${MANUSCRIPT_DIR}/`) && rel.endsWith('.md')) {
       const file = rel.slice(MANUSCRIPT_DIR.length + 1)
       const existing = st.chapters.find((c) => c.file === file)
@@ -292,6 +298,8 @@ export const useBook = create<BookState>((set, get) => {
       offExternal = on('book:externalChange', (e) => {
         if (e.root === get().root) handleExternal(e.rel, e.content)
       })
+      // The comments of the last book do not show in this one.
+      loadComments(snap.root, snap.comments ?? [], snap.commentsVersion)
       set({
         root: snap.root,
         manifest: snap.manifest,
@@ -330,6 +338,7 @@ export const useBook = create<BookState>((set, get) => {
       offExternal = null
       missingRefs = []
       useUi.getState().resetForBook()
+      loadComments(null, [])
       set({ root: null, manifest: null, chapters: [], entries: [], threads: [], actions: [], activeChapterId: null, activeEntryId: null })
       return true
     },
@@ -460,6 +469,8 @@ export const useBook = create<BookState>((set, get) => {
       // Move to a hidden trash folder instead of deleting: text is precious.
       const stamp = new Date().toISOString().replace(/[:.]/g, '-')
       const trash = `.wordelia/trash/${stamp} ${ch.file}`
+      // The comments of the chapter go to the trash with it.
+      const comments = takeChapterComments(id, `.wordelia/trash/${stamp} comments ${ch.file}.json`)
       await invoke('book:renameFile', root, chapterRel(ch), trash)
       get().updateManifest({ chapters: get().chapters.map((c) => ({ id: c.id, file: c.file })) })
       return async () => {
@@ -471,6 +482,7 @@ export const useBook = create<BookState>((set, get) => {
         const at = Math.min(idx, st.chapters.length)
         const list = [...st.chapters.slice(0, at), back, ...st.chapters.slice(at)]
         set({ chapters: list, activeChapterId: back.id, view: 'write', chapterJump: { id: back.id, n: (st.chapterJump?.n ?? 0) + 1 } })
+        putBackComments(comments)
         // The file of the trash comes back; the text in memory is the same.
         await invoke('book:renameFile', root, trash, chapterRel(back)).catch(() => saver.write(root, chapterRel(back), chapterToFile(back), true))
         if (file !== ch.file) saver.write(root, chapterRel(back), chapterToFile(back), true)

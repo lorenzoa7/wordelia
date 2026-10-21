@@ -6,6 +6,7 @@ import {
   isLens,
   openCount,
   parseCommentsFile,
+  readCommentsFile,
   serializeComments,
   type EditorComment
 } from './comments'
@@ -83,6 +84,40 @@ describe('parseCommentsFile', () => {
   it('reads a file with Windows line ends', () => {
     const list = [comment(), comment({ id: 'cm_bbbbbbbb', lens: 'proofread' })]
     expect(parseCommentsFile(serializeComments(list).replace(/\n/g, '\r\n'))).toEqual(list)
+  })
+})
+
+describe('the text of the file', () => {
+  it('a byte order mark at the start is not damage', () => {
+    const list = [comment()]
+    expect(parseCommentsFile('\uFEFF' + serializeComments(list))).toEqual(list)
+    expect(readCommentsFile('\uFEFF' + serializeComments(list)).valid).toBe(true)
+  })
+
+  it('when two comments have the same id, the first one wins', () => {
+    const first = comment({ text: 'First.' })
+    const second = comment({ text: 'Second.' })
+    const other = comment({ id: 'cm_bbbbbbbb' })
+    expect(parseCommentsFile(JSON.stringify({ version: 1, comments: [first, other, second] }))).toEqual([first, other])
+  })
+
+  it('tells the version of the file', () => {
+    expect(readCommentsFile(serializeComments([comment()])).version).toBe(1)
+    expect(readCommentsFile(JSON.stringify({ version: 2, comments: [comment()] }))).toMatchObject({ version: 2, valid: true, comments: [comment()] })
+    // No version, a missing file and a bad version are version 1.
+    expect(readCommentsFile(JSON.stringify({ comments: [] })).version).toBe(1)
+    expect(readCommentsFile(null).version).toBe(1)
+    expect(readCommentsFile(JSON.stringify({ version: 'two', comments: [] })).version).toBe(1)
+  })
+
+  it('tells a file with no comments from a text that is not a comments file', () => {
+    expect(readCommentsFile(null)).toEqual({ comments: [], version: 1, valid: true })
+    expect(readCommentsFile(serializeComments([]))).toEqual({ comments: [], version: 1, valid: true })
+    // A partial write of a sync client, and JSON of another shape.
+    expect(readCommentsFile(serializeComments([comment()]).slice(0, 80)).valid).toBe(false)
+    expect(readCommentsFile('').valid).toBe(false)
+    expect(readCommentsFile('{"version":1}').valid).toBe(false)
+    expect(readCommentsFile('42').valid).toBe(false)
   })
 })
 

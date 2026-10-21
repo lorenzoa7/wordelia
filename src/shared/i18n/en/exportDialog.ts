@@ -49,5 +49,7 @@ export const exportDialog = {
   txtNote: 'Formatting is removed.',
   exportedTo: (file: string): string => `Exported to ${file}`,
   show: 'Show',
-  exportFailed: (error: string): string => `Export failed: ${error}`
+  exportFailed: (error: string): string => `Export failed: ${error}`,
+  /** Under the presets: the book preset has the pages of the Write view */
+  sameAsScreen: 'The same pages as in the Write view: page size, margins and type.'
 }

@@ -15,7 +15,7 @@ import {
   type ISectionOptions
 } from 'docx'
 import { SCENE_BREAK_GLYPH } from '@shared/book'
-import { PAGE_SIZES, headingParts, type ExportBook } from '@shared/export/model'
+import { PAGE_SIZES, aboutWords, byAuthor, headingParts, type ExportBook } from '@shared/export/model'
 import type { DocMark, DocNode } from '@shared/types'
 
 const TWIPS_PER_MM = 56.6929
@@ -55,7 +55,7 @@ const ALIGN = {
   justify: AlignmentType.JUSTIFIED
 } as const
 
-function bodyParagraphs(nodes: DocNode[], glyph: string): Paragraph[] {
+function bodyParagraphs(nodes: DocNode[], glyph: string, indentFirst: boolean): Paragraph[] {
   const out: Paragraph[] = []
   let first = true
   const walk = (list: DocNode[], indentLevel = 0): void => {
@@ -65,8 +65,9 @@ function bodyParagraphs(nodes: DocNode[], glyph: string): Paragraph[] {
           const align = n.attrs?.textAlign as keyof typeof ALIGN | undefined
           out.push(
             new Paragraph({
-              style: first || n.attrs?.noIndent || (align && align !== 'justify' && align !== 'left') ? 'FirstParagraph' : 'Normal',
-              alignment: align && align !== 'justify' ? ALIGN[align] : undefined,
+              style: (first && !indentFirst) || n.attrs?.noIndent || align === 'center' || align === 'right' ? 'FirstParagraph' : 'Normal',
+              // A paragraph keeps its own alignment, also "left" in a justified book.
+              alignment: align ? ALIGN[align] : undefined,
               indent: indentLevel ? { left: 720 * indentLevel } : undefined,
               children: runs(n.content)
             })
@@ -130,10 +131,10 @@ export async function buildDocx(input: unknown): Promise<Buffer> {
     const children = manuscript
       ? [
           new Paragraph({ children: [new TextRun(book.author)] }),
-          new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun(`about ${(Math.round(book.words / 1000) * 1000 || book.words).toLocaleString('en-US')} words`)] }),
+          new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun(aboutWords(book.language, book.words))] }),
           new Paragraph({ spacing: { before: twips(70) }, alignment: AlignmentType.CENTER, children: [new TextRun(book.title.toUpperCase())] }),
           ...(book.subtitle ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun(book.subtitle)] })] : []),
-          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 240 }, children: [new TextRun(`by ${book.author}`)] })
+          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 240 }, children: [new TextRun(byAuthor(book.language, book.author))] })
         ]
       : [
           new Paragraph({ style: 'Title', spacing: { before: twips(size.h / 4) }, children: [new TextRun(book.title)] }),
@@ -169,25 +170,28 @@ export async function buildDocx(input: unknown): Promise<Buffer> {
         })
       )
     }
-    body.push(...bodyParagraphs(ch.blocks, glyph))
+    body.push(...bodyParagraphs(ch.blocks, glyph, Boolean(book.indentFirst)))
   })
 
   const surname = book.author.trim().split(/\s+/).pop() ?? ''
   const footer = s.pageNumbers && !manuscript
     ? { default: new Footer({ children: [new Paragraph({ style: 'Folio', children: [new TextRun({ children: [PageNumber.CURRENT] })] })] }) }
     : undefined
-  const header = s.runningHeader
+  // The manuscript header: "Surname / TITLE / 12" at the top right, or only the page number.
+  const manuscriptHeader = s.runningHeader
+    ? [`${surname} / ${book.title.toUpperCase()}${s.pageNumbers ? ' / ' : ''}`, ...(s.pageNumbers ? [PageNumber.CURRENT] : [])]
+    : s.pageNumbers
+      ? [PageNumber.CURRENT]
+      : null
+  const headerRuns = manuscript
+    ? manuscriptHeader && [new TextRun({ children: manuscriptHeader })]
+    : s.runningHeader
+      ? [new TextRun({ text: book.title, italics: true })]
+      : null
+  const header = headerRuns
     ? {
         default: new Header({
-          children: [
-            new Paragraph({
-              alignment: manuscript ? AlignmentType.RIGHT : AlignmentType.CENTER,
-              style: 'Folio',
-              children: manuscript
-                ? [new TextRun({ children: [`${surname} / ${book.title.toUpperCase()} / `, PageNumber.CURRENT] })]
-                : [new TextRun({ text: book.title, italics: true })]
-            })
-          ]
+          children: [new Paragraph({ alignment: manuscript ? AlignmentType.RIGHT : AlignmentType.CENTER, style: 'Folio', children: headerRuns })]
         })
       }
     : undefined
@@ -225,7 +229,8 @@ export async function buildDocx(input: unknown): Promise<Buffer> {
           paragraph: {
             alignment: t.align === 'justify' ? AlignmentType.JUSTIFIED : AlignmentType.LEFT,
             indent: { firstLine: indent },
-            spacing: { line, lineRule: LineRuleType.AUTO, before: 0, after: 0 }
+            // The space between paragraphs of the book typography: em to twips.
+            spacing: { line, lineRule: LineRuleType.AUTO, before: 0, after: Math.round((book.paragraphSpacing ?? 0) * t.fontSize * 20) }
           }
         },
         {

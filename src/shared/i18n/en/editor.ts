@@ -95,5 +95,19 @@ export const editor = {
     notFound: 'The text to change was not found in the chapter. It may have changed.',
     manyMatches: 'The text to change appears more than once in the chapter. Ask the AI for a longer passage.',
     noChapter: 'The chapter does not exist.'
-  }
+  },
+  /** aria-label of the text of a chapter */
+  chapterTextOf: (n: number, title: string): string => `Text of chapter ${n}: ${title}`,
+  /** aria-label of the font and size buttons of the toolbar, with their value */
+  fontIs: (font: string): string => `Font: ${font}`,
+  fontSizeIs: (size: number): string => `Font size: ${size}`,
+  /** Find and replace in all chapters */
+  replaceInAllChapters: 'Replace in all chapters…',
+  replaceInBookTitle: 'Replace in all chapters',
+  replaceInBookWhat: (find: string, replace: string): string => (replace ? `“${find}” becomes “${replace}” in these chapters:` : `“${find}” goes out of these chapters:`),
+  replaceInBookNone: (find: string): string => `No chapter has “${find}”.`,
+  replaceInBookButton: (n: number): string => (n === 1 ? 'Replace 1 time' : `Replace ${n} times`),
+  replaceCount: (n: number): string => (n === 1 ? '1 time' : `${n} times`),
+  replacedInBook: (n: number, chapters: number): string => `Replaced ${n === 1 ? '1 time' : `${n} times`} in ${chapters === 1 ? '1 chapter' : `${chapters} chapters`}.`,
+  replaceUndoPartly: (n: number): string => (n === 1 ? 'One chapter changed after the replace. It stays as it is.' : `${n} chapters changed after the replace. They stay as they are.`)
 }

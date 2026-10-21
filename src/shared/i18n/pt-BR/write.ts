@@ -4,8 +4,6 @@ const n = (v: number): string => v.toLocaleString('pt-BR')
 
 export const write: typeof en = {
   chapters: 'Capítulos',
-  newChapter: 'Novo capítulo',
-  addChapter: 'Adicionar capítulo',
   chapterTitle: 'Título do capítulo',
   chapterOptions: 'Opções do capítulo',
   /** Pages of a chapter in the chapter list */
@@ -21,8 +19,8 @@ export const write: typeof en = {
   versionHistoryMenu: 'Histórico de versões…',
   deleteChapter: 'Excluir capítulo',
   deleteTitle: (title) => `Excluir “${title}”?`,
-  deleteMessage: 'O arquivo vai para a pasta .wordelia/trash do livro. Você pode recuperá-lo de lá.',
-  deleted: (title) => `“${title}” foi para a pasta da lixeira.`,
+  deleteMessage: 'Você pode desfazer logo depois. O arquivo também fica na pasta do livro, em .wordelia/trash.',
+  deleted: (title) => `“${title}” foi excluído.`,
   status: {
     selected: 'selecionadas',
     wordsInChapter: 'palavras no capítulo',
@@ -47,5 +45,16 @@ export const write: typeof en = {
     readyIn: (action, chapter) => `A mudança de ${action} está pronta em “${chapter}”.`,
     show: 'Mostrar',
     changedMeanwhile: 'O trecho mudou enquanto a IA trabalhava. A mudança dela não foi mantida.'
-  }
+  },
+  newChapterAfterOne: (title) => `Novo capítulo depois de “${title}”`,
+  addChapterAtEnd: 'Novo capítulo no fim',
+  saveProblems: {
+    readOnly: 'O arquivo é somente leitura, ou o sistema não deixa o Wordelia alterá-lo.',
+    busy: 'Outro programa está usando o arquivo, por exemplo um app de sincronização.',
+    missing: 'A pasta do livro não está lá. Ela mudou de lugar, ou o disco dela não está conectado.',
+    diskFull: 'O disco está cheio.',
+    other: 'O Wordelia não consegue gravar o arquivo.'
+  },
+  notSavedToast: (reason) => `Suas últimas mudanças não foram salvas. ${reason} O Wordelia tenta de novo sozinho.`,
+  clickToRetry: 'Clique para tentar de novo.'
 }

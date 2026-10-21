@@ -35,7 +35,7 @@ const SCENARIOS = [
   { args: ['bookfolder'], areas: ['library', 'store'], s: 12 },
   { args: ['librarycards'], areas: ['library'], s: 10 },
   { args: ['welcome', '--fresh'], areas: ['library'], s: 8 },
-  { args: ['narrow'], areas: ['shell'], s: 14 },
+  { args: ['narrow'], areas: ['shell', 'editor'], s: 18 },
   { args: ['resize'], areas: ['shell'], s: 4 },
   { args: ['today'], areas: ['editor'], s: 4 },
   { args: ['keyboard'], areas: ['shell', 'actions'], s: 6 },

@@ -103,6 +103,19 @@
   flex: 1;
   min-height: 0;
 }
+/* The Write view stays under the Plan view, hidden, with its layout: the scroll, the pages and the
+   editors are there when the author comes back. */
+.book-pane-write {
+  transition: opacity var(--dur-med) var(--ease-out);
+}
+.book-pane-write.is-away {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity var(--dur-med) var(--ease-out),
+    visibility 0s linear var(--dur-med);
+}
 
 /* ---------- Sidebar ---------- */
 .sidebar {
@@ -275,6 +288,12 @@
     background-color var(--dur-fast) var(--ease-out),
     color var(--dur-fast) var(--ease-out);
 }
+.sidebar-add span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .sidebar-add svg {
   flex-shrink: 0;
   translate: 0 var(--icon-lift);
@@ -312,15 +331,38 @@
   color: var(--pen);
 }
 .save-state.is-error {
+  height: 22px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--ribbon-wash);
   color: var(--ribbon);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+.save-state.is-error:hover {
+  background: var(--ribbon-soft);
 }
 
-/* One line in every language: the counts shorten with an ellipsis, the right side keeps its size. */
+/* One line in every language. When the counts do not fit (StatusBar.tsx sets `data-tight`), the
+   parts that matter less go first: the reading time, then the words of the history button and
+   "Goal reached", then the words of the daily count, then the daily count. The counts of the
+   chapter and the book stay; an ellipsis is the last resort. */
 .status-left {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.status-part + .status-part::before {
+  content: '·';
+  margin: 0 0.5em;
+}
+.status-bar:is([data-tight='1'], [data-tight='2'], [data-tight='3'], [data-tight='4']) .status-read,
+.status-bar:is([data-tight='2'], [data-tight='3'], [data-tight='4']) :is(.status-btn-text, .today-done),
+.status-bar[data-tight='3'] .today-text,
+.status-bar[data-tight='4'] .today {
+  display: none;
 }
 .status-right {
   display: inline-flex;

@@ -4,17 +4,29 @@ import { useEditorState, type Editor } from '@tiptap/react'
 import { ArrowDown, ArrowUp, CaretRight, X } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { markdownToPlain } from '@shared/book'
+import { Button, Dialog } from '@/ui'
 import { useBook } from '@/stores/book'
-import { useUi } from '@/stores/ui'
-import { useT } from '@/lib/i18n'
+import { toast, useUi } from '@/stores/ui'
+import { getT, useT } from '@/lib/i18n'
 import { findKey } from './find'
 import { scrollToPos, setActiveEditor, whenChapterEditor } from './registry'
+import { matchesInBook, replaceInBook, type ChapterMatches } from './replaceBook'
 
 function countIn(text: string, q: string, cs: boolean, ww: boolean): number {
   if (!q) return 0
   const body = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const re = new RegExp(ww ? `(?<![\\p{L}\\p{N}])${body}(?![\\p{L}\\p{N}])` : body, cs ? 'gu' : 'giu')
   return text.match(re)?.length ?? 0
+}
+
+/** The plain text of each chapter, made again only when the text of the chapter changes. */
+const plainOf = new Map<string, { body: string; plain: string }>()
+function plainText(c: { id: string; body: string }): string {
+  const known = plainOf.get(c.id)
+  if (known && known.body === c.body) return known.plain
+  const plain = markdownToPlain(c.body)
+  plainOf.set(c.id, { body: c.body, plain })
+  return plain
 }
 
 export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
@@ -26,6 +38,8 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
   const [cs, setCs] = useState(false)
   const [ww, setWw] = useState(false)
   const input = useRef<HTMLInputElement>(null)
+  /** "Replace in all chapters": the chapters with matches, waiting for the confirm */
+  const [inBook, setInBook] = useState<ChapterMatches[] | null>(null)
   const chapters = useBook((s) => s.chapters)
   const activeId = useBook((s) => s.activeChapterId)
   const t = useT()
@@ -42,7 +56,8 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       const mod = e.ctrlKey || e.metaKey
-      if (mod && (e.key === 'f' || e.key === 'h')) {
+      // The Write view stays mounted under the Plan view: Ctrl+F works only while it shows.
+      if (mod && (e.key === 'f' || e.key === 'h') && useBook.getState().view === 'write') {
         e.preventDefault()
         setOpen(true)
         if (e.key === 'h') setShowReplace(true)
@@ -61,8 +76,6 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
     else editor.commands.clearFind()
   }, [open, query, cs, ww, editor, activeId])
 
-  // Plain text of the other chapters, made once per chapter text.
-  const plain = useMemo(() => new Map(chapters.map((c) => [c.id, markdownToPlain(c.body)])), [chapters])
   const [slowQuery, setSlowQuery] = useState(query)
   useEffect(() => {
     const t = setTimeout(() => setSlowQuery(query), 200)
@@ -72,9 +85,9 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
     if (!open || !slowQuery) return []
     return chapters
       .filter((c) => c.id !== activeId)
-      .map((c) => ({ id: c.id, title: c.title, n: countIn(plain.get(c.id) ?? '', slowQuery, cs, ww) }))
+      .map((c) => ({ id: c.id, title: c.title, n: countIn(plainText(c), slowQuery, cs, ww) }))
       .filter((c) => c.n > 0)
-  }, [open, slowQuery, cs, ww, chapters, activeId, plain])
+  }, [open, slowQuery, cs, ww, chapters, activeId])
 
   /**
    * Close the bar and leave the text where it is. The cursor goes to the match that shows, so the
@@ -141,7 +154,7 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
     const book = useBook.getState()
     const i = book.chapters.findIndex((c) => c.id === book.activeChapterId)
     const order = dir === 1 ? book.chapters.slice(i + 1) : book.chapters.slice(0, Math.max(0, i)).reverse()
-    const target = atEdge ? order.find((c) => countIn(plain.get(c.id) ?? '', query, cs, ww) > 0) : undefined
+    const target = atEdge ? order.find((c) => countIn(plainText(c), query, cs, ww) > 0) : undefined
     if (!target) {
       if (dir === 1) editor.commands.findNext()
       else editor.commands.findPrev()
@@ -161,7 +174,30 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
     )
   }
 
+  /** Replace the current match and show the next one (find.ts selects it). */
+  const replaceOne = (): void => {
+    if (editor.commands.replaceCurrent(replace)) showCurrent(editor)
+  }
+
+  /** Replace in all chapters, after the confirm. The toast has the result and an Undo. */
+  const replaceEverywhere = (): void => {
+    setInBook(null)
+    const r = replaceInBook(query, replace, { caseSensitive: cs, wholeWord: ww })
+    const tt = getT()
+    toast(tt.editor.replacedInBook(r.total, r.chapters), {
+      action: {
+        label: tt.common.undo,
+        run: () => {
+          const n = r.undo()
+          if (n < r.chapters) toast(getT().editor.replaceUndoPartly(r.chapters - n), { kind: 'error' })
+        }
+      }
+    })
+  }
+  const inBookTotal = inBook?.reduce((n, c) => n + c.count, 0) ?? 0
+
   return (
+    <>
     <AnimatePresence>
       {open && (
         <motion.div
@@ -195,7 +231,7 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
                 if (e.key === 'Escape') close()
               }}
             />
-            <span className="find-count" aria-live="polite">{query ? (st.count ? `${st.current + 1}/${st.count}` : tf.noResults) : ''}</span>
+            <span className="find-count" aria-live="polite">{query ? (st.count ? (st.current >= 0 ? `${st.current + 1}/${st.count}` : String(st.count)) : tf.noResults) : ''}</span>
             <button className={clsx('find-opt', cs && 'is-on')} onClick={() => setCs(!cs)} title={tf.matchCase} aria-label={tf.matchCase} aria-pressed={cs}>
               Aa
             </button>
@@ -224,16 +260,23 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault()
-                    editor.commands.replaceCurrent(replace)
+                    replaceOne()
                   }
                   if (e.key === 'Escape') close()
                 }}
               />
-              <button className="find-text-btn" disabled={!st.count} onClick={() => editor.commands.replaceCurrent(replace)}>
+              <button className="find-text-btn" disabled={st.current < 0} onClick={replaceOne}>
                 {tf.replace}
               </button>
               <button className="find-text-btn" disabled={!st.count} onClick={() => editor.commands.replaceAll(replace)}>
                 {tf.replaceAll}
+              </button>
+            </div>
+          )}
+          {showReplace && (
+            <div className="find-row find-row-all">
+              <button className="find-link-btn" disabled={!query} onClick={() => setInBook(matchesInBook(query, { caseSensitive: cs, wholeWord: ww }))}>
+                {t.editor.replaceInAllChapters}
               </button>
             </div>
           )}
@@ -266,5 +309,34 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
         </motion.div>
       )}
     </AnimatePresence>
+    <Dialog
+      open={inBook !== null}
+      onOpenChange={(v) => !v && setInBook(null)}
+      title={t.editor.replaceInBookTitle}
+      description={inBook?.length ? t.editor.replaceInBookWhat(query, replace) : t.editor.replaceInBookNone(query)}
+      width={460}
+      footer={
+        <>
+          <Button variant="ghost" onClick={() => setInBook(null)}>
+            {t.common.cancel}
+          </Button>
+          <Button variant="primary" disabled={!inBookTotal} onClick={replaceEverywhere}>
+            {t.editor.replaceInBookButton(inBookTotal)}
+          </Button>
+        </>
+      }
+    >
+      {inBook && inBook.length > 0 && (
+        <ul className="replace-book-list">
+          {inBook.map((c) => (
+            <li key={c.chapterId}>
+              <span>{c.title}</span>
+              <span className="replace-book-n">{t.editor.replaceCount(c.count)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Dialog>
+    </>
   )
 }

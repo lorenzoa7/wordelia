@@ -508,7 +508,15 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--s-4);
+  /* A narrow page (a small window with the two side panels): the switch goes under the title. */
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-4);
+}
+.plan-hero-top > h1 {
+  flex: 1 1 8em;
+}
+.plan-hero-top > .plan-switch {
+  margin-bottom: var(--s-3);
 }
 .plan-hero-category {
   padding: 0 0 var(--s-6);

@@ -4,9 +4,14 @@
 // The pages are always laid out at 100 %. The zoom is a scale (a CSS transform) of the whole desk
 // content, so a change of zoom never moves a word or a page break, and it can be a smooth animation.
 // A "sizer" element around the scaled content has the scaled size, so the desk scrolls correctly.
+//
+// The page always fits: when the desk is narrower than the pages at 100 % (a narrow window with
+// the two side panels), the pages scale down to the width of the desk. The zoom of the author
+// multiplies this fit.
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useApp } from '@/stores/app'
+import { useBook } from '@/stores/book'
 
 export const ZOOM_STEPS = [0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.2, 1.35, 1.5, 1.75, 2]
 
@@ -49,6 +54,11 @@ export function setPageZoom(to: number, point?: { x: number; y: number }, animat
   useApp.getState().setUi({ zoom: to })
 }
 
+/** The scale that makes the pages (at 100 %) as wide as the desk, or 1 when they fit. */
+export function fitScale(room: number, pagesWidth: number): number {
+  return room > 0 && pagesWidth > room ? room / pagesWidth : 1
+}
+
 /** Ease in and out */
 const ease = (t: number): number => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
 
@@ -63,8 +73,10 @@ export function useDeskZoom(
 ): number | null {
   const target = useApp((s) => s.settings?.ui.zoom ?? 1)
   const [badge, setBadge] = useState<number | null>(null)
-  /** The scale on screen now (it moves to `target` during an animation) */
+  /** The zoom of the author on screen now (it moves to `target` during an animation) */
   const shown = useRef(target)
+  /** The scale on screen now: the zoom of the author times the fit to the desk width */
+  const effective = useRef(target)
   /** The horizontal offset of the scaled pages (they are centered when narrower than the desk) */
   const offset = useRef(0)
   const frame = useRef(0)
@@ -75,14 +87,16 @@ export function useDeskZoom(
     const sizer = sizerRef.current
     const inner = innerRef.current
     if (!desk || !sizer || !inner) return
-    const w = inner.offsetWidth * s
-    const h = inner.offsetHeight * s
     const room = desk.clientWidth
+    const e = s * fitScale(room, inner.offsetWidth)
+    effective.current = e
+    const w = inner.offsetWidth * e
+    const h = inner.offsetHeight * e
     offset.current = w < room ? (room - w) / 2 : 0
     sizer.style.width = `${Math.max(room, w)}px`
     sizer.style.height = `${h}px`
-    inner.style.transform = `translate(${offset.current}px, 0) scale(${s})`
-    sizer.style.setProperty('--desk-scale', String(s))
+    inner.style.transform = `translate(${offset.current}px, 0) scale(${e})`
+    sizer.style.setProperty('--desk-scale', String(e))
   }
 
   // The size of the pages or of the desk changes (typing, a window resize): the same scale, new sizes.
@@ -91,7 +105,15 @@ export function useDeskZoom(
     const inner = innerRef.current
     if (!desk || !inner) return
     apply(shown.current)
-    const ro = new ResizeObserver(() => apply(shown.current))
+    const ro = new ResizeObserver(() => {
+      // A new width of the desk can give a new fit: the text at the reading line stays in place.
+      const before = effective.current
+      apply(shown.current)
+      if (Math.abs(effective.current - before) > 0.0005) {
+        const ay = desk.clientHeight * 0.3
+        desk.scrollTop = ((desk.scrollTop + ay) / before) * effective.current - ay
+      }
+    })
     ro.observe(inner)
     ro.observe(desk)
     return () => ro.disconnect()
@@ -120,14 +142,14 @@ export function useDeskZoom(
     const ay = req.point ? req.point.y - box.top : desk.clientHeight * 0.3
     const ax = req.point ? req.point.x - box.left : desk.clientWidth / 2
     // The anchor point in the coordinates of the pages at 100 %
-    const cy = (desk.scrollTop + ay) / from
-    const cx = (desk.scrollLeft + ax - offset.current) / from
+    const cy = (desk.scrollTop + ay) / effective.current
+    const cx = (desk.scrollLeft + ax - offset.current) / effective.current
     const inner = innerRef.current
     const step = (s: number): void => {
       shown.current = s
       apply(s)
-      desk.scrollTop = cy * s - ay
-      desk.scrollLeft = Math.max(0, cx * s + offset.current - ax)
+      desk.scrollTop = cy * effective.current - ay
+      desk.scrollLeft = Math.max(0, cx * effective.current + offset.current - ax)
     }
     desk.style.overflowAnchor = 'none'
     const done = (): void => {
@@ -164,7 +186,8 @@ export function useDeskZoom(
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       const k = zoomKey(e)
-      if (!k) return
+      // The Write view stays mounted under the Plan view: its zoom keys work only while it shows.
+      if (!k || useBook.getState().view !== 'write') return
       e.preventDefault()
       setPageZoom(k === 'reset' ? 1 : nextZoom(currentZoom(), k === 'in' ? 1 : -1))
     }

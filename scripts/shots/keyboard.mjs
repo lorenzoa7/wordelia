@@ -55,6 +55,74 @@ export default async function ({ app, page, shot, openBook }) {
   }
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1440, 900))
   await page.waitForTimeout(300)
+
+  // Replace goes on to the next match after the new text, also when the new text contains the
+  // search text: each click changes the next match, once.
+  const fail = (msg) => {
+    throw new Error(`Replace: ${msg}`)
+  }
+  const chapterText = (i) => page.evaluate((n) => window.__wordelia.book.getState().chapters[n].body, i)
+  await page.locator('.manuscript p').first().click()
+  await page.keyboard.press('Control+Home')
+  await page.keyboard.press('Control+h')
+  await page.waitForTimeout(300)
+  await page.keyboard.press('Control+a')
+  await page.keyboard.type('Elias')
+  await page.locator('.find-input').nth(1).fill('Elias Silva')
+  await page.waitForTimeout(300)
+  const replaceBtn = page.locator('.find-text-btn').first()
+  const matches = await page.evaluate(() => (window.__wordelia.editor().state.doc.textContent.match(/Elias/g) ?? []).length)
+  // One click more than the matches: after the last match, Replace stops (Next goes back to the start).
+  let clicks = 0
+  for (let i = 0; i <= matches; i++) {
+    if (await replaceBtn.isDisabled()) break
+    await replaceBtn.click()
+    clicks++
+    await page.waitForTimeout(150)
+  }
+  await page.waitForTimeout(500)
+  const replaced = await page.evaluate(() => window.__wordelia.editor().state.doc.textContent)
+  const twice = (replaced.match(/Silva Silva/g) ?? []).length
+  const silvas = (replaced.match(/Elias Silva/g) ?? []).length
+  console.log('replace after replace:', JSON.stringify({ matches, clicks, silvas, twice }))
+  if (twice) fail('"Elias Silva Silva": Replace did not go on to the next match')
+  if (silvas !== matches || clicks !== matches) fail(`${silvas} of ${matches} matches changed in ${clicks} clicks`)
+
+  // Replace in all chapters, also in a chapter far from the screen (no editor); Undo puts it back.
+  await page.keyboard.press('Escape')
+  await page.evaluate(() => {
+    const s = window.__wordelia.book.getState()
+    const ch = s.chapters[0]
+    s.restoreChapter(ch.id, Array.from({ length: 8 }, () => ch.body.trim()).join('\n\n'))
+  })
+  await page.evaluate(() => document.querySelector('.desk').scrollTo({ top: 0 }))
+  await page.waitForTimeout(800)
+  const asleep = await page.evaluate(() => document.querySelectorAll('.page[data-chapter]')[1].classList.contains('is-asleep'))
+  const before = [await chapterText(0), await chapterText(1)]
+  await page.locator('.manuscript p').first().click()
+  await page.keyboard.press('Control+h')
+  await page.waitForTimeout(300)
+  await page.keyboard.press('Control+a')
+  await page.keyboard.type('Marta')
+  await page.locator('.find-input').nth(1).fill('Martha')
+  await page.locator('.find-link-btn').click()
+  await page.waitForSelector('.replace-book-list li')
+  const rows = await page.locator('.replace-book-list li').allInnerTexts()
+  console.log('replace in all chapters:', JSON.stringify({ asleep, rows }))
+  await shot('replace-in-book')
+  if (rows.length !== 2) fail('the confirm does not list the two chapters')
+  await page.locator('.dialog-foot .btn-primary').click()
+  await page.waitForTimeout(700)
+  const after = [await chapterText(0), await chapterText(1)]
+  const toastText = await page.locator('.toast').last().innerText()
+  console.log('result:', JSON.stringify({ toast: toastText, left: after.map((t) => (t.match(/Marta/g) ?? []).length) }))
+  if (after.some((t) => t.includes('Marta')) || !after.every((t) => t.includes('Martha'))) fail('not every chapter changed')
+  await page.locator('.toast').last().getByRole('button', { name: /Undo/ }).click()
+  await page.waitForTimeout(700)
+  const undone = [await chapterText(0), await chapterText(1)]
+  if (undone[0] !== before[0] || undone[1] !== before[1]) fail('Undo did not put the text back')
+  await page.keyboard.press('Escape')
+  console.log('replace ok')
   // Tab through the title bar: every stop must show a focus ring.
   await page.locator('.status-bar').click()
   const stops = []

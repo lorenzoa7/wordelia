@@ -1,43 +1,50 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
-import { EditorState, Selection, TextSelection } from '@tiptap/pm/state'
+import { Selection, TextSelection } from '@tiptap/pm/state'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { Plus } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { parseMarkdown } from '@shared/markdown/parse'
 import { serializeMarkdown } from '@shared/markdown/serialize'
 import { countMarkdownWords, countWords } from '@shared/book'
-import { chapterWord, PAGE_SIZES } from '@shared/export/model'
+import { chapterLabel, PAGE_SIZES } from '@shared/export/model'
 import type { BookManifest, DocNode } from '@shared/types'
 import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
+import { saver } from '@/stores/saver'
 import { useT } from '@/lib/i18n'
 import { fontStack } from '@/lib/fonts'
 import { registerFlusher } from '@/lib/flush'
 import { editorExtensions } from './extensions'
-import { getChapterEditor, hasCursor, registerChapterEditor, setActiveEditor, useActiveEditor, whenChapterEditor } from './registry'
+import { getActiveEditor, getChapterEditor, hasCursor, registerChapterEditor, setActiveEditor, useActiveEditor, whenChapterEditor, type ChapterEditor } from './registry'
 import { repaginate, type PageMetrics } from './pagination'
 import { Toolbar } from './Toolbar'
 import { SelectionMenu } from './SelectionMenu'
 import { ReviewBar } from './ReviewBar'
 import { FindBar } from './FindBar'
-import { useEditorStats } from './stats'
+import { resetStats, useEditorStats } from './stats'
 import { scaleOf, useDeskZoom } from './zoom'
 import { PageCounter, countKey, setPageCount, usePagesOf } from './pageCounts'
 import { useProposalUndoKeys } from './inlineProposals'
 import { typewriterSound } from './typewriter-sound'
-import { cleanPastedHtml } from './paste'
+import { cleanPastedHtml, cleanPastedSlice, pasteStyleFor } from './paste'
+import { forgetEditorStates, isReload, keepEditorState, loadDoc, takeEditorState } from './keep'
+import { restorePlace, savePlace } from './deskPlace'
 import './editor.css'
 
 const MM = 96 / 25.4
 /** Space between two sheets of paper, in pixels at zoom 1 */
 const SHEET_GAP = 18
+/** Typing gives its text to the book store after a pause of this many milliseconds… */
+const SAVE_PAUSE = 350
+/** …and at least this often while the author types without a pause. The store then writes the file. */
+const SAVE_MAX_WAIT = 1500
 
 type Geometry = PageMetrics & { width: number; marginLeft: number; marginRight: number }
 
 /**
- * Page geometry of the book: the page size and margins of its export settings, at the zoom of the
- * screen. The screen shows a right-hand page: the inner margin (the spine) is on the left.
+ * Page geometry of the book: the page size and margins of the book (Settings → This book), at the
+ * zoom of the screen. The screen shows a right-hand page: the inner margin (the spine) is on the left.
  */
 function pageGeometry(m: BookManifest, zoom: number): Geometry {
   const size = PAGE_SIZES[m.export.pageSize] ?? PAGE_SIZES.A5
@@ -60,16 +67,38 @@ function pageGeometry(m: BookManifest, zoom: number): Geometry {
 /** Measured heights of the chapter sheets at zoom 1, so a sheet that is not on screen keeps its size at any zoom. */
 const sheetHeights = new Map<string, number>()
 
+/** The chapter sheet at the reading line (30 % of the desk height), and its top on the desk. */
+function sheetAtReadingLine(desk: HTMLElement): { id: string; top: number } | null {
+  const box = desk.getBoundingClientRect()
+  const line = box.top + box.height * 0.3
+  for (const el of desk.querySelectorAll<HTMLElement>('.page[data-chapter]')) {
+    const r = el.getBoundingClientRect()
+    if (r.top <= line && r.bottom >= line) return { id: el.dataset.chapter!, top: r.top - box.top }
+  }
+  return null
+}
+
+/** Ctrl+Z with the focus outside a text undoes an accepted chat change: only while the Write view shows. */
+function ProposalUndoKeys(): null {
+  useProposalUndoKeys()
+  return null
+}
+
 /**
  * The manuscript as pages, like a word processor: every chapter starts on a new page, the pages
  * follow one another, and scrolling down goes on into the next chapter. Each chapter has its own
- * editor (its own undo history); chapters far from the screen do not keep an editor.
+ * editor (its own undo history); chapters far from the screen do not keep an editor, but their
+ * editor state stays (keep.ts).
+ *
+ * The Write view stays mounted while the Plan view shows (BookView), so the scroll, the cursor
+ * and the undo history are there when the author comes back.
  */
 export function PageEditor(): React.JSX.Element | null {
   const manifest = useBook((s) => s.manifest)
   const chapterIds = useBook((s) => s.chapters.map((c) => c.id).join('|'))
   const ids = useMemo(() => (chapterIds ? chapterIds.split('|') : []), [chapterIds])
   const jump = useBook((s) => s.chapterJump)
+  const view = useBook((s) => s.view)
   const ui = useApp((s) => s.settings?.ui)
   const active = useActiveEditor((s) => s.active)
   const typo = manifest?.typography
@@ -78,6 +107,12 @@ export function PageEditor(): React.JSX.Element | null {
   const innerRef = useRef<HTMLDivElement>(null)
   const [typing, setTyping] = useState(false)
   const typingTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  /** The book opens at the place of the author: the desk shows when it is there. */
+  const [placing, setPlacing] = useState(true)
+  /** The chapter jump that the pages did last */
+  const doneJump = useRef(0)
+  /** The chapter at the reading line and its top on the desk, for a new order of the chapters */
+  const anchor = useRef<{ id: string; top: number } | null>(null)
 
   // The pages are laid out at 100 %; the zoom is a scale of the whole desk (zoom.ts).
   const geometry = useMemo(() => (manifest ? pageGeometry(manifest, 1) : null), [manifest])
@@ -88,6 +123,15 @@ export function PageEditor(): React.JSX.Element | null {
     typingTimer.current = setTimeout(() => setTyping(false), 1400)
   }, [])
 
+  // Another book: the counts and the kept editor states of the last book go.
+  useEffect(() => {
+    resetStats()
+    return () => {
+      forgetEditorStates()
+      resetStats()
+    }
+  }, [])
+
   // Show the toolbar again when the mouse moves.
   useEffect(() => {
     const onMove = (): void => setTyping(false)
@@ -95,11 +139,63 @@ export function PageEditor(): React.JSX.Element | null {
     return () => window.removeEventListener('mousemove', onMove)
   }, [])
 
+  // The book opens where the author was (features/write/place.ts), and the cursor is in the text.
+  useEffect(() => {
+    const desk = deskRef.current
+    if (!desk) return
+    return restorePlace(desk, () => setPlacing(false))
+  }, [])
+
+  // Save the place: at a pause in the scroll or the typing, when the view changes, when the book closes.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const later = (): void => {
+      clearTimeout(timer)
+      timer = setTimeout(() => savePlace(deskRef.current), 600)
+    }
+    const desk = deskRef.current
+    desk?.addEventListener('scroll', later, { passive: true })
+    const offSelection = useActiveEditor.subscribe(later)
+    const offView = useBook.subscribe((s, p) => {
+      if (s.view !== p.view) savePlace(deskRef.current)
+    })
+    const unflush = registerFlusher(() => savePlace(deskRef.current))
+    window.addEventListener('wordelia:selection', later)
+    return () => {
+      clearTimeout(timer)
+      desk?.removeEventListener('scroll', later)
+      window.removeEventListener('wordelia:selection', later)
+      offSelection()
+      offView()
+      unflush()
+    }
+  }, [])
+
+  // Back from the Plan view: the cursor is where it was, also when the focus went to the Plan view.
+  useEffect(() => {
+    let away: { editor: ChapterEditor | null; jump: number } | null = null
+    return useBook.subscribe((s, p) => {
+      if (p.view === 'write' && s.view !== 'write') {
+        // The focus is still in the text now: the Write view becomes inert after this change.
+        away = { editor: hasCursor() ? getActiveEditor() : null, jump: s.chapterJump?.n ?? 0 }
+      } else if (p.view !== 'write' && s.view === 'write' && away) {
+        const { editor, jump: n } = away
+        away = null
+        // A jump to a chapter (a proposal of the chat, a chapter of the story line) goes there instead.
+        if (!editor || editor.editor.isDestroyed || (s.chapterJump?.n ?? 0) !== n) return
+        requestAnimationFrame(() => {
+          if (!editor.editor.isDestroyed && useBook.getState().view === 'write') editor.editor.commands.focus(null, { scrollIntoView: false })
+        })
+      }
+    })
+  }, [])
+
   // A jump to a chapter (the sidebar, the history, the chat): scroll its first page into view.
   useEffect(() => {
-    if (!jump) return
+    if (!jump || jump.n === doneJump.current) return
+    doneJump.current = jump.n
     const desk = deskRef.current
-    const sheet = desk?.querySelector<HTMLElement>(`[data-chapter="${jump.id}"]`)
+    const sheet = desk?.querySelector<HTMLElement>(`.page[data-chapter="${jump.id}"]`)
     if (!desk || !sheet) return
     const top = sheet.getBoundingClientRect().top - desk.getBoundingClientRect().top + desk.scrollTop - 56
     desk.scrollTo({ top: Math.max(0, top), behavior: 'auto' })
@@ -108,8 +204,18 @@ export function PageEditor(): React.JSX.Element | null {
     if (jump.focus) whenChapterEditor(jump.id, (e) => setTimeout(() => e.editor.commands.focus('start'), 30))
   }, [jump])
 
-  // The chapter on screen is the active one in the sidebar, like the outline of a word processor.
-  // The toolbar and the actions stay on the chapter with the cursor, if there is one.
+  /** The chapter on screen is the active one in the sidebar. The toolbar and the actions stay on the chapter with the cursor. */
+  const markActive = useCallback((): void => {
+    const desk = deskRef.current
+    if (!desk) return
+    const at = sheetAtReadingLine(desk)
+    if (!at) return
+    anchor.current = at
+    useBook.getState().setActiveChapter(at.id)
+    const e = getChapterEditor(at.id)
+    if (e && !hasCursor()) setActiveEditor(e)
+  }, [])
+
   useEffect(() => {
     const desk = deskRef.current
     if (!desk) return
@@ -118,18 +224,7 @@ export function PageEditor(): React.JSX.Element | null {
       if (frame) return
       frame = requestAnimationFrame(() => {
         frame = 0
-        const box = desk.getBoundingClientRect()
-        const line = box.top + box.height * 0.3
-        for (const el of desk.querySelectorAll<HTMLElement>('[data-chapter]')) {
-          const r = el.getBoundingClientRect()
-          if (r.top <= line && r.bottom >= line) {
-            const id = el.dataset.chapter!
-            useBook.getState().setActiveChapter(id)
-            const e = getChapterEditor(id)
-            if (e && !hasCursor()) setActiveEditor(e)
-            break
-          }
-        }
+        markActive()
       })
     }
     desk.addEventListener('scroll', onScroll, { passive: true })
@@ -137,9 +232,28 @@ export function PageEditor(): React.JSX.Element | null {
       desk.removeEventListener('scroll', onScroll)
       if (frame) cancelAnimationFrame(frame)
     }
-  }, [])
+  }, [markActive])
 
-  useEditorStats(active?.editor ?? null)
+  // A new order of the chapters (a drag in the chapter list): the chapter on screen stays on screen,
+  // at the same height, so the sidebar, the toolbar and the status bar stay on the chapter that shows.
+  const lastIds = useRef(chapterIds)
+  // Read during the render, while the sheets are still in the old order (like getSnapshotBeforeUpdate).
+  if (lastIds.current !== chapterIds && deskRef.current) anchor.current = sheetAtReadingLine(deskRef.current) ?? anchor.current
+  useLayoutEffect(() => {
+    const was = lastIds.current
+    lastIds.current = chapterIds
+    const desk = deskRef.current
+    const a = anchor.current
+    if (!desk || !a || was === chapterIds) return
+    const before = was.split('|')
+    if (before.length !== ids.length || !ids.every((id) => before.includes(id))) return
+    const sheet = desk.querySelector<HTMLElement>(`.page[data-chapter="${a.id}"]`)
+    if (!sheet) return
+    desk.scrollTop += sheet.getBoundingClientRect().top - desk.getBoundingClientRect().top - a.top
+    markActive()
+  }, [chapterIds, ids, markActive])
+
+  useEditorStats(active?.editor ?? null, active?.chapterId ?? null)
   const zoomBadge = useDeskZoom(deskRef, sizerRef, innerRef)
   // The first page number of each chapter: the pages of the chapters before it, plus one.
   const { pages } = usePagesOf()
@@ -151,7 +265,6 @@ export function PageEditor(): React.JSX.Element | null {
       return start
     })
   }, [ids, pages])
-  useProposalUndoKeys()
 
   if (!manifest || !typo || !geometry) return null
 
@@ -176,9 +289,10 @@ export function PageEditor(): React.JSX.Element | null {
     <div
       className={clsx('write-frame', ui?.focusMode && 'focus-mode', typing && 'is-typing', ui?.typewriterScroll && 'typewriter', typo.indentFirstParagraph && 'indent-first')}
     >
+      {view === 'write' && <ProposalUndoKeys />}
       {active && <Toolbar editor={active.editor} />}
       {active && <FindBar editor={active.editor} />}
-      <div ref={deskRef} className="desk">
+      <div ref={deskRef} className={clsx('desk', placing && 'is-placing')}>
         <div ref={sizerRef} className="desk-zoom">
           <div ref={innerRef} className="desk-inner" style={vars}>
             {ids.map((id, i) => (
@@ -215,6 +329,8 @@ interface SheetProps {
 function ChapterSheet({ chapterId, index, firstPage, geometry, deskRef, onTyping }: SheetProps): React.JSX.Element | null {
   const chapter = useBook((s) => s.chapters.find((c) => c.id === chapterId))
   const isActive = useBook((s) => s.activeChapterId === chapterId)
+  /** This chapter has the cursor (or had it last): focus mode lights its paragraph only */
+  const isCurrent = useActiveEditor((s) => s.active?.chapterId === chapterId)
   const ref = useRef<HTMLElement>(null)
   const [near, setNear] = useState(isActive)
   const zoomRef = useRef(geometry.zoom)
@@ -259,27 +375,28 @@ function ChapterSheet({ chapterId, index, firstPage, geometry, deskRef, onTyping
     <article
       ref={ref}
       data-chapter={chapterId}
-      className={clsx('page grain', !mounted && 'is-asleep')}
+      className={clsx('page grain', !mounted && 'is-asleep', isCurrent && 'is-current')}
       // The page numbers of the sheet go on from the chapters before it (a CSS counter, editor.css).
       style={{ counterReset: `page ${firstPage - 1}`, ...(mounted ? {} : { height: estimate() }) }}
     >
       <ChapterHead index={index} title={chapter.title} id={chapterId} />
-      {mounted && <SheetEditor chapterId={chapterId} geometry={geometry} onTyping={onTyping} sheetRef={ref} />}
+      {mounted && <SheetEditor chapterId={chapterId} index={index} title={chapter.title} geometry={geometry} onTyping={onTyping} sheetRef={ref} />}
     </article>
   )
 }
 
 interface EditorProps {
   chapterId: string
+  index: number
+  title: string
   geometry: PageMetrics
   onTyping: () => void
   sheetRef: React.RefObject<HTMLElement | null>
 }
 
-function SheetEditor({ chapterId, geometry, onTyping, sheetRef }: EditorProps): React.JSX.Element {
+function SheetEditor({ chapterId, index, title, geometry, onTyping, sheetRef }: EditorProps): React.JSX.Element {
   const manifest = useBook((s) => s.manifest)
   const externalRev = useBook((s) => s.externalRev[chapterId] ?? 0)
-  const spellcheck = useApp((s) => s.settings?.editor.spellcheck ?? true)
   const typewriterScroll = useApp((s) => s.settings?.ui.typewriterScroll ?? false)
   const sounds = useApp((s) => s.settings?.editor.typewriterSounds ?? false)
   const typo = manifest?.typography
@@ -288,16 +405,23 @@ function SheetEditor({ chapterId, geometry, onTyping, sheetRef }: EditorProps): 
   const saveTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   /** The newest document that is not saved yet */
   const dirtyDoc = useRef<PMNode | null>(null)
+  /** When the oldest typing that is not in the store yet happened */
+  const dirtySince = useRef(0)
   const geometryRef = useRef(geometry)
   geometryRef.current = geometry
+  /** The attributes of the text, read at each update: a new title or language shows without a new editor. */
+  const attrs = useRef({ lang: 'en', label: '' })
+  attrs.current = { lang: manifest?.language ?? 'en', label: t.editor.chapterTextOf(index + 1, title) }
+  const holdId = `editor:${chapterId}`
 
   const flush = useCallback((): void => {
     clearTimeout(saveTimer.current)
+    dirtySince.current = 0
     const doc = dirtyDoc.current
-    if (!doc) return
     dirtyDoc.current = null
-    useBook.getState().setChapterBody(chapterId, serializeMarkdown(doc.toJSON() as DocNode))
-  }, [chapterId])
+    if (doc) useBook.getState().setChapterBody(chapterId, serializeMarkdown(doc.toJSON() as DocNode))
+    saver.release(holdId)
+  }, [chapterId, holdId])
 
   const extensions = useMemo(
     () =>
@@ -341,14 +465,16 @@ function SheetEditor({ chapterId, geometry, onTyping, sheetRef }: EditorProps): 
       enablePasteRules: false,
       editorProps: {
         transformPastedHTML: cleanPastedHtml,
+        // Pasted text gets the typography of the book (paste.ts).
+        transformPasted: (slice, view) => {
+          const m = useBook.getState().manifest
+          return m ? cleanPastedSlice(slice, view.state.schema, pasteStyleFor(m.language, m.typography)) : slice
+        },
         scrollMargin: { top: 130, bottom: 90, left: 0, right: 0 },
         scrollThreshold: { top: 130, bottom: 90, left: 0, right: 0 },
-        attributes: {
-          class: 'manuscript',
-          spellcheck: String(spellcheck),
-          lang: manifest?.language ?? 'en',
-          'aria-label': t.editor.page.chapterText
-        },
+        // Spell check follows the setting of the app: the text has no attribute of its own, so it
+        // takes the one of the page (BookView).
+        attributes: () => ({ class: 'manuscript', lang: attrs.current.lang, 'aria-label': attrs.current.label }),
         // The book is one long text: the arrows go on into the next or the previous chapter.
         handleKeyDown: (view, event) => {
           // Ctrl+Home / Ctrl+End: the start or the end of the chapter. The browser cannot do it
@@ -385,11 +511,19 @@ function SheetEditor({ chapterId, geometry, onTyping, sheetRef }: EditorProps): 
         }
       },
       onUpdate: ({ transaction }) => {
-        if (!transaction.docChanged) return
+        // A text from the store (a change from outside, a restored version) is not typing.
+        if (!transaction.docChanged || isReload(transaction)) return
         dirtyDoc.current = transaction.doc
+        // The status bar shows at once that the change is not on disk yet.
+        saver.hold(holdId)
+        const now = Date.now()
+        if (!dirtySince.current) dirtySince.current = now
         clearTimeout(saveTimer.current)
-        saveTimer.current = setTimeout(flush, 350)
+        saveTimer.current = setTimeout(flush, Math.max(0, Math.min(SAVE_PAUSE, SAVE_MAX_WAIT - (now - dirtySince.current))))
         onTyping()
+      },
+      onSelectionUpdate: () => {
+        window.dispatchEvent(new Event('wordelia:selection'))
       },
       onFocus: () => {
         useBook.getState().setActiveChapter(chapterId)
@@ -398,9 +532,21 @@ function SheetEditor({ chapterId, geometry, onTyping, sheetRef }: EditorProps): 
     [extensions]
   )
 
-  // Register this chapter's editor; the focused one becomes the active one.
+  // Register this chapter's editor; the focused one becomes the active one. A chapter that had an
+  // editor before gets its state back: the undo history, the cursor and the text (keep.ts).
   useEffect(() => {
     if (!editor) return
+    const kept = takeEditorState(chapterId)
+    if (kept && !editor.isDestroyed) {
+      try {
+        editor.view.updateState(kept.state.reconfigure({ plugins: editor.state.plugins }))
+        // The text changed while the chapter had no editor (a file from outside, a restore).
+        const body = useBook.getState().chapters.find((c) => c.id === chapterId)?.body
+        if (body !== undefined && body !== kept.body) loadDoc(editor, editor.schema.nodeFromJSON(parseMarkdown(body)), false)
+      } catch {
+        /* a state of another schema (an old editor): keep the new one */
+      }
+    }
     const handle = { editor, chapterId, flush }
     const unregister = registerChapterEditor(handle)
     const unflush = registerFlusher(flush)
@@ -409,22 +555,34 @@ function SheetEditor({ chapterId, geometry, onTyping, sheetRef }: EditorProps): 
     return () => {
       editor.off('focus', onFocus)
       flush()
+      if (!editor.isDestroyed) {
+        const body = useBook.getState().chapters.find((c) => c.id === chapterId)?.body
+        if (body !== undefined) keepEditorState(chapterId, editor.state, body)
+      }
       unflush()
       unregister()
     }
   }, [editor, chapterId, flush])
 
-  // A file changed outside the app, or a version was restored: reload the text.
+  // A new title or language: the label and the language of the text change.
+  useEffect(() => {
+    if (editor && !editor.isDestroyed) editor.view.setProps({})
+  }, [editor, title, index, manifest?.language])
+
+  // A file changed outside the app, or a version was restored: load the new text, and keep the
+  // cursor and the undo history (keep.ts). Ctrl+Z undoes a restore, not a change from outside.
   const seenRev = useRef(externalRev)
   useEffect(() => {
     if (!editor || externalRev === seenRev.current) return
     seenRev.current = externalRev
     const ch = useBook.getState().chapters.find((c) => c.id === chapterId)
     if (!ch) return
-    const doc = editor.schema.nodeFromJSON(parseMarkdown(ch.body))
-    editor.view.updateState(EditorState.create({ doc, plugins: editor.state.plugins, schema: editor.schema }))
+    clearTimeout(saveTimer.current)
     dirtyDoc.current = null
-  }, [editor, chapterId, externalRev])
+    dirtySince.current = 0
+    saver.release(holdId)
+    loadDoc(editor, editor.schema.nodeFromJSON(parseMarkdown(ch.body)), useBook.getState().undoableRev[chapterId] === externalRev)
+  }, [editor, chapterId, externalRev, holdId])
 
   // New page geometry (zoom, page size): measure the pages again.
   useEffect(() => {
@@ -487,9 +645,13 @@ function ChapterHead({ index, title, id }: { index: number; title: string; id: s
   const [value, setValue] = useState(title)
   useEffect(() => setValue(title), [title, id])
   const headRef = useRef<HTMLElement>(null)
+  /** Escape: the blur after it must not save the new text */
+  const cancelled = useRef(false)
   const commit = (): void => {
-    if (value.trim() && value !== title) void useBook.getState().renameChapter(id, value)
+    const clean = value.trim()
+    if (!cancelled.current && clean && clean !== title) void useBook.getState().renameChapter(id, clean)
     else setValue(title)
+    cancelled.current = false
   }
   // A long title takes two lines: the text of the first page then starts lower.
   useEffect(() => {
@@ -507,7 +669,8 @@ function ChapterHead({ index, title, id }: { index: number; title: string; id: s
   }, [id])
   return (
     <header ref={headRef} className="chapter-head">
-      <div className="chapter-label caps">{chapterWord(language, index + 1)}</div>
+      {/* "CHAPTER" above the number: the number says which one, the title says what it is. */}
+      <div className="chapter-label caps">{chapterLabel(language)}</div>
       <div className="chapter-number">{index + 1}</div>
       <textarea
         className="chapter-title"
@@ -526,6 +689,9 @@ function ChapterHead({ index, title, id }: { index: number; title: string; id: s
             whenChapterEditor(id, (ed) => ed.editor.commands.focus('start'))
           }
           if (e.key === 'Escape') {
+            // Cancel: the title stays as it was.
+            e.preventDefault()
+            cancelled.current = true
             setValue(title)
             ;(e.target as HTMLTextAreaElement).blur()
           }
@@ -552,8 +718,8 @@ function PageEnd(): React.JSX.Element {
 
 function EmptyManuscript(): React.JSX.Element {
   const t = useT()
-  // The first chapter: its title is the first planned chapter of the story line, else the word of
-  // the language of the book ("Chapter One").
+  // The first chapter: its title is the first planned chapter of the story line, else a title
+  // without a number in the language of the book ("Untitled").
   return (
     <div className="empty-manuscript">
       <p>{t.editor.page.noChapters}</p>

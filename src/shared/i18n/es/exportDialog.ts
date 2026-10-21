@@ -45,5 +45,6 @@ export const exportDialog: typeof en = {
   txtNote: 'Se quita el formato.',
   exportedTo: (file) => `Exportado a ${file}`,
   show: 'Mostrar',
-  exportFailed: (error) => `Error al exportar: ${error}`
+  exportFailed: (error) => `Error al exportar: ${error}`,
+  sameAsScreen: 'Las mismas páginas que en Escribir: tamaño, márgenes y tipografía.'
 }

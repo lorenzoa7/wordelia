@@ -8,6 +8,8 @@ export default async function ({ page, shot }) {
   await page.waitForSelector('.manuscript', { timeout: 15000 })
   await page.waitForTimeout(700)
   await shot('empty-chapter')
+  // The cursor is in the text at once: keys go there without a click.
+  if (!(await page.evaluate(() => Boolean(document.activeElement?.closest('.manuscript'))))) throw new Error('No cursor in the text of the new book')
   await page.locator('.manuscript').click()
   await page.keyboard.type('Era uma vez um farol... ')
   await page.keyboard.press('Enter')

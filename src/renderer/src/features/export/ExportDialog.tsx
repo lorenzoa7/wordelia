@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import clsx from 'clsx'
 import { BookOpen, FileDoc, FilePdf, FileText, Files, MarkdownLogo } from '@phosphor-icons/react'
 import { SCENE_BREAK_GLYPH, countMarkdownWords, markdownToPlain } from '@shared/book'
-import { PAGE_SIZES, buildExportBook, headingParts, presetSettings } from '@shared/export/model'
+import { PAGE_SIZES, buildExportBook, exportSettingsToKeep, headingParts, presetSettings, startExportSettings } from '@shared/export/model'
 import { buildPrintHtml } from '@shared/export/html'
+import { bookToMarkdown, bookToPlainText } from '@shared/export/text'
 import type { ExportSettings, PageSize } from '@shared/types'
 import { Button, Dialog, Field, Select, Switch } from '@/ui'
 import { invoke } from '@/lib/api'
@@ -34,7 +35,8 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
   useEffect(() => {
     if (open && manifest) {
       flushEditor()
-      setSettings(manifest.export)
+      // The book preset starts from the pages of the Write view; the manuscript preset from its own page.
+      setSettings(startExportSettings(manifest))
     }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -48,7 +50,8 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
     try {
       const book = useBook.getState()
       const words = book.chapters.reduce((n, c) => n + countMarkdownWords(c.body), 0)
-      const model = buildExportBook(manifest, book.chapters, words, s)
+      // A text file has the scene break of the book typography: the dialog shows the print choice only for PDF and Word.
+      const model = buildExportBook(manifest, book.chapters, words, paged ? s : { ...s, sceneBreak: manifest.typography.sceneBreak })
       const name = manifest.title || 'Book'
       let path: string | null = null
       if (format === 'pdf') {
@@ -57,11 +60,12 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
       } else if (format === 'docx') {
         path = await invoke('export:docx', { book: model, defaultName: name })
       } else {
-        const content = format === 'md' ? toMarkdown(model.title, model.author, book.chapters) : toText(model, book.chapters)
+        const content = format === 'md' ? bookToMarkdown(model) : bookToPlainText(model)
         path = await invoke('export:text', { content, defaultName: name, extension: format })
       }
-      // Keep the export settings with the book.
-      book.updateManifest({ export: s })
+      // Keep the choices of this export with the book, but not its page: the page size and the margins
+      // are the page of the Write view (Settings → This book), and an export never changes them.
+      book.updateManifest({ export: exportSettingsToKeep(manifest, s) })
       if (path) {
         onOpenChange(false)
         const tt = getT()
@@ -114,7 +118,7 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
                   <button
                     className={clsx('preset', s.preset === 'book' && 'is-active')}
                     aria-pressed={s.preset === 'book'}
-                    onClick={() => setSettings(presetSettings('book', s, manifest.typography.fontFamily))}
+                    onClick={() => setSettings(presetSettings('book', s, manifest))}
                   >
                     <BookOpen size={16} />
                     <span>
@@ -122,7 +126,7 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
                       <small>{t.exportDialog.presets.book.hint}</small>
                     </span>
                   </button>
-                  <button aria-pressed={s.preset === 'manuscript'} className={clsx('preset', s.preset === 'manuscript' && 'is-active')} onClick={() => setSettings(presetSettings('manuscript', s, manifest.typography.fontFamily))}>
+                  <button aria-pressed={s.preset === 'manuscript'} className={clsx('preset', s.preset === 'manuscript' && 'is-active')} onClick={() => setSettings(presetSettings('manuscript', s, manifest))}>
                     <Files size={16} />
                     <span>
                       <b>{t.exportDialog.presets.manuscript.name}</b>
@@ -151,7 +155,7 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
                     <Select
                       value={String(s.typography.fontSize)}
                       onValueChange={(v) => setTypo({ fontSize: Number(v) })}
-                      options={[9, 10, 10.5, 11, 11.5, 12, 13, 14].map((n) => ({ value: String(n), label: `${t.common.number(n)} pt` }))}
+                      options={withValue([9, 10, 10.5, 11, 11.5, 12, 13, 14], s.typography.fontSize).map((n) => ({ value: String(n), label: `${t.common.number(n)} pt` }))}
                       ariaLabel={t.exportDialog.size}
                     />
                   </Field>
@@ -159,7 +163,7 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
                     <Select
                       value={String(s.typography.lineHeight)}
                       onValueChange={(v) => setTypo({ lineHeight: Number(v) })}
-                      options={[1.15, 1.3, 1.45, 1.5, 1.6, 2].map((n) => ({ value: String(n), label: n === 2 ? t.exportDialog.double : t.common.number(n) }))}
+                      options={withValue([1.15, 1.3, 1.45, 1.5, 1.6, 2], s.typography.lineHeight).map((n) => ({ value: String(n), label: n === 2 ? t.exportDialog.double : t.common.number(n) }))}
                       ariaLabel={t.exportDialog.lineSpacing}
                     />
                   </Field>
@@ -194,6 +198,7 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
                     <Switch checked={s.chapterStartsOnNewPage} onCheckedChange={(v) => set({ chapterStartsOnNewPage: v })} />
                   </Field>
                 </div>
+                {s.preset === 'book' && sameAsScreen(s, manifest) && <p className="export-note">{t.exportDialog.sameAsScreen}</p>}
                 {format === 'docx' && <p className="export-note">{t.exportDialog.docxNote}</p>}
               </>
             )}
@@ -263,23 +268,22 @@ function PagePreview({ settings: s }: { settings: ExportSettings }): React.JSX.E
   )
 }
 
-function toMarkdown(title: string, author: string, chapters: Array<{ title: string; body: string }>): string {
-  const head = `# ${title}\n\n${author ? `*${author}*\n\n` : ''}`
-  return head + chapters.map((c) => `## ${c.title}\n\n${c.body.trim()}\n`).join('\n')
+/** A list of choices with the value now in it: the book typography can have a size that the list does not have. */
+function withValue(list: number[], value: number): number[] {
+  return list.includes(value) ? list : [...list, value].sort((x, y) => x - y)
 }
 
-function toText(model: { title: string; author: string; settings: ExportSettings; language: string }, chapters: Array<{ title: string; body: string }>): string {
-  const glyph = SCENE_BREAK_GLYPH[model.settings.sceneBreak] || ''
-  const head = `${model.title}\n${model.author}\n\n\n`
+/** The export has the pages of the Write view: the same page size, margins and type. */
+function sameAsScreen(s: ExportSettings, m: { export: ExportSettings; typography: { fontFamily: string; fontSize: number; lineHeight: number; firstLineIndent: number; align: string } }): boolean {
+  const t = s.typography
+  const b = m.typography
   return (
-    head +
-    chapters
-      .map((c, i) => {
-        const text = markdownToPlain(c.body.replace(/^\* \* \*$/gm, glyph || ' '))
-          .replace(/\n{3,}/g, '\n\n')
-          .trim()
-        return `${i + 1}\n${c.title}\n\n${text}\n`
-      })
-      .join('\n\n\n')
+    s.pageSize === m.export.pageSize &&
+    JSON.stringify(s.margins) === JSON.stringify(m.export.margins) &&
+    t.fontFamily === b.fontFamily &&
+    t.fontSize === b.fontSize &&
+    t.lineHeight === b.lineHeight &&
+    t.firstLineIndent === b.firstLineIndent &&
+    t.align === b.align
   )
 }

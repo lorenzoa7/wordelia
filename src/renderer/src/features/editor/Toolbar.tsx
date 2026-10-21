@@ -65,7 +65,7 @@ export function Toolbar({ editor }: { editor: Editor }): React.JSX.Element {
 
   return (
     <div className="toolbar-wrap">
-      <div className="toolbar" aria-label={tb.formatting}>
+      <div className="toolbar" role="toolbar" aria-label={tb.formatting}>
         <IconButton label={t.common.undo} shortcut="Ctrl+Z" disabled={!st.canUndo} onClick={() => run().undo().run()}>
           <ArrowArcLeft size={17} />
         </IconButton>
@@ -76,7 +76,7 @@ export function Toolbar({ editor }: { editor: Editor }): React.JSX.Element {
 
         <Menu
           trigger={
-            <button className="toolbar-select toolbar-font" aria-label={tb.font}>
+            <button className="toolbar-select toolbar-font" aria-label={t.editor.fontIs(st.font ?? bookFont)}>
               <span style={{ fontFamily: fontStack(st.font ?? bookFont) }}>{st.font ?? bookFont}</span>
               <CaretDown size={10} />
             </button>
@@ -103,7 +103,7 @@ export function Toolbar({ editor }: { editor: Editor }): React.JSX.Element {
 
         <Menu
           trigger={
-            <button className="toolbar-select toolbar-size" aria-label={tb.fontSize}>
+            <button className="toolbar-select toolbar-size" aria-label={t.editor.fontSizeIs(st.size ?? bookSize)}>
               <span style={{ fontFamily: fontStack(st.font ?? bookFont) }}>{st.size ?? bookSize}</span>
               <CaretDown size={10} />
             </button>

@@ -7,7 +7,43 @@ import { readFrontmatter, writeFrontmatter } from '@shared/markdown/frontmatter'
 import type { HistoryItem } from '@shared/types'
 import { atomicWrite, safeJoin } from '../fsutil'
 
-const MAX_PER_CHAPTER = 60
+const HOUR = 60 * 60 * 1000
+const DAY = 24 * HOUR
+
+/** A chapter never keeps more versions than this. */
+export const MAX_VERSIONS = 400
+
+/**
+ * Which versions stay, from the newest to the oldest. A long day of writing must not push out
+ * the versions of last month:
+ * - the last day: all versions;
+ * - up to 7 days: the newest version of each hour;
+ * - up to 60 days: the newest version of each day;
+ * - older: the newest version of each week.
+ * There are never more than `MAX_VERSIONS`. Returns the ids of the versions to delete.
+ */
+export function versionsToDrop(items: Array<Pick<HistoryItem, 'id' | 'at'>>, now: number): string[] {
+  const sorted = [...items].sort((a, b) => b.id.localeCompare(a.id))
+  const seen = new Set<string>()
+  const drop: string[] = []
+  let kept = 0
+  for (const it of sorted) {
+    const at = Date.parse(it.at)
+    const age = now - at
+    let bucket: string | null = null
+    if (!Number.isFinite(at) || age < DAY) bucket = null
+    else if (age < 7 * DAY) bucket = `h${Math.floor(at / HOUR)}`
+    else if (age < 60 * DAY) bucket = `d${Math.floor(at / DAY)}`
+    else bucket = `w${Math.floor(at / (7 * DAY))}`
+    if ((bucket && seen.has(bucket)) || kept >= MAX_VERSIONS) {
+      drop.push(it.id)
+      continue
+    }
+    if (bucket) seen.add(bucket)
+    kept++
+  }
+  return drop
+}
 
 function dir(root: string, chapterId: string): string {
   if (!/^[\w-]+$/.test(chapterId)) throw new Error('Bad chapter id')
@@ -25,8 +61,8 @@ export async function saveSnapshot(root: string, chapterId: string, label: strin
   const at = new Date().toISOString()
   const id = at.replace(/[:.]/g, '-')
   await atomicWrite(`${d}/${id}.md`, writeFrontmatter({ label, at }, body))
-  // Keep the newest versions only.
-  for (const old of items.slice(MAX_PER_CHAPTER - 1)) await rm(`${d}/${old.id}.md`, { force: true })
+  // Fewer versions for each older day (versionsToDrop).
+  for (const old of versionsToDrop([{ id, at }, ...items], Date.now())) await rm(`${d}/${old}.md`, { force: true })
 }
 
 export async function listSnapshots(root: string, chapterId: string): Promise<HistoryItem[]> {

@@ -24,8 +24,11 @@ await mkdir(resolve('test-results/exports'), { recursive: true })
 const work = await mkdtemp(join(tmpdir(), 'wordelia-shot-'))
 const userData = join(work, 'userdata')
 await mkdir(userData, { recursive: true })
-const settings = fresh ? { theme: dark ? 'dark' : 'light', onboarded: false } : {
+// The interface is in English, as the scenarios expect. A fresh start (--fresh) takes the language of the
+// system, as a new install does (SHOT_LANG sets it: for example SHOT_LANG=pt-BR).
+const settings = fresh ? { theme: dark ? 'dark' : 'light', onboarded: false, ...(process.env.SHOT_LANG ? { language: process.env.SHOT_LANG } : {}) } : {
   theme: dark ? 'dark' : 'light',
+  language: 'en',
   routes: {
     chat: { provider: 'claude-code', model: 'opus' },
     action: { provider: 'claude-code', model: 'sonnet' },

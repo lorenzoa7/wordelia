@@ -23,12 +23,15 @@ export const onboarding = {
   start: 'Start writing',
   copied: 'Copied. Paste it in a terminal.',
   runInTerminal: (cmd: string): string => `Run in a terminal: ${cmd}`,
-  /** Before the install command */
-  notInstalled: 'Not installed. In a terminal, run',
+  notInstalled: 'Not installed on this computer.',
   expired: 'The login on this computer has expired.',
   notLoggedIn: 'Installed, but not logged in.',
   found: (account?: string): string => `Found on this computer${account ? `, logged in as ${account}` : ''}.`,
   connected: 'Connected',
   waiting: 'Waiting…',
-  logIn: 'Log in'
+  logIn: 'Log in',
+  /** Opens the official install page of the program */
+  install: 'Install…',
+  installWaiting: 'Install it from the page that opened. Wordelia finds it by itself when it is done.'
+
 }

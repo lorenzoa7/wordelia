@@ -73,6 +73,10 @@
   align-items: center;
   gap: 6px;
 }
+/* The title of the second step takes the focus (Tab goes on from it); it is not a control, so no ring. */
+.welcome-h2:focus {
+  outline: none;
+}
 .welcome-h2 {
   margin: 0 0 6px;
   font-family: var(--font-prose);
@@ -128,20 +132,6 @@
 .welcome-hint {
   margin-top: 6px;
   line-height: 1.6;
-}
-.cmd-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 1px 7px;
-  border: 0;
-  border-radius: 4px;
-  background: var(--desk-2);
-  color: var(--ink);
-  font-size: var(--text-xs);
-}
-.cmd-chip:hover {
-  background: var(--desk-3);
 }
 .welcome-api {
   display: flex;

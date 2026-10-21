@@ -292,11 +292,13 @@ export const TextArea = forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttrib
 export function Switch({
   checked,
   onCheckedChange,
-  label
+  label,
+  disabled
 }: {
   checked: boolean
   onCheckedChange: (v: boolean) => void
   label?: string
+  disabled?: boolean
 }): React.JSX.Element {
   const field = useContext(FieldContext)
   return (
@@ -304,6 +306,7 @@ export function Switch({
       className="switch"
       id={field?.controlId}
       checked={checked}
+      disabled={disabled}
       onCheckedChange={onCheckedChange}
       aria-label={label}
       aria-labelledby={label ? undefined : field?.labelId}

@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from 'react'
 import { motion } from 'motion/react'
 import {
   ArrowCircleUp,
@@ -19,7 +20,8 @@ import { useApp } from '@/stores/app'
 import { useBook, type BookView } from '@/stores/book'
 import { useUi } from '@/stores/ui'
 import { invoke } from '@/lib/api'
-import { useT } from '@/lib/i18n'
+import { getT, useT } from '@/lib/i18n'
+import { askConfirm } from '@/ui/prompt'
 import { installUpdate, useUpdate } from '@/lib/update'
 import { Logo } from './Logo'
 import { ProviderBadge } from './ProviderBadge'
@@ -30,9 +32,68 @@ const VIEWS: Array<{ id: BookView; icon: React.ReactNode; key: string }> = [
   { id: 'plan', icon: <Notebook size={14} />, key: 'Ctrl+2' }
 ]
 
-const closeBook = (): void => void useBook.getState().close().then(() => useApp.getState().refreshLibrary())
+/** Close the book. When some text is not on disk, ask first, like the close of the window. */
+async function closeBookNow(): Promise<void> {
+  if (!(await useBook.getState().close())) {
+    const t = getT()
+    const d = t.main.closeDialog
+    const anyway = await askConfirm({
+      title: d.message,
+      // Plain words: the error of the system (EPERM, the full path) is in the tooltip of the save state.
+      message: `${d.fileNotWritten} ${d.syncAppHint}`,
+      confirm: d.closeAnyway,
+      cancel: t.app.keepBookOpen,
+      danger: true
+    })
+    if (!anyway || !(await useBook.getState().close({ force: true }))) return
+  }
+  await useApp.getState().refreshLibrary()
+}
+const closeBook = (): void => void closeBookNow()
 
-export function TitleBar(): React.JSX.Element {
+/** The width that the children of a row need, with their margins, the gaps and the padding of the row. */
+function neededWidth(row: HTMLElement): number {
+  const cs = getComputedStyle(row)
+  const kids = [...row.children] as HTMLElement[]
+  const margins = (k: HTMLElement): number => parseFloat(getComputedStyle(k).marginLeft) + parseFloat(getComputedStyle(k).marginRight)
+  const gaps = (parseFloat(cs.columnGap) || 0) * Math.max(0, kids.length - 1)
+  return kids.reduce((n, k) => n + k.getBoundingClientRect().width + margins(k), 0) + gaps + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight)
+}
+
+/**
+ * The tools on the right never cover the view tabs. When they do not fit in their column (a narrow
+ * window, a long language, the update badge and the AI warning together), the AI warning shows only
+ * its icon (`fit-1`), then the update badge too (`fit-2`). Their tooltips keep the full text.
+ */
+function useFitTools(): React.RefObject<HTMLDivElement | null> {
+  const ref = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const row = ref.current
+    if (!row) return
+    const fit = (): void => {
+      row.classList.remove('fit-1', 'fit-2')
+      for (const level of ['fit-1', 'fit-2']) {
+        if (neededWidth(row) <= row.clientWidth + 0.5) return
+        row.classList.add(level)
+      }
+    }
+    fit()
+    // The column has the width of its grid track, not of its content: a class change here never resizes it.
+    const size = new ResizeObserver(fit)
+    size.observe(row)
+    // A badge that comes or goes, or a new language.
+    const content = new MutationObserver(fit)
+    content.observe(row, { childList: true, subtree: true, characterData: true })
+    return () => {
+      size.disconnect()
+      content.disconnect()
+    }
+  }, [])
+  return ref
+}
+
+/** `inert`: a modal screen (the welcome) is open, so the title bar takes no focus and no clicks. */
+export function TitleBar({ inert = false }: { inert?: boolean }): React.JSX.Element {
   const t = useT()
   const root = useBook((s) => s.root)
   const title = useBook((s) => s.manifest?.title)
@@ -42,9 +103,10 @@ export function TitleBar(): React.JSX.Element {
   const setUi = useApp((s) => s.setUi)
   const openSettings = useUi((s) => s.openSettings)
   const setExportOpen = useUi((s) => s.setExportOpen)
+  const tools = useFitTools()
 
   return (
-    <header className={clsx('titlebar', root && 'has-book')}>
+    <header className={clsx('titlebar', root && 'has-book')} inert={inert}>
       {/* The wordmark at the far left; the sidebar toggle is in the sidebar header. */}
       <div className="titlebar-left">
         {root ? (
@@ -110,7 +172,7 @@ export function TitleBar(): React.JSX.Element {
         </nav>
       )}
 
-      <div className="titlebar-right">
+      <div className="titlebar-right" ref={tools}>
         <UpdateBadge />
         <ProviderBadge />
         {root && (
@@ -140,7 +202,7 @@ function UpdateBadge(): React.JSX.Element | null {
   if (u.state !== 'ready') return null
   return (
     <Tooltip label={t.app.update.badgeHint(u.version)}>
-      <button className="update-badge" onClick={installUpdate}>
+      <button className="update-badge" aria-label={t.app.update.badge} onClick={installUpdate}>
         <ArrowCircleUp size={14} weight="bold" />
         <span>{t.app.update.badge}</span>
       </button>

@@ -137,7 +137,21 @@ export interface BookSnapshot {
   syncState: SyncState
   /** The actions of this book, from `ai/actions.json`. The app settings keep the actions for all books. */
   actions: AiAction[]
+  /** What the writer must know about the files of the book when it opens */
+  notices?: BookNotice[]
 }
+
+/**
+ * A problem with the files of a book that the app found when the book opened.
+ * - `manifestRepaired`: wordelia.json did not parse. The app kept a copy of it (`backup`, relative to the
+ *   book) and made a new one from one side of a git conflict, from its last good copy, from the parts that
+ *   it could read, or from nothing (`from`).
+ * - `chaptersMissing`: the manifest names chapter files that are not there (a sync client did not deliver
+ *   them yet). Their places in the order stay.
+ */
+export type BookNotice =
+  | { kind: 'manifestRepaired'; from: 'conflict' | 'copy' | 'salvage' | 'new'; backup: string }
+  | { kind: 'chaptersMissing'; files: string[] }
 
 export interface HistoryItem {
   id: string

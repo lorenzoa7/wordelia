@@ -39,5 +39,7 @@ export const app: typeof en = {
     network: 'No hay conexión con el proveedor de IA.',
     cancelled: 'Detenido.',
     unknown: 'Algo salió mal.'
-  }
+  },
+  keepBookOpen: 'Mantener el libro abierto'
+
 }

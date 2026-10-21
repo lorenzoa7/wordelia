@@ -24,7 +24,8 @@ export const main: typeof en = {
     importBook: 'Importar um livro',
     documents: 'Documentos',
     importNotes: 'Importar notas para o planejamento',
-    markdownNotes: 'Notas em Markdown'
+    markdownNotes: 'Notas em Markdown',
+    notABook: 'Esta pasta não é um livro do Wordelia. Abra-a com o botão Abrir pasta.'
   },
   export: {
     pdf: { title: 'Exportar PDF', filter: 'PDF' },

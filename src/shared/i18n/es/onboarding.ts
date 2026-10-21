@@ -20,11 +20,14 @@ export const onboarding: typeof en = {
   start: 'Empezar a escribir',
   copied: 'Copiado. Pégalo en una terminal.',
   runInTerminal: (cmd) => `Ejecuta en una terminal: ${cmd}`,
-  notInstalled: 'No instalado. En una terminal, ejecuta',
+  notInstalled: 'No está instalado en esta computadora.',
   expired: 'La sesión en esta computadora expiró.',
   notLoggedIn: 'Instalado, pero sin sesión iniciada.',
   found: (account) => `Encontrado en esta computadora${account ? `, con sesión iniciada como ${account}` : ''}.`,
   connected: 'Conectado',
   waiting: 'Esperando…',
-  logIn: 'Iniciar sesión'
+  logIn: 'Iniciar sesión',
+  install: 'Instalar…',
+  installWaiting: 'Instálalo desde la página que se abrió. Wordelia lo encuentra solo cuando termines.'
+
 }

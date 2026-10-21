@@ -26,6 +26,8 @@ interface UiState {
   setNewBookOpen(v: boolean): void
   setFindOpen(v: boolean): void
   openHistory(chapterId: string | null): void
+  /** Close what belongs to the open book (the find bar, the history, the export): another book opens, or none. */
+  resetForBook(): void
   toast(message: string, opts?: { kind?: Toast['kind']; action?: Toast['action']; ms?: number }): void
   dismissToast(id: number): void
   pauseToast(id: number): void
@@ -61,6 +63,10 @@ export const useUi = create<UiState>((set, get) => ({
   },
   openHistory(chapterId) {
     set({ historyChapterId: chapterId })
+  },
+  resetForBook() {
+    const tab = get().settingsTab
+    set({ findOpen: false, historyChapterId: null, exportOpen: false, ...(tab === 'book' || tab === 'rules' ? { settingsOpen: false } : {}) })
   },
   toast(message, opts = {}) {
     const id = nextToast++

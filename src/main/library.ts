@@ -6,7 +6,9 @@ import { join } from 'node:path'
 import { MANUSCRIPT_DIR, chapterFromFile, countMarkdownWords, markdownToPlain } from '@shared/book'
 import { estimatePages } from '@shared/export/pages'
 import type { BookManifest, Chapter, LibraryItem } from '@shared/types'
-import { readManifest } from './book/store'
+import type { RelocateResult } from '@shared/ipc'
+import { salvageManifest } from '@shared/manifest'
+import { findBookRoot, readManifest, readManifestFile } from './book/store'
 import { atomicWrite, readJson, readTextOr, safeJoin } from './fsutil'
 
 const file = (): string => join(app.getPath('userData'), 'library.json')
@@ -119,4 +121,40 @@ export async function refreshLibraryItem(root: string): Promise<void> {
 export async function removeFromLibrary(root: string): Promise<void> {
   const items = (await load()).filter((i) => !sameRoot(i, root))
   await save(items)
+}
+
+/** Put back a card that the writer removed (Undo). It goes back to its place: the list is in the order of `openedAt`. */
+export async function restoreLibraryItem(item: LibraryItem): Promise<void> {
+  const items = await load()
+  if (items.some((i) => sameRoot(i, item.root))) return
+  items.push({ ...item, missing: undefined })
+  items.sort((a, b) => b.openedAt.localeCompare(a.openedAt))
+  await save(items.slice(0, 50))
+}
+
+/** The id of the book in a folder, also when its manifest is damaged. Null when the folder is not a book. */
+async function bookIdAt(root: string): Promise<{ id: string; title: string } | null> {
+  const read = await readManifestFile(root)
+  if (read.state === 'ok') return { id: read.manifest.id, title: read.manifest.title }
+  if (read.state === 'broken') {
+    const part = salvageManifest(read.text)
+    return part?.id ? { id: part.id, title: part.title ?? '' } : null
+  }
+  return null
+}
+
+/**
+ * "Find the folder…": the card of a book that moved points to `picked`, when that folder (or the book that
+ * it is in) has the same book, by id.
+ */
+export async function relocateLibraryItem(oldRoot: string, picked: string): Promise<RelocateResult> {
+  const items = await load()
+  const i = items.findIndex((it) => sameRoot(it, oldRoot))
+  const root = (await findBookRoot(picked)) ?? picked
+  const found = await bookIdAt(root)
+  if (!found) return { ok: false, reason: 'notBook' }
+  if (i < 0 || found.id !== items[i].id) return { ok: false, reason: 'otherBook', title: found.title }
+  const moved: LibraryItem = { ...items[i], root, missing: undefined }
+  await save([moved, ...items.filter((it, k) => k !== i && !sameRoot(it, root))].sort((a, b) => b.openedAt.localeCompare(a.openedAt)))
+  return { ok: true, root }
 }

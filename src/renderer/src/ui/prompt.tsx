@@ -7,7 +7,7 @@ import { Button, Dialog, Field, TextInput } from './index'
 
 type Request =
   | { kind: 'text'; title: string; label: string; placeholder?: string; initial?: string; confirm?: string; resolve: (v: string | null) => void }
-  | { kind: 'confirm'; title: string; message: string; confirm?: string; danger?: boolean; resolve: (v: boolean) => void }
+  | { kind: 'confirm'; title: string; message: string; confirm?: string; cancel?: string; danger?: boolean; resolve: (v: boolean) => void }
 
 const usePrompt = create<{ req: Request | null }>(() => ({ req: null }))
 
@@ -15,7 +15,8 @@ export function askText(opts: { title: string; label: string; placeholder?: stri
   return new Promise((resolve) => usePrompt.setState({ req: { kind: 'text', ...opts, resolve } }))
 }
 
-export function askConfirm(opts: { title: string; message: string; confirm?: string; danger?: boolean }): Promise<boolean> {
+/** A yes or no question. `cancel` is the label of the no button (default: Cancel). */
+export function askConfirm(opts: { title: string; message: string; confirm?: string; cancel?: string; danger?: boolean }): Promise<boolean> {
   return new Promise((resolve) => usePrompt.setState({ req: { kind: 'confirm', ...opts, resolve } }))
 }
 
@@ -44,7 +45,7 @@ export function PromptHost(): React.JSX.Element {
       footer={
         <>
           <Button variant="ghost" onClick={() => close(req?.kind === 'confirm' ? false : null)}>
-            {t.common.cancel}
+            {(req?.kind === 'confirm' && req.cancel) || t.common.cancel}
           </Button>
           <Button
             variant={req?.kind === 'confirm' && req.danger ? 'ribbon' : 'primary'}

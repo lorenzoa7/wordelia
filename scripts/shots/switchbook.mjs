@@ -20,4 +20,12 @@ export default async function ({ page, openBook, book, work }) {
     await openBook()
     await page.waitForTimeout(900)
   }
+
+  // The find bar belongs to the book: it does not stay open in the next book.
+  await page.keyboard.press('Control+f')
+  await page.waitForSelector('.find-bar')
+  await page.evaluate(() => window.__wordelia.book.getState().close())
+  await page.evaluate((p) => window.__wordelia.openBook(p), other)
+  await page.waitForSelector('.manuscript')
+  if (await page.locator('.find-bar').count()) throw new Error('The find bar stayed open after a book switch')
 }

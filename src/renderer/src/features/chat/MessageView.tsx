@@ -18,7 +18,8 @@ import clsx from 'clsx'
 import { modelLabel } from '@shared/ai/effort'
 import { hasProposals, parseProposals, replyProse, type Segment } from '@shared/proposals/parse'
 import { Selection } from '@tiptap/pm/state'
-import { toast, useUi } from '@/stores/ui'
+import { toast } from '@/stores/ui'
+import { describeError } from '@/lib/ai'
 import { getActiveEditor } from '@/features/editor/registry'
 import { sliceFromMarkdown } from '@/features/editor/review'
 import type { ChatMessage, Thread } from '@shared/types'
@@ -221,8 +222,37 @@ function EditBox({ message, thread, after }: { message: ChatMessage; thread: Thr
 /* Replies of the AI                                                    */
 /* ------------------------------------------------------------------ */
 
-/** The errors that the AI settings can fix: the button opens Settings → AI. */
-const SETTINGS_ERRORS = new Set(['not-installed', 'not-logged-in'])
+/**
+ * The error of a failed reply: the plain message, the button that fixes it (for example "Open
+ * settings", which opens the row of the provider), and the words of the provider under "Details".
+ */
+function ReplyError({ message }: { message: ChatMessage }): React.JSX.Element {
+  const t = useT()
+  const [open, setOpen] = useState(false)
+  const fix = message.errorKind ? describeError({ ok: false, text: '', errorKind: message.errorKind, provider: message.provider }).fix : undefined
+  return (
+    <div className="msg-error">
+      <WarningCircle size={14} />
+      <div className="msg-error-text">
+        {message.error}
+        {message.errorDetail && (
+          <>
+            {' '}
+            <button className="msg-error-more" aria-expanded={open} onClick={() => setOpen(!open)}>
+              {t.chat.errorDetails}
+            </button>
+            {open && <span className="msg-error-detail">{message.errorDetail}</span>}
+          </>
+        )}
+      </div>
+      {fix && (
+        <button className="msg-error-btn" onClick={fix.run}>
+          {fix.label}
+        </button>
+      )}
+    </div>
+  )
+}
 
 function AssistantMessage({ message, thread, after, canAct }: Props): React.JSX.Element {
   const t = useT()
@@ -247,17 +277,7 @@ function AssistantMessage({ message, thread, after, canAct }: Props): React.JSX.
           <StopCircle size={13} aria-hidden /> {t.chat.stoppedMark}
         </p>
       )}
-      {message.error && (
-        <div className="msg-error">
-          <WarningCircle size={14} />
-          <span className="msg-error-text">{message.error}</span>
-          {message.errorKind && SETTINGS_ERRORS.has(message.errorKind) && (
-            <button className="msg-error-btn" onClick={() => useUi.getState().openSettings('ai')}>
-              {t.chat.fixInSettings}
-            </button>
-          )}
-        </div>
-      )}
+      {message.error && <ReplyError message={message} />}
       <ReplyReview segments={segments} message={message} thread={thread} />
       <MessageActions message={message} threadId={thread.id} canRetry={canAct && after === 0} />
     </div>

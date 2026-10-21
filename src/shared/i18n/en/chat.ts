@@ -224,6 +224,6 @@ export const chat = {
     [`${input} tokens in`, `${output} out`, ...(cost ? [`about ${cost}`] : [])].join(' · '),
   usageOfThread: 'Use of this thread',
   usageReplies: (v: number): string => (v === 1 ? 'in 1 reply' : `in ${v} replies`),
-  /** A provider error that the settings can fix */
-  fixInSettings: 'Open Settings → AI'
+  /** The words of the provider about an error, under the plain message */
+  errorDetails: 'Details'
 }

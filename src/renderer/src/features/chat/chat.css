@@ -1891,6 +1891,23 @@ button.proposal-file:hover span {
 .msg-error-btn:hover {
   border-color: var(--ribbon);
 }
+.msg-error-more {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.msg-error-detail {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
 
 /* ---------- Mentions and the use of a thread ---------- */
 .mention-alias {

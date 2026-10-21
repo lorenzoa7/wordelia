@@ -206,6 +206,25 @@ export default async function ({ app, page, shot, openBook, book }) {
     return e.aliases.includes('the keeper') && e.body.includes('Personality')
   }, null, { timeout: 5000 }).catch(() => fail('Undo did not bring the note back'))
 
+  // A failed reply: the plain message, "Details" with the words of the provider, and the button that fixes it.
+  await page.evaluate(() => {
+    const s = window.__wordelia.book.getState()
+    const t = s.threads.find((x) => x.id === 'th_replace')
+    const now = new Date().toISOString()
+    s.saveThread({ ...t, messages: [...t.messages, { id: 'mr_u2', role: 'user', content: 'And Marta?', createdAt: now },
+      { id: 'mr_a2', role: 'assistant', content: '', createdAt: now, error: 'You are not logged in to Claude Code. Open Settings → AI to log in.', errorKind: 'not-logged-in', errorDetail: 'Invalid API key · Please run /login', provider: 'claude-code' }] })
+  })
+  await page.locator('.msg-error .msg-error-more').click()
+  const failedReply = await page.evaluate(() => ({ fix: document.querySelector('.msg-error .msg-error-btn')?.textContent, detail: document.querySelector('.msg-error .msg-error-detail')?.textContent }))
+  console.log('failed reply:', JSON.stringify(failedReply))
+  if (!failedReply.fix || !/login/.test(failedReply.detail ?? '')) fail('a login error has no fix button or no details')
+  await page.locator('.msg-error').scrollIntoViewIfNeeded()
+  await shot('error-details')
+  await page.locator('.msg-error .msg-error-btn').click()
+  await page.waitForSelector('.settings-dialog', { timeout: 5000 }).catch(() => fail('the fix button did not open the settings'))
+  await page.keyboard.press('Escape')
+  await page.waitForSelector('.settings-dialog', { state: 'detached', timeout: 5000 })
+
   // ---- 5. No move while the author types ----
   await page.evaluate((id) => window.__wordelia.chat.getState().setActiveThread(id), tid)
   // (b) The author types in a chapter, and a reply changes a note: the app stays in the chapter.

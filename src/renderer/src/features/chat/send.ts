@@ -5,7 +5,7 @@ import { newId, THREADS_DIR } from '@shared/book'
 import { buildChatSystem, buildChatUserTurn, chatHistory } from '@shared/prompts/chat'
 import type { ChatMessage, CompletionResult, Mention, ModelChoice, Thread } from '@shared/types'
 import { messagesFor, type Messages } from '@shared/i18n'
-import { friendlyError, runCompletion } from '@/lib/ai'
+import { describeError, runCompletion } from '@/lib/ai'
 import { invoke } from '@/lib/api'
 import { getT } from '@/lib/i18n'
 import { useApp } from '@/stores/app'
@@ -246,14 +246,17 @@ export async function requestReply(threadId: string): Promise<void> {
   // Stopped before the first word: nothing to keep.
   if (stopped && !result.text.trim()) return
   const used = usageOf(result, usage)
+  // A stop is the choice of the author, not an error. An error keeps its kind and the words of the
+  // provider, so the chat shows "Details" and the button that fixes it.
+  const failed = result.ok || stopped ? null : describeError(result)
   const reply: ChatMessage = {
     id: assistantId,
     role: 'assistant',
     content: result.text,
     createdAt: new Date().toISOString(),
     model: result.model,
-    // A stop is the choice of the author, not an error.
-    ...(result.ok || stopped ? {} : { error: friendlyError(result), ...(result.errorKind ? { errorKind: result.errorKind } : {}) }),
+    ...(result.provider ? { provider: result.provider } : {}),
+    ...(failed ? { error: failed.message, errorKind: failed.kind, ...(failed.detail ? { errorDetail: failed.detail } : {}) } : {}),
     ...(stopped ? { stopped: true } : {}),
     ...(used ? { usage: used } : {})
   }

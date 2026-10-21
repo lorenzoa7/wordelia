@@ -188,5 +188,5 @@ export const chat: typeof en = {
   usage: (input, output, cost) => [`${input} tokens de entrada`, `${output} de saída`, ...(cost ? [`cerca de ${cost}`] : [])].join(' · '),
   usageOfThread: 'Uso desta conversa',
   usageReplies: (v) => (v === 1 ? 'em 1 resposta' : `em ${v} respostas`),
-  fixInSettings: 'Abrir Configurações → IA'
+  errorDetails: 'Detalhes'
 }

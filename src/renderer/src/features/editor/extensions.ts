@@ -16,6 +16,7 @@ import { WikiLinks } from './wiki-links'
 import { wikiLinkOptions } from '@/features/plan/links'
 import { Pagination, type PaginationOptions } from './pagination'
 import { InlineProposals, type InlineProposalsOptions } from './inlineProposals'
+import { CommentMarks, type CommentMarksOptions } from '@/features/read/marks'
 
 /** Extensions that define the schema. Used by the editor and by HTML import. */
 export function schemaExtensions(): AnyExtension[] {
@@ -71,6 +72,8 @@ export interface EditorConfig {
   pages?: PaginationOptions
   /** Chat proposals in the text: the chapter of this editor */
   proposals?: InlineProposalsOptions
+  /** The passages of the editor's comments in the text: the chapter of this editor */
+  comments?: CommentMarksOptions
 }
 
 export function editorExtensions(cfg: EditorConfig): AnyExtension[] {
@@ -91,6 +94,7 @@ export function editorExtensions(cfg: EditorConfig): AnyExtension[] {
     Review,
     WikiLinks.configure(wikiLinkOptions(false)),
     ...(cfg.pages ? [Pagination.configure(cfg.pages)] : []),
-    ...(cfg.proposals ? [InlineProposals.configure(cfg.proposals)] : [])
+    ...(cfg.proposals ? [InlineProposals.configure(cfg.proposals)] : []),
+    ...(cfg.comments ? [CommentMarks.configure(cfg.comments)] : [])
   ]
 }

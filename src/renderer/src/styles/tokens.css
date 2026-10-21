@@ -98,6 +98,20 @@
   --pen-soft: #dfeadf;
   --pen-wash: rgba(47, 106, 82, 0.12);
 
+  /* The lenses of an editor's read: the tag of a comment, and the mark of its passage in the text
+     (the wash; Continuity has a wavy amber line). They use the hues of the planning map, which stay
+     different for color vision deficiency. */
+  --lens-structure: #2f6fb8;
+  --lens-structure-wash: rgba(47, 111, 184, 0.12);
+  --lens-reader: #7a5cc7;
+  --lens-reader-wash: rgba(122, 92, 199, 0.12);
+  --lens-style: #1d876e;
+  --lens-style-wash: rgba(29, 135, 110, 0.12);
+  --lens-continuity: #b8730f;
+  --lens-continuity-wash: rgba(184, 115, 15, 0.13);
+  --lens-proofread: #9a5a28;
+  --lens-proofread-wash: rgba(154, 90, 40, 0.12);
+
   /* Planning map: one color for each category, in the order of the categories.
      Checked for color vision deficiency (adjacent pairs) and 3:1 contrast on the paper. */
   --map-1: #c4462f;
@@ -180,6 +194,17 @@
   --pen: #8cc3a4;
   --pen-soft: #22352b;
   --pen-wash: rgba(140, 195, 164, 0.14);
+
+  --lens-structure: #6a9ee0;
+  --lens-structure-wash: rgba(106, 158, 224, 0.17);
+  --lens-reader: #a197ea;
+  --lens-reader-wash: rgba(161, 151, 234, 0.17);
+  --lens-style: #5bb592;
+  --lens-style-wash: rgba(91, 181, 146, 0.16);
+  --lens-continuity: #e0a845;
+  --lens-continuity-wash: rgba(224, 168, 69, 0.16);
+  --lens-proofread: #c98a55;
+  --lens-proofread-wash: rgba(201, 138, 85, 0.16);
 
   --map-1: #d9634a;
   --map-2: #4f8bd6;

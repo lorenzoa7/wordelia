@@ -208,3 +208,73 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+/* ---------- The passages of the comments in the text (marks.ts) ---------- */
+.cm-structure {
+  --lens: var(--lens-structure);
+  --lens-wash: var(--lens-structure-wash);
+}
+.cm-reader {
+  --lens: var(--lens-reader);
+  --lens-wash: var(--lens-reader-wash);
+}
+.cm-style {
+  --lens: var(--lens-style);
+  --lens-wash: var(--lens-style-wash);
+}
+.cm-continuity {
+  --lens: var(--lens-continuity);
+  --lens-wash: var(--lens-continuity-wash);
+}
+.cm-proofread {
+  --lens: var(--lens-proofread);
+  --lens-wash: var(--lens-proofread-wash);
+}
+
+/* A soft wash in the color of the lens */
+.cm-mark {
+  border-radius: 2px;
+  background: var(--lens-wash);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+/* Continuity: a wavy amber line under the words, no wash */
+.cm-mark.cm-continuity {
+  background: none;
+  text-decoration: underline wavy var(--lens);
+  text-decoration-thickness: 1px;
+  text-decoration-skip-ink: none;
+  text-underline-offset: 0.24em;
+}
+
+/* The numbers of the comments in the right margin of the page, on the first line of each passage.
+   The text of the chapter (.ProseMirror) is the box of the position. */
+.cm-nums {
+  position: absolute;
+  right: calc(var(--page-mr) / -2);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: calc((1lh - 18px) / 2);
+  text-indent: 0;
+  translate: 50% 0;
+  cursor: default;
+  user-select: none;
+}
+.cm-num {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--paper);
+  box-shadow: inset 0 0 0 1px var(--lens);
+  color: var(--lens);
+  font-family: var(--font-ui);
+  font-size: var(--text-2xs);
+  font-style: normal;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-decoration: none;
+}

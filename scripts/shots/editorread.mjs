@@ -97,6 +97,32 @@ export default async function ({ app, page, shot, openBook }) {
   const reply = await page.locator('.msg-ai').last().innerText()
   if (!/O que funciona|What works/.test(reply)) fail('the letter is not in the reply')
   if (/<note|<find/.test(reply)) fail('a tag of a comment shows in the chat')
+  // The passages are marked in the text, and their numbers in the right margin of the page follow the
+  // order of the chapter.
+  const numbers = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll('.page[data-chapter="ch_sample01"] .cm-num')].map((n) => {
+        const box = n.getBoundingClientRect()
+        const text = n.closest('.manuscript').getBoundingClientRect()
+        const sheet = n.closest('.page').getBoundingClientRect()
+        return { n: n.textContent, id: n.dataset.comment, lens: n.className, inMargin: box.left > text.right && box.right < sheet.right }
+      })
+    )
+  await until('the passages of the comments are not marked', async () => (await numbers()).length === 3)
+  const marked = await numbers()
+  console.log('numbers:', JSON.stringify(marked))
+  if (marked.map((m) => m.n).join() !== '1,2,3' || marked.map((m) => m.id).join() !== first.map((c) => c.id).join()) fail('the numbers do not follow the order of the passages')
+  if (!marked.every((m) => m.inMargin)) fail('a number is not in the right margin of the page')
+  for (const lens of ['style', 'structure', 'continuity']) {
+    if (!(await page.locator(`.page[data-chapter="ch_sample01"] .cm-mark.cm-${lens}`).count())) fail(`the passage of the ${lens} comment has no mark`)
+  }
+  if ((await page.locator('.cm-mark.cm-continuity').first().evaluate((e) => getComputedStyle(e).textDecorationStyle)) !== 'wavy') fail('the continuity mark is not a wavy line')
+  // "Hide" takes the marks out of the text, and puts them back.
+  const hide = (hidden) => page.evaluate((h) => window.__commentMarks.useCommentMarks.setState({ hidden: h }), hidden)
+  await hide(true)
+  await until('"Hide" did not take the marks away', async () => !(await page.locator('.cm-mark, .cm-num').count()), 3000)
+  await hide(false)
+  await until('the marks did not come back', async () => (await numbers()).length === 3, 3000)
   const head = await page.locator('.msg-ai .read-head').innerText()
   console.log('header:', JSON.stringify(head))
   if (!/3/.test(head) || !/Cap\. 1|Ch\. 1/.test(head)) fail(`the header card says "${head}"`)
@@ -158,4 +184,43 @@ export default async function ({ app, page, shot, openBook }) {
   if (!/A Tempestade/.test(shown)) fail(`the chat shows "${shown}" after the offer`)
   await until('the comments of the offered read did not come', async () => (await comments()).length === 7)
   await shot('after-offer')
+
+  // 5. The comments follow the text. A word typed in the passage of the open style comment goes into its
+  // passage after a short pause, and the mark stays. Ctrl+Z takes the word out again. A passage that the
+  // author deletes makes its comment "lost", and its mark goes away. A text from outside the editor that
+  // has the passage again gives the comment its passage back.
+  const style = (await comments()).find((c) => c.lens === 'style' && c.state === 'open')
+  if (!style) fail('no open style comment')
+  const original = await page.evaluate(() => window.__wordelia.book.getState().chapters.find((c) => c.id === 'ch_sample01').body)
+  const passageOf = async (id) => (await comments()).find((c) => c.id === id)
+  const rangeOf = (id) =>
+    page.evaluate((i) => {
+      const r = window.__commentMarks.commentRanges('ch_sample01').get(i)
+      return r ? { from: r.from, to: r.to } : null
+    }, id)
+  const select = (sel) => page.evaluate((s) => window.__wordelia.editor().chain().focus().setTextSelection(s).run(), sel)
+  await page.locator('.page[data-chapter="ch_sample01"] p').first().click()
+  const at = await rangeOf(style.id)
+  if (!at) fail('the style comment has no range in the text')
+  await select(at.from + 'Elias acendeu'.length)
+  await page.keyboard.type(' devagar')
+  await until('the passage did not get the new word', async () => (await passageOf(style.id)).passage === 'Elias acendeu devagar a lâmpada do farol', 3000)
+  const mark = page.locator(`.page[data-chapter="ch_sample01"] .cm-mark[data-mark="${style.id}"]`)
+  if ((await mark.allInnerTexts()).join('') !== 'Elias acendeu devagar a lâmpada do farol') fail(`the mark of the style comment is on "${(await mark.allInnerTexts()).join('')}"`)
+  if (!(await page.locator(`.cm-num[data-comment="${style.id}"]`).count())) fail('the number of the style comment went away')
+  await shot('passage-edited')
+  await page.keyboard.press('Control+z')
+  await until('Ctrl+Z did not take the word out of the passage', async () => (await passageOf(style.id)).passage === 'Elias acendeu a lâmpada do farol', 3000)
+  const whole = await rangeOf(style.id)
+  await select(whole)
+  await page.keyboard.press('Delete')
+  await until('the deleted passage did not make the comment lost', async () => (await passageOf(style.id)).lost === true, 3000)
+  if (await page.locator(`.cm-num[data-comment="${style.id}"], .cm-mark[data-mark="${style.id}"]`).count()) fail('the lost comment still has a mark')
+  if ((await passageOf(style.id)).state !== 'open') fail('the lost comment is not open')
+  await shot('passage-lost')
+  // An older version of the chapter comes back (History → Restore): the editor loads it as a text from outside.
+  await page.evaluate((body) => window.__wordelia.book.getState().restoreChapter('ch_sample01', body), original)
+  await until('the restored text did not give the comment its passage back', async () => !(await passageOf(style.id)).lost, 3000)
+  await until('the mark of the comment did not come back', async () => (await page.locator(`.page[data-chapter="ch_sample01"] .cm-num[data-comment="${style.id}"]`).count()) === 1, 3000)
+  if ((await passageOf(style.id)).passage !== 'Elias acendeu a lâmpada do farol') fail(`the passage after the restore is "${(await passageOf(style.id)).passage}"`)
 }

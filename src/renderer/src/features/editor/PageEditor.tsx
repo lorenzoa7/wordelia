@@ -448,7 +448,8 @@ function SheetEditor({ chapterId, index, title, geometry, onTyping, sheetRef }: 
             if (ch && m) setPageCount(chapterId, n, countKey(ch, m))
           }
         },
-        proposals: { docId: () => chapterId }
+        proposals: { docId: () => chapterId },
+        comments: { chapterId: () => chapterId }
       }),
     // Typing rules and the interface language change rarely; the editor is rebuilt when they do.
     // eslint-disable-next-line react-hooks/exhaustive-deps

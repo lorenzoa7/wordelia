@@ -48,7 +48,7 @@ export default async function ({ page, shot, openBook, book }) {
 
   // The comments of the book: a sync client delivers ai/comments.json, and the store reloads it.
   const stamp = '2026-10-21T10:00:00.000Z'
-  const item = (id, state) => ({ id, chapterId: 'ch_sample01', lens: 'style', rank: 1, text: 'Repete a palavra.', passage: 'Elias acendeu', sources: [], state, threadId: 'th_x', messageId: 'msg_x', key: '0', createdAt: stamp, updatedAt: stamp })
+  const item = (id, state) => ({ id, chapterId: 'ch_sample01', lens: 'style', rank: 1, text: 'Repete a palavra.', passage: 'O vento entrava', sources: [], state, threadId: 'th_x', messageId: 'msg_x', key: '0', createdAt: stamp, updatedAt: stamp })
   const list = () => page.evaluate(() => window.__wordelia.comments.getState().list.map((c) => `${c.id}|${c.state}`))
   const waitFor = (expected) => page.waitForFunction((want) => JSON.stringify(window.__wordelia.comments.getState().list.map((c) => `${c.id}|${c.state}`)) === want, JSON.stringify(expected), { timeout: 5000 }).catch(() => null)
   const comments = join(book, 'ai', 'comments.json')

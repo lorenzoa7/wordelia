@@ -12,7 +12,7 @@ export interface Candidate extends Mention {
   alias?: string
 }
 
-/** Lower case, without accents: "jose" finds "José". */
+/** Lower case, without accents: "ines" finds "Inês". */
 export function fold(s: string): string {
   return s
     .normalize('NFD')

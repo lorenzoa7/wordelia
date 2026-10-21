@@ -3,18 +3,18 @@
 import { app, BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
 import { copyFile, mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, extname, join, resolve } from 'node:path'
-import { ASSETS_DIR, CHAT_IMAGES_DIR, PLANNING_DIR, fileNameFromTitle, uniqueName } from '@shared/book'
+import { ASSETS_DIR, CHAT_IMAGES_DIR, MANIFEST_FILE, PLANNING_DIR, fileNameFromTitle, uniqueName } from '@shared/book'
 import type { InvokeArgs, InvokeChannel, InvokeResult } from '@shared/ipc'
 import { cancel, complete, providerModels, providerStatus } from './ai'
 import { openLogin } from './ai/login'
-import { createBook, openBook } from './book/store'
+import { NotABookError, createBook, inspectFolder, keepManifestCopy, openBook } from './book/store'
 import { listSnapshots, readSnapshot, saveSnapshot } from './book/history'
 import { noteOwnWrite, unwatchBook, watchBook } from './book/watcher'
 import { exportDocx, exportPdf, exportText } from './export'
 import { atomicWrite, readTextOr, safeJoin } from './fsutil'
 import { mainT } from './i18n'
 import { readImport } from './import'
-import { bookFacts, listLibrary, refreshLibraryItem, removeFromLibrary, setLibraryPages, touchLibrary } from './library'
+import { bookFacts, listLibrary, refreshLibraryItem, relocateLibraryItem, removeFromLibrary, restoreLibraryItem, setLibraryPages, touchLibrary } from './library'
 import { getSecret, getSettings, setSecret, setSettings } from './settings'
 import { assetUrl, registerBookRoot } from './assets'
 import { themeOverlay } from './window'
@@ -60,6 +60,11 @@ export function registerIpc(): void {
   handle('library:remove', (_e, root) => removeFromLibrary(root))
   handle('library:touch', (_e, item) => touchLibrary(item))
   handle('library:pages', (_e, root, pages, words) => setLibraryPages(root, pages, words))
+  handle('library:restore', (_e, item) => restoreLibraryItem(item))
+  handle('library:relocate', (_e, oldRoot, newRoot) => {
+    assertPicked(newRoot)
+    return relocateLibraryItem(oldRoot, newRoot)
+  })
 
   handle('book:create', async (e, opts) => {
     if (!E2E && !isPicked(opts.parentDir) && !samePath(opts.parentDir, defaultBooksDir())) {
@@ -76,11 +81,14 @@ export function registerIpc(): void {
     return snap
   })
 
-  handle('book:open', async (e, root) => {
+  handle('book:open', async (e, root, opts) => {
     // A book from the library, or a folder that the user chose.
     const known = (await listLibrary()).some((i) => samePath(i.root, root))
     if (!E2E && !known && !isPicked(root)) throw new Error((await mainT()).main.dialogs.useOpenFolder)
-    const snap = await openBook(root)
+    const snap = await openBook(root, opts).catch(async (err: unknown) => {
+      if (err instanceof NotABookError) throw new Error((await mainT()).main.dialogs.notABook)
+      throw err
+    })
     await afterOpen(e, root)
     await touchLibrary({
       root,
@@ -109,11 +117,21 @@ export function registerIpc(): void {
     return dir
   })
 
+  handle('book:inspectFolder', async (_e, path) => {
+    assertPicked(path)
+    const info = await inspectFolder(path)
+    // The writer chose a folder inside this book: the book may open.
+    if (info.kind === 'inside') allowPicked(info.root)
+    return info
+  })
+
   handle('book:writeFile', async (_e, root, rel, content) => {
     assertRoot(root)
     const full = safeJoin(root, rel)
     noteOwnWrite(full, content)
     await atomicWrite(full, content)
+    // A good copy of the manifest repairs a damaged one later (a sync conflict, a half-written file).
+    if (rel === MANIFEST_FILE) void keepManifestCopy(root, content)
   })
 
   handle('book:readFile', (_e, root, rel) => {

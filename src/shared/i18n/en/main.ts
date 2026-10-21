@@ -28,7 +28,8 @@ export const main = {
     importBook: 'Import a book',
     documents: 'Documents',
     importNotes: 'Import notes into the planning',
-    markdownNotes: 'Markdown notes'
+    markdownNotes: 'Markdown notes',
+    notABook: 'This folder is not a Wordelia book. Open it with the Open folder button.'
   },
   /** Save dialogs of the export: the title and the file type name */
   export: {

@@ -41,7 +41,7 @@ Outside React (stores, plain functions): `getT()` from `@/lib/i18n`. In the main
 | Planning | Planejamento | Planificación |
 | Story world | Universo da história | Universo de la historia |
 | Category | Categoria | Categoría |
-| Entry (a planning note) | Nota | Nota |
+| Note (a planning entry; `Entry` in code) | Nota | Nota |
 | Alias | Outro nome | Otro nombre |
 | Update notes / from the chapters (the sync button) | Atualizar notas / pelos capítulos | Actualizar notas / desde los capítulos |
 | Writing rules | Regras de escrita | Reglas de escritura |
@@ -70,3 +70,5 @@ Outside React (stores, plain functions): `getT()` from `@/lib/i18n`. In the main
 | Daily goal | Meta diária | Meta diaria |
 | Export / Import | Exportar / Importar | Exportar / Importar |
 | Page / Desk | Página / Mesa | Página / Escritorio |
+| Delete | Excluir | Eliminar |
+| Accept / Reject (a change) | Aceitar / Rejeitar | Aceptar / Rechazar |

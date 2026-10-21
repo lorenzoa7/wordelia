@@ -5,7 +5,7 @@ import { invoke } from '@/lib/api'
 import { getT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
 import { toast } from '@/stores/ui'
-import { useChat } from './chatStore'
+import { shownDraftKey, useChat } from './chatStore'
 
 /** The images of one message */
 export const MAX_MESSAGE_IMAGES = 6
@@ -47,6 +47,8 @@ export async function attachImages(files: File[]): Promise<void> {
   const t = getT()
   const images = imageFiles(files)
   const { images: added, imagesBusy } = useChat.getState()
+  // The draft of the thread that shows now: an image that is ready later goes there, also when another thread shows then.
+  const owner = shownDraftKey()
   const room = Math.max(0, MAX_MESSAGE_IMAGES - added.length - imagesBusy)
   if (images.length > room) toast(t.chat.tooManyImages(MAX_MESSAGE_IMAGES), { kind: 'error' })
   await Promise.all(
@@ -56,7 +58,7 @@ export async function attachImages(files: File[]): Promise<void> {
       try {
         const small = await shrinkImage(file)
         const rel = await invoke('chat:saveImage', root, small.data, name)
-        useChat.getState().addImage({ file: rel, name, width: small.width, height: small.height })
+        useChat.getState().addImage({ file: rel, name, width: small.width, height: small.height }, owner)
       } catch {
         toast(t.chat.imageNotRead(name), { kind: 'error' })
       } finally {
@@ -64,4 +66,28 @@ export async function attachImages(files: File[]): Promise<void> {
       }
     })
   )
+}
+
+/** True when a message, a note or a draft of the open book uses the image. */
+function inUse(file: string): boolean {
+  const book = useBook.getState()
+  if (book.threads.some((t) => t.messages.some((m) => m.images?.some((i) => i.file === file) || m.content.includes(file)))) return true
+  if (book.entries.some((e) => e.image === file || e.body.includes(file))) return true
+  const chat = useChat.getState()
+  return chat.images.some((i) => i.file === file) || Object.values(chat.drafts).some((d) => d.images.some((i) => i.file === file))
+}
+
+/**
+ * The author took images out of a draft that was never sent: their files go to the trash of the book
+ * (`.wordelia/trash/`), unless a message, a note or another draft uses them.
+ */
+export async function trashUnusedImages(files: string[]): Promise<void> {
+  const root = useBook.getState().root
+  if (!root) return
+  for (const file of files) {
+    if (!file.startsWith('_assets/chat/') || inUse(file)) continue
+    const name = file.split('/').pop() ?? 'image.webp'
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+    await invoke('book:renameFile', root, `planning/${file}`, `.wordelia/trash/${stamp} ${name}`).catch(() => {})
+  }
 }

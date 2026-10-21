@@ -22,6 +22,7 @@ import { mentionLabel } from './send'
 import { MentionIcon, MentionPill } from './MentionPill'
 import type { DraftDoc } from './draft'
 import { imageFiles } from './images'
+import { matchCandidates, mentionQueryIn, type Candidate } from './mentions'
 
 /* ------------------------------------------------------------------ */
 /* The mention node                                                     */
@@ -86,19 +87,7 @@ const MentionNode = Node.create({
 /* The list of mentions                                                 */
 /* ------------------------------------------------------------------ */
 
-interface Candidate extends Mention {
-  sub?: string
-}
-
-/** Lower case, without accents: "jose" finds "José". */
-function fold(s: string): string {
-  return s
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
-    .toLowerCase()
-}
-
-function useCandidates(query: string | null): Candidate[] {
+function useCandidates(query: string | null, excludeThreadId?: string | null): Candidate[] {
   const t = useT()
   const chapters = useBook((s) => s.chapters)
   const entries = useBook((s) => s.entries)
@@ -106,20 +95,16 @@ function useCandidates(query: string | null): Candidate[] {
   const categories = useBook((s) => s.manifest?.planning.categories)
   return useMemo(() => {
     if (query === null) return []
-    const q = fold(query)
     const all: Candidate[] = [
       ...chapters.map((c, i) => ({ kind: 'chapter' as const, id: c.id, label: c.title, sub: t.chat.chapterNumber(i + 1) })),
-      ...entries.map((e) => ({ kind: 'entry' as const, id: e.id, label: e.name, sub: folderCategoryName(t, e.category, categories ?? []) })),
-      // A thread without messages is not a thread yet.
+      ...entries.map((e) => ({ kind: 'entry' as const, id: e.id, label: e.name, aliases: e.aliases, sub: folderCategoryName(t, e.category, categories ?? []) })),
+      // A thread without messages is not a thread yet. The thread of the composer is not a choice.
       ...threads
-        .filter((th) => th.messages.length > 0)
+        .filter((th) => th.messages.length > 0 && th.id !== excludeThreadId)
         .map((th) => ({ kind: 'thread' as const, id: th.id, label: mentionLabel(t, { kind: 'thread', label: th.title }), sub: t.chat.thread }))
     ]
-    // Names that start with the letters first, then names that have them inside.
-    const hits = all.filter((c) => fold(c.label).includes(q))
-    const starts = (c: Candidate): number => (fold(c.label).startsWith(q) ? 0 : 1)
-    return hits.sort((a, b) => starts(a) - starts(b)).slice(0, 8)
-  }, [query, chapters, entries, threads, categories, t])
+    return matchCandidates(all, query)
+  }, [query, chapters, entries, threads, categories, t, excludeThreadId])
 }
 
 interface Query {
@@ -128,7 +113,7 @@ interface Query {
   to: number
 }
 
-/** "@" and up to 30 letters just before the cursor, after a space or at the start of a line. */
+/** "@" and up to 30 characters just before the cursor, after a space or at the start of a line. Spaces can be in the query. */
 function mentionQuery(state: EditorState): Query | null {
   const { selection } = state
   if (!selection.empty) return null
@@ -136,9 +121,9 @@ function mentionQuery(state: EditorState): Query | null {
   const before = $from.parent.textBetween(Math.max(0, $from.parentOffset - 40), $from.parentOffset, undefined, (n: PMNode) =>
     n.type.name === 'hardBreak' ? '\n' : '￼'
   )
-  const m = /(^|\s)@([^\s@￼]{0,30})$/.exec(before)
+  const m = mentionQueryIn(before)
   if (!m) return null
-  return { text: m[2], from: $from.pos - m[2].length - 1, to: $from.pos }
+  return { text: m.text, from: $from.pos - m.length - 1, to: $from.pos }
 }
 
 /* ------------------------------------------------------------------ */
@@ -161,16 +146,18 @@ export interface ChatInputProps {
   onReady?: (editor: Editor | null) => void
   /** Images in a paste (the composer adds them to the message). Without it, a paste of images does nothing. */
   onPasteImages?: (files: File[]) => void
+  /** The thread of this input: the list of mentions does not offer it */
+  threadId?: string | null
 }
 
-export function ChatInput({ initial, className, ariaLabel, placeholder, autoFocus, onChange, onEnter, onEscape, onReady, onPasteImages }: ChatInputProps): React.JSX.Element {
+export function ChatInput({ initial, className, ariaLabel, placeholder, autoFocus, onChange, onEnter, onEscape, onReady, onPasteImages, threadId }: ChatInputProps): React.JSX.Element {
   const t = useT()
   const listId = useId()
   const [query, setQuery] = useState<Query | null>(null)
   const [dismissed, setDismissed] = useState(false)
   const [highlight, setHighlight] = useState(0)
   const [empty, setEmpty] = useState(true)
-  const candidates = useCandidates(query?.text ?? null)
+  const candidates = useCandidates(query?.text ?? null, threadId)
   const open = query !== null && !dismissed && candidates.length > 0
 
   // The editor reads these when a key goes down, so they must be current.
@@ -328,7 +315,10 @@ export function ChatInput({ initial, className, ariaLabel, placeholder, autoFocu
               onMouseEnter={() => setHighlight(i)}
             >
               <MentionIcon kind={c.kind} id={c.id} size={14} />
-              <span className="mention-label">{c.label}</span>
+              <span className="mention-label">
+                {c.label}
+                {c.alias && <span className="mention-alias"> · {c.alias}</span>}
+              </span>
               <span className="mention-sub">{c.sub}</span>
             </button>
           ))}

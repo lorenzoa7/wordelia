@@ -336,7 +336,9 @@ export default async function ({ app, page, shot, openBook, book }) {
   await page.keyboard.press('Escape')
   await page.waitForSelector('.chat-thread', { timeout: 5000 })
 
-  // 5. "New thread" saves nothing until the first message. Back to the list: no new row, no new file.
+  // 5. "New thread" saves nothing until the first message. A new thread without changes goes away when the
+  //    author leaves it: no new row, no new file. A new thread with a purpose stays in the list (in memory,
+  //    not on disk) until its first message, and Esc goes back to it.
   await page.waitForTimeout(800)
   const filesBefore = (await onDisk()).length
   const storeBefore = (await threads()).length
@@ -344,12 +346,24 @@ export default async function ({ app, page, shot, openBook, book }) {
   await page.waitForSelector('.thread-view', { timeout: 5000 })
   const titlesBefore = await rowTitles()
   await page.locator('.thread-new').click()
+  await page.waitForSelector('.chat-empty', { timeout: 5000 })
+  await page.locator('.chat-back').click()
+  await page.waitForSelector('.thread-view', { timeout: 5000 })
+  if (JSON.stringify(await rowTitles()) !== JSON.stringify(titlesBefore)) fail('a new thread without changes shows in the list')
+  // Esc goes back to the thread that was open before "New thread".
+  await page.keyboard.press('Escape')
+  await page.waitForSelector('.chat-thread', { timeout: 5000 })
+  if (!/visitante|visitor/i.test(await page.locator('.chat-title').innerText())) fail('Esc did not go back to the open thread')
+  await page.locator('.chat-back').click()
+  await page.waitForSelector('.thread-view', { timeout: 5000 })
+  await page.locator('.thread-new').click()
   await page.waitForSelector('.chat-thread', { timeout: 5000 })
   await page.waitForSelector('.chat-empty', { timeout: 5000 })
   // A purpose for the new thread, before its first message: it stays in memory only.
+  const purpose = pt ? 'Um propósito antes da primeira mensagem.' : 'A purpose before the first message.'
   await page.locator('.chat-title').click()
   await page.waitForSelector('.dialog textarea', { timeout: 5000 })
-  await page.locator('.dialog textarea').fill(pt ? 'Um propósito antes da primeira mensagem.' : 'A purpose before the first message.')
+  await page.locator('.dialog textarea').fill(purpose)
   await page.locator('.dialog-foot .btn-primary').click()
   await page.waitForSelector('.chat-brief', { timeout: 5000 })
   await page.waitForTimeout(800)
@@ -362,14 +376,30 @@ export default async function ({ app, page, shot, openBook, book }) {
   await page.waitForTimeout(800)
   const titlesAfter = await rowTitles()
   blank = { files: (await onDisk()).length, store: (await threads()).length, empty: await emptyOnDisk() }
-  console.log('back in the list:', JSON.stringify(blank), JSON.stringify(titlesAfter))
-  if (JSON.stringify(titlesAfter) !== JSON.stringify(titlesBefore)) fail('the empty new thread shows in the list')
-  if (blank.files !== filesBefore || blank.store !== storeBefore) fail('the empty new thread was saved')
+  const keptRow = await page.locator('.thread-row', { hasText: purpose }).count()
+  console.log('back in the list:', JSON.stringify(blank), JSON.stringify(titlesAfter), 'kept row:', keptRow)
+  if (titlesAfter.length !== titlesBefore.length + 1 || keptRow !== 1) fail('the new thread with a purpose does not stay in the list')
+  if (blank.files !== filesBefore || blank.store !== storeBefore) fail('the new thread with a purpose was saved on disk before its first message')
   await shot('list-after-blank')
-  // Esc goes back to the thread that was open before "New thread".
+  // Esc goes back to the new thread, with its purpose.
   await page.keyboard.press('Escape')
+  await page.waitForSelector('.chat-thread .chat-brief', { timeout: 5000 })
+  if (!(await page.locator('.chat-brief', { hasText: purpose }).count())) fail('Esc did not go back to the new thread')
+  // Another thread, then the new thread again from the list: its purpose is still there.
+  await page.locator('.chat-back').click()
+  await page.waitForSelector('.thread-view', { timeout: 5000 })
+  await page.locator('.thread-item', { hasText: pt ? 'visitante' : 'visitor' }).click()
   await page.waitForSelector('.chat-thread', { timeout: 5000 })
-  if (!/visitante|visitor/i.test(await page.locator('.chat-title').innerText())) fail('Esc did not go back to the open thread')
+  await page.locator('.chat-back').click()
+  await page.waitForSelector('.thread-view', { timeout: 5000 })
+  await page.locator('.thread-item', { hasText: purpose }).click()
+  await page.waitForSelector('.chat-thread .chat-brief', { timeout: 5000 })
+  if (!(await page.locator('.chat-brief', { hasText: purpose }).count())) fail('the kept new thread lost its purpose')
+  await page.locator('.chat-back').click()
+  await page.waitForSelector('.thread-view', { timeout: 5000 })
+  await page.locator('.thread-item', { hasText: pt ? 'visitante' : 'visitor' }).click()
+  await page.waitForSelector('.chat-thread', { timeout: 5000 })
+  if (!/visitante|visitor/i.test(await page.locator('.chat-title').innerText())) fail('the visitor thread did not open')
 
   // 6. A thread at work and a thread with a new reply: their states in the list. The first message saves the new thread.
   await page.locator('.chat-back').click()

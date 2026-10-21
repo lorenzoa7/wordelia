@@ -150,12 +150,14 @@ function ProviderRow({ id }: { id: ProviderId }): React.JSX.Element {
     const started = Date.now()
     const version = useApp.getState().status[id]?.version
     const tick = async (): Promise<void> => {
+      // A check on the focus of the window can find the provider first: then it said so already.
+      const announced = readyNow().includes(id)
       const st = await check(id, { quiet: true })
       if (stopped) return
       const done = waiting === 'install' ? st.installed : waiting === 'login' ? st.installed && st.loggedIn !== false : Boolean(st.version) && st.version !== version
       if (done || Date.now() - started > POLL_FOR) {
         setWaiting(null)
-        if (done && waiting !== 'update' && st.loggedIn !== false) void announceConnected(id)
+        if (done && waiting !== 'update' && st.loggedIn !== false && !announced) void announceConnected(id)
         return
       }
       timer = setTimeout(() => void tick(), POLL_EVERY)

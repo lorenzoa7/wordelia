@@ -111,4 +111,14 @@ export default async function ({ page, shot, openBook }) {
   await shot('statuses')
   await page.locator('.settings-panes').evaluate((el) => el.scrollTo({ top: 5000 }))
   await shot('statuses-routes')
+
+  // 8. "Log in…" opens a terminal (not in a test run). The row then checks again by itself until the
+  //    login works: the writer does not have to come back and click "Check again".
+  await page.evaluate(() => {
+    const status = window.__wordelia.app.getState().status
+    window.__wordelia.app.setState({ status: { ...status, 'claude-code': { ...status['claude-code'], loggedIn: false, reason: 'expired' } } })
+  })
+  await page.getByRole('button', { name: 'Log in…: Claude Code' }).click()
+  await row('Claude Code').locator('.provider-line-text', { hasText: 'Waiting for the login…' }).waitFor()
+  await row('Claude Code').locator('.provider-line-text', { hasText: /^Connected/ }).waitFor({ timeout: 10000 })
 }

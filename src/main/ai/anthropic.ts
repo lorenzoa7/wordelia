@@ -5,7 +5,7 @@ import type { CompletionResult, ModelInfo, ProviderStatus, StreamEvent } from '@
 import { EFFORT_ORDER, modelLabel } from '@shared/ai/effort'
 import { mainT } from '../i18n'
 import { getSecret } from '../settings'
-import { classifyError, type ProviderTransport } from './transport'
+import { failure, keyStatus, type ProviderTransport } from './transport'
 import { anthropicContent, type AiRequest } from './images'
 
 /** Models that support the server-side refusal fallback chain. */
@@ -41,8 +41,7 @@ export const anthropicApi: ProviderTransport = {
       await c.models.list({ limit: 1 })
       return { provider: 'anthropic', installed: true, loggedIn: true, detail: t.apiKeyWorks }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      return { provider: 'anthropic', installed: true, loggedIn: false, detail: msg.slice(0, 200) }
+      return keyStatus('anthropic', err, err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError)
     }
   },
 
@@ -133,22 +132,16 @@ export const anthropicApi: ProviderTransport = {
       }
       onEvent({ type: 'usage', ...usage })
       if (final.stop_reason === 'refusal') {
-        return { ok: false, text, model: final.model, error: t.refusal, errorKind: 'other', usage }
+        return { ok: false, text, model: final.model, error: t.refusal, errorKind: 'refused', usage }
       }
       return { ok: true, text, model: final.model, usage }
     } catch (err) {
       if (signal.aborted) return { ok: false, text, model, error: t.cancelled, errorKind: 'cancelled' }
-      if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
-        return { ok: false, text, model, error: t.anthropicKeyRejected, errorKind: 'not-logged-in' }
-      }
-      if (err instanceof Anthropic.RateLimitError) {
-        return { ok: false, text, model, error: t.rateLimit, errorKind: 'rate-limit' }
-      }
-      if (err instanceof Anthropic.APIConnectionError) {
-        return { ok: false, text, model, error: t.anthropicUnreachable, errorKind: 'network' }
-      }
-      const msg = err instanceof Error ? err.message : String(err)
-      return { ok: false, text, model, error: msg, errorKind: classifyError(msg) }
+      const r = failure(err instanceof Error ? err.message : String(err), { text, model, api: true })
+      if (err instanceof Anthropic.APIConnectionError) return { ...r, errorKind: 'network' }
+      if ((err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) && r.errorKind !== 'no-credit') return { ...r, errorKind: 'bad-key' }
+      return r
     }
   }
 }
+

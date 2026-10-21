@@ -59,3 +59,11 @@ export function routeText(t: Messages, route: ModelChoice | null, models?: Model
   const model = models?.find((m) => m.id === route.model)?.label ?? (route.model || defaultModel)
   return `${PROVIDER_LABELS[route.provider].short} · ${model}${route.effort ? ` · ${effortName(t, route.effort)}` : ''}`
 }
+
+/** The interface language for a language tag of the system, for example "pt-BR" or "es-419". English when the app does not have it. */
+export function localeForSystem(tag: string | undefined): Locale {
+  const t = (tag ?? '').toLowerCase()
+  if (t.startsWith('pt')) return 'pt-BR'
+  if (t.startsWith('es')) return 'es'
+  return 'en'
+}

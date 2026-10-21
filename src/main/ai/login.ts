@@ -6,17 +6,23 @@ import type { ProviderId } from '@shared/types'
 import { mainT } from '../i18n'
 import { getSettings } from '../settings'
 import { claudeCandidates, codexCandidates, resolveBin } from './resolve-bin'
+import { runCli } from './transport'
 
 export async function openLogin(provider: ProviderId, task: 'login' | 'update' = 'login'): Promise<boolean> {
   if (provider !== 'claude-code' && provider !== 'codex') return false
   // Only Claude Code updates itself. Codex is updated with the tool that installed it.
   if (task === 'update' && provider !== 'claude-code') return false
+  // Test runs with the scripted AI never open a terminal or run a real program.
+  if (process.env['WORDELIA_MOCK_AI'] === '1') return true
   const s = await getSettings()
   const bin =
     provider === 'claude-code'
       ? await resolveBin('claude', s.providers['claude-code'].binPath, claudeCandidates())
       : await resolveBin('codex', s.providers.codex.binPath, codexCandidates())
   if (!bin) return false
+  // An expired Codex login must go first: "codex logout", then "codex login" in the terminal.
+  // A logout without a login does no harm, so it always runs.
+  if (provider === 'codex' && task === 'login') await runCli(bin, ['logout'], { timeoutMs: 15000 }).catch(() => undefined)
   const args = task === 'update' ? ['update'] : provider === 'claude-code' ? ['auth', 'login'] : ['login']
   if (process.platform === 'win32') {
     // A new console window: cmd /k keeps it open so the user can read the result.

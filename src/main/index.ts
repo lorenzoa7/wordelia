@@ -11,7 +11,7 @@ import { themeOverlay } from './window'
 import { loadWindowState, trackWindowState } from './window-state'
 import { installContextMenu } from './context-menu'
 import { mainT } from './i18n'
-import { initUpdater, quitForUpdate } from './updater'
+import { cancelUpdateInstall, initUpdater, quitForUpdate } from './updater'
 
 // Tests use a separate data folder, so they never touch the user's library.
 if (process.env['WORDELIA_USER_DATA']) app.setPath('userData', process.env['WORDELIA_USER_DATA'])
@@ -99,6 +99,8 @@ async function createWindow(): Promise<void> {
         cancelId: 0
       })
       if (choice === 1) close()
+      // The window stays open: a later quit is a normal quit, not "Restart now".
+      else cancelUpdateInstall()
     })
     win.webContents.send('app:flushRequest', {})
   })

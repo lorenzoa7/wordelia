@@ -137,7 +137,21 @@ export interface BookSnapshot {
   syncState: SyncState
   /** The actions of this book, from `ai/actions.json`. The app settings keep the actions for all books. */
   actions: AiAction[]
+  /** What the writer must know about the files of the book when it opens */
+  notices?: BookNotice[]
 }
+
+/**
+ * A problem with the files of a book that the app found when the book opened.
+ * - `manifestRepaired`: wordelia.json did not parse. The app kept a copy of it (`backup`, relative to the
+ *   book) and made a new one from one side of a git conflict, from its last good copy, from the parts that
+ *   it could read, or from nothing (`from`).
+ * - `chaptersMissing`: the manifest names chapter files that are not there (a sync client did not deliver
+ *   them yet). Their places in the order stay.
+ */
+export type BookNotice =
+  | { kind: 'manifestRepaired'; from: 'conflict' | 'copy' | 'salvage' | 'new'; backup: string }
+  | { kind: 'chaptersMissing'; files: string[] }
 
 export interface HistoryItem {
   id: string
@@ -205,10 +219,17 @@ export interface ProviderStatus {
   version?: string
   /** The newest published version of the CLI, when the app could check */
   latestVersion?: string
-  /** Why the provider is not connected, when the app knows: the saved login has expired */
-  reason?: 'expired'
+  /**
+   * Why the provider does not work, when the app knows: the saved login has expired, the API key
+   * was rejected, the API account has no credit, or the app could not reach the provider to check.
+   */
+  reason?: 'expired' | 'bad-key' | 'no-credit' | 'offline'
   detail?: string
   account?: string
+  /** The program that the app runs (Claude Code, Codex) */
+  path?: string
+  /** True when the app could not use the program path of the settings and found the program itself */
+  pathIgnored?: boolean
 }
 
 export interface ChatTurn {
@@ -258,12 +279,36 @@ export type StreamEvent =
   | { type: 'thinking'; delta: string }
   | { type: 'usage'; inputTokens?: number; outputTokens?: number; costUsd?: number }
 
+/**
+ * Why a request failed (src/shared/ai/errors.ts). 'rate-limit' is the usage limit of a plan;
+ * 'overloaded' is a busy server or too many requests in a short time; 'off' is a provider that the
+ * writer turned off in the settings.
+ */
+export type AiErrorKind =
+  | 'not-installed'
+  | 'not-logged-in'
+  | 'login-expired'
+  | 'bad-key'
+  | 'no-credit'
+  | 'rate-limit'
+  | 'overloaded'
+  | 'network'
+  | 'refused'
+  | 'off'
+  | 'cancelled'
+  | 'other'
+
 export interface CompletionResult {
   ok: boolean
   text: string
   model?: string
+  /** The text of the provider, for "Details". Show `friendlyError()` (src/renderer/src/lib/ai.ts) to the writer. */
   error?: string
-  errorKind?: 'not-installed' | 'not-logged-in' | 'rate-limit' | 'cancelled' | 'network' | 'other'
+  errorKind?: AiErrorKind
+  /** When the usage limit ends: an ISO time, or the words of the provider ("3pm") */
+  resets?: string
+  /** The provider of the request */
+  provider?: ProviderId
   usage?: { inputTokens?: number; outputTokens?: number; costUsd?: number }
 }
 

@@ -7,10 +7,11 @@ import { spawn } from 'node:child_process'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { CompletionResult, ModelInfo, ProviderStatus, StreamEvent } from '@shared/types'
+import { cleanProgramPath } from '@shared/ai/paths'
 import { mainT } from '../i18n'
 import { getSettings } from '../settings'
 import { cleanEnv, codexCandidates, resolveBin, type ResolvedBin } from './resolve-bin'
-import { classifyError, flattenConversation, killTree, runCli, type ProviderTransport } from './transport'
+import { failure, flattenConversation, killTree, runCli, type ProviderTransport } from './transport'
 import { allImages, codexInput, type AiRequest } from './images'
 import { latestVersion } from './updates'
 import { parseEfforts } from '@shared/ai/effort'
@@ -210,14 +211,17 @@ export const codex: ProviderTransport = {
   async status(): Promise<ProviderStatus> {
     const b = await bin()
     const t = (await mainT()).main.ai
-    if (!b) return { provider: 'codex', installed: false, loggedIn: false, detail: t.codexNotFound }
+    if (!b) {
+      const custom = cleanProgramPath((await getSettings()).providers.codex.binPath)
+      return { provider: 'codex', installed: false, loggedIn: false, detail: t.codexNotFound, ...(custom ? { pathIgnored: true } : {}) }
+    }
     const ver = await runCli(b, ['--version'], { timeoutMs: 15000 })
     const version = ver.stdout.trim().split(/\s+/).pop() || undefined
     const [login, latest] = await Promise.all([runCli(b, ['login', 'status'], { timeoutMs: 15000 }), latestVersion('codex')])
     const out = (login.stdout + login.stderr).trim()
     let loggedIn: boolean | null = login.code === 0 && /logged in/i.test(out) ? true : login.code === 0 ? null : false
     let account = loggedIn ? out.replace(/^logged in using /i, '') : undefined
-    let detail = loggedIn === false ? t.codexLogin : b.path
+    let detail = loggedIn === false ? t.codexLogin : undefined
     let reason: ProviderStatus['reason']
     // "codex login status" only reads the saved file. Ask the server, which also refreshes the token:
     // an old login can look fine and still fail on the first request.
@@ -230,7 +234,18 @@ export const codex: ProviderTransport = {
         reason = 'expired'
       } else if (typeof live === 'string') account = live
     }
-    return { provider: 'codex', installed: true, loggedIn, version, latestVersion: latest, account, detail, ...(reason ? { reason } : {}) }
+    return {
+      provider: 'codex',
+      installed: true,
+      loggedIn,
+      version,
+      latestVersion: latest,
+      account,
+      path: b.path,
+      ...(b.customIgnored ? { pathIgnored: true } : {}),
+      ...(detail ? { detail } : {}),
+      ...(reason ? { reason } : {})
+    }
   },
 
   async listModels(): Promise<ModelInfo[]> {
@@ -384,11 +399,11 @@ async function completeWithAppServer(
     const outcome = await done
     if (signal.aborted) return { ok: false, text, model, error: t.cancelled, errorKind: 'cancelled' }
     if (outcome.ok) return { ok: true, text, model, usage }
-    return { ok: false, text, model, error: outcome.error, errorKind: classifyError(outcome.error ?? '') }
+    return failure(outcome.error ?? '', { text, model })
   } catch (err) {
     if (signal.aborted) return { ok: false, text, model, error: t.cancelled, errorKind: 'cancelled' }
     const msg = err instanceof Error ? err.message : String(err)
-    return { ok: false, text, model, error: msg, errorKind: classifyError(msg) }
+    return failure(msg, { text, model })
   } finally {
     signal.removeEventListener('abort', onAbort)
     server.kill()
@@ -444,5 +459,5 @@ async function completeWithExec(
   if (res.aborted) return { ok: false, text, error: t.cancelled, errorKind: 'cancelled' }
   if (res.code === 0 && !error) return { ok: true, text, usage }
   const msg = error || res.stderr.trim() || t.codexExited(res.code)
-  return { ok: false, text, error: msg, errorKind: classifyError(msg) }
+  return failure(msg, { text })
 }

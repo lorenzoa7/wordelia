@@ -37,11 +37,12 @@ export const common = {
   untitled: 'Untitled',
   words: (v: number): string => (v === 1 ? '1 word' : `${n(v)} words`),
   chapters: (v: number): string => (v === 1 ? '1 chapter' : `${n(v)} chapters`),
+  /** Effort levels of a model. The settings keep the English id (low, medium…); these are the names to show. */
   efforts: { minimal: 'Minimal', low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high', max: 'Max' },
   /** What each provider is, under its name */
   providerKind: {
-    'claude-code': 'Your Claude subscription, through the claude CLI',
-    codex: 'Your ChatGPT subscription, through the codex CLI',
+    'claude-code': 'Your Claude plan, through the Claude Code program',
+    codex: 'Your ChatGPT plan, through the Codex program',
     anthropic: 'Pay per use with an API key',
     openai: 'Pay per use with an API key'
   },
@@ -50,7 +51,7 @@ export const common = {
     chat: { name: 'Chat', hint: 'Conversations, feedback and proposed edits.' },
     action: { name: 'Actions', hint: 'Polish and the other actions on selected text. Speed matters here.' },
     sync: { name: 'Planning sync', hint: 'Reads chapters and updates the planning.' },
-    background: { name: 'Background', hint: 'Thread digests, titles and chapter summaries.' }
+    background: { name: 'Background', hint: 'Short summaries of the threads and the chapters, and thread titles.' }
   },
   /** Names of the built-in actions, by action id. Expand is retired, but an author can still have a changed copy. */
   builtinActions: { polish: 'Polish', tighten: 'Tighten', grammar: 'Fix grammar only', show: "Show, don't tell", expand: 'Expand' } as Record<string, string>,

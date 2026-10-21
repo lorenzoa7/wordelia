@@ -41,6 +41,11 @@ export const write: typeof en = {
     connectFirst: 'Conecte uma IA primeiro.',
     openSettings: 'Abrir configurações',
     nothingToChange: 'A IA não encontrou nada para mudar.',
-    noRewrite: 'A IA não enviou a reescrita. Tente de novo.'
+    noRewrite: 'A IA não enviou a reescrita. Tente de novo.',
+    nothingSelected: 'Selecione um texto ou ponha o cursor num parágrafo com texto.',
+    aiSays: (words) => `A IA não reescreveu o trecho: “${words}”`,
+    readyIn: (action, chapter) => `A mudança de ${action} está pronta em “${chapter}”.`,
+    show: 'Mostrar',
+    changedMeanwhile: 'O trecho mudou enquanto a IA trabalhava. A mudança dela não foi mantida.'
   }
 }

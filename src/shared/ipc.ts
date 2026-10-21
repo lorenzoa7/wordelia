@@ -16,6 +16,7 @@ import type {
 } from './types'
 
 export interface ImportedChapter {
+  /** '' when the file gives no title: the renderer names the chapter in the book language */
   title: string
   /** DOCX imports give HTML. The renderer converts it to Markdown. */
   html?: string
@@ -28,6 +29,26 @@ export interface ImportedBook {
   chapters: ImportedChapter[]
   warnings: string[]
 }
+
+/**
+ * What a folder that the writer chose is: a book; a folder inside a book (`root` is the book); or another
+ * folder, with the count of Markdown and text files at its top (`notes`) and in its `manuscript/` folder.
+ */
+export type FolderInfo =
+  | { kind: 'book' }
+  | { kind: 'inside'; root: string; title: string }
+  | { kind: 'folder'; name: string; notes: number; chapters: number }
+
+/** Options of `book:open` */
+export interface OpenBookOptions {
+  /** Make a folder without wordelia.json a book (the writer said yes) */
+  makeBook?: boolean
+  /** The book language for a new manifest */
+  language?: string
+}
+
+/** The result of "Find the folder…" for a book that moved */
+export type RelocateResult = { ok: true; root: string } | { ok: false; reason: 'notBook' | 'otherBook'; title?: string }
 
 export interface FontFaceSpec {
   family: string
@@ -64,9 +85,15 @@ export interface IpcInvokeMap {
   'library:touch': [[item: LibraryItem], void]
   /** The editor counted the pages of the open book: the card shows this number, not an estimate */
   'library:pages': [[root: string, pages: number, words: number], void]
+  /** Put back a card that "Remove from list" took away (Undo) */
+  'library:restore': [[item: LibraryItem], void]
+  /** Point the card of a moved book to its new folder, when the folder has the same book (by id) */
+  'library:relocate': [[oldRoot: string, newRoot: string], RelocateResult]
 
   'book:create': [[opts: { parentDir: string; title: string; author: string; language: string; empty?: boolean }], BookSnapshot]
-  'book:open': [[root: string], BookSnapshot]
+  'book:open': [[root: string, opts?: OpenBookOptions], BookSnapshot]
+  /** What a chosen folder is: a book, a folder inside a book, or another folder */
+  'book:inspectFolder': [[path: string], FolderInfo]
   'book:close': [[root: string], void]
   'book:pickFolder': [[opts: { title: string; create?: boolean }], string | null]
   'book:writeFile': [[root: string, rel: string, content: string], void]
@@ -93,7 +120,8 @@ export interface IpcInvokeMap {
   'ai:models': [[provider: ProviderId], ModelInfo[]]
   'ai:complete': [[requestId: string, req: CompletionRequest], CompletionResult]
   'ai:cancel': [[requestId: string], void]
-  'ai:setKey': [[provider: ProviderId, key: string | null], void]
+  /** `error`: why the key was not saved, in the interface language */
+  'ai:setKey': [[provider: ProviderId, key: string | null], { ok: boolean; error?: string }]
   'ai:hasKey': [[provider: ProviderId], boolean]
   /** Open a terminal window that runs the login command of a CLI provider */
   'ai:openLogin': [[provider: ProviderId], boolean]
@@ -145,8 +173,11 @@ export const INVOKE_CHANNELS: InvokeChannel[] = [
   'library:remove',
   'library:touch',
   'library:pages',
+  'library:restore',
+  'library:relocate',
   'book:create',
   'book:open',
+  'book:inspectFolder',
   'book:close',
   'book:pickFolder',
   'book:writeFile',

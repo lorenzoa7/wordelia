@@ -2,7 +2,7 @@
 
 import { SCENE_BREAK_GLYPH } from '../book'
 import type { DocMark, DocNode } from '../types'
-import { PAGE_SIZES, headingParts, type ExportBook } from './model'
+import { PAGE_SIZES, aboutWords, byAuthor, headingParts, type ExportBook } from './model'
 
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
@@ -54,23 +54,31 @@ function inline(nodes: DocNode[] | undefined): string {
     .join('')
 }
 
-function blocks(nodes: DocNode[], sceneGlyph: string): string {
+interface BlockStyle {
+  sceneGlyph: string
+  /** The alignment of the book: a paragraph with another alignment keeps it */
+  align: string
+  /** The first paragraph of a chapter or scene has a first-line indent too */
+  indentFirst: boolean
+}
+
+function blocks(nodes: DocNode[], style: BlockStyle): string {
   let firstInScene = true
   return nodes
     .map((n) => {
       switch (n.type) {
         case 'paragraph': {
           const cls: string[] = []
-          if (firstInScene || n.attrs?.noIndent) cls.push('first')
+          if ((firstInScene && !style.indentFirst) || n.attrs?.noIndent) cls.push('first')
           const align = n.attrs?.textAlign
-          if (align && align !== 'left' && align !== 'justify') cls.push(`a-${String(align)}`)
+          if (align && align !== style.align) cls.push(`a-${String(align)}`)
           firstInScene = false
           const content = inline(n.content)
           return `<p${cls.length ? ` class="${cls.join(' ')}"` : ''}>${content || '&nbsp;'}</p>`
         }
         case 'sceneBreak':
           firstInScene = true
-          return `<div class="scene">${esc(sceneGlyph) || '&nbsp;'}</div>`
+          return `<div class="scene">${esc(style.sceneGlyph) || '&nbsp;'}</div>`
         case 'pageBreak':
           return '<div class="pagebreak"></div>'
         case 'heading': {
@@ -79,11 +87,11 @@ function blocks(nodes: DocNode[], sceneGlyph: string): string {
           return `<h${level}>${inline(n.content)}</h${level}>`
         }
         case 'blockquote':
-          return `<blockquote>${blocks(n.content ?? [], sceneGlyph)}</blockquote>`
+          return `<blockquote>${blocks(n.content ?? [], style)}</blockquote>`
         case 'bulletList':
         case 'orderedList': {
           const tag = n.type === 'bulletList' ? 'ul' : 'ol'
-          return `<${tag}>${(n.content ?? []).map((li) => `<li>${blocks(li.content ?? [], sceneGlyph)}</li>`).join('')}</${tag}>`
+          return `<${tag}>${(n.content ?? []).map((li) => `<li>${blocks(li.content ?? [], style)}</li>`).join('')}</${tag}>`
         }
         case 'image':
           return ''
@@ -103,14 +111,20 @@ export function buildPrintHtml(book: ExportBook, fontCss: string): string {
   const manuscript = s.preset === 'manuscript'
   const surname = book.author.trim().split(/\s+/).pop() ?? ''
   const folio = `font-family: ${cssString(t.fontFamily)}; font-size: ${Math.max(8, t.fontSize - 2)}pt; color: #333;`
-  const headerText = manuscript ? `${surname} / ${book.title.toUpperCase()} / ` : ''
+  // The manuscript header: "Surname / TITLE / 12" at the top right, or only the page number.
+  const headerText = `${surname} / ${book.title.toUpperCase()}`
+  const manuscriptTop = s.runningHeader
+    ? `content: ${cssString(s.pageNumbers ? `${headerText} / ` : headerText)}${s.pageNumbers ? ' counter(page)' : ''};`
+    : s.pageNumbers
+      ? 'content: counter(page);'
+      : ''
 
   const pageRules = [
     `@page { size: ${size.w}mm ${size.h}mm; margin: ${m.top}mm ${m.outer}mm ${m.bottom}mm ${m.inner}mm; }`,
     manuscript ? '' : `@page :left { margin-left: ${m.outer}mm; margin-right: ${m.inner}mm; }`,
     manuscript ? '' : `@page :right { margin-left: ${m.inner}mm; margin-right: ${m.outer}mm; }`,
     s.pageNumbers && !manuscript ? `@page { @bottom-center { content: counter(page); ${folio} } }` : '',
-    s.runningHeader && manuscript ? `@page { @top-right { content: ${cssString(headerText)} counter(page); ${folio} } }` : '',
+    manuscript && manuscriptTop ? `@page { @top-right { ${manuscriptTop} ${folio} } }` : '',
     s.runningHeader && !manuscript ? `@page :left { @top-left { content: ${cssString(book.author)}; ${folio} font-style: italic; } } @page :right { @top-right { content: ${cssString(book.title)}; ${folio} font-style: italic; } }` : '',
     '@page title { @bottom-center { content: none; } @top-right { content: none; } @top-left { content: none; } }'
   ].join('\n')
@@ -124,7 +138,7 @@ export function buildPrintHtml(book: ExportBook, fontCss: string): string {
 ${label ? `<div class="ch-label">${esc(label)}</div>` : ''}
 ${title ? `<h1 class="ch-title">${esc(title)}</h1>` : ''}
 </header>
-${blocks(ch.blocks, glyph)}
+${blocks(ch.blocks, { sceneGlyph: glyph, align: t.align, indentFirst: book.indentFirst })}
 </section>`
     })
     .join('\n')
@@ -133,8 +147,8 @@ ${blocks(ch.blocks, glyph)}
     ? manuscript
       ? `<section class="title-page ms">
 <div class="ms-contact">${esc(book.author)}</div>
-<div class="ms-words">about ${(Math.round(book.words / 1000) * 1000 || book.words).toLocaleString('en-US')} words</div>
-<div class="ms-center"><div class="tp-title">${esc(book.title)}</div>${book.subtitle ? `<div class="tp-sub">${esc(book.subtitle)}</div>` : ''}<div class="tp-author">by ${esc(book.author)}</div></div>
+<div class="ms-words">${esc(aboutWords(book.language, book.words))}</div>
+<div class="ms-center"><div class="tp-title">${esc(book.title)}</div>${book.subtitle ? `<div class="tp-sub">${esc(book.subtitle)}</div>` : ''}<div class="tp-author">${esc(byAuthor(book.language, book.author))}</div></div>
 </section>`
       : `<section class="title-page"><div class="tp-title">${esc(book.title)}</div>${book.subtitle ? `<div class="tp-sub">${esc(book.subtitle)}</div>` : ''}<div class="tp-rule"></div><div class="tp-author">${esc(book.author)}</div></section>`
     : ''
@@ -149,8 +163,10 @@ ${fontCss}
 ${pageRules}
 html { -webkit-print-color-adjust: exact; }
 body { margin: 0; font-family: ${cssString(t.fontFamily)}, Georgia, serif; font-size: ${t.fontSize}pt; line-height: ${t.lineHeight}; color: #111; text-align: ${t.align}; hyphens: auto; orphans: 2; widows: 2; font-kerning: normal; font-variant-ligatures: common-ligatures; }
-p { margin: 0; text-indent: ${t.firstLineIndent}em; }
+p { margin: 0 0 ${book.paragraphSpacing ?? 0}em; text-indent: ${t.firstLineIndent}em; }
 p.first { text-indent: 0; }
+p.a-left { text-align: left; }
+p.a-justify { text-align: justify; }
 p.a-center { text-align: center; text-indent: 0; }
 p.a-right { text-align: right; text-indent: 0; }
 .scene { text-align: center; margin: ${manuscript ? '0' : '0.9em 0'}; text-indent: 0; letter-spacing: 0.3em; }

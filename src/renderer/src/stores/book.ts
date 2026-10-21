@@ -239,9 +239,10 @@ export const useBook = create<BookState>((set, get) => {
       })
       if (snap.notices?.length) {
         showNotices(snap.root, snap.notices, () => {
-          // "Forget": the missing chapters leave the order of the book.
+          // "Forget": the missing chapters leave the order of the book (if the book is still open).
+          if (get().root !== snap.root) return
           missingRefs = []
-          if (get().root === snap.root) get().updateManifest({ chapters: get().chapters.map((c) => ({ id: c.id, file: c.file })) })
+          get().updateManifest({ chapters: get().chapters.map((c) => ({ id: c.id, file: c.file })) })
         })
       }
     },

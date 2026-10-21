@@ -240,6 +240,11 @@ export async function runAction(action: AiAction, range?: { from: number; to: nu
 function finish(result: CompletionResult, run: { id: string; action: AiAction; label: string; chapterId: string; editor: ChapterEditor; selectionMd: string }): void {
   const t = getT()
   const { id, action, chapterId } = run
+  // The book closed, or another book opened, while the AI worked: nothing to show.
+  if (!useBook.getState().chapters.some((c) => c.id === chapterId)) {
+    lost.delete(id)
+    return
+  }
   // The editor of the chapter can be gone (the Plan view, a far scroll): the change then waits for it.
   const live = run.editor.editor.isDestroyed ? null : run.editor.editor
   const review = live ? reviewKey.getState(live.state) : (lost.get(id) ?? null)

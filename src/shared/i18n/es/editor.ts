@@ -52,7 +52,7 @@ export const editor: typeof en = {
     working: (action) => `${action}: la IA trabaja en el pasaje. Puedes escribir en el resto del capítulo.`,
     readyStatus: (action, added, removed) =>
       `${action}: el cambio está listo, ${added} añadidas y ${removed} quitadas. Enter acepta, Esc rechaza, Tab va a la barra.`,
-    lockedShort: 'Pasaje bloqueado',
+    lockedShort: 'Bloqueado',
     lockedWorking: 'El pasaje queda bloqueado mientras la IA trabaja. Esc detiene.',
     lockedReady: 'El pasaje queda bloqueado hasta que decidas. Enter acepta, Esc rechaza.'
   },

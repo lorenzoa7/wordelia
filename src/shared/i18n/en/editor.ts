@@ -61,7 +61,7 @@ export const editor = {
     readyStatus: (action: string, added: number, removed: number): string =>
       `${action}: the change is ready, ${added} added and ${removed} removed. Enter accepts, Esc rejects, Tab goes to the bar.`,
     /** A key that the locked passage refused */
-    lockedShort: 'Passage locked',
+    lockedShort: 'Locked',
     lockedWorking: 'The passage is locked while the AI works. Esc stops.',
     lockedReady: 'The passage is locked until you decide. Enter accepts, Esc rejects.'
   },

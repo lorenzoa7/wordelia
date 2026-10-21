@@ -323,8 +323,8 @@ function breakPos(doc: PMNode, p: number): number {
  * the plain text of `textWithMap`).
  */
 export function diffDecorations(doc: PMNode, from: number, to: number, ops: DiffOp[], id: string, view: DiffView = 'words', source?: ReviewText): Decoration[] {
-  const src = source ?? plainSource(doc, from, to)
   if (view !== 'words') return wholeDecorations(doc, from, to, ops, id, view)
+  const src = source ?? plainSource(doc, from, to)
   const decos: Decoration[] = []
   const { map, kinds } = src
   let i = 0

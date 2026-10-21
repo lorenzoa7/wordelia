@@ -47,7 +47,7 @@ export const write = {
   /** The "+" in the header of the chapter list: the new chapter goes after the chapter on screen */
   newChapterAfterOne: (title: string): string => `New chapter after “${title}”`,
   /** The button under the chapter list */
-  addChapterAtEnd: 'Add a chapter at the end',
+  addChapterAtEnd: 'New chapter at the end',
   /** Why the app cannot save, in plain words */
   saveProblems: {
     readOnly: 'The file is read-only, or the system does not let Wordelia change it.',

@@ -73,7 +73,7 @@ export function ChapterSidebar(): React.JSX.Element {
       </Reorder.Group>
       <StoryLineCard />
       <button className="sidebar-add" onClick={() => void useBook.getState().addChapter(chapters[chapters.length - 1]?.id ?? null)}>
-        <Plus size={13} /> {t.write.addChapterAtEnd}
+        <Plus size={13} /> <span>{t.write.addChapterAtEnd}</span>
       </button>
     </div>
   )

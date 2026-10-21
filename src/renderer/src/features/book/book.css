@@ -288,6 +288,12 @@
     background-color var(--dur-fast) var(--ease-out),
     color var(--dur-fast) var(--ease-out);
 }
+.sidebar-add span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .sidebar-add svg {
   flex-shrink: 0;
   translate: 0 var(--icon-lift);
@@ -340,8 +346,8 @@
 
 /* One line in every language. When the counts do not fit (StatusBar.tsx sets `data-tight`), the
    parts that matter less go first: the reading time, then the words of the history button and
-   "Goal reached", then the words of the daily count. The counts of the chapter and the book stay;
-   an ellipsis is the last resort. */
+   "Goal reached", then the words of the daily count, then the daily count. The counts of the
+   chapter and the book stay; an ellipsis is the last resort. */
 .status-left {
   min-width: 0;
   overflow: hidden;
@@ -352,9 +358,10 @@
   content: '·';
   margin: 0 0.5em;
 }
-.status-bar:is([data-tight='1'], [data-tight='2'], [data-tight='3']) .status-read,
-.status-bar:is([data-tight='2'], [data-tight='3']) :is(.status-btn-text, .today-done),
-.status-bar[data-tight='3'] .today-text {
+.status-bar:is([data-tight='1'], [data-tight='2'], [data-tight='3'], [data-tight='4']) .status-read,
+.status-bar:is([data-tight='2'], [data-tight='3'], [data-tight='4']) :is(.status-btn-text, .today-done),
+.status-bar[data-tight='3'] .today-text,
+.status-bar[data-tight='4'] .today {
   display: none;
 }
 .status-right {

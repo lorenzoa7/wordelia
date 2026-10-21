@@ -50,7 +50,8 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
     try {
       const book = useBook.getState()
       const words = book.chapters.reduce((n, c) => n + countMarkdownWords(c.body), 0)
-      const model = buildExportBook(manifest, book.chapters, words, s)
+      // A text file has the scene break of the book typography: the dialog shows the print choice only for PDF and Word.
+      const model = buildExportBook(manifest, book.chapters, words, paged ? s : { ...s, sceneBreak: manifest.typography.sceneBreak })
       const name = manifest.title || 'Book'
       let path: string | null = null
       if (format === 'pdf') {

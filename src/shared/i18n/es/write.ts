@@ -42,7 +42,7 @@ export const write: typeof en = {
     noRewrite: 'La IA no envió la nueva versión. Inténtalo de nuevo.'
   },
   newChapterAfterOne: (title) => `Nuevo capítulo después de “${title}”`,
-  addChapterAtEnd: 'Agregar un capítulo al final',
+  addChapterAtEnd: 'Nuevo capítulo al final',
   saveProblems: {
     readOnly: 'El archivo es de solo lectura, o el sistema no deja que Wordelia lo cambie.',
     busy: 'Otro programa está usando el archivo, por ejemplo una app de sincronización.',

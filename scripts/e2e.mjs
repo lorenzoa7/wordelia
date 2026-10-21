@@ -59,6 +59,7 @@ const SCENARIOS = [
   { args: ['graph', '--en'], areas: ['plan'], s: 34 },
   { args: ['graph', '--en', '--dark'], areas: ['plan'], s: 33 },
   { args: ['switchbook'], areas: ['shell', 'store'], s: 12 },
+  { args: ['narrow'], areas: ['shell', 'editor'], s: 8 },
   // Pixel positions of the font on screen: they depend on the machine, so not in CI.
   { args: ['icons'], areas: ['shell'], s: 8, local: true },
   { args: ['shell'], areas: ['shell', 'settings', 'plan'], s: 15 }

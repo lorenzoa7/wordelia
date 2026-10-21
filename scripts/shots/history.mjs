@@ -144,4 +144,22 @@ export default async function ({ page, shot, openBook, book }) {
   if (foot.mutations.length) fail(`the buttons changed while the versions loaded: ${foot.mutations.join(', ')}`)
   if (foot.states.length !== 1) fail(`the buttons or the compare view moved or flashed: ${foot.states.join(' / ')}`)
   await shot('versions-buttons-still')
+
+  // Restore the oldest version: Ctrl+Z in the chapter undoes the restore, and the toast has an Undo.
+  const bodyOf = () => page.evaluate((id) => window.__wordelia.book.getState().chapters.find((c) => c.id === id).body.trim(), marker.id)
+  const beforeRestore = await bodyOf()
+  await page.locator('.history-item').last().click()
+  await page.waitForTimeout(500)
+  await page.locator('.dialog-foot .btn-primary').click()
+  await page.waitForTimeout(800)
+  const restored = await bodyOf()
+  const undoInToast = await page.locator('.toast').last().getByRole('button', { name: /Undo|Desfazer/ }).count()
+  if (restored === beforeRestore) fail('the restore did not change the chapter')
+  if (!undoInToast) fail('the toast of the restore has no Undo')
+  await page.locator(`.page[data-chapter="${marker.id}"] .manuscript`).click()
+  await page.keyboard.press('Control+z')
+  await page.waitForTimeout(800)
+  const afterUndo = await bodyOf()
+  console.log('restore and Ctrl+Z:', JSON.stringify({ restored: restored.length, back: afterUndo === beforeRestore }))
+  if (afterUndo !== beforeRestore) fail('Ctrl+Z did not undo the restore')
 }

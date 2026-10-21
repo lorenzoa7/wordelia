@@ -237,6 +237,8 @@ export function PageEditor(): React.JSX.Element | null {
   // A new order of the chapters (a drag in the chapter list): the chapter on screen stays on screen,
   // at the same height, so the sidebar, the toolbar and the status bar stay on the chapter that shows.
   const lastIds = useRef(chapterIds)
+  // Read during the render, while the sheets are still in the old order (like getSnapshotBeforeUpdate).
+  if (lastIds.current !== chapterIds && deskRef.current) anchor.current = sheetAtReadingLine(deskRef.current) ?? anchor.current
   useLayoutEffect(() => {
     const was = lastIds.current
     lastIds.current = chapterIds

@@ -31,7 +31,7 @@ export function StatusBar(): React.JSX.Element {
     const bar = barRef.current
     const left = bar?.querySelector<HTMLElement>('.status-left')
     if (!bar || !left) return
-    for (let level = 0; level <= 3; level++) {
+    for (let level = 0; level <= 4; level++) {
       bar.dataset.tight = String(level)
       if (left.scrollWidth <= left.clientWidth + 1) break
     }

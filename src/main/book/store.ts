@@ -134,14 +134,29 @@ export class NotABookError extends Error {
   }
 }
 
+/** Copy a damaged manifest to `.wordelia/wordelia.json.broken-<time>`. Returns its path in the book. */
+async function backupManifest(root: string, text: string): Promise<string> {
+  const backup = `.wordelia/wordelia.json.broken-${new Date().toISOString().replace(/[:.]/g, '-')}`
+  await atomicWrite(join(root, backup), text)
+  return backup
+}
+
+/**
+ * Before the app writes the manifest of an open book: when the file on disk does not parse (a git
+ * conflict or a sync client wrote it while the book was open), keep a copy of it first.
+ */
+export async function keepBrokenManifest(root: string): Promise<void> {
+  const read = await readManifestFile(root)
+  if (read.state === 'broken') await backupManifest(root, read.text)
+}
+
 /**
  * A manifest that does not parse. First a copy of it goes to `.wordelia/`. Then the app takes, in this order:
  * one side of a git conflict (this computer first), the last good copy, the parts of the file that it can
  * read, or a new manifest.
  */
 async function repairManifest(root: string, text: string, fallback: { title: string; language: string }): Promise<{ manifest: BookManifest; notice: BookNotice }> {
-  const backup = `.wordelia/wordelia.json.broken-${new Date().toISOString().replace(/[:.]/g, '-')}`
-  await atomicWrite(join(root, backup), text)
+  const backup = await backupManifest(root, text)
   const done = (raw: Record<string, unknown>, from: 'conflict' | 'copy' | 'salvage'): { manifest: BookManifest; notice: BookNotice } => ({
     manifest: normalizeManifest(raw as Partial<BookManifest>),
     notice: { kind: 'manifestRepaired', from, backup }

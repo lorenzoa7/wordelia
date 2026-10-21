@@ -7,7 +7,7 @@ import { ASSETS_DIR, CHAT_IMAGES_DIR, MANIFEST_FILE, PLANNING_DIR, fileNameFromT
 import type { InvokeArgs, InvokeChannel, InvokeResult } from '@shared/ipc'
 import { cancel, complete, providerModels, providerStatus } from './ai'
 import { openLogin } from './ai/login'
-import { NotABookError, createBook, inspectFolder, keepManifestCopy, openBook } from './book/store'
+import { NotABookError, createBook, inspectFolder, keepBrokenManifest, keepManifestCopy, openBook } from './book/store'
 import { listSnapshots, readSnapshot, saveSnapshot } from './book/history'
 import { noteOwnWrite, unwatchBook, watchBook } from './book/watcher'
 import { exportDocx, exportPdf, exportText } from './export'
@@ -128,6 +128,8 @@ export function registerIpc(): void {
   handle('book:writeFile', async (_e, root, rel, content) => {
     assertRoot(root)
     const full = safeJoin(root, rel)
+    // A damaged manifest on disk (a git conflict while the book was open) is never replaced without a copy.
+    if (rel === MANIFEST_FILE) await keepBrokenManifest(root)
     noteOwnWrite(full, content)
     await atomicWrite(full, content)
     // A good copy of the manifest repairs a damaged one later (a sync conflict, a half-written file).

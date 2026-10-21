@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { MANIFEST_COPY, NotABookError, inspectFolder, openBook } from './store'
+import { MANIFEST_COPY, NotABookError, inspectFolder, keepBrokenManifest, openBook } from './store'
 
 const SAMPLE = resolve(__dirname, '../../../e2e/fixtures/sample-book')
 let work = ''
@@ -58,6 +58,16 @@ describe('a wordelia.json that does not parse', () => {
     expect(snap.manifest.id).toBe('bk_sample01')
     expect(snap.manifest.language).toBe('pt-BR')
     expect(snap.chapters.map((c) => c.file)).toEqual(['O Visitante.md', 'A Tempestade.md'])
+  })
+
+  it('a damaged manifest that arrives while the book is open is copied before the app writes over it', async () => {
+    await keepBrokenManifest(book)
+    expect(await backups()).toEqual([])
+    const broken = '<<<<<<< HEAD\n{}\n=======\n'
+    await writeFile(join(book, 'wordelia.json'), broken)
+    await keepBrokenManifest(book)
+    const [copy] = await backups()
+    expect(await readFile(join(book, '.wordelia', copy), 'utf8')).toBe(broken)
   })
 
   it('a byte order mark is not damage', async () => {

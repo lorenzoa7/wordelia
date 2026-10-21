@@ -33,7 +33,7 @@ describe('effort', () => {
   })
   it('names the default', () => {
     expect(defaultEffortLabel({ defaultEffort: 'medium' }, true)).toBe('Default (Medium)')
-    expect(defaultEffortLabel(undefined, true)).toBe('Default (the CLI decides)')
+    expect(defaultEffortLabel(undefined, true)).toBe('Default (automatic)')
   })
   it('makes friendly model names', () => {
     expect(friendlyModelName('claude-opus-5-5')).toBe('Claude Opus 5.5')

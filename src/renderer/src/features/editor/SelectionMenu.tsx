@@ -10,7 +10,8 @@ import { ActionIcon } from '@/features/actions/ActionIcon'
 import { runAction } from '@/features/actions/runAction'
 import { useAllActions } from '@/features/actions/allActions'
 import { addQuote } from '@/features/chat/chatStore'
-import { actionName, useT } from '@/lib/i18n'
+import { useT } from '@/lib/i18n'
+import { actionLabel } from '@/features/actions/names'
 import { reviewKey, textWithMap } from './review'
 
 /** The small menu above a text selection: Reply, the default action, and more actions. */
@@ -23,8 +24,17 @@ export function SelectionMenu({ editor }: { editor: Editor }): React.JSX.Element
   // meanwhile, because the menu is placed under its button.
   const [moreOpen, setMoreOpen] = useState(false)
   const keepOpen = useRef(false)
+  // The menu opens away from the selected text: up when the bubble is above the text, down when the
+  // bubble is below it (no room above).
+  const [side, setSide] = useState<'top' | 'bottom'>('top')
+  const bubbleRef = useRef<HTMLButtonElement>(null)
   const setMore = (open: boolean): void => {
     keepOpen.current = open
+    if (open) {
+      const bubble = bubbleRef.current?.closest('.selection-menu')?.getBoundingClientRect()
+      const text = editor.view.coordsAtPos(editor.state.selection.from)
+      setSide(bubble && bubble.top > text.top ? 'bottom' : 'top')
+    }
     setMoreOpen(open)
   }
 
@@ -56,10 +66,10 @@ export function SelectionMenu({ editor }: { editor: Editor }): React.JSX.Element
         </button>
       </Tooltip>
       {primary && (
-        <Tooltip label={<>{t.editor.selection.withAi(actionName(t, primary))} {primary.shortcut && <Kbd>{primary.shortcut}</Kbd>}</>} side="top">
+        <Tooltip label={<>{t.editor.selection.withAi(actionLabel(t, primary))} {primary.shortcut && <Kbd>{primary.shortcut}</Kbd>}</>} side="top">
           <button className="sel-btn sel-primary" onMouseDown={(e) => e.preventDefault()} onClick={() => void runAction(primary)}>
             <ActionIcon name={primary.icon} size={14} weight="fill" />
-            <span>{actionName(t, primary)}</span>
+            <span>{actionLabel(t, primary)}</span>
           </button>
         </Tooltip>
       )}
@@ -67,6 +77,7 @@ export function SelectionMenu({ editor }: { editor: Editor }): React.JSX.Element
         <DropdownMenu.Root open={moreOpen} onOpenChange={setMore}>
           <DropdownMenu.Trigger asChild>
             <button
+              ref={bubbleRef}
               className="sel-btn sel-more"
               aria-label={t.editor.selection.moreActions}
               onPointerDown={(e) => {
@@ -82,7 +93,7 @@ export function SelectionMenu({ editor }: { editor: Editor }): React.JSX.Element
           </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
             <DropdownMenu.Content
-              side="bottom"
+              side={side}
               align="end"
               sideOffset={6}
               className="menu"
@@ -95,7 +106,7 @@ export function SelectionMenu({ editor }: { editor: Editor }): React.JSX.Element
               <MenuLabel>{t.editor.selection.actions}</MenuLabel>
               {actions.map((a) => (
                 <MenuItem key={a.id} icon={<ActionIcon name={a.icon} />} onSelect={() => void runAction(a)} shortcut={a.shortcut}>
-                  {actionName(t, a)}
+                  {actionLabel(t, a)}
                 </MenuItem>
               ))}
               <MenuSeparator />

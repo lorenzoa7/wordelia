@@ -277,6 +277,16 @@ export const settings = {
     toBookConfirm: 'Use only in this book',
     movedWithoutShortcut: (name: string, keys: string, other: string): string => `“${name}” has no shortcut now: ${keys} is the shortcut for “${other}”.`,
     /** Under the shortcut of a global action when an action of the open book has the same shortcut */
-    shortcutInBook: (keys: string, other: string): string => `In this book, ${keys} runs “${other}”.`
+    shortcutInBook: (keys: string, other: string): string => `In this book, ${keys} runs “${other}”.`,
+    /** The name of an action that has no name */
+    unnamed: 'Unnamed action',
+    nameEmpty: 'An action needs a name.',
+    mainCannotDelete: 'The main action cannot be deleted. Make another action the main action first.',
+    moveUp: 'Move up',
+    moveDown: 'Move down',
+    /** The model control of an action that uses the model of Actions */
+    sameAsActionsWith: (model: string): string => `Same as Actions (${model})`,
+    /** Under the model of an action whose provider is not on this computer (a book from another computer) */
+    modelMissing: (provider: string): string => `${provider} is not connected on this computer. This action uses the model of Actions.`
   }
 }

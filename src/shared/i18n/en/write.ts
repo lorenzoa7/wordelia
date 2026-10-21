@@ -44,6 +44,14 @@ export const write = {
     connectFirst: 'Connect an AI first.',
     openSettings: 'Open settings',
     nothingToChange: 'The AI found nothing to change.',
-    noRewrite: 'The AI sent no rewrite. Try again.'
+    noRewrite: 'The AI sent no rewrite. Try again.',
+    /** Ctrl+J in an empty paragraph, or on a selection of spaces */
+    nothingSelected: 'Select some text, or put the cursor in a paragraph with text.',
+    /** A reply without a rewrite: the words of the AI */
+    aiSays: (words: string): string => `The AI did not rewrite the passage: “${words}”`,
+    /** The change is ready while the author is in the Plan view */
+    readyIn: (action: string, chapter: string): string => `The change of ${action} is ready in “${chapter}”.`,
+    show: 'Show',
+    changedMeanwhile: 'The passage changed while the AI worked, so its change was not kept.'
   }
 }

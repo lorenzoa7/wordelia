@@ -251,6 +251,13 @@ export const settings: typeof en = {
     toBookMessage: 'Los otros libros no tendrán esta acción. Para devolvérsela, abre este libro y elige “Todos los libros”.',
     toBookConfirm: 'Usar solo en este libro',
     movedWithoutShortcut: (name, keys, other) => `“${name}” se quedó sin atajo: ${keys} es el atajo de “${other}”.`,
-    shortcutInBook: (keys, other) => `En este libro, ${keys} ejecuta “${other}”.`
+    shortcutInBook: (keys, other) => `En este libro, ${keys} ejecuta “${other}”.`,
+    unnamed: 'Acción sin nombre',
+    nameEmpty: 'Una acción necesita un nombre.',
+    mainCannotDelete: 'La acción principal no se puede eliminar. Primero, haz que otra acción sea la principal.',
+    moveUp: 'Subir',
+    moveDown: 'Bajar',
+    sameAsActionsWith: (model) => `El mismo de Acciones (${model})`,
+    modelMissing: (provider) => `${provider} no está conectado en esta computadora. Esta acción usa el modelo de Acciones.`
   }
 }

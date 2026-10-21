@@ -2,7 +2,8 @@
 // Backspace right after a replacement undoes it (core undoInputRule).
 
 import { Extension, InputRule } from '@tiptap/core'
-import { quotesFor } from '@shared/text/quotes'
+import type { EditorState } from '@tiptap/pm/state'
+import { apostropheN, quoteOpensAfter, quotesFor, singleQuoteFor } from '@shared/text/quotes'
 
 export interface SmartTypingOptions {
   dash: string
@@ -17,12 +18,10 @@ export interface SmartTypingOptions {
 
 export { quotesFor }
 
-/** Is the character before the cursor a place where a quote opens? */
-const OPENS_AFTER = /[\s([{—―–-]$|^$/
-
-function textBefore(state: import('@tiptap/pm/state').EditorState, pos: number): string {
+/** The last characters of the text block before a position. */
+function textBefore(state: EditorState, pos: number, n = 3): string {
   const $pos = state.doc.resolve(pos)
-  return $pos.parent.textBetween(Math.max(0, $pos.parentOffset - 1), $pos.parentOffset, undefined, '￼')
+  return $pos.parent.textBetween(Math.max(0, $pos.parentOffset - n), $pos.parentOffset, undefined, '￼')
 }
 
 export const SmartTyping = Extension.create<SmartTypingOptions>({
@@ -57,15 +56,29 @@ export const SmartTyping = Extension.create<SmartTypingOptions>({
         new InputRule({
           find: /"$/,
           handler: ({ state, range }) => {
-            const before = textBefore(state, range.from)
-            state.tr.insertText(OPENS_AFTER.test(before) ? o.doubleOpen : o.doubleClose, range.from, range.to)
+            state.tr.insertText(quoteOpensAfter(textBefore(state, range.from)) ? o.doubleOpen : o.doubleClose, range.from, range.to)
           }
         }),
         new InputRule({
           find: /'$/,
           handler: ({ state, range }) => {
             const before = textBefore(state, range.from)
-            state.tr.insertText(OPENS_AFTER.test(before) ? o.singleOpen : o.singleClose, range.from, range.to)
+            // "rock 'n' roll": the quote before the n becomes an apostrophe too.
+            const n = apostropheN(before, '', o)
+            if (n !== null) {
+              const start = range.from - before.length
+              state.tr.insertText(`${n}’`, start, range.to)
+              return
+            }
+            state.tr.insertText(singleQuoteFor(before, '', o), range.from, range.to)
+          }
+        }),
+        // A digit after an opening single quote: it was an apostrophe ('90s).
+        new InputRule({
+          find: new RegExp(`${escapeRe(o.singleOpen)}(\\d)$`),
+          handler: ({ state, range, match }) => {
+            if (!quoteOpensAfter(textBefore(state, range.from))) return null
+            state.tr.insertText(`’${match[1]}`, range.from, range.to)
           }
         })
       )
@@ -73,3 +86,7 @@ export const SmartTyping = Extension.create<SmartTypingOptions>({
     return rules
   }
 })
+
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}

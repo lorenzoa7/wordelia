@@ -27,6 +27,16 @@ describe('typesetText', () => {
     expect(typesetText('E então...', pt, on)).toBe('E então…')
     expect(typesetText('E então...', pt, { quotes: true, ellipsis: false })).toBe('E então...')
   })
+  it('closes a quote after a dash at the end of a word', () => {
+    expect(typesetText('"Wait, really--"', quotesFor('en'), on)).toBe('“Wait, really--”')
+    expect(typesetText('"Wait, really—"', quotesFor('en'), on)).toBe('“Wait, really—”')
+  })
+  it('makes apostrophes of short forms', () => {
+    const en = quotesFor('en')
+    expect(typesetText("the '90s", en, on)).toBe('the ’90s')
+    expect(typesetText("rock 'n' roll", en, on)).toBe('rock ’n’ roll')
+    expect(typesetText("'quoted' word", en, on)).toBe('‘quoted’ word')
+  })
   it('changes nothing when both options are off', () => {
     expect(typesetText('"a"...', pt, { quotes: false, ellipsis: false })).toBe('"a"...')
   })

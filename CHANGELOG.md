@@ -2,6 +2,23 @@
 
 Each version has its Windows installer in GitHub Releases. The release workflow copies the section of the version from this file to the release notes.
 
+## 0.13.0 (2026-10-21)
+
+### New
+- The AI in the chat sees the portraits of your notes. Each message brings a sheet with all the portraits and their names, and the notes that the message is about at a larger size. Ask it to compare the looks of a character with the text.
+- A click on the portrait of a note shows the whole image. "Change" under the portrait chooses another image.
+
+### Changed
+- A new reply that changes a note (or the story line) opens that page.
+- A portrait that the AI proposes shows on the page of the note, with "Use" and "Reject".
+- The chat card of a story line proposal: the count of changes at the right, "Reject all" and "Apply all" side by side, and "Show in the line" under them.
+- The card dialog: "Open the chapter" is next to the chapter field, and the buttons at the bottom stay in the dialog.
+- The AI marks with @ every name of a note in the cards that it writes.
+
+### Fixed
+- A change that the AI proposes for a list in a note shows in the note as a diff.
+- Apply and Reject on the story line keep the board where it is. The last decision no longer moves the board back to where it was before the proposal.
+
 ## 0.12.0 (2026-10-20)
 
 ### Changed

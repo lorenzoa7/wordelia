@@ -19,6 +19,9 @@ const THEMES: Array<{ id: ThemeSetting; icon: React.ReactNode }> = [
   { id: 'system', icon: <Desktop size={16} /> }
 ]
 
+/** An update error that comes from a missing connection ("net::ERR_INTERNET_DISCONNECTED") */
+const OFFLINE = /net::ERR_|ENOTFOUND|ETIMEDOUT|ECONNREFUSED|ECONNRESET|EAI_AGAIN|getaddrinfo/i
+
 /** The highest daily goal, in words */
 const MAX_GOAL = 100000
 
@@ -162,7 +165,9 @@ function UpdatesSection(): React.JSX.Element | null {
       : u.state === 'ready'
         ? st.ready(u.version)
         : u.state === 'error'
-          ? st.error(u.message)
+          ? OFFLINE.test(u.message)
+            ? st.offline
+            : st.error
           : st[u.state]
   return (
     <>
@@ -172,7 +177,7 @@ function UpdatesSection(): React.JSX.Element | null {
       </Field>
       <div className="update-row">
         <span className="update-version">{version ? g.version(version) : ''}</span>
-        <span className={clsx('update-line', u.state === 'error' && 'is-error')} role="status" aria-live="polite">
+        <span className={clsx('update-line', u.state === 'error' && 'is-error')} role="status" aria-live="polite" title={u.state === 'error' ? u.message : undefined}>
           {line}
         </span>
         {u.state === 'ready' ? (

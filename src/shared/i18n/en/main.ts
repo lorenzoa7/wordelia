@@ -47,14 +47,14 @@ export const main = {
   ai: {
     retrying: 'Retrying…',
     cancelled: 'Cancelled.',
-    claudeNotFound: 'The claude CLI was not found.',
-    claudeLogin: 'Run "claude auth login" in a terminal to log in.',
+    claudeNotFound: 'Wordelia did not find the claude program on this computer.',
+    claudeLogin: 'Click “Log in…” to log in. Or run "claude auth login" in a terminal.',
     claudeNotInstalled: 'Claude Code is not installed.',
-    claudeBadArgs: 'The claude CLI rejected its arguments.',
+    claudeBadArgs: 'The claude program did not accept the request. Update Claude Code.',
     claudeExited: (code: number | null): string => `claude exited with code ${code}`,
-    codexNotFound: 'The codex CLI was not found.',
-    codexLogin: 'Run "codex login" in a terminal to log in.',
-    codexExpired: 'The Codex login has expired. Run "codex logout", then "codex login", in a terminal.',
+    codexNotFound: 'Wordelia did not find the codex program on this computer.',
+    codexLogin: 'Click “Log in…” to log in. Or run "codex login" in a terminal.',
+    codexExpired: 'The Codex login has expired. Click “Log in…” to log out and log in again.',
     codexNotInstalled: 'Codex is not installed.',
     codexError: 'Codex error',
     codexTurn: (status: string): string => `Turn ${status}`,
@@ -63,11 +63,12 @@ export const main = {
     addApiKey: 'Add an API key.',
     apiKeyWorks: 'API key works.',
     anthropicAddKey: 'Add an Anthropic API key in Settings.',
-    anthropicKeyRejected: 'The Anthropic API key was rejected.',
-    anthropicUnreachable: 'Could not reach the Anthropic API.',
     refusal: 'The model declined this request.',
-    rateLimit: 'Rate limit reached. Try again soon.',
     openaiAddKey: 'Add an OpenAI API key in Settings.',
-    requestFailed: 'The request failed.'
+    requestFailed: 'The request failed.',
+    /** A request to a provider that the writer turned off */
+    providerOff: (provider: string): string => `${provider} is off in Settings → AI.`,
+    /** Saving an API key without the key store of the system */
+    noKeyStore: 'This computer has no safe place for the key (the key store of the system is not available).'
   }
 }

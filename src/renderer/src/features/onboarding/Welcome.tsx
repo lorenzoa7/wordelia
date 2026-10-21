@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { ArrowRight, ArrowSquareOut, CaretDown, CheckCircle, Globe, Key, SignIn, Terminal } from '@phosphor-icons/react'
 import clsx from 'clsx'
+import { installPage } from '@shared/ai/install'
 import { PROVIDER_LABELS } from '@shared/ai/routes'
 import type { ProviderId } from '@shared/types'
 import { Button, Menu, MenuItem, Spinner } from '@/ui'
@@ -14,14 +15,6 @@ import './welcome.css'
 
 const CLI: ProviderId[] = ['claude-code', 'codex']
 const LOGIN_CMD: Record<string, string> = { 'claude-code': 'claude auth login', codex: 'codex login' }
-/**
- * The official install pages. Each one gives the steps for Windows, macOS and Linux; Claude Code has a
- * native installer, so the writer does not need Node.js. (Settings → AI uses the same pages.)
- */
-const INSTALL_URL: Record<string, string> = {
-  'claude-code': 'https://code.claude.com/docs/en/setup',
-  codex: 'https://developers.openai.com/codex/cli'
-}
 /** How often a row looks again for its program while the writer installs it or logs in */
 const POLL_MS = 4000
 
@@ -241,7 +234,7 @@ function CliRow({ id }: { id: ProviderId }): React.JSX.Element {
             variant="primary"
             icon={waiting === 'install' ? <Spinner size={12} /> : <ArrowSquareOut size={13} />}
             onClick={() => {
-              void invoke('window:openExternal', INSTALL_URL[id])
+              void invoke('window:openExternal', installPage(id, window.wordelia?.platform ?? '') ?? '')
               setWaiting('install')
             }}
           >

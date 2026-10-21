@@ -8,7 +8,7 @@
 import { app, BrowserWindow } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import type { UpdateState } from '@shared/types'
-import { getSettings } from './settings'
+import { getSettings, onSettingsChanged } from './settings'
 
 const CHECK_EVERY = 6 * 60 * 60 * 1000
 const FIRST_CHECK_AFTER = 15 * 1000
@@ -53,6 +53,20 @@ export function installUpdate(): void {
   for (const w of BrowserWindow.getAllWindows()) w.close()
 }
 
+/**
+ * The window stays open after "Restart now" (the writer chose "Keep the window open" because some
+ * text was not saved). A later normal quit must not restart the app.
+ */
+export function cancelUpdateInstall(): void {
+  installOnClose = false
+}
+
+/** An update that is ready installs when the app quits only while "Download updates automatically" is on. */
+function installOnQuit(autoUpdate: boolean): void {
+  // WORDELIA_UPDATE_TEST=1: check and download only (scripts/smoke-update.mjs), never install.
+  autoUpdater.autoInstallOnAppQuit = autoUpdate && process.env.WORDELIA_UPDATE_TEST !== '1'
+}
+
 /** Call from 'window-all-closed'. Returns true when the update takes over the quit. */
 export function quitForUpdate(): boolean {
   if (!installOnClose) return false
@@ -68,8 +82,8 @@ export async function initUpdater(): Promise<void> {
   }
   autoUpdater.autoDownload = true
   // An update that the user did not install yet goes in when they quit the app.
-  // WORDELIA_UPDATE_TEST=1: check and download only (scripts/smoke-update.mjs), never install.
-  autoUpdater.autoInstallOnAppQuit = process.env.WORDELIA_UPDATE_TEST !== '1'
+  installOnQuit((await getSettings()).autoUpdate)
+  onSettingsChanged((s) => installOnQuit(s.autoUpdate))
   autoUpdater.on('update-available', (info) => publish({ state: 'downloading', version: info.version, percent: 0 }))
   autoUpdater.on('download-progress', (p) => {
     if (state.state === 'downloading') publish({ ...state, percent: Math.round(p.percent) })

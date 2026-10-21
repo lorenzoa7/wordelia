@@ -10,7 +10,7 @@ import { buildActionSystem, buildActionUser, extractRewrite, replyWithoutRewrite
 import { contextAround } from '@shared/prompts/context'
 import { hasChanges } from '@shared/text/diff'
 import type { AiAction, CompletionResult, DocNode, ModelChoice, ProviderId } from '@shared/types'
-import { friendlyError, runCompletion, type RunHandle } from '@/lib/ai'
+import { describeError, runCompletion, type RunHandle } from '@/lib/ai'
 import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
 import { toast, useUi } from '@/stores/ui'
@@ -261,8 +261,9 @@ function finish(result: CompletionResult, run: { id: string; action: AiAction; l
   if (!result.ok) {
     end()
     if (result.errorKind === 'cancelled') return
-    const connect = result.errorKind === 'not-logged-in' || result.errorKind === 'not-installed'
-    toast(friendlyError(result), { kind: 'error', action: connect ? { label: t.write.action.openSettings, run: () => useUi.getState().openSettings('ai') } : again })
+    // A problem that the writer fixes in Settings → AI gets its button there; any other error gets Try again.
+    const info = describeError(result)
+    toast(info.message, { kind: 'error', action: info.fix ?? again })
     return
   }
   const raw = extractRewrite(result.text).text

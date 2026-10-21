@@ -32,14 +32,22 @@ export const app: typeof en = {
     expiredHint: (name) => `O login do ${name} expirou. Abra Configurações → IA para entrar de novo.`
   },
   aiErrors: {
-    notInstalled: 'O provedor de IA não está instalado.',
-    notLoggedIn: 'Sem login.',
-    connectHint: (detail) => `${detail} Abra Configurações → IA para conectar.`,
-    rateLimit: 'O provedor de IA diz que o limite de uso foi atingido. Tente de novo mais tarde.',
-    network: 'Sem conexão com o provedor de IA.',
+    notInstalled: (p) => `O ${p} não está instalado neste computador. Abra Configurações → IA para instalar.`,
+    notLoggedIn: (p) => `Você não fez login no ${p}. Abra Configurações → IA para entrar.`,
+    noKey: (p) => `Adicione uma chave de API para ${p} em Configurações → IA.`,
+    loginExpired: (p) => `O login do ${p} expirou. Abra Configurações → IA para entrar de novo.`,
+    badKey: (p) => `A chave de API não funcionou com ${p}. Confira a chave em Configurações → IA.`,
+    noCredit: (p) => `A sua conta de ${p} está sem crédito. Adicione crédito no site de ${p} e tente de novo.`,
+    usageLimit: 'Você chegou ao limite de uso do seu plano. Tente de novo mais tarde.',
+    usageLimitUntil: (time) => `Você chegou ao limite de uso do seu plano. Ele se renova: ${time}.`,
+    overloaded: (p) => `O servidor de ${p} está ocupado agora. Tente de novo daqui a pouco.`,
+    network: (p) => `Sem conexão com ${p}. Confira a internet e tente de novo.`,
+    refused: 'O modelo recusou este pedido.',
+    off: (p) => `O provedor ${p} está desligado. Ligue-o em Configurações → IA.`,
     cancelled: 'Interrompido.',
-    unknown: 'Algo deu errado.'
+    other: (p) => `${p} não conseguiu responder. Tente de novo.`,
+    theAi: 'a IA',
+    openSettings: 'Abrir configurações'
   },
   keepBookOpen: 'Manter o livro aberto'
-
 }

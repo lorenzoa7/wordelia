@@ -35,17 +35,29 @@ export const app = {
     expired: 'AI login expired',
     expiredHint: (name: string): string => `The login of ${name} has expired. Open Settings → AI to log in again.`
   },
-  /** Errors of an AI call, in words for the user */
+  /** Errors of an AI call, in words for the user. `p` is the name of the provider, for example "Claude Code". */
   aiErrors: {
-    notInstalled: 'The AI provider is not installed.',
-    notLoggedIn: 'Not logged in.',
-    connectHint: (detail: string): string => `${detail} Open Settings → AI to connect.`,
-    rateLimit: 'The AI provider says the usage limit is reached. Try again later.',
-    network: 'No connection to the AI provider.',
+    notInstalled: (p: string): string => `${p} is not installed on this computer. Open Settings → AI to install it.`,
+    notLoggedIn: (p: string): string => `You are not logged in to ${p}. Open Settings → AI to log in.`,
+    /** An API without a key */
+    noKey: (p: string): string => `Add an API key for ${p} in Settings → AI.`,
+    loginExpired: (p: string): string => `Your ${p} login has expired. Open Settings → AI to log in again.`,
+    badKey: (p: string): string => `${p} did not accept your API key. Check the key in Settings → AI.`,
+    noCredit: (p: string): string => `Your ${p} account has no credit left. Add credit on the ${p} website, then try again.`,
+    usageLimit: 'You reached the usage limit of your plan. Try again later.',
+    /** `time`: when the limit ends, for example "15:05" or "Fri 09:00" */
+    usageLimitUntil: (time: string): string => `You reached the usage limit of your plan. It resets at ${time}.`,
+    overloaded: (p: string): string => `${p} is busy right now. Try again in a moment.`,
+    network: (p: string): string => `No connection to ${p}. Check the internet connection, then try again.`,
+    refused: 'The model declined this request.',
+    off: (p: string): string => `${p} is off. Turn it on in Settings → AI.`,
     cancelled: 'Stopped.',
-    unknown: 'Something went wrong.'
+    other: (p: string): string => `${p} could not answer. Try again.`,
+    /** The name in the messages when the provider is not known */
+    theAi: 'the AI',
+    /** The button that opens the row of the provider in Settings → AI */
+    openSettings: 'Open settings'
   },
   /** The question when a book closes and some text is not on disk (the other texts are main.closeDialog) */
   keepBookOpen: 'Keep the book open'
-
 }

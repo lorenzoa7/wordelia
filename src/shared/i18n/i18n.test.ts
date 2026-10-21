@@ -32,8 +32,11 @@ describe('built-in action instructions', () => {
 })
 
 describe('effort names', () => {
-  it('stay in English in every language', () => {
-    expect(MESSAGES['pt-BR'].common.efforts).toEqual(MESSAGES.en.common.efforts)
-    expect(MESSAGES.es.common.efforts).toEqual(MESSAGES.en.common.efforts)
+  it('are in the language of the interface, for each level', () => {
+    for (const locale of ['pt-BR', 'es'] as const) {
+      expect(Object.keys(MESSAGES[locale].common.efforts)).toEqual(Object.keys(MESSAGES.en.common.efforts))
+      expect(MESSAGES[locale].common.efforts.medium).not.toBe(MESSAGES.en.common.efforts.medium)
+    }
+    expect(MESSAGES['pt-BR'].common.efforts.medium).toBe('Médio')
   })
 })

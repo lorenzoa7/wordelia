@@ -120,7 +120,8 @@ export interface IpcInvokeMap {
   'ai:models': [[provider: ProviderId], ModelInfo[]]
   'ai:complete': [[requestId: string, req: CompletionRequest], CompletionResult]
   'ai:cancel': [[requestId: string], void]
-  'ai:setKey': [[provider: ProviderId, key: string | null], void]
+  /** `error`: why the key was not saved, in the interface language */
+  'ai:setKey': [[provider: ProviderId, key: string | null], { ok: boolean; error?: string }]
   'ai:hasKey': [[provider: ProviderId], boolean]
   /** Open a terminal window that runs the login command of a CLI provider */
   'ai:openLogin': [[provider: ProviderId], boolean]

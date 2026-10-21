@@ -1,11 +1,9 @@
 // App-level state: settings, theme, library, AI provider status.
 
 import { create } from 'zustand'
-import type { AppSettings, LibraryItem, ModelInfo, ModelRoutes, ProviderId, ProviderStatus, TaskKind } from '@shared/types'
-import { suggestRoutes } from '@shared/ai/routes'
+import type { AppSettings, LibraryItem, ModelInfo, ProviderId, ProviderStatus, TaskKind } from '@shared/types'
+import { PROVIDER_ORDER as PROVIDERS, readyProviders, repairRoutes, type RouteRepair } from '@shared/ai/routes'
 import { invoke } from '@/lib/api'
-
-const PROVIDERS: ProviderId[] = ['claude-code', 'codex', 'anthropic', 'openai']
 
 interface AppState {
   settings: AppSettings | null
@@ -19,10 +17,14 @@ interface AppState {
   updateSettings(patch: Partial<AppSettings>): Promise<void>
   setUi(patch: Partial<AppSettings['ui']>): void
   refreshLibrary(): Promise<void>
-  checkProvider(id: ProviderId): Promise<ProviderStatus>
-  checkAllProviders(): Promise<void>
-  /** Fill empty routes with suggestions for the first working provider */
-  autoRoute(): Promise<void>
+  /** `quiet`: no "Checking…" while the check runs (a check in the background) */
+  checkProvider(id: ProviderId, opts?: { quiet?: boolean }): Promise<ProviderStatus>
+  checkAllProviders(opts?: { quiet?: boolean }): Promise<void>
+  /**
+   * Give a route to each task without one, and to each task whose provider is off: the routes of
+   * `prefer` when it is ready, else of the first ready provider (repairRoutes). Null: no change.
+   */
+  autoRoute(prefer?: ProviderId): Promise<RouteRepair | null>
   routeFor(task: TaskKind): AppSettings['routes'][TaskKind]
 }
 
@@ -77,8 +79,8 @@ export const useApp = create<AppState>((set, get) => ({
     set({ library: await invoke('library:list') })
   },
 
-  async checkProvider(id) {
-    set((s) => ({ checking: { ...s.checking, [id]: true } }))
+  async checkProvider(id, opts) {
+    if (!opts?.quiet) set((s) => ({ checking: { ...s.checking, [id]: true } }))
     try {
       const status = await invoke('ai:status', id)
       set((s) => ({ status: { ...s.status, [id]: status } }))
@@ -88,30 +90,23 @@ export const useApp = create<AppState>((set, get) => ({
       }
       return status
     } finally {
-      set((s) => ({ checking: { ...s.checking, [id]: false } }))
+      if (!opts?.quiet) set((s) => ({ checking: { ...s.checking, [id]: false } }))
     }
   },
 
-  async checkAllProviders() {
+  async checkAllProviders(opts) {
     const s = get().settings
     const ids = PROVIDERS.filter((p) => s?.providers[p]?.enabled !== false)
-    await Promise.all(ids.map((id) => get().checkProvider(id)))
+    await Promise.all(ids.map((id) => get().checkProvider(id, opts)))
   },
 
-  async autoRoute() {
+  async autoRoute(prefer) {
     const s = get().settings
-    if (!s) return
-    const missing = (Object.keys(s.routes) as TaskKind[]).filter((k) => !s.routes[k])
-    if (!missing.length) return
-    const ready = PROVIDERS.find((p) => {
-      const st = get().status[p]
-      return st?.installed && st.loggedIn !== false && s.providers[p]?.enabled !== false
-    })
-    if (!ready) return
-    const suggested = suggestRoutes(ready, get().models[ready] ?? [])
-    const routes: ModelRoutes = { ...s.routes }
-    for (const k of missing) routes[k] = suggested[k]
-    await get().updateSettings({ routes })
+    if (!s) return null
+    const ready = readyProviders(s, get().status)
+    const repair = repairRoutes(s.routes, (p) => s.providers[p]?.enabled !== false, ready, get().models, prefer)
+    if (repair) await get().updateSettings({ routes: repair.routes })
+    return repair
   },
 
   routeFor(task) {

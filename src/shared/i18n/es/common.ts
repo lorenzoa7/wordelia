@@ -34,10 +34,10 @@ export const common: typeof en = {
   words: (v) => (v === 1 ? '1 palabra' : `${n(v)} palabras`),
   chapters: (v) => (v === 1 ? '1 capítulo' : `${n(v)} capítulos`),
   // Effort names stay in English, as in the AI tools.
-  efforts: { minimal: 'Minimal', low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high', max: 'Max' },
+  efforts: { minimal: 'Mínimo', low: 'Bajo', medium: 'Medio', high: 'Alto', xhigh: 'Muy alto', max: 'Máximo' },
   providerKind: {
-    'claude-code': 'Tu suscripción de Claude, con el programa claude',
-    codex: 'Tu suscripción de ChatGPT, con el programa codex',
+    'claude-code': 'Tu plan de Claude, con el programa Claude Code',
+    codex: 'Tu plan de ChatGPT, con el programa Codex',
     anthropic: 'Pago por uso, con una clave de API',
     openai: 'Pago por uso, con una clave de API'
   },

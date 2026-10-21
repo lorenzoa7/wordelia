@@ -40,14 +40,14 @@ export const main: typeof en = {
   ai: {
     retrying: 'Tentando de novo…',
     cancelled: 'Cancelado.',
-    claudeNotFound: 'O programa claude não foi encontrado.',
-    claudeLogin: 'Execute "claude auth login" em um terminal para entrar.',
+    claudeNotFound: 'O Wordelia não encontrou o programa claude neste computador.',
+    claudeLogin: 'Clique em “Entrar…” para fazer login. Ou execute "claude auth login" em um terminal.',
     claudeNotInstalled: 'O Claude Code não está instalado.',
-    claudeBadArgs: 'O programa claude rejeitou os argumentos.',
+    claudeBadArgs: 'O programa claude não aceitou o pedido. Atualize o Claude Code.',
     claudeExited: (code) => `O claude terminou com o código ${code}`,
-    codexNotFound: 'O programa codex não foi encontrado.',
-    codexLogin: 'Execute "codex login" em um terminal para entrar.',
-    codexExpired: 'O login do Codex expirou. Em um terminal, execute "codex logout" e depois "codex login".',
+    codexNotFound: 'O Wordelia não encontrou o programa codex neste computador.',
+    codexLogin: 'Clique em “Entrar…” para fazer login. Ou execute "codex login" em um terminal.',
+    codexExpired: 'O login do Codex expirou. Clique em “Entrar…” para sair e entrar de novo.',
     codexNotInstalled: 'O Codex não está instalado.',
     codexError: 'Erro do Codex',
     codexTurn: (status) => `A execução terminou: ${status}`,
@@ -56,11 +56,10 @@ export const main: typeof en = {
     addApiKey: 'Adicione uma chave de API.',
     apiKeyWorks: 'A chave de API funciona.',
     anthropicAddKey: 'Adicione uma chave da Anthropic API nas Configurações.',
-    anthropicKeyRejected: 'A chave da Anthropic API foi recusada.',
-    anthropicUnreachable: 'Não foi possível acessar a Anthropic API.',
     refusal: 'O modelo recusou este pedido.',
-    rateLimit: 'Limite de uso atingido. Tente de novo daqui a pouco.',
     openaiAddKey: 'Adicione uma chave da OpenAI API nas Configurações.',
-    requestFailed: 'O pedido falhou.'
+    requestFailed: 'O pedido falhou.',
+    providerOff: (provider) => `O ${provider} está desligado em Configurações → IA.`,
+    noKeyStore: 'Este computador não tem um lugar seguro para a chave (o cofre de chaves do sistema não está disponível).'
   }
 }

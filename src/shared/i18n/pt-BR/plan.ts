@@ -236,7 +236,8 @@ export const plan: typeof en = {
       return `${what}: ${chapters}${parts > 1 ? ` (parte ${part} de ${parts})` : ''}.`
     },
     undoUnsafe: 'Uma nota mudou depois dessas mudanças. Desfazer poderia apagar suas palavras novas. Use o chat para desfazer uma mudança.',
-    nothingToRead: 'Os capítulos ainda não têm texto.'
+    nothingToRead: 'Os capítulos ainda não têm texto.',
+    threadPurpose: 'Mantém o planejamento em dia com o manuscrito. As propostas vêm do botão Atualizar notas.'
   },
   links: {
     noEntry: (name) => `Nenhuma nota se chama "${name}".`,

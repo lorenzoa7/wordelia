@@ -264,11 +264,13 @@ export const plan = {
     threadBrief: 'Keeps the planning in step with the manuscript. Proposals come from the Sync button.',
     /** The user message in the sync thread. `chapters` is the list of chapter titles in quotes. */
     request: (bootstrap: boolean, count: number, chapters: string, part: number, parts: number): string =>
-      `${bootstrap ? 'Build the planning from' : 'Sync the planning with'} ${count === 1 ? 'chapter' : `${count} chapters`}: ${chapters}${parts > 1 ? ` (part ${part} of ${parts})` : ''}.`,
+      `${bootstrap ? 'Build the planning from' : 'Update the notes from'} ${count === 1 ? 'chapter' : `${count} chapters`}: ${chapters}${parts > 1 ? ` (part ${part} of ${parts})` : ''}.`,
     /** The toast of Undo after Accept all, when a note changed after the changes */
     undoUnsafe: 'A note changed after these changes, so Undo could remove your new words. Use the chat to undo a change.',
     /** The hint of the build button on a book with no text */
-    nothingToRead: 'The chapters have no text yet.'
+    nothingToRead: 'The chapters have no text yet.',
+    /** The purpose of the sync thread on screen (the thread keeps `threadBrief`) */
+    threadPurpose: 'Keeps the planning in step with the manuscript. Proposals come from the "Update notes" button.'
   },
   links: {
     noEntry: (name: string): string => `No note is called "${name}".`,

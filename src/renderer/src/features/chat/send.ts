@@ -34,7 +34,7 @@ export function threadTitle(t: Messages, title: string): string {
 
 /** The purpose to show for a thread. The purpose of the planning sync thread shows in the interface language. */
 export function threadBrief(t: Messages, brief: string): string {
-  return brief === EN.plan.sync.threadBrief ? t.plan.sync.threadBrief : brief
+  return brief === EN.plan.sync.threadBrief ? t.plan.sync.threadPurpose : brief
 }
 
 /** The label to show for a mention. */

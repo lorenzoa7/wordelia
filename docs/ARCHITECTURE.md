@@ -92,6 +92,7 @@ My Book/
     sync-state.json      Content hashes of chapters at the last planning sync
   .wordelia/             Local cache. Not synced (the app writes a .gitignore for it)
     cache/summaries.json
+    wordelia.last-good.json   The last manifest that parsed (see 4.4)
   .gitignore
 ```
 
@@ -144,6 +145,23 @@ image: _assets/marta.webp
 ## Appearance
 ...
 ```
+
+### 4.4 Opening a book
+
+`src/main/book/store.ts` (`openBook`, `inspectFolder`) and `src/main/library.ts`.
+
+- **A damaged manifest.** A `wordelia.json` that does not parse is never replaced without a copy. The app writes the damaged file to `.wordelia/wordelia.json.broken-<time>`, then makes the manifest again from, in this order: one side of a git conflict (the version of this computer first), the last good copy (`.wordelia/wordelia.last-good.json`, written when a book opens and on each save of the manifest), the parts of the file that it can read (`salvageManifest` in `src/shared/manifest.ts`: the id, the title, the language, the chapter order, the typography), or nothing. A note (`BookSnapshot.notices`) tells the writer, with a button that shows the old file. A byte order mark is not damage.
+- **A missing chapter file.** A chapter in the manifest whose file is not there (a sync client did not deliver it yet) keeps its place in the manifest. A note tells the writer and offers "Forget this chapter". When the file arrives, the chapter comes back in its place (the store keeps the missing ids, and `keepMissingChapters` keeps their places when the order changes).
+- **Open folder.** A folder without `wordelia.json` becomes a book only when the writer says yes ("Make it a book", with the book language). For a folder of Markdown or text files, the app offers Import instead: Import copies the files into a new book, one chapter for each file, and the folder does not change. A folder inside a book (for example its `manuscript/` folder) opens that book.
+- **A book that moved.** "Find the folder…" on a "Folder not found" card points the card to the new folder when that folder has the same book (by id). "Remove from list" has Undo; the files stay on disk.
+
+### 4.5 Import
+
+`src/main/import.ts` splits the file into chapters; `src/shared/import.ts` has the rules; the renderer (`features/library/convert.ts`) turns DOCX HTML into Markdown.
+
+- **Chapters.** DOCX: the Heading 1 or Heading 2 paragraphs (the level where most headings say "Chapter" or "Capítulo"; a shallower level is parts), or two or more Title paragraphs, or paragraphs like "Capítulo Um". Markdown: one heading level the same way; one "# Title" before the "## Chapter" headings is the title of the book. TXT: lines like "Capítulo Um", "CHAPTER 12" or "Chapter Two — The Storm". The text before the first chapter is the title page, up to its first paragraph of prose (25 words): from there it is a chapter. A chapter without a title in the file gets "Chapter One", "Capítulo Um"… in the language of the book.
+- **Scene breaks.** A paragraph with only a marker ("* * *", "***", "#", "⁂", a centered "*") is a scene break. Blank lines are scene breaks or only spacing (`chooseBlankLines`): a document with markers, or with blank lines between more than one pair of paragraphs in four (the Google Docs style), uses them as spacing. The import dialog shows the count of scene breaks, and the writer can change the choice.
+- An empty file cannot be imported. The dialog numbers the chapters and says which AI builds the planning.
 
 ## 5. AI
 
@@ -461,7 +479,9 @@ The story line is a board of cards: each card is one event of the story. The boa
 
 ## 7c. Shell and controls
 
-- **Title bar.** The wordmark is at the far left, then the book menu. The view tabs stay in the middle. On the right: the update badge, the AI warning, the chat button and the settings button.
+- **Title bar.** The wordmark is at the far left, then the book menu. The view tabs stay in the middle. On the right: the update badge, the AI warning, the chat button and the settings button. The tools never cover the tabs: when they do not fit in their column (`useFitTools` in `app/TitleBar.tsx`), the AI warning keeps only its icon, then the update badge too. The `narrow` scenario measures this in each language from 980 px to 1440 px.
+- **Welcome** (`features/onboarding/Welcome.tsx`). A modal dialog: the title bar and the page are inert behind it, Tab stays in it, the global shortcuts are off, and Esc closes it. A program that is not installed has "Install…", which opens its official install page; the row then looks again every 4 s, and when the window gets the focus back. "Start writing" with no book opens the New book dialog. A new install has the interface language of the system (`localeForSystem`).
+- **A book switch.** `useUi.resetForBook()` closes what belongs to the last book: the find bar, the history and the export.
 - **AI warning** (`app/ProviderBadge.tsx`). It shows only when the chat has no AI: no chat route, or the chat provider is not installed or not logged in (an expired login has its own text). A problem must stay for 1.5 s before the warning shows, so the start-up checks do not make it flash. A click opens Settings → AI.
 - **Sidebar toggle** (`features/book/SidebarToggle.tsx`). The sidebar header has the hide button. A hidden sidebar leaves a small button at the top-left corner of the page area (`.sidebar-show` in `BookView`), over the Write and the Plan views. The shortcut and the window edge also work. When the sidebar is hidden, `.book-main` has the class `is-sidebar-closed`: the editor toolbar and the Plan pages get more space at the left. A view that puts controls at the top-left corner must keep 56 px clear in this state.
 - **Fields** (`ui/index.tsx`). `Field` does not wrap its control in the label. The label covers its text only. A click on the label focuses a text box or flips a switch; it never opens a dropdown. A click beside a control does nothing. The controls get their `id` and `aria-labelledby` from the field (`FieldContext`).
@@ -483,7 +503,7 @@ The story line is a board of cards: each card is one event of the story. The boa
 
 - Each chapter editor keeps up to 350 ms of typing in memory, then writes Markdown to the book store. An editor that unmounts (its chapter scrolled far away) writes first.
 - The store writes files through `saver` (500 ms debounce for each file, ordered writes).
-- Editors register a flusher (`src/renderer/src/lib/flush.ts`). Closing a book runs all flushers, then `saver.flush()`.
+- Editors register a flusher (`src/renderer/src/lib/flush.ts`). Closing a book runs all flushers, then `saver.flush()`. When some text is not on disk, the book stays open and the app asks "Keep the book open / Close anyway", as for the window.
 - Closing the window: the main process stops the close, sends `app:flushRequest`, and closes when the renderer answers `app:flushDone` (or after 4 s).
 - Deleted chapters and entries move to `.wordelia/trash/`. Nothing is deleted for good.
 - Accepted AI proposals show an **Undo** toast. It restores the text from before the change.

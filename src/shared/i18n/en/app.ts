@@ -44,5 +44,8 @@ export const app = {
     network: 'No connection to the AI provider.',
     cancelled: 'Stopped.',
     unknown: 'Something went wrong.'
-  }
+  },
+  /** The question when a book closes and some text is not on disk (the other texts are main.closeDialog) */
+  keepBookOpen: 'Keep the book open'
+
 }

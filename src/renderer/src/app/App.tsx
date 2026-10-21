@@ -98,7 +98,8 @@ export function App(): React.JSX.Element {
     <MotionConfig reducedMotion="user">
     <TooltipProvider>
       <div className="app">
-        <TitleBar />
+        {/* The welcome is modal: the title bar and the page take no focus and no clicks behind it. */}
+        <TitleBar inert={!onboarded} />
         <main className="app-main" inert={!onboarded}>
           {/* A fade in with CSS: a quick close and open of another book can never leave a view invisible. */}
           {ready &&

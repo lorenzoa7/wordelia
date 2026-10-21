@@ -11,6 +11,8 @@ export function useGlobalShortcuts(): void {
       if (!mod) return
       const key = e.key.toLowerCase()
       const app = useApp.getState()
+      // The welcome is open: it is modal, so Settings and the panels do not open behind it.
+      if (app.settings && !app.settings.onboarded) return
       const book = useBook.getState()
       const ui = useUi.getState()
       if (key === ',') {

@@ -314,8 +314,8 @@ export function Switch({
 }
 
 /**
- * A box for a number. Typing stays in the box; Enter or leaving the box saves it, Esc puts the
- * saved value back. The arrow keys step the value (Shift: ten steps) and save at once. The box
+ * A box for a number. Typing stays in the box; Enter, leaving the box or closing its dialog saves it.
+ * Esc puts the saved value back, and only that: the dialog stays open. The arrow keys step the value (Shift: ten steps) and save at once. The box
  * accepts a comma or a point for decimals and shows the number in the interface language.
  */
 export function NumberInput({
@@ -375,6 +375,33 @@ export function NumberInput({
     setDraft(format(v))
     if (v !== value) onCommit(v)
   }
+  // The latest draft and commit, for the listeners below.
+  const latest = useRef({ draft, value, editing, format, commit: (_: string): void => {} })
+  latest.current = { draft, value, editing, format, commit: (text: string) => commit(parse(text)) }
+
+  // Esc with a changed draft puts the saved value back and does nothing more. A dialog listens for Esc
+  // on the document in the capture phase, so the box listens on the window first and stops the key there.
+  useEffect(() => {
+    if (!editing) return
+    const onKey = (e: KeyboardEvent): void => {
+      const l = latest.current
+      if (e.key !== 'Escape' || e.target !== input.current || l.draft === l.format(l.value)) return
+      e.stopPropagation()
+      e.preventDefault()
+      setDraft(l.format(l.value))
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [editing])
+
+  // The box goes away while the user types (the dialog closes): save the draft.
+  useEffect(
+    () => () => {
+      const l = latest.current
+      if (l.editing && l.draft !== l.format(l.value)) l.commit(l.draft)
+    },
+    []
+  )
   // The width of the longest value, in characters: the UI font is monospaced.
   const chars = Math.max(String(Math.trunc(max)).length, String(Math.trunc(min)).length) + (decimals ? decimals + 1 : 0)
 
@@ -419,8 +446,6 @@ export function NumberInput({
             e.preventDefault()
             commit(parse(draft))
             input.current?.select()
-          } else if (e.key === 'Escape' && draft !== format(value)) {
-            setDraft(format(value))
           } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
             e.preventDefault()
             const base = parse(draft) ?? value

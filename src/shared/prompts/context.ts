@@ -3,6 +3,7 @@
 import { countMarkdownWords } from '../book'
 import type { BookManifest, Chapter, Entry, Thread } from '../types'
 import { boardView, parseBoard } from '../storyline'
+import { rulesForAi } from '../ai/defaults'
 
 export interface BookContext {
   manifest: BookManifest
@@ -75,7 +76,8 @@ export function bookBlock(m: BookManifest): string {
 }
 
 export function writingRulesBlock(rules: string): string {
-  const clean = rules.trim()
+  // The notes and examples of the template are hints for the author, not rules (rulesForAi).
+  const clean = rulesForAi(rules)
   if (!clean) return '<writing_rules>\n(The author has not written rules yet. Follow the voice of the existing text.)\n</writing_rules>'
   return `<writing_rules>\n${clean}\n</writing_rules>`
 }

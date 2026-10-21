@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AiAction } from '../types'
-import { BUILTIN_ACTIONS, DEFAULT_ACTIONS, RETIRED_ACTIONS, isUnchangedBuiltIn, withoutRetiredActions } from './defaults'
+import { BUILTIN_ACTIONS, DEFAULT_ACTIONS, RETIRED_ACTIONS, isUnchangedBuiltIn, rulesForAi, withoutRetiredActions, writingRulesTemplate } from './defaults'
+import { writingRulesBlock } from '../prompts/context'
 import { withDefaultShortcuts } from './shortcuts'
 
 const expand = RETIRED_ACTIONS.find((a) => a.id === 'expand') as AiAction
@@ -71,5 +72,21 @@ describe('settings version 5: retired actions', () => {
   })
   it('never leaves the list empty', () => {
     expect(withoutRetiredActions([{ ...expand }], 'polish')).toHaveLength(1)
+  })
+})
+
+describe('the writing rules that the AI gets', () => {
+  it('leaves out the notes and the examples of the template of a new book', () => {
+    const rules = rulesForAi(writingRulesTemplate('Brazilian Portuguese'))
+    expect(rules).toBe('# Writing rules\n\n## Language\n- Write in Brazilian Portuguese.')
+    expect(rules).not.toMatch(/Example|1899|dash/)
+  })
+  it('keeps the rules of the author, also next to an example that is left', () => {
+    const own = '# Writing rules\n\n## Dialogue\n- (Example: dialogue lines start with a dash.)\n- Dialogue goes in double quotation marks.\n\n## Avoid\n- (Exemplo: gírias modernas.)'
+    expect(rulesForAi(own)).toBe('# Writing rules\n\n## Dialogue\n- Dialogue goes in double quotation marks.')
+  })
+  it('gives no rules when only headings are left, so the prompt says that there are none', () => {
+    expect(rulesForAi('# Writing rules\n\n## Voice\n- (Example: third person.)')).toBe('')
+    expect(writingRulesBlock('# Writing rules\n\n## Voice\n- (Example: third person.)')).toContain('has not written rules yet')
   })
 })

@@ -13,7 +13,7 @@ export const plan: typeof en = {
   sidebar: {
     planning: 'Planificación',
     /** The sync button. Its tooltip says what it does. */
-    sync: 'Sincronizar',
+    sync: 'Actualizar notas',
     updateNotesHint:
       'La IA lee los capítulos que cambiaron desde la última actualización y propone cambios en las notas de la planificación. Tú aceptas o rechazas cada cambio. La IA no cambia el manuscrito.',
     changedChapters: (count) =>
@@ -32,11 +32,15 @@ export const plan: typeof en = {
     categoryMenu: (category) => `Acciones de ${category}`,
     renameCategory: 'Renombrar la categoría',
     rename: 'Renombrar',
-    deleteCategory: 'Borrar la categoría',
-    deleteCategoryTitle: (category) => `¿Borrar «${category}»?`,
+    deleteCategory: 'Eliminar la categoría',
+    deleteCategoryTitle: (category) => `¿Eliminar «${category}»?`,
     deleteCategoryMessage: (notes) =>
       notes ? `${notes === 1 ? 'Su nota va' : `Sus ${notes} notas van`} a la papelera del libro.` : 'La categoría no tiene notas.',
-    lastCategory: 'La planificación necesita una categoría.'
+    lastCategory: 'La planificación necesita una categoría.',
+    categoryDeleted: (category, notes) =>
+      notes ? `«${category}» se eliminó. ${notes === 1 ? 'Su nota está' : `Sus ${notes} notas están`} en la papelera del libro.` : `«${category}» se eliminó.`,
+    icon: 'Icono',
+    outside: 'Fuera de las categorías'
   },
   overview: {
     title: 'El universo de la historia',
@@ -78,17 +82,17 @@ export const plan: typeof en = {
     rename: 'Renombrar',
     renameChapter: 'Renombrar el capítulo',
     openChapter: 'Abrir el capítulo',
-    deleteColumn: 'Borrar la columna',
+    deleteColumn: 'Eliminar la columna',
     columnDeleted: (title, cards, tray) =>
-      cards ? `«${title}» se borró. ${cards === 1 ? 'Su tarjeta está' : `Sus ${cards} tarjetas están`} en «${tray}».` : `«${title}» se borró.`,
+      cards ? `«${title}» se eliminó. ${cards === 1 ? 'Su tarjeta está' : `Sus ${cards} tarjetas están`} en «${tray}».` : `«${title}» se eliminó.`,
     cardTitle: 'Tarjeta',
     chapter: 'Capítulo',
     momentField: 'Momento',
     none: 'Ninguno',
     mentions: 'Notas mencionadas',
     noMentions: 'Escribe @ en el texto para mencionar una nota.',
-    deleteCard: 'Borrar la tarjeta',
-    cardDeleted: 'La tarjeta se borró.',
+    deleteCard: 'Eliminar la tarjeta',
+    cardDeleted: 'La tarjeta se eliminó.',
     textRequired: 'Escribe lo que pasa.',
     suggestions: 'Notas para mencionar',
     bannerText: 'La IA puede llenar la línea con un resumen, una nota o una imagen.',
@@ -98,16 +102,16 @@ export const plan: typeof en = {
     reviewTitle: 'Propuesta de la IA',
     changes: (n) => (n === 1 ? '1 cambio' : `${n} cambios`),
     fromAi: (n) => (n === 1 ? '1 cambio de la IA' : `${n} cambios de la IA`),
-    apply: 'Aplicar',
+    apply: 'Aceptar',
     rejectOne: 'Rechazar',
-    applyAll: 'Aplicar todo',
+    applyAll: 'Aceptar todo',
     rejectAll: 'Rechazar todo',
     slotAdd: 'Entra aquí',
     slotRemove: 'Sale de aquí',
-    slotDelete: 'Borrada',
+    slotDelete: 'Eliminada',
     slotText: 'Texto nuevo',
     columnAdd: 'Columna nueva',
-    columnDelete: 'Columna borrada',
+    columnDelete: 'Columna eliminada',
     columnRename: 'Título nuevo',
     columnMove: 'Cambia de lugar',
     reviewLocked: 'Acepta o rechaza la propuesta antes de cambiar la línea.',
@@ -125,7 +129,12 @@ export const plan: typeof en = {
     dndStart: (text) => `Tomaste «${text}».`,
     dndOver: (title) => `Sobre «${title}».`,
     dndEnd: (title) => `Soltada en «${title}».`,
-    dndCancel: 'El movimiento se canceló.'
+    dndCancel: 'El movimiento se canceló.',
+    cardSaved: 'La tarjeta se guardó.',
+    chapterRenamed: (from, to) => `El capítulo «${from}» ahora se llama «${to}».`,
+    trayButton: (tray, cards) => `${tray} · ${cards}`,
+    trayButtonHint: (cards) => (cards === 1 ? '1 tarjeta no tiene lugar en esta vista. Haz clic para verla.' : `${cards} tarjetas no tienen lugar en esta vista. Haz clic para verlas.`),
+    draft: 'Continuar la tarjeta'
   },
   map: {
     views: 'Vistas de la planificación',
@@ -155,11 +164,11 @@ export const plan: typeof en = {
     showAll: 'Mostrar todas'
   },
   entry: {
-    deleteTitle: (name) => `¿Eliminar “${name}”?`,
+    deleteTitle: (name) => `¿Eliminar «${name}»?`,
     deleteMessage: 'El archivo pasa a la carpeta .wordelia/trash del libro.',
     askChat: 'Preguntar al chat sobre esta nota',
     mentionInChat: 'Mencionar en el chat',
-    deleteEntry: 'Eliminar nota',
+    deleteEntry: 'Eliminar la nota',
     chooseImage: 'Elegir una imagen',
     changeImage: 'Cambiar',
     addImage: 'Agregar imagen',
@@ -171,8 +180,17 @@ export const plan: typeof en = {
     alsoCalled: 'Otros nombres',
     removeAlias: (alias) => `Quitar ${alias}`,
     aliasPlaceholder: '+ nombre',
-    notesPlaceholder: 'Apuntes: apariencia, personalidad, pasado, secretos…',
-    inManuscript: 'En el manuscrito'
+    notesPlaceholder: 'Apariencia, personalidad, pasado, secretos…',
+    inManuscript: 'En el manuscrito',
+    findInChapter: (name) => `Abrir el capítulo en el primer «${name}»`,
+    deleted: (name) => `«${name}» está en la papelera del libro.`,
+    removeImage: 'Quitar',
+    removeImageLabel: 'Quitar el retrato',
+    imageRemoved: 'El retrato se quitó.',
+    category: 'Categoría',
+    moveTo: (category) => `En ${category}. Mover a otra categoría`,
+    moved: (name, category) => `«${name}» ahora está en ${category}.`,
+    inFolder: (folder) => `En la carpeta ${folder}`
   },
   rules: {
     intro:
@@ -189,36 +207,58 @@ export const plan: typeof en = {
     connectAiFirst: 'Conecta una IA primero.',
     openSettings: 'Abrir ajustes',
     upToDate: 'La planificación está al día con el manuscrito.',
-    syncing: 'Sincronizando…',
+    syncing: 'Actualizando las notas…',
     started: 'Las notas se actualizan en segundo plano. La vista Planificar muestra el progreso.',
     reading: (n) => (n === 1 ? 'Leyendo 1 capítulo…' : `Leyendo ${n} capítulos…`),
     writing: (found) => (found === 0 ? 'Escribiendo los cambios…' : found === 1 ? '1 cambio hasta ahora…' : `${found} cambios hasta ahora…`),
     part: (part, parts) => `Parte ${part} de ${parts}`,
-    cancel: 'Cancelar la sincronización',
+    cancel: 'Detener la actualización',
     proposed: (n) => (n === 1 ? '1 cambio propuesto en las notas' : `${n} cambios propuestos en las notas`),
     noChanges: 'Ningún cambio. Las notas coinciden con los capítulos.',
     review: 'Revisar',
     reviewHint: 'Abrir los cambios en el chat. Allí aceptas o rechazas cada cambio.',
-    accepted: (n) => (n === 1 ? '1 cambio aplicado en las notas.' : `${n} cambios aplicados en las notas.`),
+    accepted: (n) => (n === 1 ? '1 cambio aceptado en las notas.' : `${n} cambios aceptados en las notas.`),
     rejected: (n) => (n === 1 ? '1 cambio rechazado.' : `${n} cambios rechazados.`),
-    failed: 'La sincronización se detuvo.',
-    result: 'Resultado de la sincronización',
+    failed: 'La actualización se detuvo.',
+    result: 'Resultado de la actualización',
     threadTitle: 'Sincronización de la planificación',
-    threadBrief: 'Mantiene la planificación al día con el manuscrito. Las propuestas vienen del botón Sincronizar.',
+    threadBrief: 'Mantiene la planificación al día con el manuscrito. Las propuestas vienen del botón Actualizar notas.',
     request: (bootstrap, count, chapters, part, parts) => {
       const what = bootstrap
         ? count === 1
           ? 'Crear la planificación a partir del capítulo'
           : `Crear la planificación a partir de ${count} capítulos`
         : count === 1
-          ? 'Sincronizar la planificación con el capítulo'
-          : `Sincronizar la planificación con ${count} capítulos`
+          ? 'Actualizar la planificación con el capítulo'
+          : `Actualizar la planificación con ${count} capítulos`
       return `${what}: ${chapters}${parts > 1 ? ` (parte ${part} de ${parts})` : ''}.`
-    }
+    },
+    undoUnsafe: 'Una nota cambió después de estos cambios. Deshacer podría borrar tus palabras nuevas. Usa el chat para deshacer un cambio.',
+    nothingToRead: 'Los capítulos todavía no tienen texto.'
   },
   links: {
-    noEntry: (name) => `Ninguna nota de la planificación se llama "${name}".`,
-    createIt: 'Crear nota'
+    noEntry: (name) => `Ninguna nota se llama "${name}".`,
+    createIt: 'Crear nota',
+    openHint: 'Ctrl+clic para abrir la nota.',
+    missingHint: 'Ninguna nota tiene este nombre. Ctrl+clic para crearla.',
+    created: (name, category) => `«${name}» es una nota nueva en ${category}.`
   },
-  imported: (count, category) => (count === 1 ? `1 nota importada a ${category}.` : `${count} notas importadas a ${category}.`)
+  imported: (count, category) => (count === 1 ? `1 nota importada a ${category}.` : `${count} notas importadas a ${category}.`),
+  importRenamed: (list) => `Una nota del libro ya tiene el mismo nombre: ${list}.`,
+  importRenamedItem: (from, to) => `«${from}» ahora se llama «${to}»`,
+  importLeftOut: (left, max) =>
+    `${left === 1 ? '1 archivo no se importó' : `${left} archivos no se importaron`}: el límite es de ${max} archivos a la vez.`,
+  names: {
+    nameTaken: (name) => `Otra nota ya se llama «${name}».`,
+    aliasTaken: (alias, note) => `«${alias}» ya es un nombre de ${note}.`,
+    aliasOwn: (alias) => `«${alias}» ya es un nombre de esta nota.`,
+    categoryTaken: (name) => `Una categoría ya se llama «${name}».`,
+    renamed: (links, oldName) =>
+      [
+        links ? (links === 1 ? '1 enlace ahora lleva al nombre nuevo.' : `${links} enlaces ahora llevan al nombre nuevo.`) : '',
+        oldName ? `«${oldName}» queda como otro nombre, así los capítulos todavía lo cuentan.` : ''
+      ]
+        .filter(Boolean)
+        .join(' ')
+  }
 }

@@ -57,7 +57,8 @@ export function NoteEditor({
     () => [
       ...schemaExtensions(),
       SmartTyping.configure({ dash, quotes: true, ellipsis: true, ...quotesFor(language) }),
-      WikiLinks.configure(wikiLinkOptions(true)),
+      // A plain click puts the caret in a link (to fix a typo); Ctrl+click opens it.
+      WikiLinks.configure(wikiLinkOptions()),
       Placeholder.configure({ placeholder: hint }),
       ...(inlineProposals ? [InlineProposals.configure({ docId: () => docKey })] : [])
     ],

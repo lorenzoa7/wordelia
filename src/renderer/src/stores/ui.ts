@@ -30,6 +30,10 @@ interface UiState {
   dismissToast(id: number): void
   pauseToast(id: number): void
   resumeToast(id: number): void
+  /** A search for the find bar from another view (the "In the manuscript" chips of a note). The find bar takes it once. */
+  findSeed: { query: string; chapterId: string; n: number } | null
+  /** Open the find bar on a chapter with this text, at its first match */
+  openFind(query: string, chapterId: string): void
 }
 
 let nextToast = 1
@@ -86,6 +90,10 @@ export const useUi = create<UiState>((set, get) => ({
     if (t?.timer) clearTimeout(t.timer)
     toastTimers.delete(id)
     set({ toasts: get().toasts.filter((t) => t.id !== id) })
+  },
+  findSeed: null,
+  openFind(query, chapterId) {
+    set({ findOpen: true, findSeed: { query, chapterId, n: (get().findSeed?.n ?? 0) + 1 } })
   }
 }))
 

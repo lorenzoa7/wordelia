@@ -27,7 +27,9 @@ export const settings = {
       none: 'You have the newest version.',
       downloading: (v: string, p: number): string => `Downloading version ${v}… ${p}%`,
       ready: (v: string): string => `Version ${v} is ready. Restart to install it.`,
-      error: (m: string): string => `Could not check for updates: ${m}`
+      /** The text of the updater shows only in the tooltip of the line */
+      error: 'Could not check for updates. Try again later.',
+      offline: 'Could not check for updates: no internet connection.'
     },
     language: 'Language',
     interfaceLanguage: 'Interface language',

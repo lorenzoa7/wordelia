@@ -24,7 +24,8 @@ export const settings: typeof en = {
       none: 'Você tem a versão mais nova.',
       downloading: (v, p) => `Baixando a versão ${v}… ${p}%`,
       ready: (v) => `A versão ${v} está pronta. Reinicie para instalar.`,
-      error: (m) => `Não foi possível procurar atualizações: ${m}`
+      error: 'Não foi possível procurar atualizações. Tente de novo mais tarde.',
+      offline: 'Não foi possível procurar atualizações: sem conexão com a internet.'
     },
     language: 'Idioma',
     interfaceLanguage: 'Idioma da interface',

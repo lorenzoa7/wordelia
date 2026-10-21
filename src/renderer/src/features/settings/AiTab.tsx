@@ -197,8 +197,9 @@ function ProviderRow({ id }: { id: ProviderId }): React.JSX.Element {
   const saveKey = async (): Promise<void> => {
     const value = key.trim()
     if (!value) return
-    const saved = await invoke('ai:setKey', id, value)
-    if (!saved.ok) return toast(a.keyNotSaved(saved.error ?? ''), { kind: 'error' })
+    // A file that cannot be written also says "not saved", never nothing.
+    const saved = await invoke('ai:setKey', id, value).catch(() => ({ ok: false, error: '' }))
+    if (!saved.ok) return toast(a.keyNotSaved(saved.error ?? '').trim(), { kind: 'error' })
     setKey('')
     setHasKey(true)
     await setProvider({ enabled: true })

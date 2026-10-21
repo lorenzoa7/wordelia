@@ -336,7 +336,7 @@ The thread list shows a state for each thread (`src/renderer/src/features/chat/s
 
 Delete thread stops its reply in progress and moves the thread file to `.wordelia/trash/` of the book. A toast has Undo (`restoreThread`).
 
-Each reply keeps its tokens and its cost when the provider tells them (`ChatMessage.usage`, from the `usage` events and the result). The line of the model under a reply shows them, and "Title and purpose" shows the total of the thread. A failed reply keeps the kind of its error (`ChatMessage.errorKind`): a login error has a button to Settings → AI.
+Each reply keeps its tokens and its cost when the provider tells them (`ChatMessage.usage`, from the `usage` events and the result). The line of the model under a reply shows them, and "Title and purpose" shows the total of the thread. A failed reply keeps the kind of its error, the words of the provider and the provider (`ChatMessage.errorKind`, `errorDetail`, `provider`). Its error box shows the plain message of `describeError` (`src/renderer/src/lib/ai.ts`), "Details", and the fix button of the kind (for example "Open settings", which opens the row of the provider).
 
 A failed or empty reply never goes back to the AI (`chatHistory` in `src/shared/prompts/chat.ts`): an API refuses an empty turn, and then each later message of the thread would fail. Two turns of the author in a row become one turn. A reply that ends after its book closed goes into the thread file of its book.
 

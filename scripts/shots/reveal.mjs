@@ -115,7 +115,10 @@ export default async function ({ page, shot, openBook }) {
   console.log('after Ctrl+Y:', redone)
   if (redone !== 'accepted') throw new Error('Ctrl+Y did not apply the change again')
 
-  // A new reply with a proposal in the same thread: the text scrolls to it by itself.
+  // A new reply with a proposal in the same thread: the text scrolls to it by itself, when the author
+  // does not type. Ctrl+Y put the focus in the text: the author leaves it, and the last key is old.
+  await page.evaluate(() => document.activeElement?.blur())
+  await page.waitForFunction(() => !window.__inline.authorIsBusy(), null, { timeout: 8000 })
   await page.evaluate(() => document.querySelector('.desk').scrollTo({ top: 0 }))
   await page.waitForTimeout(400)
   await page.evaluate((id) => {

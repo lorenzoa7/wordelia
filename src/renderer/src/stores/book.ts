@@ -11,6 +11,7 @@ import {
   WRITING_RULES_FILE,
   chapterFromFile,
   chapterToFile,
+  entryFileStem,
   entryFromFile,
   entryToFile,
   fileNameFromTitle,
@@ -26,12 +27,30 @@ import { boardView, findStoryLine, headingName, isStoryLine, parseBoard, renameC
 import { invoke, on } from '@/lib/api'
 import { saver } from './saver'
 import { untitledChapter } from '@shared/export/model'
+import { entryPath, inFolder, topFolder } from '@shared/planning/notes'
 import { runFlushers } from '@/lib/flush'
 import { getT } from '@/lib/i18n'
 import { openingPlace } from '@/features/write/place'
 import { toast, useUi } from './ui'
 
 export type BookView = 'write' | 'plan'
+
+/** A note that went to the trash of the book: Undo moves its file back (restoreEntries). */
+export interface TrashedEntry {
+  entry: Entry
+  /** The path of the file in the book, in the trash folder */
+  trash: string
+}
+
+/** A category that went away, with its notes: Undo brings them back (restoreCategory). */
+export interface DeletedCategory {
+  category: CategoryDef
+  /** Its place in the list of categories */
+  index: number
+  entries: TrashedEntry[]
+  /** The story line moved from this category to another one */
+  storyLine: string | null
+}
 
 interface BookState {
   root: string | null
@@ -82,18 +101,32 @@ interface BookState {
 
   createEntry(category: string, name: string, body?: string, extra?: Partial<Entry>): Promise<Entry>
   updateEntry(id: string, patch: Partial<Pick<Entry, 'body' | 'aliases' | 'summary' | 'image'>>): void
-  renameEntry(id: string, name: string): Promise<void>
-  deleteEntry(id: string): Promise<void>
+  /**
+   * A new name for an entry. The file gets the new name; a name with signs that a file name cannot
+   * have stays in the front matter. True when the entry changed.
+   */
+  renameEntry(id: string, name: string): Promise<boolean>
+  /** Move an entry to the trash of the book. The result can bring it back (restoreEntries). */
+  deleteEntry(id: string): Promise<TrashedEntry | null>
+  /** Move entries back from the trash (Undo of a delete). */
+  restoreEntries(items: TrashedEntry[]): Promise<void>
   addCategory(name: string): CategoryDef
   /** A new name for a category. Its folder stays: the files do not move. */
   renameCategory(id: string, name: string): void
+  /** A new icon for a category (a name of features/plan/categoryIcons.ts) */
+  setCategoryIcon(id: string, icon: string): void
   /** Delete a category: its notes go to the trash; the story line moves to another category. */
-  deleteCategory(id: string): Promise<void>
+  deleteCategory(id: string): Promise<DeletedCategory | null>
+  /** Bring back a deleted category with its notes (Undo of a delete). */
+  restoreCategory(deleted: DeletedCategory): Promise<void>
   /** Move a planning entry to another category folder */
   moveEntry(id: string, category: string): Promise<void>
 
   saveThread(thread: Thread, immediate?: boolean): void
-  deleteThread(id: string): Promise<void>
+  /** Move a thread to the trash of the book. Returns the file in the trash, or null. */
+  deleteThread(id: string): Promise<string | null>
+  /** Bring a deleted thread back (Undo). `trash`: its file in the trash, which goes away. */
+  restoreThread(thread: Thread, trash: string | null): Promise<void>
   setWritingRules(text: string): void
   setSyncState(state: SyncState): void
   setActions(actions: AiAction[]): void
@@ -110,6 +143,17 @@ function chapterRel(c: Pick<Chapter, 'file'>): string {
 
 function entryRel(e: Pick<Entry, 'file'>): string {
   return `${PLANNING_DIR}/${e.file}`
+}
+
+/** The file names of the entries in one folder (not in the folders under it), without `exceptId`. */
+function filesIn(entries: Entry[], category: string, exceptId?: string): string[] {
+  return entries.filter((e) => e.category === category && e.id !== exceptId).map((e) => e.file.slice(e.file.lastIndexOf('/') + 1))
+}
+
+/** The file name for an entry name. A name of signs only ("???") gets the word for "untitled" of the interface. */
+function entryFileName(name: string): string {
+  const file = fileNameFromTitle(name)
+  return file === 'Untitled.md' && name !== 'Untitled' ? fileNameFromTitle(getT().common.untitled) : file
 }
 
 let offExternal: (() => void) | null = null
@@ -303,7 +347,8 @@ export const useBook = create<BookState>((set, get) => {
       const e = get().entries.find((x) => x.id === id)
       // The story line has its own page: the Line view (features/graph/nav.ts, LINE_PAGE).
       if (e && isStoryLine(e)) return set({ activeEntryId: null, view: 'plan', activeCategory: ':line' })
-      set({ activeEntryId: id, view: 'plan', activeCategory: e?.category ?? get().activeCategory })
+      // A note in a folder under a category belongs to that category.
+      set({ activeEntryId: id, view: 'plan', activeCategory: e ? topFolder(e.category) || null : get().activeCategory })
     },
     selectCategory(folder) {
       set({ activeCategory: folder, activeEntryId: null, view: 'plan' })
@@ -466,13 +511,15 @@ export const useBook = create<BookState>((set, get) => {
     async createEntry(category, name, body = '', extra = {}) {
       const { entries, root } = get()
       if (!root) throw new Error('No book is open')
-      const inCat = entries.filter((e) => e.category === category).map((e) => e.file.slice(category.length + 1))
-      const fileName = uniqueName(fileNameFromTitle(name), inCat)
+      const clean = name.replace(/\s+/g, ' ').trim()
+      const base = entryFileName(clean)
+      const fileName = uniqueName(base, filesIn(entries, category))
       const e: Entry = {
         id: newId('en'),
         category,
-        file: `${category}/${fileName}`,
-        name: fileName.replace(/\.md$/, ''),
+        file: entryPath(category, fileName),
+        // The name as the author wrote it; a taken file name gets " 2" in the name too.
+        name: fileName === base && clean ? clean : fileName.replace(/\.md$/, ''),
         aliases: [],
         summary: '',
         image: null,
@@ -498,16 +545,19 @@ export const useBook = create<BookState>((set, get) => {
       runFlushers()
       const { entries, root } = get()
       const e = entries.find((x) => x.id === id)
-      if (!e || !root) return
-      const others = entries.filter((x) => x.category === e.category && x.id !== id).map((x) => x.file.slice(e.category.length + 1))
-      const fileName = uniqueName(fileNameFromTitle(name.trim() || getT().common.untitled), others)
-      const file = `${e.category}/${fileName}`
-      if (file === e.file) return
+      const clean = name.replace(/\s+/g, ' ').trim()
+      if (!e || !root || !clean) return false
+      const fileName = uniqueName(entryFileName(clean), filesIn(entries, e.category, id))
+      const file = entryPath(e.category, fileName)
+      if (file === e.file && clean === e.name) return false
       const oldRel = entryRel(e)
-      set({ entries: get().entries.map((x) => (x.id === id ? { ...x, file, name: fileName.replace(/\.md$/, '') } : x)) })
+      set({ entries: get().entries.map((x) => (x.id === id ? { ...x, file, name: clean } : x)) })
       const next = get().entries.find((x) => x.id === id)!
       saver.cancel(root, oldRel)
-      if (file.toLowerCase() === e.file.toLowerCase()) {
+      if (file === e.file) {
+        // Only the name in the front matter changes.
+        saver.write(root, entryRel(next), entryToFile(next), true)
+      } else if (file.toLowerCase() === e.file.toLowerCase()) {
         await invoke('book:renameFile', root, oldRel, entryRel(next))
         saver.write(root, entryRel(next), entryToFile(next), true)
       } else {
@@ -515,6 +565,7 @@ export const useBook = create<BookState>((set, get) => {
         await saver.flush()
         await invoke('book:deleteFile', root, oldRel)
       }
+      return true
     },
 
     async deleteEntry(id) {
@@ -522,12 +573,34 @@ export const useBook = create<BookState>((set, get) => {
       await saver.flush()
       const { entries, root, activeEntryId } = get()
       const e = entries.find((x) => x.id === id)
-      if (!e || !root) return
+      if (!e || !root) return null
       // Close the entry first, so no editor writes it again.
       set({ entries: entries.filter((x) => x.id !== id), activeEntryId: activeEntryId === id ? null : activeEntryId })
       saver.cancel(root, entryRel(e))
       const stamp = new Date().toISOString().replace(/[:.]/g, '-')
-      await invoke('book:renameFile', root, entryRel(e), `.wordelia/trash/${stamp} ${e.name}.md`)
+      const trash = `.wordelia/trash/${stamp} ${entryFileStem(e.file)}.md`
+      await invoke('book:renameFile', root, entryRel(e), trash)
+      return { entry: e, trash }
+    },
+
+    async restoreEntries(items) {
+      const root = get().root
+      if (!root) return
+      for (const { entry, trash } of items) {
+        // A note with the same file came meanwhile: the old note comes back under a free file name.
+        const file = entry.file.slice(entry.file.lastIndexOf('/') + 1)
+        const fileName = uniqueName(file, filesIn(get().entries, entry.category, entry.id))
+        const back = fileName === file ? entry : { ...entry, file: entryPath(entry.category, fileName) }
+        try {
+          await invoke('book:renameFile', root, trash, entryRel(back))
+        } catch {
+          // The file is not in the trash any more: write it again from memory.
+          saver.write(root, entryRel(back), entryToFile(back), true)
+        }
+        // Under another file name, the name of the note goes into its front matter.
+        if (back !== entry) saver.write(root, entryRel(back), entryToFile(back), true)
+        set({ entries: [...get().entries.filter((x) => x.id !== back.id), back] })
+      }
     },
 
     addCategory(name) {
@@ -546,23 +619,48 @@ export const useBook = create<BookState>((set, get) => {
       get().updateManifest({ planning: { ...m.planning, categories: m.planning.categories.map((c) => (c.id === id ? { ...c, name: clean } : c)) } })
     },
 
+    setCategoryIcon(id, icon) {
+      const m = get().manifest
+      if (!m) return
+      get().updateManifest({ planning: { ...m.planning, categories: m.planning.categories.map((c) => (c.id === id ? { ...c, icon } : c)) } })
+    },
+
     async deleteCategory(id) {
       const m = get().manifest
-      const cat = m?.planning.categories.find((c) => c.id === id)
+      const index = m?.planning.categories.findIndex((c) => c.id === id) ?? -1
+      const cat = m?.planning.categories[index]
       const rest = m?.planning.categories.filter((c) => c.id !== id) ?? []
-      if (!m || !cat || !rest.length) return
+      if (!m || !cat || !rest.length) return null
       // The story line does not show in the categories: it lives on in another one.
       const story = findStoryLine(get().entries)
-      if (story && story.category === cat.folder) {
+      let storyLine: string | null = null
+      if (story && inFolder(story, cat.folder)) {
         const to = rest.find((c) => c.id === 'plot') ?? rest.find((c) => c.id === 'notes') ?? rest[0]
         await get().moveEntry(story.id, to.folder)
+        storyLine = story.id
       }
       // Notes in folders under the category go too: else they would stay on disk, out of sight.
-      const inside = (x: Entry): boolean => x.category === cat.folder || x.category.startsWith(`${cat.folder}/`)
-      for (const e of get().entries.filter(inside)) await get().deleteEntry(e.id)
+      const entries: TrashedEntry[] = []
+      for (const e of get().entries.filter((x) => inFolder(x, cat.folder))) {
+        const trashed = await get().deleteEntry(e.id)
+        if (trashed) entries.push(trashed)
+      }
       const now = get().manifest!
       get().updateManifest({ planning: { ...now.planning, categories: now.planning.categories.filter((c) => c.id !== id) } })
       if (get().activeCategory === cat.folder) get().selectCategory(null)
+      return { category: cat, index, entries, storyLine }
+    },
+
+    async restoreCategory(deleted) {
+      const m = get().manifest
+      if (!m) return
+      if (!m.planning.categories.some((c) => c.id === deleted.category.id)) {
+        const categories = [...m.planning.categories]
+        categories.splice(Math.min(deleted.index, categories.length), 0, deleted.category)
+        get().updateManifest({ planning: { ...m.planning, categories } })
+      }
+      await get().restoreEntries(deleted.entries)
+      if (deleted.storyLine) await get().moveEntry(deleted.storyLine, deleted.category.folder)
     },
 
     async moveEntry(id, category) {
@@ -571,9 +669,10 @@ export const useBook = create<BookState>((set, get) => {
       const { entries, root } = get()
       const e = entries.find((x) => x.id === id)
       if (!e || !root || e.category === category) return
-      const inCat = entries.filter((x) => x.category === category).map((x) => x.file.slice(category.length + 1))
-      const fileName = uniqueName(`${e.name}.md`, inCat)
-      const next = { ...e, category, file: `${category}/${fileName}`, name: fileName.replace(/\.md$/, '') }
+      const file = e.file.slice(e.file.lastIndexOf('/') + 1)
+      const fileName = uniqueName(file, filesIn(entries, category))
+      // The name stays; a taken file name gets " 2" in the name too.
+      const next = { ...e, category, file: entryPath(category, fileName), name: fileName === file ? e.name : fileName.replace(/\.md$/, '') }
       const oldRel = entryRel(e)
       set({ entries: get().entries.map((x) => (x.id === id ? next : x)) })
       saver.cancel(root, oldRel)
@@ -593,10 +692,24 @@ export const useBook = create<BookState>((set, get) => {
 
     async deleteThread(id) {
       const { threads, root } = get()
-      if (!root) return
-      saver.cancel(root, `${THREADS_DIR}/${id}.json`)
-      await invoke('book:deleteFile', root, `${THREADS_DIR}/${id}.json`)
-      set({ threads: threads.filter((t) => t.id !== id) })
+      const th = threads.find((t) => t.id === id)
+      if (!root || !th) return null
+      // The thread goes to the trash of the book, like a chapter or a note: Undo can bring it back.
+      const rel = `${THREADS_DIR}/${id}.json`
+      const trash = `.wordelia/trash/${new Date().toISOString().replace(/[:.]/g, '-')} thread ${id}.json`
+      saver.cancel(root, rel)
+      set({ threads: get().threads.filter((t) => t.id !== id) })
+      await invoke('book:writeFile', root, trash, JSON.stringify(th, null, 2))
+      await invoke('book:deleteFile', root, rel)
+      return trash
+    },
+
+    async restoreThread(thread, trash) {
+      const root = get().root
+      if (!root || get().threads.some((t) => t.id === thread.id)) return
+      get().saveThread(thread, true)
+      await saver.flush()
+      if (trash) await invoke('book:deleteFile', root, trash)
     },
 
     setWritingRules(text) {

@@ -1,7 +1,9 @@
-// The story line board by hand: add a card with a mention, the card dialog, drag cards (in a
-// column, to another column) and columns, add, rename and delete columns, delete a card, Undo,
-// rename a chapter. And the layout: no page scroll, cards of one size with one gap, mentions in
-// their card, a drag image of the size of the card.
+// The story line board by hand: add a card with a mention (Esc keeps the text of the box), the
+// card dialog (Esc, a click outside and a mentioned note keep the typed text; Cancel drops it),
+// drag cards (in a column, to another column) and columns, add, rename and delete columns (the
+// tray button shows where the cards went), delete a card, Undo, rename a chapter (a toast with
+// Undo). And the layout: no page scroll, cards of one size with one gap, mentions in their card,
+// a drag image of the size of the card.
 const BODY = [
   '# Cards',
   '- ^c1 @Elias acende a lâmpada do farol; falta um barco no porto.',
@@ -120,6 +122,19 @@ export default async function ({ page, shot, openBook }) {
   if (visitor.length !== 3) fail(`the chapter has ${visitor.length} cards`)
   const added = visitor[2].slice(1)
   if ((await textOf(added)) !== '@Marta encontra um anel de prata.') fail(`the new card says "${await textOf(added)}"`)
+  // Esc closes the box of a new card and keeps its text: the "+" shows it, and the box opens with it.
+  await col('A Tempestade').locator('.line-add-card').click()
+  await page.keyboard.type('Um rascunho')
+  await page.keyboard.press('Escape')
+  await page.waitForSelector('.line-add-card.has-draft', { timeout: 2000 }).catch(() => fail('Esc lost the text of the new card'))
+  if ((await refs('A Tempestade')).length !== 3) fail('Esc added the card')
+  await col('A Tempestade').locator('.line-add-card').click()
+  if ((await page.locator('.line-card.is-new textarea').inputValue()) !== 'Um rascunho') fail('the box did not open with its text')
+  await page.keyboard.press('Control+a')
+  await page.keyboard.press('Backspace')
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(150)
+  if (await page.locator('.line-add-card.has-draft').count()) fail('an empty box keeps a draft')
 
   // 3. The dialog: the full text, a new text and a moment.
   await card('Marta encontra um anel').click()
@@ -168,6 +183,36 @@ export default async function ({ page, shot, openBook }) {
   await page.waitForTimeout(300)
   if ((await textOf(added)) !== '@Marta encontra um anel de prata no bolso do visitante.') fail('the dialog did not save the text')
   if ((await refs('A noite da tempestade')).at(-1) !== `^${added}`) fail('the dialog did not put the card in the moment')
+  // Typed text is never lost: Esc, a click outside and a mentioned note keep it. Cancel drops it.
+  const edit = async (text) => {
+    await card('no bolso do visitante').first().click()
+    await page.waitForSelector('.line-dialog', { timeout: 3000 })
+    await page.locator('.line-dialog textarea').fill(text)
+  }
+  await edit('@Marta encontra um anel de prata no bolso.')
+  await page.keyboard.press('Escape')
+  await page.waitForSelector('.line-dialog', { state: 'detached', timeout: 2000 })
+  if ((await textOf(added)) !== '@Marta encontra um anel de prata no bolso.') fail('Esc lost the typed text')
+  if (!(await page.locator('.toast', { hasText: /card is saved|cartão foi salvo/ }).count())) fail('no toast after Esc kept the text')
+  await card('no bolso').first().click()
+  await page.waitForSelector('.line-dialog', { timeout: 3000 })
+  await page.locator('.line-dialog textarea').fill('@Marta guarda o anel no bolso do visitante.')
+  await page.mouse.click(8, 600)
+  await page.waitForSelector('.line-dialog', { state: 'detached', timeout: 2000 })
+  if ((await textOf(added)) !== '@Marta guarda o anel no bolso do visitante.') fail('a click outside lost the typed text')
+  await edit('@Marta mostra o anel do visitante.')
+  await page.locator('.line-dialog .dialog-foot .btn-ghost:not(.line-dialog-delete)').click()
+  await page.waitForSelector('.line-dialog', { state: 'detached', timeout: 2000 })
+  if ((await textOf(added)) !== '@Marta guarda o anel no bolso do visitante.') fail('Cancel kept the typed text')
+  await card('guarda o anel').first().click()
+  await page.waitForSelector('.line-dialog', { timeout: 3000 })
+  await page.locator('.line-dialog textarea').fill('@Marta guarda o anel de prata no bolso do visitante.')
+  await page.locator('.line-dialog-links .mention-link', { hasText: 'Marta' }).click()
+  await page.waitForFunction(() => document.querySelector('.entry-name')?.value === 'Marta', null, { timeout: 3000 }).catch(() => fail('the chip did not open the note'))
+  if ((await textOf(added)) !== '@Marta guarda o anel de prata no bolso do visitante.') fail('a mentioned note lost the typed text')
+  await page.evaluate(() => window.__wordelia.book.getState().selectCategory(':line'))
+  await page.waitForSelector('.line-board .line-card', { timeout: 3000 })
+  await view('chapter')
 
   // 4. A click on a mention opens its note. Its back link goes back to the line, by time, as it was.
   await view('order')
@@ -242,8 +287,14 @@ export default async function ({ page, shot, openBook }) {
   await page.waitForTimeout(300)
   const tray = await page.locator('.line-col.is-tray .line-card').count()
   if (tray !== 4) fail(`the tray has ${tray} cards`)
+  // The button over the board says how many cards wait in the tray, and shows the tray.
+  const jump = (await page.locator('.line-tray-jump').innerText().catch(() => '')).trim()
+  if (!/· 4$/.test(jump)) fail(`the tray button says "${jump}"`)
+  await page.locator('.line-scroll').evaluate((el) => (el.scrollLeft = el.scrollWidth))
+  await page.locator('.line-tray-jump').click()
+  await page.waitForFunction(() => document.querySelector('.line-scroll').scrollLeft === 0, null, { timeout: 3000 }).catch(() => fail('the tray button did not show the tray'))
   await shot('tray')
-  await page.locator('.toast button', { hasText: /undo|desfazer/i }).first().click()
+  await page.locator('.toast', { hasText: /“A noite da tempestade” (is deleted|foi excluída)/ }).locator('.toast-action').click()
   await page.waitForTimeout(300)
   if ((await refs('A noite da tempestade')).length !== 4) fail('Undo did not bring the column back')
   if (await page.locator('.line-col.is-tray').count()) fail('the tray stays after Undo')
@@ -253,7 +304,7 @@ export default async function ({ page, shot, openBook }) {
   await page.locator('.line-dialog-delete').click()
   await page.waitForTimeout(300)
   if ((await textOf('c5')) !== null) fail('the card was not deleted')
-  await page.locator('.toast button', { hasText: /undo|desfazer/i }).first().click()
+  await page.locator('.toast', { hasText: /card is deleted|cartão foi excluído/ }).locator('.toast-action').click()
   await page.waitForTimeout(300)
   if (!(await textOf('c5'))) fail('Undo did not bring the card back')
 
@@ -270,7 +321,13 @@ export default async function ({ page, shot, openBook }) {
   const renamed = await page.evaluate(() => window.__wordelia.book.getState().chapters.map((c) => c.title))
   if (!renamed.includes('O Bote Azul')) fail(`chapters: ${renamed.join(', ')}`)
   if (!(await body()).includes('## O Bote Azul ^k2')) fail('the column did not follow the new title')
+  // The chapter of the book changed: the toast says so, and Undo gives it its old title.
+  const renamedToast = page.locator('.toast', { hasText: /“O Visitante” is now “O Bote Azul”|“O Visitante” agora se chama “O Bote Azul”/ })
+  await renamedToast.waitFor({ timeout: 3000 }).catch(() => fail('no toast after the rename of a chapter'))
   await shot('renamed')
+  await renamedToast.locator('.toast-action').click()
+  await page.waitForFunction(() => window.__wordelia.book.getState().chapters.some((c) => c.title === 'O Visitante'), null, { timeout: 3000 }).catch(() => fail('Undo did not give the chapter its title'))
+  if (!(await body()).includes('## O Visitante ^k2')) fail('the column did not follow the Undo')
 
   // 10. The keyboard: Space picks up a card, an arrow moves it to the next column, Space drops it.
   await view('order')

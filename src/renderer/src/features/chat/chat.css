@@ -1761,3 +1761,169 @@ button.proposal-file:hover span {
   font-size: var(--text-xs);
   color: var(--strike);
 }
+
+/* ---------- Proposals that the author must see before a decision ---------- */
+/* A change of punctuation or spaces only: a word in the place of "+0 −0". */
+.proposal-stats.is-small {
+  font-weight: 400;
+  color: var(--ink-3);
+}
+/* A quiet line under a change: it stopped before its end, or a newer proposal changes the same words. */
+.hunk-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  margin: 6px 0 0;
+  font-size: var(--text-2xs);
+  line-height: 1.45;
+  color: var(--ink-3);
+}
+.hunk-note svg {
+  flex-shrink: 0;
+  translate: 0 0.1em;
+}
+.proposal-note {
+  margin: 0;
+  padding: 8px 12px 0;
+}
+.hunk-where {
+  margin: 0 0 4px;
+  font-size: var(--text-2xs);
+  color: var(--ink-4);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.hunk-foot .hunk-badge {
+  margin-top: 0;
+}
+.hunk-caret {
+  transition: rotate var(--dur-fast) var(--ease-out);
+  rotate: -90deg;
+}
+.hunk-caret.is-open {
+  rotate: 0deg;
+}
+/* The text that a change that was not found looks for */
+.hunk-looked {
+  margin: 6px 0 0;
+  padding: 6px 10px;
+  border-left: 2px solid var(--rule);
+  font-family: var(--font-prose);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  user-select: text;
+}
+/* A new text for a note that exists: what the note loses */
+.proposal-warn {
+  margin: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--rule-soft);
+  background: var(--ribbon-wash);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+.proposal-body.is-partial {
+  color: var(--ink-3);
+}
+.note-diff.hunk {
+  padding: 0;
+  border: 0;
+}
+.note-diff-row {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0 0 8px;
+}
+.note-diff-label {
+  font-size: var(--text-2xs);
+  color: var(--ink-4);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+/*
+ * The header of a note or a portrait: the name gets the whole width of its group, and the kind
+ * ("replaces the note") goes under it. When the buttons do not fit beside them, they go to a second line.
+ */
+.proposal.is-create .proposal-title,
+.proposal.is-portrait .proposal-title {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  flex-basis: 120px;
+}
+.proposal.is-create .proposal-file,
+.proposal.is-portrait .proposal-file,
+.proposal.is-create .proposal-cat,
+.proposal.is-portrait .proposal-cat {
+  max-width: 100%;
+}
+
+/* ---------- A reply that the author stopped, and errors with a way out ---------- */
+.msg-stopped {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 6px 0 0;
+  font-size: var(--text-2xs);
+  color: var(--ink-4);
+}
+.msg-error-text {
+  flex: 1;
+  min-width: 0;
+}
+.msg-error-btn {
+  flex-shrink: 0;
+  align-self: center;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--ribbon) 40%, var(--rule));
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ribbon);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.msg-error-btn:hover {
+  border-color: var(--ribbon);
+}
+.msg-error-more {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.msg-error-detail {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+/* ---------- Mentions and the use of a thread ---------- */
+.mention-alias {
+  color: var(--ink-4);
+}
+.thread-usage {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+
+/* ---------- A chat change that adds text at the end of a chapter or a note (inlineProposals.ts) ---------- */
+.pm-prop-append {
+  margin-top: 0.4em;
+  border-radius: var(--radius-xs);
+}
+.pm-prop-append p {
+  margin: 0;
+}

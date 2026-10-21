@@ -288,20 +288,40 @@ function ColumnMenu({ col, onRename, onDelete }: { col: ViewColumn; onRename(): 
 /* New cards and new columns                                            */
 /* ------------------------------------------------------------------ */
 
-/** "+" under the last card: a box for the text of a new card. Enter adds it and opens the next box. */
-function AddCard({ notes, onAdd }: { notes: Entry[]; onAdd(text: string): void }): React.JSX.Element {
+/**
+ * The text of the boxes of new cards and new columns that Esc closed: the box shows it again. One
+ * text for each view and column, for this session.
+ */
+const drafts = new Map<string, string>()
+useBook.subscribe((s, prev) => {
+  if (s.root !== prev.root) drafts.clear()
+})
+
+/**
+ * "+" under the last card: a box for the text of a new card. Enter adds it and opens the next box.
+ * A click outside adds the card too. Esc closes the box and keeps the text: the "+" shows it, and
+ * the box opens with it again.
+ */
+function AddCard({ notes, draftKey, onAdd }: { notes: Entry[]; draftKey: string; onAdd(text: string): void }): React.JSX.Element {
   const t = useT()
   const [open, setOpen] = useState(false)
-  const [text, setText] = useState('')
+  const [text, setTextState] = useState(() => drafts.get(draftKey) ?? '')
+  const setText = (v: string): void => {
+    setTextState(v)
+    if (v.trim()) drafts.set(draftKey, v)
+    else drafts.delete(draftKey)
+  }
   const add = (): void => {
     if (text.trim()) onAdd(text)
     setText('')
   }
   if (!open) {
+    const draft = text.trim()
     return (
-      <Tooltip label={t.plan.line.addCard}>
-        <button className="line-add-card" aria-label={t.plan.line.addCard} onClick={() => setOpen(true)}>
+      <Tooltip label={draft ? t.plan.line.draft : t.plan.line.addCard}>
+        <button className={clsx('line-add-card', draft && 'has-draft')} aria-label={draft ? `${t.plan.line.draft}: ${draft}` : t.plan.line.addCard} onClick={() => setOpen(true)}>
           <Plus size={16} />
+          {draft && <span className="line-add-draft">{draft}</span>}
         </button>
       </Tooltip>
     )
@@ -312,10 +332,7 @@ function AddCard({ notes, onAdd }: { notes: Entry[]; onAdd(text: string): void }
         value={text}
         onChange={setText}
         onSubmit={add}
-        onCancel={() => {
-          setText('')
-          setOpen(false)
-        }}
+        onCancel={() => setOpen(false)}
         onBlur={() => {
           add()
           setOpen(false)
@@ -331,11 +348,20 @@ function AddCard({ notes, onAdd }: { notes: Entry[]; onAdd(text: string): void }
   )
 }
 
-/** "+" after the last column: a box for the title of a new column. Enter adds it and keeps the box. */
+/**
+ * "+" after the last column: a box for the title of a new column. Enter adds it and keeps the box.
+ * A click outside adds it too; Esc closes the box and keeps the text for the next time.
+ */
 function AddColumn({ view, onAdd }: { view: LineView; onAdd(title: string): void }): React.JSX.Element {
   const t = useT()
+  const key = `column:${view}`
   const [open, setOpen] = useState(false)
-  const [title, setTitle] = useState('')
+  const [title, setTitleState] = useState(() => drafts.get(key) ?? '')
+  const setTitle = (v: string): void => {
+    setTitleState(v)
+    if (v.trim()) drafts.set(key, v)
+    else drafts.delete(key)
+  }
   const label = view === 'chapter' ? t.plan.line.addChapter : t.plan.line.addMoment
   const add = (): void => {
     if (title.trim()) onAdd(title)
@@ -360,7 +386,6 @@ function AddColumn({ view, onAdd }: { view: LineView; onAdd(title: string): void
               if (e.key === 'Enter') add()
               if (e.key === 'Escape') {
                 e.stopPropagation()
-                setTitle('')
                 setOpen(false)
               }
             }}
@@ -452,8 +477,28 @@ function ColumnInner({
     return c ? [c] : []
   })
   const rename = (title: string): void => {
-    if (col.kind === 'chapter' && col.chapterId) void useBook.getState().renameChapter(col.chapterId, title)
-    else if (col.columnId) saveBoard(renameColumn(board, view, col.columnId, title))
+    if (col.kind === 'chapter' && col.chapterId) {
+      // A written chapter: the title of the chapter in the book changes, and its file. The toast says so.
+      const id = col.chapterId
+      const before = useBook.getState().chapters.find((c) => c.id === id)?.title ?? col.title
+      void useBook
+        .getState()
+        .renameChapter(id, title)
+        .then(() => {
+          const after = useBook.getState().chapters.find((c) => c.id === id)?.title
+          if (!after || after === before) return
+          toast(t.plan.line.chapterRenamed(before, after), {
+            ms: 9000,
+            action: {
+              label: t.common.undo,
+              run: () => {
+                // A later rename stays.
+                if (useBook.getState().chapters.find((c) => c.id === id)?.title === after) void useBook.getState().renameChapter(id, before)
+              }
+            }
+          })
+        })
+    } else if (col.columnId) saveBoard(renameColumn(board, view, col.columnId, title))
   }
   const remove =
     movable(col) && col.columnId
@@ -494,7 +539,9 @@ function ColumnInner({
           {cards.map((c) => (
             <SortableCard key={c.id} look={look(c, col)} view={view} notes={notes} onOpen={() => onOpenCard(c.id)} />
           ))}
-          {col.kind !== 'tray' && <AddCard notes={notes} onAdd={(text) => saveBoard(addCard(board, view, col.key, text, chapters).board)} />}
+          {col.kind !== 'tray' && (
+            <AddCard notes={notes} draftKey={`${view}:${col.key}`} onAdd={(text) => saveBoard(addCard(board, view, col.key, text, chapters).board)} />
+          )}
         </SortableContext>
       )}
     </ColumnShell>

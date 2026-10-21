@@ -115,6 +115,26 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
     return () => clearTimeout(id)
   }, [open, query, cs, ww, editor])
 
+  // A search from another view (a chip of "In the manuscript" on a note): the text goes into the
+  // box, and the chapter shows its first match.
+  const seed = useUi((s) => s.findSeed)
+  useEffect(() => {
+    if (!seed) return
+    useUi.setState({ findSeed: null })
+    setQuery(seed.query)
+    setCs(false)
+    setWw(true)
+    whenChapterEditor(seed.chapterId, (e) =>
+      setTimeout(() => {
+        setActiveEditor(e)
+        e.editor.commands.setTextSelection(0)
+        e.editor.commands.setFind(seed.query, { caseSensitive: false, wholeWord: true })
+        e.editor.commands.findCurrent()
+        showCurrent(e.editor)
+      }, 60)
+    )
+  }, [seed]) // eslint-disable-line react-hooks/exhaustive-deps
+
   /** Next or previous match; after the last match of the chapter, go on in the next chapter that has one. */
   const go = (dir: 1 | -1): void => {
     // Enter right after typing or a paste: the search of the text in the box is not there yet. Make

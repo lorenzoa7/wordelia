@@ -1,5 +1,5 @@
 // The state of each thread for the thread list and the title bar: it works, it needs the user
-// (proposals wait for a decision), or it has a reply that the user did not see yet.
+// (proposals of the current replies wait for a decision), or it has a reply that the user did not see yet.
 
 import { useMemo } from 'react'
 import clsx from 'clsx'
@@ -8,7 +8,8 @@ import type { ChatMessage, Thread } from '@shared/types'
 import { useBook } from '@/stores/book'
 import { useT } from '@/lib/i18n'
 import { useChat } from './chatStore'
-import { pendingKeys } from './applyProposal'
+import { pendingKeys, currentFrom } from '@shared/proposals/state'
+import { SYNC_THREAD_ID } from '@/features/plan/sync'
 import './chat.css'
 
 export type ThreadState = 'working' | 'needs-you' | 'unseen'
@@ -41,7 +42,10 @@ export function lastReplyAt(thread: Thread): string {
 }
 
 export function threadStatus(thread: Thread, working: boolean): ThreadStatus {
-  const pending = thread.messages.reduce((n, m) => n + pendingIn(m), 0)
+  // Only the current replies count: the proposals of the replies before the last message of the
+  // author are old, and their cards keep them. The planning sync has its own review: all count.
+  const from = thread.id === SYNC_THREAD_ID ? 0 : currentFrom(thread.messages)
+  const pending = thread.messages.reduce((n, m, i) => n + (i >= from ? pendingIn(m) : 0), 0)
   if (working) return { state: 'working', pending }
   if (pending > 0) return { state: 'needs-you', pending }
   const last = lastReplyAt(thread)

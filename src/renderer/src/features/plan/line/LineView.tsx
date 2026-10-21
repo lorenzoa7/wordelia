@@ -3,10 +3,10 @@
 // the line shows on the board with its changes, with Accept and Reject.
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ArrowBendUpLeft, BookOpenText, ChatCircleText, Check, Clock, Sparkle } from '@phosphor-icons/react'
+import { ArrowBendUpLeft, BookOpenText, ChatCircleText, Check, Clock, Sparkle, Tray } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { boardView, hereKey, type LineView as View } from '@shared/storyline'
-import { Button, IconButton, Spinner } from '@/ui'
+import { Button, IconButton, Spinner, Tooltip } from '@/ui'
 import { getT, useT } from '@/lib/i18n'
 import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
@@ -76,7 +76,17 @@ export function LineView(): React.JSX.Element {
   const review = proposal && proposal.after !== null ? proposal : null
   const shown = board
   const here = hereKey(shown, view, chapters)
-  const cols = boardView(shown, view, chapters).filter((c) => c.kind !== 'tray')
+  const all = boardView(shown, view, chapters)
+  const cols = all.filter((c) => c.kind !== 'tray')
+  // The tray is the first column: the board opens at "You are here", so the tray can be out of
+  // sight. A button over the board says how many cards it has, and shows it.
+  const trayCards = all.find((c) => c.kind === 'tray')?.cards.length ?? 0
+  const showTray = (): void => {
+    const box = scroll.current
+    if (!box) return
+    box.scrollTo({ left: 0, behavior: 'smooth' })
+    box.querySelector<HTMLElement>('.line-col.is-tray .line-card')?.focus({ preventScroll: true })
+  }
   const count = view === 'chapter' ? t.plan.line.statsChapters(cols.length, shown.cards.length) : t.plan.line.statsMoments(cols.length, shown.cards.length)
 
   // "You are here" is on screen when the view opens. The board then starts at a column, so no
@@ -135,8 +145,9 @@ export function LineView(): React.JSX.Element {
     bar = (
       <div className="line-bar is-review" role="status">
         <Sparkle size={14} weight="fill" className="line-bar-icon" aria-label={t.plan.line.reviewTitle} />
-        <div className="line-bar-text is-one-line">
-          <b>{t.plan.line.fromAi(review.changes.length)}</b>
+        {/* The icon of the AI says where the changes come from: the short text fits next to the buttons. */}
+        <div className="line-bar-text is-one-line" title={t.plan.line.fromAi(review.changes.length)}>
+          <b>{t.plan.line.changes(review.changes.length)}</b>
         </div>
         <IconButton label={t.plan.line.showInChat} onClick={() => showInChat(review)}>
           <ChatCircleText size={15} />
@@ -206,7 +217,17 @@ export function LineView(): React.JSX.Element {
           <PlanViewSwitch active="line" />
         </div>
         <div className="line-tools">
-          <div className="line-tools-left">{bar}</div>
+          <div className="line-tools-left">
+            {bar}
+            {!review && trayCards > 0 && (
+              <Tooltip label={t.plan.line.trayButtonHint(trayCards)}>
+                <button className="line-tray-jump" onClick={showTray}>
+                  <Tray size={14} />
+                  <span>{t.plan.line.trayButton(view === 'chapter' ? t.plan.line.trayChapter : t.plan.line.trayTime, trayCards)}</span>
+                </button>
+              </Tooltip>
+            )}
+          </div>
           <ViewSwitch view={view} />
         </div>
       </header>

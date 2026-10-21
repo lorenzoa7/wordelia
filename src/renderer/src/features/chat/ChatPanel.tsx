@@ -1,22 +1,27 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowLeft, DotsThree, MagnifyingGlass, NotePencil, Plus, PushPin, Target, Trash } from '@phosphor-icons/react'
+import { ArrowLeft, Broom, DotsThree, MagnifyingGlass, NotePencil, Plus, PushPin, Target, Trash } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import type { Thread } from '@shared/types'
 import { Button, Dialog, Field, IconButton, Menu, MenuItem, MenuSeparator, TextArea, TextInput, Tooltip } from '@/ui'
 import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
 import { useT } from '@/lib/i18n'
+import { toast } from '@/stores/ui'
+import { oldPending } from '@shared/proposals/state'
 import { SYNC_THREAD_ID } from '@/features/plan/sync'
-import { focusComposer, useChat } from './chatStore'
+import { composerEditor, draftKey, ensureBlank, focusComposer, useChat, worthKeeping } from './chatStore'
 import { askConfirm } from '@/ui/prompt'
-import { newThread, threadBrief, threadTitle } from './send'
+import { newThread, stopReply, threadBrief, threadTitle } from './send'
 import { MessageView, StreamingMessage } from './MessageView'
 import { Composer } from './Composer'
 import { RewindHost } from './RewindDialog'
 import { lastReplyAt, markSeen, StatusDot, useChatAttention, useThreadStatuses } from './status'
-import { hasMessages, latestThread, saveThreadChange, startThread } from './threads'
+import { dropDraft, hasMessages, isUnsaved, keptThreads, latestThread, saveThreadChange, startThread } from './threads'
 import { useFollowEnd } from './follow'
+import { trashUnusedImages } from './images'
+import { rejectManyWithUndo } from './undo'
+import { formatCost, sumUsage } from './usage'
 import { isE2E } from '@/lib/api'
 import './chat.css'
 
@@ -49,7 +54,7 @@ export function ChatPanel(): React.JSX.Element {
   // No open thread (a book without threads, or the open thread was deleted): show a blank thread.
   // An open thread that is not in the book yet (the planning sync makes its thread) does not get one.
   useLayoutEffect(() => {
-    if (!listOpen && !blank && !activeId) useChat.setState({ blank: newThread() })
+    if (!listOpen && !blank && !activeId) ensureBlank(newThread())
   }, [listOpen, blank, activeId])
 
   // Hooks for end-to-end tests and screenshots.
@@ -108,10 +113,36 @@ export function ChatPanel(): React.JSX.Element {
   const canAct = Boolean(thread) && !streaming && thread?.id !== SYNC_THREAD_ID
 
   const open = (id: string): void => {
-    setActive(id)
+    // A new thread without messages that the user left: it shows again as the new thread.
+    const kept = keptThreads().find((th) => th.id === id) ?? (useChat.getState().blank?.id === id ? useChat.getState().blank : null)
+    if (kept) useChat.getState().openBlank(kept)
+    else setActive(id)
     focusComposer(50)
   }
-  const askDelete = (th: Thread): void =>
+  const askDelete = (th: Thread): void => {
+    // A new thread is not on disk: it goes away at once, and Undo brings it back.
+    if (isUnsaved(th.id)) {
+      const root = useBook.getState().root ?? ''
+      const gone = useChat.getState().discardKept(th.id)
+      let back = false
+      toast(t.chat.newThreadRemoved, {
+        ms: 8000,
+        action: {
+          label: t.common.undo,
+          run: () => {
+            back = true
+            const s = useChat.getState()
+            useChat.setState({
+              kept: { ...s.kept, [root]: [th, ...(s.kept[root] ?? []).filter((x) => x.id !== th.id)] },
+              drafts: { ...s.drafts, [draftKey(root, th.id)]: gone }
+            })
+          }
+        }
+      })
+      // The images of its draft go to the trash when Undo is not used.
+      if (gone.images.length) setTimeout(() => !back && void trashUnusedImages(gone.images.map((i) => i.file)), 8500)
+      return
+    }
     void askConfirm({
       title: t.chat.deleteTitle(threadTitle(t, th.title)),
       message: t.chat.deleteMessage,
@@ -119,14 +150,32 @@ export function ChatPanel(): React.JSX.Element {
       danger: true
     }).then(async (ok) => {
       if (!ok) return
+      // A reply in progress stops: the thread goes away.
+      stopReply(th.id)
       const wasActive = th.id === useChat.getState().activeThreadId
-      await useBook.getState().deleteThread(th.id)
+      const latest = useBook.getState().threads.find((x) => x.id === th.id) ?? th
+      const trash = await useBook.getState().deleteThread(th.id)
+      dropDraft(th.id)
+      toast(t.chat.threadDeleted(threadTitle(t, latest.title)), {
+        ms: 9000,
+        action: {
+          label: t.common.undo,
+          run: () =>
+            void useBook
+              .getState()
+              .restoreThread(latest, trash)
+              .then(() => {
+                if (wasActive) useChat.getState().setActiveThread(latest.id)
+              })
+        }
+      })
       if (!wasActive) return
       const next = latestThread(useBook.getState().threads)
       useChat.setState({ activeThreadId: next?.id ?? null })
       // The other threads show, so the user picks the next one (Esc opens the most recent). Without other threads, a blank thread shows.
       setListOpen(Boolean(next))
     })
+  }
 
   return (
     <aside className="chat-panel" aria-label={t.chat.panel}>
@@ -247,6 +296,9 @@ function ThreadHead({
 
 function ThreadMenuItems({ thread, onEdit, onDelete }: { thread: Thread; onEdit: (th: Thread) => void; onDelete: (th: Thread) => void }): React.JSX.Element {
   const t = useT()
+  // The proposals of the earlier replies that wait: they are not in the text any more, and one click rejects them.
+  const old = thread.id === SYNC_THREAD_ID ? [] : oldPending(thread.messages)
+  const count = old.reduce((n, x) => n + x.keys.length, 0)
   return (
     <>
       <MenuItem icon={<NotePencil size={15} />} onSelect={() => onEdit(thread)}>
@@ -255,6 +307,11 @@ function ThreadMenuItems({ thread, onEdit, onDelete }: { thread: Thread; onEdit:
       <MenuItem icon={<PushPin size={15} />} onSelect={() => saveThreadChange({ ...thread, pinned: !thread.pinned })}>
         {thread.pinned ? t.chat.unpin : t.chat.pin}
       </MenuItem>
+      {count > 0 && (
+        <MenuItem icon={<Broom size={15} />} onSelect={() => rejectManyWithUndo(thread, old)}>
+          <span title={t.chat.dismissOldHint}>{t.chat.dismissOld(count)}</span>
+        </MenuItem>
+      )}
       <MenuSeparator />
       <MenuItem danger icon={<Trash size={15} className="icon-trash" />} onSelect={() => onDelete(thread)}>
         {t.chat.deleteThread}
@@ -297,8 +354,15 @@ function ThreadList({
   const t = useT()
   const [q, setQ] = useState('')
   const statuses = useThreadStatuses()
-  // A thread without messages never shows.
-  const threads = useMemo(() => all.filter(hasMessages), [all])
+  const root = useBook((s) => s.root ?? '')
+  const kept = useChat((s) => s.kept[root])
+  const blank = useChat((s) => s.blank)
+  const blankKept = useChat((s) => Boolean(s.blank && worthKeeping(s.blank, s)))
+  // A thread without messages does not show, except a new thread that the user gave a title, a purpose, a model or a draft.
+  const threads = useMemo(
+    () => [...(blank && blankKept ? [blank] : []), ...(kept ?? []), ...all.filter(hasMessages)],
+    [all, kept, blank, blankKept]
+  )
   const listRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const { pinned, recent } = useMemo(() => {
@@ -343,7 +407,7 @@ function ThreadList({
               <span className="thread-item-time">{timeAgo(th.updatedAt, t.common.locale)}</span>
             </span>
             <span className={clsx('thread-item-sub', statusText && 'is-status')}>
-              {statusText || threadBrief(t, th.brief) || firstLine(th.digest) || t.chat.messages(th.messages.length)}
+              {statusText || threadBrief(t, th.brief) || firstLine(th.digest) || (th.messages.length ? t.chat.messages(th.messages.length) : t.chat.notStarted)}
             </span>
           </span>
         </button>
@@ -463,6 +527,21 @@ function ThreadEditor({ thread, onClose }: { thread: Thread | null; onClose: () 
       setBrief(thread.brief)
     }
   }, [thread])
+  const used = thread ? sumUsage(thread.messages) : null
+  const save = (): void => {
+    if (thread) {
+      const next = title.trim()
+      // Save the newest version of the thread: a reply can arrive while the dialog is open.
+      // A new thread keeps its title and purpose in the chat store until its first message saves it.
+      const s = useChat.getState()
+      const now =
+        useBook.getState().threads.find((th) => th.id === thread.id) ??
+        (s.blank?.id === thread.id ? s.blank : keptThreads().find((th) => th.id === thread.id)) ??
+        thread
+      saveThreadChange({ ...now, title: next && next !== shownTitle ? next : now.title, brief: brief.trim() })
+    }
+    onClose()
+  }
   return (
     <Dialog
       open={thread !== null}
@@ -474,43 +553,69 @@ function ThreadEditor({ thread, onClose }: { thread: Thread | null; onClose: () 
           <Button variant="ghost" onClick={onClose}>
             {t.common.cancel}
           </Button>
-          <Button
-            variant="primary"
-            onClick={() => {
-              if (thread) {
-                const next = title.trim()
-                // Save the newest version of the thread: a reply can arrive while the dialog is open.
-                // The blank thread keeps its title and purpose until its first message saves it.
-                const blank = useChat.getState().blank
-                const now = useBook.getState().threads.find((th) => th.id === thread.id) ?? (blank?.id === thread.id ? blank : thread)
-                saveThreadChange({ ...now, title: next && next !== shownTitle ? next : now.title, brief: brief.trim() })
-              }
-              onClose()
-            }}
-          >
+          <Button variant="primary" onClick={save}>
             {t.common.save}
           </Button>
         </>
       }
     >
       <Field label={t.chat.title}>
-        <TextInput value={title} onChange={(e) => setTitle(e.target.value)} />
+        {/* Enter saves, as in the other dialogs. */}
+        <TextInput
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+              e.preventDefault()
+              save()
+            }
+          }}
+        />
       </Field>
       <Field label={t.chat.purpose} hint={t.chat.purposeHint}>
-        <TextArea value={brief} onChange={(e) => setBrief(e.target.value)} rows={3} />
+        {/* Enter starts a new line in the purpose; Ctrl+Enter saves. */}
+        <TextArea
+          value={brief}
+          onChange={(e) => setBrief(e.target.value)}
+          rows={3}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+              e.preventDefault()
+              save()
+            }
+          }}
+        />
       </Field>
       {thread?.digest && (
         <Field label={t.chat.digest}>
           <div className="digest-box">{thread.digest}</div>
         </Field>
       )}
+      {used && used.replies > 0 && (
+        <Field label={t.chat.usageOfThread}>
+          <p className="thread-usage">
+            {t.chat.usage(t.common.number(used.inputTokens), t.common.number(used.outputTokens), used.costUsd !== null ? formatCost(used.costUsd, t.common.locale) : null)}{' '}
+            {t.chat.usageReplies(used.replies)}
+          </p>
+        </Field>
+      )}
     </Dialog>
   )
 }
 
+/** Put a suggestion in the composer. A typed draft stays: the suggestion goes after it, on a new line (Ctrl+Z takes it out). */
+function suggest(text: string): void {
+  const ed = composerEditor()
+  if (!useChat.getState().draft.trim() || !ed) {
+    useChat.getState().setDraft(text)
+    focusComposer()
+    return
+  }
+  ed.chain().focus('end').insertContent([{ type: 'hardBreak' }, { type: 'text', text }]).run()
+}
+
 function ChatEmpty(): React.JSX.Element {
   const t = useT()
-  const setDraft = useChat((s) => s.setDraft)
   return (
     <AnimatePresence>
       <motion.div className="chat-empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
@@ -521,10 +626,7 @@ function ChatEmpty(): React.JSX.Element {
             <button
               key={s}
               className="chat-suggestion"
-              onClick={() => {
-                setDraft(s)
-                focusComposer()
-              }}
+              onClick={() => suggest(s)}
             >
               {s}
             </button>

@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'motion/react'
-import { BookOpenText, Check, Columns, Crosshair, FilePlus, Notebook, Path, Rows, UserCircle, WarningCircle, X } from '@phosphor-icons/react'
+import { ArrowClockwise, BookOpenText, CaretDown, Check, Columns, Crosshair, FilePlus, Notebook, Path, Rows, UserCircle, WarningCircle, X } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import ReactMarkdown from 'react-markdown'
-import { markdownToPlain } from '@shared/book'
+import { entryToFile, markdownToPlain } from '@shared/book'
 import { readFrontmatter } from '@shared/markdown/frontmatter'
 import { hunkKey, parseProposals, type Hunk, type Segment } from '@shared/proposals/parse'
+import { losesSomething, noteReplace, type NoteReplace } from '@shared/proposals/replace'
 import { wordDiff, diffStats, type DiffOp } from '@shared/text/diff'
 import { findStoryLine } from '@shared/storyline'
 import type { ChatMessage, HunkState, Thread } from '@shared/types'
@@ -15,11 +16,12 @@ import { typesetForBook } from '@/lib/typeset'
 import { useAssetUrl } from '@/lib/assets'
 import { toast } from '@/stores/ui'
 import { folderCategoryName, useT } from '@/lib/i18n'
-import { acceptPortrait, inlineProposalId, revealProposal } from '@/features/editor/inlineProposals'
+import { acceptPortrait, inlineProposalId, revealProposal, reviveProposal, useInlineProposals } from '@/features/editor/inlineProposals'
 import { openLine } from '@/features/graph'
 import { acceptLineProposal, isLineSegment, lineStateOf, messageLineProposal, rejectLineProposal, type LineSegment } from '@/features/plan/line/proposal'
 import { useChat } from './chatStore'
 import { applyCreate, applyEditHunk, markAfter, resolveTarget, restoreSnapshot, setHunkStates, snapshotOf, type Snapshot } from './applyProposal'
+import { acceptedToast, rejectWithUndo } from './undo'
 
 type EditSeg = Extract<Segment, { kind: 'edit' }>
 type CreateSeg = Extract<Segment, { kind: 'create' }>
@@ -97,10 +99,26 @@ function HunkView({ hunk, split }: { hunk: Hunk; split: boolean }): React.JSX.El
   )
 }
 
+/** The counts of words added and removed. A change of punctuation or spaces only says so, not "+0 −0". */
+function Stats({ added, removed, changed }: { added: number; removed: number; changed: boolean }): React.JSX.Element | null {
+  const t = useT()
+  if (added || removed) {
+    return (
+      <span className="proposal-stats">
+        <span className="plus">+{t.common.number(added)}</span>
+        <span className="minus">−{t.common.number(removed)}</span>
+      </span>
+    )
+  }
+  if (!changed) return null
+  return <span className="proposal-stats is-small">{t.chat.smallChange}</span>
+}
+
 function EditCard({ segment: raw, message, thread, streaming }: Props & { segment: EditSeg }): React.JSX.Element {
   const t = useT()
   const [split, setSplit] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [looking, setLooking] = useState<number | null>(null)
   const target = resolveTarget(raw.file)
   // Show chapter text with the quotes of the book, as it will be applied.
   const segment = useMemo(
@@ -109,21 +127,28 @@ function EditCard({ segment: raw, message, thread, streaming }: Props & { segmen
   )
   const states = message?.hunks ?? {}
   const keys = segment.hunks.map((_, i) => hunkKey(segment.index, i))
-  const pending = keys.filter((k) => !states[k] || states[k] === 'pending')
+  const ids = keys.map((k) => (thread && message ? inlineProposalId(thread.id, message.id, k) : ''))
+  // Only a complete change can wait for a decision: a change that the reply did not finish is cut.
+  const isPending = (i: number): boolean => segment.hunks[i].complete && (!states[keys[i]] || states[keys[i]] === 'pending')
+  const pending = keys.filter((_, i) => isPending(i))
+  const replaced = useInlineProposals((s) => ids.map((id) => Boolean(id && s.replaced[id])).join(','))
+  const inText = useInlineProposals((s) => ids.map((id) => s.list.some((p) => p.id === id)).join(','))
   const totals = useMemo(() => {
     let added = 0
     let removed = 0
+    let changed = false
     for (const h of segment.hunks) {
       if (!h.complete) continue
       const s = diffStats(wordDiff(plain(h.find), plain(h.replace)))
       added += s.added
       removed += s.removed
+      changed = changed || plain(h.find) !== plain(h.replace)
     }
-    return { added, removed }
+    return { added, removed, changed }
   }, [segment.hunks])
 
   const apply = (i: number): boolean => {
-    if (!thread || !message) return false
+    if (!thread || !message || !segment.hunks[i].complete) return false
     const res = applyEditHunk(segment.file, segment.hunks[i])
     setHunkState(thread, message.id, keys[i], res.ok ? 'accepted' : 'failed')
     if (!res.ok) toast(res.reason, { kind: 'error' })
@@ -152,8 +177,8 @@ function EditCard({ segment: raw, message, thread, streaming }: Props & { segmen
       offerUndo(snap, [i], t.chat.changeApplied(target.label))
     }
   }
-  const reject = (i: number): void => {
-    if (thread && message) setHunkState(thread, message.id, keys[i], 'rejected')
+  const reject = (only: string[]): void => {
+    if (thread && message) rejectWithUndo(thread, message.id, only)
   }
   const acceptAll = (): void => {
     setBusy(true)
@@ -161,7 +186,7 @@ function EditCard({ segment: raw, message, thread, streaming }: Props & { segmen
     const accepted: number[] = []
     // Apply from the last hunk to the first, so earlier text does not move.
     for (let i = segment.hunks.length - 1; i >= 0; i--) {
-      if (states[keys[i]] && states[keys[i]] !== 'pending') continue
+      if (!isPending(i)) continue
       if (apply(i)) accepted.push(i)
     }
     setBusy(false)
@@ -173,10 +198,12 @@ function EditCard({ segment: raw, message, thread, streaming }: Props & { segmen
   /** Take the user to the change in the chapter. Pending changes show in the text with Accept and Reject. */
   const reveal = (i: number): void => {
     if (target.kind !== 'chapter' || !thread || !message) return
-    const found = revealProposal(target.chapter.id, segment.hunks[i].find, inlineProposalId(thread.id, message.id, keys[i]))
+    // A change of an older reply is not in the text: it comes back there.
+    if (isPending(i) && inText.split(',')[i] !== 'true') reviveProposal(ids[i])
+    const found = revealProposal(target.chapter.id, segment.hunks[i].find, ids[i])
     if (!found) toast(t.chat.passageNotFound, { kind: 'error' })
   }
-  const firstPending = segment.hunks.findIndex((h, i) => h.complete && pending.includes(keys[i]))
+  const firstPending = segment.hunks.findIndex((_, i) => isPending(i))
   const open = (): void => {
     if (target.kind === 'chapter') {
       if (!streaming && firstPending >= 0) reveal(firstPending)
@@ -198,10 +225,7 @@ function EditCard({ segment: raw, message, thread, streaming }: Props & { segmen
             <Icon size={14} />
             <span>{target.label}</span>
           </button>
-          <span className="proposal-stats">
-            <span className="plus">+{totals.added}</span>
-            <span className="minus">−{totals.removed}</span>
-          </span>
+          <Stats {...totals} />
         </div>
         <div className="proposal-tools">
           <Tooltip label={split ? t.chat.inlineView : t.chat.splitView}>
@@ -214,7 +238,7 @@ function EditCard({ segment: raw, message, thread, streaming }: Props & { segmen
           ) : (
             pending.length > 0 && (
               <>
-                <button className="proposal-btn" onClick={() => keys.forEach((k, i) => pending.includes(k) && reject(i))}>
+                <button className="proposal-btn" onClick={() => reject(pending)}>
                   {segment.hunks.length > 1 ? t.common.rejectAll : t.common.reject}
                 </button>
                 <button className="proposal-btn is-accept" onClick={acceptAll} disabled={busy}>
@@ -228,10 +252,18 @@ function EditCard({ segment: raw, message, thread, streaming }: Props & { segmen
       <div className="proposal-hunks">
         {segment.hunks.map((h, i) => {
           const st = states[keys[i]] ?? 'pending'
+          const cut = !h.complete && !streaming
           return (
-            <div key={i} className={clsx('hunk', `is-${st}`)}>
+            <div key={i} className={clsx('hunk', `is-${st}`, cut && 'is-cut')}>
+              {!h.find.trim() && h.complete && target.kind === 'chapter' && <p className="hunk-where">{t.chat.atEnd}</p>}
               <HunkView hunk={h} split={split} />
-              {!streaming && h.complete && st === 'pending' && (target.kind === 'chapter' || segment.hunks.length > 1) && (
+              {cut && (
+                <p className="hunk-note">
+                  <WarningCircle size={12} aria-hidden /> {t.chat.changeIncomplete}
+                </p>
+              )}
+              {!streaming && isPending(i) && replaced.split(',')[i] === 'true' && <p className="hunk-note">{t.chat.replacedByNewer}</p>}
+              {!streaming && isPending(i) && (target.kind === 'chapter' || segment.hunks.length > 1) && (
                 <div className="hunk-foot">
                   {target.kind === 'chapter' && (
                     <Tooltip label={t.chat.showInTextHint}>
@@ -244,7 +276,7 @@ function EditCard({ segment: raw, message, thread, streaming }: Props & { segmen
                   {segment.hunks.length > 1 && (
                     <>
                       <Tooltip label={t.chat.rejectChange}>
-                        <button className="hunk-icon" onClick={() => reject(i)} aria-label={t.chat.rejectChange}>
+                        <button className="hunk-icon" onClick={() => reject([keys[i]])} aria-label={t.chat.rejectChange}>
                           <X size={12} />
                         </button>
                       </Tooltip>
@@ -257,7 +289,25 @@ function EditCard({ segment: raw, message, thread, streaming }: Props & { segmen
                   )}
                 </div>
               )}
-              {st !== 'pending' && <HunkBadge state={st} />}
+              {st !== 'pending' && (
+                <div className="hunk-foot">
+                  <HunkBadge state={st} />
+                  {st === 'failed' && !streaming && (
+                    <>
+                      {h.find.trim() && (
+                        <button className="hunk-reveal" aria-expanded={looking === i} onClick={() => setLooking(looking === i ? null : i)}>
+                          <CaretDown size={11} className={clsx('hunk-caret', looking === i && 'is-open')} /> {t.chat.lookedFor}
+                        </button>
+                      )}
+                      <span className="proposal-spacer" />
+                      <button className="hunk-reveal" onClick={() => accept(i)}>
+                        <ArrowClockwise size={12} /> {t.chat.tryAgain}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+              {st === 'failed' && looking === i && <blockquote className="hunk-looked">{plain(h.find)}</blockquote>}
             </div>
           )
         })}
@@ -289,6 +339,46 @@ function HunkBadge({ state }: { state: HunkState }): React.JSX.Element {
   )
 }
 
+/** The note as it is and as the proposal makes it: the summary, the other names, and the text, as a diff. */
+function NoteDiff({ diff }: { diff: NoteReplace }): React.JSX.Element {
+  const t = useT()
+  const { before, after } = diff
+  const summary = useMemo(() => wordDiff(before.summary, after.summary), [before.summary, after.summary])
+  const body = useMemo(() => wordDiff(plain(before.body), plain(after.body)), [before.body, after.body])
+  const names = [
+    ...before.aliases.map((a) => ({ a, kind: after.aliases.some((b) => b.toLowerCase() === a.toLowerCase()) ? 'equal' : 'delete' })),
+    ...after.aliases.filter((b) => !before.aliases.some((a) => a.toLowerCase() === b.toLowerCase())).map((a) => ({ a, kind: 'insert' }))
+  ]
+  return (
+    <div className="note-diff hunk">
+      {(before.summary || after.summary) && (
+        <p className="note-diff-row">
+          <span className="note-diff-label">{t.chat.noteSummary}</span>
+          <span className="hunk-text">
+            <DiffText ops={summary} />
+          </span>
+        </p>
+      )}
+      {names.length > 0 && (
+        <p className="note-diff-row">
+          <span className="note-diff-label">{t.chat.noteAliases}</span>
+          <span className="hunk-text">
+            {names.map((n, i) => (
+              <span key={n.a}>
+                {i > 0 && ', '}
+                {n.kind === 'delete' ? <del>{n.a}</del> : n.kind === 'insert' ? <ins>{n.a}</ins> : n.a}
+              </span>
+            ))}
+          </span>
+        </p>
+      )}
+      <div className="hunk-text note-diff-body">
+        <DiffText ops={body} />
+      </div>
+    </div>
+  )
+}
+
 function CreateCard({ segment, message, thread, streaming }: Props & { segment: CreateSeg }): React.JSX.Element {
   const t = useT()
   const [expanded, setExpanded] = useState(false)
@@ -302,21 +392,36 @@ function CreateCard({ segment, message, thread, streaming }: Props & { segment: 
   const category = folderCategoryName(t, segment.file.replace(/^planning\//, '').split('/').slice(0, -1).join('/'), categories)
   // After the user creates the entry, it exists: the card still shows where it went.
   const exists = target.kind === 'entry' && state === 'pending'
+  // A reply that stopped in the middle of the note: the note is cut, it cannot be created.
+  const cut = !segment.complete && !streaming
+  // The note that exists, and the note as the proposal makes it: the card shows the diff, and what the note loses.
+  const diff = useMemo(() => {
+    if (!exists || target.kind !== 'entry' || !segment.complete) return null
+    const merged = segment.content.startsWith('---') ? segment.content : entryToFile({ ...target.entry, body: segment.content })
+    return noteReplace(entryToFile(target.entry), merged)
+  }, [exists, target, segment.content, segment.complete])
+  const lost = diff && losesSomething(diff)
+    ? [
+        diff.lost.aliases.length ? t.chat.lostAliases(diff.lost.aliases.map((a) => `“${a}”`).join(', ')) : '',
+        diff.lost.fields.length ? t.chat.lostFields(diff.lost.fields.join(', ')) : '',
+        diff.lost.sections.length ? t.chat.lostSections(diff.lost.sections.map((s) => `“${s}”`).join(', ')) : ''
+      ].filter(Boolean).join('; ')
+    : ''
 
   const create = async (): Promise<void> => {
-    if (!thread || !message) return
+    if (!thread || !message || !segment.complete) return
     const res = await applyCreate(segment.file, segment.content)
-    // Keep the replaced entry, so a rewind of the thread can bring it back.
+    // Keep the replaced entry, so a rewind of the thread (or Undo) can bring it back.
     setHunkStates(thread, message.id, { [key]: res.ok ? 'accepted' : 'failed' }, res.ok && res.previous ? { [key]: res.previous } : undefined)
     if (!res.ok) toast(res.reason, { kind: 'error' })
-    else toast(exists ? t.chat.entryUpdated(target.label) : t.chat.entryCreated(target.label))
+    else acceptedToast(exists ? t.chat.entryUpdated(target.label) : t.chat.entryCreated(target.label), thread.id, message.id, [key])
   }
 
   return (
     <motion.div className="proposal is-create" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
       <header className="proposal-head">
         <div className="proposal-title">
-          <span className="proposal-file">
+          <span className="proposal-file" title={target.label}>
             <FilePlus size={14} />
             <span>{target.label}</span>
           </span>
@@ -325,9 +430,9 @@ function CreateCard({ segment, message, thread, streaming }: Props & { segment: 
         <div className="proposal-tools">
           {streaming ? (
             <Spinner size={12} />
-          ) : state === 'pending' ? (
+          ) : cut ? null : state === 'pending' ? (
             <>
-              <button className="proposal-btn" onClick={() => thread && message && setHunkState(thread, message.id, key, 'rejected')}>
+              <button className="proposal-btn" onClick={() => thread && message && rejectWithUndo(thread, message.id, [key])}>
                 {t.chat.dismiss}
               </button>
               <button className="proposal-btn is-accept" onClick={() => void create()}>
@@ -339,13 +444,25 @@ function CreateCard({ segment, message, thread, streaming }: Props & { segment: 
           )}
         </div>
       </header>
-      <div id={`create-${segment.index}`} className={clsx('proposal-body prose', !expanded && 'is-clamped')}>
+      {cut && (
+        <p className="hunk-note proposal-note">
+          <WarningCircle size={12} aria-hidden /> {t.chat.incompleteNote}
+        </p>
+      )}
+      {lost && <p className="proposal-warn">{t.chat.replaceTakesOut(lost)}</p>}
+      <div id={`create-${segment.index}`} className={clsx('proposal-body prose', !expanded && 'is-clamped', cut && 'is-partial')}>
         {portrait && <img className="proposal-portrait is-small" src={portrait} alt={t.chat.portraitAlt(target.label)} />}
-        {typeof data.summary === 'string' && <p className="proposal-summary">{data.summary}</p>}
-        {Array.isArray(data.aliases) && data.aliases.length > 0 && (
-          <p className="proposal-aliases">{t.chat.aliases((data.aliases as unknown[]).map(String).join(', '))}</p>
+        {diff ? (
+          <NoteDiff diff={diff} />
+        ) : (
+          <>
+            {typeof data.summary === 'string' && <p className="proposal-summary">{data.summary}</p>}
+            {Array.isArray(data.aliases) && data.aliases.length > 0 && (
+              <p className="proposal-aliases">{t.chat.aliases((data.aliases as unknown[]).map(String).join(', '))}</p>
+            )}
+            <ReactMarkdown>{body}</ReactMarkdown>
+          </>
         )}
-        <ReactMarkdown>{body}</ReactMarkdown>
       </div>
       <button className="proposal-more" aria-expanded={expanded} aria-controls={`create-${segment.index}`} onClick={() => setExpanded(!expanded)}>
         {expanded ? t.chat.showLess : t.chat.showAll}
@@ -381,11 +498,11 @@ function PortraitCard({ segment, message, thread, streaming }: Props & { segment
           <span className="proposal-cat">{t.chat.portrait}</span>
         </div>
         <div className="proposal-tools">
-          {streaming || !segment.complete ? (
+          {streaming ? (
             <Spinner size={12} />
-          ) : state === 'pending' ? (
+          ) : !segment.complete ? null : state === 'pending' ? (
             <>
-              <button className="proposal-btn" onClick={() => thread && message && setHunkState(thread, message.id, key, 'rejected')}>
+              <button className="proposal-btn" onClick={() => thread && message && rejectWithUndo(thread, message.id, [key])}>
                 {t.chat.dismiss}
               </button>
               <button className="proposal-btn is-accept" onClick={use}>
@@ -429,9 +546,20 @@ function LineCard({ segment, message, thread, streaming }: Props & { segment: Li
           <span>{t.plan.line.title}</span>
         </button>
         <span className="line-proposal-count">
-          {streaming || !segment.complete ? <Spinner size={12} /> : p ? p.after !== null && t.plan.line.changes(p.changes.length) : <HunkBadge state={state} />}
+          {streaming ? (
+            <Spinner size={12} />
+          ) : !segment.complete ? null : p ? (
+            p.after !== null && t.plan.line.changes(p.changes.length)
+          ) : (
+            <HunkBadge state={state} />
+          )}
         </span>
       </header>
+      {!streaming && !segment.complete && (
+        <p className="hunk-note proposal-note">
+          <WarningCircle size={12} aria-hidden /> {t.chat.changeIncomplete}
+        </p>
+      )}
       {p && (
         <div className="line-proposal-body">
           {p.after === null ? (

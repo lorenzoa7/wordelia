@@ -11,12 +11,14 @@ import {
   ListChecks,
   PencilSimple,
   Quotes,
+  StopCircle,
   WarningCircle
 } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { modelLabel } from '@shared/ai/effort'
-import { parseProposals, proposalSummary, type Segment } from '@shared/proposals/parse'
-import { toast } from '@/stores/ui'
+import { hasProposals, parseProposals, replyProse, type Segment } from '@shared/proposals/parse'
+import { Selection } from '@tiptap/pm/state'
+import { toast, useUi } from '@/stores/ui'
 import { getActiveEditor } from '@/features/editor/registry'
 import { sliceFromMarkdown } from '@/features/editor/review'
 import type { ChatMessage, Thread } from '@shared/types'
@@ -36,6 +38,9 @@ import { docFromParts, readDraft, splitMentions } from './draft'
 import { useChat, type Streaming } from './chatStore'
 import { confirmAndRewind } from './rewind'
 import { latestThought, streamPhase, type StreamPhase } from './thinking'
+import { closeMarkdown } from './markdown'
+import { acceptedToast, rejectWithUndo } from './undo'
+import { formatCost } from './usage'
 
 const mdComponents = {
   a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
@@ -216,24 +221,41 @@ function EditBox({ message, thread, after }: { message: ChatMessage; thread: Thr
 /* Replies of the AI                                                    */
 /* ------------------------------------------------------------------ */
 
+/** The errors that the AI settings can fix: the button opens Settings → AI. */
+const SETTINGS_ERRORS = new Set(['not-installed', 'not-logged-in'])
+
 function AssistantMessage({ message, thread, after, canAct }: Props): React.JSX.Element {
+  const t = useT()
   const segments = useMemo(() => parseProposals(message.content), [message.content])
   const thought = useChat((s) => s.thoughts[message.id])
+  // A reply that stopped or failed can end in the middle of a mark ("**bold"): close it.
+  const cut = Boolean(message.stopped || message.error)
   return (
     <div className="msg msg-ai">
       {thought && <ThinkingLine thinking={thought} phase={{ kind: 'text' }} />}
       {segments.map((s, i) =>
         s.kind === 'text' ? (
           <div key={i} className="msg-ai-text prose">
-            <Markdown text={s.text} />
+            <Markdown text={cut && i === segments.length - 1 ? closeMarkdown(s.text) : s.text} />
           </div>
         ) : (
           <ProposalCard key={i} segment={s} message={message} thread={thread} />
         )
       )}
+      {message.stopped && (
+        <p className="msg-stopped" title={t.chat.stoppedHint}>
+          <StopCircle size={13} aria-hidden /> {t.chat.stoppedMark}
+        </p>
+      )}
       {message.error && (
         <div className="msg-error">
-          <WarningCircle size={14} /> {message.error}
+          <WarningCircle size={14} />
+          <span className="msg-error-text">{message.error}</span>
+          {message.errorKind && SETTINGS_ERRORS.has(message.errorKind) && (
+            <button className="msg-error-btn" onClick={() => useUi.getState().openSettings('ai')}>
+              {t.chat.fixInSettings}
+            </button>
+          )}
         </div>
       )}
       <ReplyReview segments={segments} message={message} thread={thread} />
@@ -290,12 +312,16 @@ function ReplyReview({ segments, message, thread }: { segments: Segment[]; messa
       const ok = states.filter((s) => s === 'accepted').length
       const failed = states.length - ok
       const chapters = segments.some((s) => s.kind === 'edit' && s.file.replace(/\\/g, '/').startsWith('manuscript/'))
-      toast(failed ? t.chat.bulkPartial(ok, states.length, failed) : t.chat.bulkApplied(ok, chapters), failed ? { kind: 'error' } : {})
+      const done = Object.keys(result).filter((k) => result[k] === 'accepted')
+      if (failed) toast(t.chat.bulkPartial(ok, states.length, failed), { kind: 'error' })
+      // Undo takes the changes of this reply out of the book again, where their text is unchanged.
+      else if (done.length) acceptedToast(t.chat.bulkApplied(ok, chapters), thread.id, message.id, done)
+      else if (line) toast(t.chat.bulkApplied(ok, chapters))
     } finally {
       setBusy(false)
     }
   }
-  const rejectAll = (): void => setHunkStates(thread, message.id, Object.fromEntries(pending.map((k) => [k, 'rejected'])))
+  const rejectAll = (): void => rejectWithUndo(thread, message.id, pending)
 
   // A few names, then a count of the others. The names get "…" when they do not fit; the count always shows.
   const named = files.slice(0, BULK_NAMES)
@@ -337,20 +363,38 @@ function ReplyReview({ segments, message, thread }: { segments: Segment[]; messa
   )
 }
 
+/**
+ * Put text as new paragraphs after the paragraph of the cursor. A selection stays as it is: the text
+ * never takes its place, and never joins the paragraph.
+ */
+function insertParagraphs(markdown: string): boolean {
+  const a = getActiveEditor()
+  if (!a) return false
+  const { state } = a.editor
+  const slice = sliceFromMarkdown(state.schema, typesetForBook(markdown))
+  const $to = state.selection.$to
+  const at = $to.depth > 0 ? $to.after(1) : $to.pos
+  const tr = state.tr.insert(at, slice.content)
+  tr.setSelection(Selection.near(tr.doc.resolve(at + slice.content.size), -1))
+  a.editor.view.dispatch(tr.scrollIntoView())
+  a.editor.commands.focus()
+  return true
+}
+
+/** "1,234 tokens in · 210 out · about $0.012" */
+function usageLabel(t: ReturnType<typeof useT>, u: NonNullable<ChatMessage['usage']>): string {
+  return t.chat.usage(t.common.number(u.inputTokens ?? 0), t.common.number(u.outputTokens ?? 0), typeof u.costUsd === 'number' ? formatCost(u.costUsd, t.common.locale) : null)
+}
+
 function MessageActions({ message, threadId, canRetry }: { message: ChatMessage; threadId: string; canRetry: boolean }): React.JSX.Element | null {
   const t = useT()
-  const text = message.content.trim() ? proposalSummary(message.content).trim() : ''
-  if (!text && !canRetry) return null
+  // Copy and Insert take the prose of the reply: never the proposals, never the words about them.
+  const text = message.content.trim() ? replyProse(message.content) : ''
+  // A reply with proposals is about changes: its text is not for the book.
+  const canInsert = Boolean(text) && !hasProposals(message.content)
+  if (!text && !canRetry && !message.model && !message.usage) return null
   const insert = (): void => {
-    const a = getActiveEditor()
-    if (!a) {
-      toast(t.chat.openChapterFirst)
-      return
-    }
-    const { state } = a.editor
-    const slice = sliceFromMarkdown(state.schema, typesetForBook(text))
-    a.editor.view.dispatch(state.tr.replaceSelection(slice).scrollIntoView())
-    a.editor.commands.focus()
+    if (!insertParagraphs(text)) toast(t.chat.openChapterFirst)
   }
   return (
     <div className={clsx('msg-actions', canRetry && message.error && 'is-shown')}>
@@ -368,14 +412,18 @@ function MessageActions({ message, threadId, canRetry }: { message: ChatMessage;
           </button>
         </Tooltip>
       )}
-      {text && (
+      {canInsert && (
         <Tooltip label={t.chat.insertHint}>
           <button className="msg-insert" onClick={insert}>
             <CursorText size={13} /> {t.chat.insert}
           </button>
         </Tooltip>
       )}
-      {message.model && <span className="msg-model">{modelLabel(message.model)}</span>}
+      {(message.model || message.usage) && (
+        <span className="msg-model">
+          {[message.model ? modelLabel(message.model) : '', message.usage ? usageLabel(t, message.usage) : ''].filter(Boolean).join(' · ')}
+        </span>
+      )}
     </div>
   )
 }
@@ -444,7 +492,7 @@ export function StreamingMessage({ streaming }: { streaming: Streaming }): React
       {segments.map((s, i) =>
         s.kind === 'text' ? (
           <div key={i} className="msg-ai-text prose">
-            <Markdown text={s.text} />
+            <Markdown text={i === segments.length - 1 ? closeMarkdown(s.text) : s.text} />
           </div>
         ) : (
           <ProposalCard key={i} segment={s} streaming />

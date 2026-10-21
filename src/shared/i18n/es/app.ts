@@ -32,12 +32,21 @@ export const app: typeof en = {
     expiredHint: (name) => `La sesión de ${name} expiró. Abre Ajustes → IA para iniciar sesión de nuevo.`
   },
   aiErrors: {
-    notInstalled: 'El proveedor de IA no está instalado.',
-    notLoggedIn: 'Sin sesión iniciada.',
-    connectHint: (detail) => `${detail} Abre Ajustes → IA para conectarte.`,
-    rateLimit: 'El proveedor de IA dice que se alcanzó el límite de uso. Inténtalo más tarde.',
-    network: 'No hay conexión con el proveedor de IA.',
+    notInstalled: (p) => `${p} no está instalado en esta computadora. Abre Ajustes → IA para instalarlo.`,
+    notLoggedIn: (p) => `No iniciaste sesión en ${p}. Abre Ajustes → IA para iniciar sesión.`,
+    noKey: (p) => `Agrega una clave de API para ${p} en Ajustes → IA.`,
+    loginExpired: (p) => `La sesión de ${p} caducó. Abre Ajustes → IA para iniciar sesión de nuevo.`,
+    badKey: (p) => `La clave de API no funcionó con ${p}. Revisa la clave en Ajustes → IA.`,
+    noCredit: (p) => `Tu cuenta de ${p} no tiene crédito. Agrega crédito en el sitio de ${p} y vuelve a intentarlo.`,
+    usageLimit: 'Llegaste al límite de uso de tu plan. Inténtalo más tarde.',
+    usageLimitUntil: (time) => `Llegaste al límite de uso de tu plan. Se renueva: ${time}.`,
+    overloaded: (p) => `El servidor de ${p} está ocupado. Inténtalo de nuevo en un momento.`,
+    network: (p) => `No hay conexión con ${p}. Revisa internet y vuelve a intentarlo.`,
+    refused: 'El modelo rechazó esta solicitud.',
+    off: (p) => `El proveedor ${p} está desactivado. Actívalo en Ajustes → IA.`,
     cancelled: 'Detenido.',
-    unknown: 'Algo salió mal.'
+    other: (p) => `${p} no pudo responder. Inténtalo de nuevo.`,
+    theAi: 'la IA',
+    openSettings: 'Abrir ajustes'
   }
 }

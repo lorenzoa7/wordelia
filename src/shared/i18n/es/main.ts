@@ -39,14 +39,14 @@ export const main: typeof en = {
   ai: {
     retrying: 'Reintentando…',
     cancelled: 'Cancelado.',
-    claudeNotFound: 'No se encontró el programa claude.',
-    claudeLogin: 'Ejecuta "claude auth login" en una terminal para iniciar sesión.',
+    claudeNotFound: 'Wordelia no encontró el programa claude en esta computadora.',
+    claudeLogin: 'Haz clic en “Iniciar sesión…”. O ejecuta "claude auth login" en una terminal.',
     claudeNotInstalled: 'Claude Code no está instalado.',
-    claudeBadArgs: 'El programa claude rechazó sus argumentos.',
+    claudeBadArgs: 'El programa claude no aceptó la solicitud. Actualiza Claude Code.',
     claudeExited: (code) => `claude terminó con el código ${code}`,
-    codexNotFound: 'No se encontró el programa codex.',
-    codexLogin: 'Ejecuta "codex login" en una terminal para iniciar sesión.',
-    codexExpired: 'La sesión de Codex caducó. En una terminal, ejecuta "codex logout" y luego "codex login".',
+    codexNotFound: 'Wordelia no encontró el programa codex en esta computadora.',
+    codexLogin: 'Haz clic en “Iniciar sesión…”. O ejecuta "codex login" en una terminal.',
+    codexExpired: 'La sesión de Codex caducó. Haz clic en “Iniciar sesión…” para cerrarla e iniciarla de nuevo.',
     codexNotInstalled: 'Codex no está instalado.',
     codexError: 'Error de Codex',
     codexTurn: (status) => `La ejecución terminó: ${status}`,
@@ -55,11 +55,9 @@ export const main: typeof en = {
     addApiKey: 'Agrega una clave de API.',
     apiKeyWorks: 'La clave de API funciona.',
     anthropicAddKey: 'Agrega una clave de Anthropic API en Ajustes.',
-    anthropicKeyRejected: 'La clave de Anthropic API fue rechazada.',
-    anthropicUnreachable: 'No se pudo conectar con la Anthropic API.',
     refusal: 'El modelo rechazó esta solicitud.',
-    rateLimit: 'Se alcanzó el límite de uso. Inténtalo de nuevo pronto.',
     openaiAddKey: 'Agrega una clave de OpenAI API en Ajustes.',
-    requestFailed: 'La solicitud falló.'
+    requestFailed: 'La solicitud falló.',
+    providerOff: (provider) => `${provider} está desactivado en Ajustes → IA.`
   }
 }

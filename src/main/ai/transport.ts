@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import type { ChatTurn, CompletionResult, ModelInfo, ProviderId, ProviderStatus, StreamEvent } from '@shared/types'
+import { classifyError, errorDetail } from '@shared/ai/errors'
 import { cleanEnv, type ResolvedBin } from './resolve-bin'
 import type { AiRequest } from './images'
 
@@ -115,11 +116,21 @@ export function flattenConversation(messages: ChatTurn[]): string {
   ].join('\n')
 }
 
-export function classifyError(text: string): CompletionResult['errorKind'] {
-  const t = text.toLowerCase()
-  if (/not logged in|please run \/login|login expired|token has expired|could not be refreshed|unauthori[sz]ed|401|invalid api key|authentication/.test(t))
-    return 'not-logged-in'
-  if (/rate.?limit|session limit|usage limit|429|overloaded|quota/.test(t)) return 'rate-limit'
-  if (/enotfound|econnreset|etimedout|network|fetch failed/.test(t)) return 'network'
-  return 'other'
+/** A failed result for an error text of a provider: its kind, and when a usage limit ends. */
+export function failure(error: string, opts: { text?: string; model?: string; api?: boolean } = {}): CompletionResult {
+  const c = classifyError(error, { api: opts.api })
+  return { ok: false, text: opts.text ?? '', model: opts.model, error: errorDetail(error), errorKind: c.kind, ...(c.resets ? { resets: c.resets } : {}) }
+}
+
+/**
+ * The status of an API key after a failed check. A rejected key and an account without credit are
+ * clear. Any other error (no connection, a busy server) says nothing about the key: the app cannot tell.
+ */
+export function keyStatus(provider: 'anthropic' | 'openai', err: unknown, rejected: boolean): ProviderStatus {
+  const msg = err instanceof Error ? err.message : String(err)
+  const detail = errorDetail(msg).slice(0, 300)
+  const kind = classifyError(msg, { api: true }).kind
+  if (kind === 'no-credit') return { provider, installed: true, loggedIn: true, reason: 'no-credit', detail }
+  if (rejected || kind === 'bad-key') return { provider, installed: true, loggedIn: false, reason: 'bad-key', detail }
+  return { provider, installed: true, loggedIn: null, reason: 'offline', detail }
 }

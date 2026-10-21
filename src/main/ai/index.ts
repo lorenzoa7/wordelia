@@ -2,6 +2,9 @@
 
 import type { WebContents } from 'electron'
 import type { CompletionRequest, CompletionResult, ModelInfo, ProviderId, ProviderStatus } from '@shared/types'
+import { PROVIDER_LABELS } from '@shared/ai/routes'
+import { mainT } from '../i18n'
+import { getSettings } from '../settings'
 import { anthropicApi } from './anthropic'
 import { loadImages } from './images'
 import { claudeCode } from './claude-code'
@@ -44,18 +47,25 @@ export async function providerModels(id: ProviderId): Promise<ModelInfo[]> {
 }
 
 export async function complete(sender: WebContents, requestId: string, req: CompletionRequest): Promise<CompletionResult> {
+  const provider = req.route.provider
+  // The last gate: a provider that the writer turned off is never used (it can cost money).
+  if ((await getSettings()).providers[provider]?.enabled === false) {
+    const t = (await mainT()).main.ai
+    return { ok: false, text: '', error: t.providerOff(PROVIDER_LABELS[provider].name), errorKind: 'off', provider }
+  }
   const ac = new AbortController()
   running.set(requestId, ac)
   try {
-    return await transport(req.route.provider).complete(
+    const result = await transport(provider).complete(
       await loadImages(req),
       (event) => {
         if (!sender.isDestroyed()) sender.send('ai:event', { requestId, event })
       },
       ac.signal
     )
+    return { ...result, provider }
   } catch (err) {
-    return { ok: false, text: '', error: err instanceof Error ? err.message : String(err), errorKind: 'other' }
+    return { ok: false, text: '', error: err instanceof Error ? err.message : String(err), errorKind: 'other', provider }
   } finally {
     running.delete(requestId)
   }

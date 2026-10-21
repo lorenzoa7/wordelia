@@ -59,7 +59,7 @@ export default async function ({ app, page, shot, openBook }) {
   await page.waitForSelector('.composer-input', { timeout: 5000 })
   await page.waitForTimeout(400)
   const draft = await page.locator('.composer-input').innerText()
-  if (!/^(Fill my story line|Popule minha Linha da história)/.test(draft)) fail(`the draft is "${draft}"`)
+  if (!/^(Fill my story line|Preencha minha linha da história)/.test(draft)) fail(`the draft is "${draft}"`)
   await page.keyboard.type('Elias, Marta e o visitante do bote azul.')
   await page.keyboard.press('Enter')
   await idle()
@@ -85,6 +85,9 @@ export default async function ({ app, page, shot, openBook }) {
   const added = await page.locator('.line-board.is-review .line-card.is-added').count()
   if (added !== 6) fail(`${added} new cards on the board`)
   if (await story()) fail('the story line exists before the author accepts it')
+  // The bar over the board shows its whole text next to its buttons.
+  const barText = await page.locator('.line-bar.is-review .line-bar-text b').evaluate((el) => ({ text: el.textContent, cut: el.scrollWidth > el.clientWidth + 1 }))
+  if (barText.cut) fail(`the review bar cuts "${barText.text}"`)
   await shot('review-chapter')
   await view('order')
   await page.waitForTimeout(200)

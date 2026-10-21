@@ -4,8 +4,8 @@ This file is the source of truth for progress. Update it after each task. Mark a
 
 ## Current focus
 
-> **Milestone:** Version 0.13 — portraits for the AI, proposals in notes
-> **Next task:** Collect feedback on 0.13.1. Then fix what the author finds.
+> **Milestone:** Version 0.14 — the fixes of the full review
+> **Next task:** Collect feedback on 0.14.0. Proposed next feature, waiting for the user's decision: the "Editor's read" (notes in the margin with four lenses — structure, reader, line, continuity — and one revision list; mockups in test-results/mockups).
 > **Not verified:** Codex and the two API transports. The user has no Codex account, and no API keys are set. The scripted provider (`WORDELIA_MOCK_AI=1`) covers their UI flows.
 
 ## M0 — Foundation
@@ -352,6 +352,17 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] The board keeps its place after Apply and Reject (`anchor.ts`; the `storyline` scenario checks the last decision in a narrow window)
 - [x] The chat card of a line proposal, the footer of the card dialog, @ for every note name in AI cards
 - [x] 0.13.1: the find bar closes without a scroll (the `keyboard` scenario checks it); a click on a chapter proposal opens it from any page (the `reveal` scenario checks it from Plan)
+
+## Version 0.14 — the fixes of the full review
+
+- [x] A review of every screen by six agents found 136 problems (19 High, 68 Medium, 49 Low)
+- [x] Write: the place, the cursor and Undo stay (Plan and back, far chapters, outside changes, restore); replace in the book; saves at most 2 s late; exports never change the page
+- [x] AI actions: only the passage is locked; the diff shows paragraphs, scene breaks and italics; Esc stops the request; protected main action; reorder
+- [x] Chat: no cut proposals; no move while the author types; the newest proposal wins; Undo for decisions; a draft for each conversation; tokens and cost
+- [x] Plan: renames keep links and mentions; Undo for deletes; notes in subfolders; move a note; one word ("note")
+- [x] Settings: routes on connect; a provider that is off is never used; plain error kinds with a fix button
+- [x] Library: scene breaks and chapter headings on import; repair of a damaged manifest; questions before a folder becomes a book
+- [x] New scenarios: review, actions-tab, proposals, plannotes, settings-ai, importfiles, bookfolder, librarycards; 54 scenarios, 463 unit tests
 
 ## Tests and CI
 

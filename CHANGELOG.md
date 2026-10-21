@@ -2,6 +2,50 @@
 
 Each version has its Windows installer in GitHub Releases. The release workflow copies the section of the version from this file to the release notes.
 
+## 0.14.0 (2026-10-21)
+
+This version fixes the 136 problems of a full review of the app, screen by screen.
+
+### Write
+- Plan and back: the page, the cursor and Undo stay as they were. A book opens where you stopped.
+- Undo stays when a chapter goes far from the screen, after a change from Drive or git, and after you restore a version. A restore and a chapter delete have Undo in their message.
+- Find and replace: Replace goes on to the next match, and "Replace in all chapters" changes the whole book.
+- The app saves at least every 2 seconds while you type, and says "Saving…" until the text is on disk. A failed save says why, with Try again.
+- An export never changes the page of the Write view. The Book PDF has the same pages as the screen. Page numbers, the title page in the language of the book, plain text and Markdown are correct.
+- Paste gives the text the quotes and dashes of the book, and "***" becomes a scene break.
+- The page fits small windows. New chapters say where they go. Focus mode, smart quotes and the status bar are fixed.
+
+### AI actions
+- Only the passage under review is locked: you can type in the rest of the chapter while the AI works.
+- The diff shows joined paragraphs, removed scene breaks and changes of italics. A change of punctuation no longer shows "+0 −0".
+- Esc stops the request. A reply without a rewrite is never put into the text. The selection comes back after an error or Reject.
+- The main action cannot be deleted. You can reorder actions.
+
+### Chat
+- A reply that stopped never gives a change that you can accept.
+- A reply no longer moves you to another page while you type: "Changes ready · Show" waits for you.
+- The newest proposal for a passage wins. Old proposals leave the text. Reject, Create, Replace and Delete have Undo.
+- A new text for an existing note shows what changes and what the note loses.
+- Each conversation has its own draft. "Insert at cursor" inserts only the prose.
+- Each reply shows its tokens and cost. Errors say what happened in plain words, with a button to fix them.
+
+### Plan
+- A rename of a note updates its [[links]] and the @mentions of the story line.
+- The card dialog never loses what you typed. Deletes of notes and categories have Undo.
+- Notes in subfolders show. Move a note to another category, remove a portrait, [[Name#Heading]] and [[Name|text]] links.
+- One word for one thing: "note", and "Update notes" for the sync.
+
+### Settings and AI
+- A provider that you connect gets the tasks at once. A provider that you turn off is never used.
+- Esc in a number box no longer closes Settings and loses the value.
+- Clear statuses: login expired, bad key, no credit, offline, busy, usage limit with its reset time. "Remove key". Install pages instead of terminal commands.
+
+### Library and import
+- Import finds real scene breaks and chapter headings in words ("Capítulo Um"), and asks what blank lines are.
+- A damaged wordelia.json is repaired from a kept copy, never lost. A missing chapter file keeps its place.
+- "Open folder" asks before it makes a book. "Find the folder…" for a moved book. Undo for "Remove from list".
+- Closing a book with text that is not saved asks first.
+
 ## 0.13.1 (2026-10-21)
 
 ### Fixed

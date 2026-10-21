@@ -2,6 +2,7 @@
 
 import type { ModelChoice, ModelInfo, ModelRoutes, ProviderId, TaskKind } from '../types'
 import { EFFORT_LABELS, TASK_EFFORT, nearestEffort } from './effort'
+import { isGeneralOpenAiModel } from './openai'
 
 export const TASK_LABELS: Record<TaskKind, { name: string; hint: string }> = {
   chat: { name: 'Chat', hint: 'Conversations, feedback and proposed edits.' },
@@ -58,8 +59,10 @@ export function suggestRoutes(provider: ProviderId, models: ModelInfo[]): ModelR
       }
     }
     case 'openai': {
-      const best = models.find((m) => m.tier !== 'fast') ?? models[0]
-      const fast = models.find((m) => m.tier === 'fast') ?? best
+      // General chat models only: a pro or research model is slow and expensive, or needs tools.
+      const general = models.filter((m) => isGeneralOpenAiModel(m.id))
+      const best = general.find((m) => m.tier !== 'fast') ?? general[0] ?? models[0]
+      const fast = general.find((m) => /-mini$/.test(m.id)) ?? general.find((m) => m.tier === 'fast') ?? best
       return { chat: pick('chat', best), action: pick('action', best), sync: pick('sync', best), background: pick('background', fast) }
     }
   }

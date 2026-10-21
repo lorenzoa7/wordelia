@@ -215,7 +215,7 @@ export default async function ({ page, shot, openBook, book, work }) {
   const sampleNodes = await page.locator('.map-nodes > .map-node').count()
   const sampleEdges = await page.locator('.map-edges > .map-edge').count()
   if (sampleNodes !== 3 || sampleEdges !== 2) fail(`Sample map: ${sampleNodes} nodes, ${sampleEdges} edges (want 3 and 2)`)
-  if (!process.env.I18N_LANG && !(await page.locator('.map-stats').textContent())?.includes('3 entries · 2 links')) fail('Wrong map stats')
+  if (!process.env.I18N_LANG && !(await page.locator('.map-stats').textContent())?.includes('3 notes · 2 links')) fail('Wrong map stats')
   await shot('sample')
 
   // Alt+← goes back to the cards; the switch opens the map again.

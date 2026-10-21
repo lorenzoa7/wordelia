@@ -9,7 +9,7 @@
 // rewind of the chat work on them. "Review" opens that thread in the chat.
 
 import { create } from 'zustand'
-import { hashText, newId } from '@shared/book'
+import { PLANNING_DIR, entryToFile, hashText, newId } from '@shared/book'
 import { buildSyncSystem, buildSyncUser } from '@shared/prompts/sync'
 import { estimateTokens } from '@shared/prompts/context'
 import { parseProposals, type Segment } from '@shared/proposals/parse'
@@ -180,11 +180,20 @@ function syncMessages(ids: string[]): { thread: Thread; message: ChatMessage }[]
   })
 }
 
-/** Apply every pending change of the run, reply by reply, in the order of the replies. */
+/**
+ * Apply every pending change of the run, reply by reply, in the order of the replies. The toast can
+ * undo all of them: the notes go back to their text from before, a new note goes to the trash, and
+ * the changes wait for a decision again.
+ */
 export async function acceptAllSync(ids: string[]): Promise<void> {
   const t = getT()
+  flushEditor()
+  // The book before: each change makes new objects, so the objects that stay the same did not change.
+  const before = new Map(useBook.getState().entries.map((e) => [e.id, e]))
+  const chaptersBefore = new Map(useBook.getState().chapters.map((c) => [c.id, c]))
   let ok = 0
   let failed = 0
+  const decided: Array<{ id: string; keys: string[] }> = []
   for (const id of ids) {
     // The thread changes after each reply: read it again.
     const [found] = syncMessages([id])
@@ -193,13 +202,42 @@ export async function acceptAllSync(ids: string[]): Promise<void> {
     if (!pendingKeys(segments, found.message.hunks).length) continue
     const { states, replaced } = await acceptPending(segments, found.message.hunks)
     setHunkStates(found.thread, id, states, replaced)
+    decided.push({ id, keys: Object.keys(states) })
     for (const s of Object.values(states)) {
       if (s === 'accepted') ok++
       else failed++
     }
   }
-  if (failed) toast(t.chat.bulkPartial(ok, ok + failed, failed), { kind: 'error' })
-  else if (ok) toast(t.plan.sync.accepted(ok))
+  if (failed) {
+    toast(t.chat.bulkPartial(ok, ok + failed, failed), { kind: 'error' })
+    return
+  }
+  if (!ok) return
+  flushEditor()
+  const after = useBook.getState()
+  const changed = after.entries.filter((e) => before.has(e.id) && before.get(e.id) !== e)
+  const created = after.entries.filter((e) => !before.has(e.id))
+  const chapters = after.chapters.filter((c) => chaptersBefore.has(c.id) && chaptersBefore.get(c.id) !== c)
+  const undo = async (): Promise<void> => {
+    flushEditor()
+    const now = useBook.getState()
+    // Undo only while the notes are as the changes left them: else it could remove new words.
+    const same =
+      [...changed, ...created].every((e) => now.entries.find((x) => x.id === e.id) === e) &&
+      chapters.every((c) => now.chapters.find((x) => x.id === c.id) === c)
+    if (!same) {
+      toast(t.plan.sync.undoUnsafe, { kind: 'error' })
+      return
+    }
+    for (const e of changed) await now.writeRaw(`${PLANNING_DIR}/${before.get(e.id)!.file}`, entryToFile(before.get(e.id)!))
+    for (const c of chapters) now.restoreChapter(c.id, chaptersBefore.get(c.id)!.body)
+    for (const e of created) await useBook.getState().deleteEntry(e.id)
+    for (const d of decided) {
+      const [found] = syncMessages([d.id])
+      if (found) setHunkStates(found.thread, d.id, Object.fromEntries(d.keys.map((k) => [k, 'pending' as HunkState])))
+    }
+  }
+  toast(t.plan.sync.accepted(ok), { ms: 10000, action: { label: t.common.undo, run: () => void undo() } })
 }
 
 /** Reject every pending change of the run. The toast can undo it. */
@@ -260,7 +298,8 @@ export async function startPlanningSync(opts: { bootstrap?: boolean } = {}): Pro
   if (!book.manifest) return
   const todo = opts.bootstrap ? book.chapters.filter((c) => c.body.trim()) : changedChapters()
   if (!todo.length) {
-    toast(t.plan.sync.upToDate)
+    // A new book: no chapter has text yet. That is not "up to date".
+    toast(book.chapters.some((c) => c.body.trim()) ? t.plan.sync.upToDate : t.plan.sync.nothingToRead)
     return
   }
 

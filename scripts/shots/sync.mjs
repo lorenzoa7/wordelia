@@ -1,7 +1,7 @@
 // The planning sync runs in the background. The sync button shows a spinner and the progress; the
 // chat does not open and does not change its thread. Cancel stops the sync. At the end, a card in
 // the Plan sidebar shows the result: Review opens the sync thread in the chat, Accept all and Reject
-// all decide every change (Reject all has Undo). An error shows in the card. When no chapter changed,
+// all decide every change (both have Undo). An error shows in the card. When no chapter changed,
 // the button is off and its tooltip says so. Away from the Plan view, a toast tells the result.
 // Usage: node scripts/shot.mjs sync [--en] [--dark]   (I18N_LANG=pt-BR or es for another interface language)
 export default async function ({ app, page, shot, openBook }) {
@@ -39,7 +39,7 @@ export default async function ({ app, page, shot, openBook }) {
   await sync.click()
   await page.waitForSelector('.sync-btn.is-running', { timeout: 5000 })
   const label = (await page.locator('.sync-btn .sync-label').innerText()).trim()
-  if (english && label !== 'Syncing…') fail(`the running button says "${label}"`)
+  if (english && label !== 'Updating the notes…') fail(`the running button says "${label}"`)
   const progress = await page.locator('.sync-progress').innerText()
   if (english && !/^(Reading 2 chapters…|Writing the changes…|\d+ changes? so far…)$/.test(progress.trim())) fail(`the progress says "${progress}"`)
   await page.waitForTimeout(400)
@@ -80,6 +80,13 @@ export default async function ({ app, page, shot, openBook }) {
   await page.waitForTimeout(500)
   const review = await chat()
   if (review.active !== 'th_planning_sync' || !review.open || review.list || review.blank) fail(`Review did not open the sync thread: ${JSON.stringify(review)}`)
+  // The card of the new note shows its whole name and category: the buttons go under them.
+  const cut = await page.evaluate(() =>
+    [...document.querySelectorAll('.chat-panel .proposal.is-create :is(.proposal-file span, .proposal-cat)')]
+      .filter((el) => el.scrollWidth > el.clientWidth + 1)
+      .map((el) => el.textContent)
+  )
+  if (cut.length) fail(`the card of the new note cuts ${cut.join(', ')}`)
   await shot('review')
 
   // 5. Reject all: the card goes away; Undo brings the changes back.
@@ -92,17 +99,28 @@ export default async function ({ app, page, shot, openBook }) {
   await card.waitFor({ timeout: 3000 })
   if ((await states()).some((s) => s !== 'pending')) fail('Undo did not bring the changes back')
 
-  // 6. Accept all: the notes change, the card goes away.
+  // 6. Accept all: the notes change, the card goes away. Undo puts the notes back and the changes
+  // wait again; a second Accept all applies them.
+  const accepted = (name) => {
+    const s = window.__wordelia.book.getState()
+    const elias = s.entries.find((e) => e.name === 'Elias')
+    return s.entries.some((e) => e.name === name) && /blue boat|bote azul/.test(elias?.body ?? '')
+  }
   await page.locator('.sync-accept-all').click()
-  await page.waitForFunction(
-    (name) => {
+  await page.waitForFunction(accepted, visitor, { timeout: 5000 })
+  const undoAccept = page.locator('.toast', { hasText: /Accepted 2 changes|2 mudanças aceitas|2 cambios aceptados/ }).locator('.toast-action')
+  await undoAccept.click({ timeout: 3000 }).catch(() => fail('no Undo after Accept all'))
+  await page
+    .waitForFunction((name) => {
       const s = window.__wordelia.book.getState()
       const elias = s.entries.find((e) => e.name === 'Elias')
-      return s.entries.some((e) => e.name === name) && /blue boat|bote azul/.test(elias?.body ?? '')
-    },
-    visitor,
-    { timeout: 5000 }
-  )
+      return !s.entries.some((e) => e.name === name) && !/blue boat|bote azul/.test(elias?.body ?? '')
+    }, visitor, { timeout: 5000 })
+    .catch(() => fail('Undo did not put the notes back'))
+  await card.waitFor({ timeout: 3000 }).catch(() => fail('the card did not come back after Undo'))
+  if ((await states()).some((s) => s !== 'pending')) fail('the changes do not wait again after Undo')
+  await page.locator('.sync-accept-all').click()
+  await page.waitForFunction(accepted, visitor, { timeout: 5000 })
   await page.waitForTimeout(400)
   if (await card.count()) fail('the card stays after Accept all')
   await shot('accepted')
@@ -133,7 +151,7 @@ export default async function ({ app, page, shot, openBook }) {
   await sync.click()
   await page.waitForSelector('.sync-card.is-error', { timeout: 3000 })
   const error = await card.innerText()
-  if (english && (!error.includes('The sync stopped.') || !error.includes('Connect an AI first.') || !error.includes('Open settings'))) fail(`the error card says "${error}"`)
+  if (english && (!error.includes('The update stopped.') || !error.includes('Connect an AI first.') || !error.includes('Open settings'))) fail(`the error card says "${error}"`)
   await page.waitForTimeout(300)
   // Not "error": the e2e runner reads a screenshot named error as a failed scenario.
   await shot('error-card')
@@ -146,6 +164,9 @@ export default async function ({ app, page, shot, openBook }) {
   if (await card.count()) fail('the close button did not close the card')
 
   // 9. Away from the Plan view, a toast tells the result; its Review opens the sync thread.
+  // The toasts of the steps before (Undo of Accept all) go first.
+  for (const b of await page.locator('.toast-close').all()) await b.click({ timeout: 500 }).catch(() => {})
+  await page.waitForSelector('.toast', { state: 'detached', timeout: 3000 }).catch(() => {})
   await page.evaluate(() => window.__wordelia.chat.getState().setListOpen(true))
   await setUi({ chatOpen: false })
   await slow(40)

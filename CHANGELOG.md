@@ -2,6 +2,13 @@
 
 Each version has its Windows installer in GitHub Releases. The release workflow copies the section of the version from this file to the release notes.
 
+## 0.13.1 (2026-10-21)
+
+### Fixed
+- Escape or the close button of the find bar no longer scrolls the text back to where the cursor was. The text stays at the match, and the cursor goes there.
+- Enter right after you type or paste in the find bar goes to the first match.
+- A click on a chat proposal for a chapter always goes to the change: also from Plan, and also when the chapter is far from the screen.
+
 ## 0.13.0 (2026-10-21)
 
 ### New

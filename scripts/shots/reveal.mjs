@@ -32,6 +32,29 @@ export default async function ({ page, shot, openBook }) {
   console.log('shown without a click:', JSON.stringify(shown))
   if (shown.props !== 2) throw new Error('The pending proposals do not show in the text')
 
+  // From another page (Plan), a click on the name of the proposal opens the chapter at the change.
+  await page.keyboard.press('Control+2')
+  await page.waitForTimeout(500)
+  await page.locator('.proposal .proposal-file').first().click()
+  const inView = await page
+    .waitForFunction(
+      () => {
+        const desk = document.querySelector('.desk')
+        const mark = document.querySelector('.pm-prop[data-prop="th_reveal:m_ai:0:0"]')
+        if (!desk || !mark) return false
+        const d = desk.getBoundingClientRect()
+        const r = mark.getBoundingClientRect()
+        return r.top >= d.top && r.bottom <= d.bottom
+      },
+      null,
+      { timeout: 5000 }
+    )
+    .then(() => true)
+    .catch(() => false)
+  const view = await page.evaluate(() => window.__wordelia.book.getState().view)
+  console.log('from Plan:', JSON.stringify({ view, inView }))
+  if (view !== 'write' || !inView) throw new Error('A click on the proposal from Plan did not open the change')
+
   // "Show in text" from the top of the book: the scroll only goes down, never to the chapter top first.
   await page.evaluate(() => document.querySelector('.desk').scrollTo({ top: 0 }))
   await page.waitForTimeout(300)

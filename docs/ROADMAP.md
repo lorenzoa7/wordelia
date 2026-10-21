@@ -5,7 +5,7 @@ This file is the source of truth for progress. Update it after each task. Mark a
 ## Current focus
 
 > **Milestone:** Version 0.13 — portraits for the AI, proposals in notes
-> **Next task:** Collect feedback on 0.13.0. Then fix what the author finds.
+> **Next task:** Collect feedback on 0.13.1. Then fix what the author finds.
 > **Not verified:** Codex and the two API transports. The user has no Codex account, and no API keys are set. The scripted provider (`WORDELIA_MOCK_AI=1`) covers their UI flows.
 
 ## M0 — Foundation
@@ -351,6 +351,7 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] A proposed portrait waits on the page of the note; a click on a portrait shows it whole
 - [x] The board keeps its place after Apply and Reject (`anchor.ts`; the `storyline` scenario checks the last decision in a narrow window)
 - [x] The chat card of a line proposal, the footer of the card dialog, @ for every note name in AI cards
+- [x] 0.13.1: the find bar closes without a scroll (the `keyboard` scenario checks it); a click on a chapter proposal opens it from any page (the `reveal` scenario checks it from Plan)
 
 ## Tests and CI
 

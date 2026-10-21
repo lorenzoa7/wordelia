@@ -27,6 +27,8 @@ declare module '@tiptap/core' {
       setFind: (query: string, opts?: { caseSensitive?: boolean; wholeWord?: boolean }) => ReturnType
       findNext: () => ReturnType
       findPrev: () => ReturnType
+      /** Select the match that shows now (the nearest one after a new search) */
+      findCurrent: () => ReturnType
       replaceCurrent: (text: string) => ReturnType
       replaceAll: (text: string) => ReturnType
       clearFind: () => ReturnType
@@ -157,6 +159,12 @@ export const FindReplace = Extension.create({
         ({ state, ...rest }) => {
           const s = findKey.getState(state)
           return select((s?.current ?? 0) - 1)({ state, ...rest })
+        },
+      findCurrent:
+        () =>
+        ({ state, ...rest }) => {
+          const s = findKey.getState(state)
+          return select(Math.max(0, s?.current ?? 0))({ state, ...rest })
         },
       replaceCurrent:
         (text) =>

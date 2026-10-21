@@ -369,11 +369,13 @@ export function revealProposal(chapterId: string, find: string, id?: string): bo
       focusTimer = setTimeout(() => useInlineProposals.setState({ focus: null }), 1600)
     }
   }
-  if (getChapterEditor(chapterId)) {
+  const book = useBook.getState()
+  if (book.view === 'write' && getChapterEditor(chapterId)) {
     go()
   } else {
-    // A chapter far from the screen has no editor yet: the active chapter always has one.
-    useBook.getState().setActiveChapter(chapterId)
+    // Another page (Plan), or a chapter far from the screen, has no editor: open the chapter (the
+    // Write view, at the chapter), then go to the change when its editor is there.
+    book.selectChapter(chapterId)
     whenChapterEditor(chapterId, () => setTimeout(go, 60))
   }
   return true

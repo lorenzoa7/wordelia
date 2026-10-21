@@ -76,9 +76,16 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
       .filter((c) => c.n > 0)
   }, [open, slowQuery, cs, ww, chapters, activeId, plain])
 
+  /**
+   * Close the bar and leave the text where it is. The cursor goes to the match that shows, so the
+   * search ends there (a focus at the old cursor would scroll the text back to it).
+   */
   const close = (): void => {
+    const f = findKey.getState(editor.state)
+    const m = f && f.current >= 0 ? f.matches[f.current] : null
     setOpen(false)
-    editor.commands.focus()
+    if (m) editor.commands.setTextSelection({ from: m.from, to: m.to })
+    editor.commands.focus(null, { scrollIntoView: false })
   }
 
   /** Bring the current match into view. */
@@ -97,6 +104,17 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
 
   /** Next or previous match; after the last match of the chapter, go on in the next chapter that has one. */
   const go = (dir: 1 | -1): void => {
+    // Enter right after typing or a paste: the search of the text in the box is not there yet. Make
+    // it, and go to its first match (the nearest after the cursor).
+    const before = findKey.getState(editor.state)
+    if (!before || before.query !== query || before.caseSensitive !== cs || before.wholeWord !== ww) {
+      editor.commands.setFind(query, { caseSensitive: cs, wholeWord: ww })
+      if (findKey.getState(editor.state)?.matches.length) {
+        editor.commands.findCurrent()
+        showCurrent(editor)
+        return
+      }
+    }
     const f = findKey.getState(editor.state)
     const count = f?.matches.length ?? 0
     const atEdge = !count || (dir === 1 ? (f?.current ?? 0) >= count - 1 : (f?.current ?? 0) <= 0)

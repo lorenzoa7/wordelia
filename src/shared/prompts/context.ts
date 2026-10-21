@@ -133,9 +133,17 @@ function escapeRe(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-/** Names that identify an entry in text: its name and aliases. */
+/** Names that identify an entry in text: its name and aliases, each one once (an alias "marta" next to "Marta" counts once). */
 export function entryNames(e: Entry): string[] {
-  return [e.name, ...e.aliases].map((n) => n.trim()).filter((n) => n.length >= 3)
+  const seen = new Set<string>()
+  return [e.name, ...e.aliases]
+    .map((n) => n.trim())
+    .filter((n) => {
+      const key = n.normalize('NFC').toLowerCase()
+      if (n.length < 3 || seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
 }
 
 /** Entries whose name or alias appears in the text. */

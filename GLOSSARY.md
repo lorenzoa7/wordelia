@@ -19,7 +19,8 @@ This file is the ubiquitous language of Wordelia. Use these words in code, docs 
 |---|---|---|
 | **Planning** | The notes about the book that are not the book: characters, places, world, plot. The AI reads it as the source of truth. | `Planning` |
 | **Category** | A group of entries, for example Characters. One folder in `planning/`. | `Category` |
-| **Entry** | One planning note, for example one character. One Markdown file. | `Entry` |
+| **Entry** | One planning note, for example one character. One Markdown file. On screen the word is "note" ("nota" in Portuguese and Spanish); "entry" is the word in code and docs. | `Entry` |
+| **Link** | `[[Note name]]` in a note or a chapter, like Obsidian. Also `[[Note name#Heading]]` and `[[Note name|shown text]]`. Ctrl+click opens the note. | `WikiLinks`, `parseWikiTarget` |
 | **Portrait** | The image of an entry. It shows on the card of the entry. The file is in `planning/_assets/`. | `entry.image` |
 | **Story line** | The events of the story as a board of cards, in two views: by chapter and by time. A planning entry with `type: story-line`. The Plan view shows it as "Line". | `Board`, `storyline.ts` |
 | **Line card** | One event of the story on the story line. It has a place in each view, or none. | `LineCard` |
@@ -29,7 +30,7 @@ This file is the ubiquitous language of Wordelia. Use these words in code, docs 
 | **Planned chapter** | A column of the story line by chapter for a chapter that is not in the book yet. | `ViewColumn.kind = 'planned'` |
 | **Tray** | The first column of a view of the story line: the cards that have no place in that view. | `TRAY` |
 | **Alias** | Another name for an entry. The app uses aliases to find mentions in the manuscript. | `aliases` |
-| **Sync** | The AI compares the manuscript with the planning and proposes changes to the planning. The button is "Update notes from the chapters". | `planningSync` |
+| **Sync** | The AI compares the manuscript with the planning and proposes changes to the planning. The button says "Update notes"; its tooltip says that the notes update from the chapters. On screen, the word "sync" is not used. | `planningSync` |
 
 ## AI
 

@@ -1761,3 +1761,9 @@ button.proposal-file:hover span {
   font-size: var(--text-xs);
   color: var(--strike);
 }
+
+/* A new note: the name and the category take their full width; the buttons go to the next line
+   when the card is narrow (the sync review in the chat), so the name is not cut. */
+.proposal.is-create .proposal-title {
+  flex: 1 1 auto;
+}

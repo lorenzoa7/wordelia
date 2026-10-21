@@ -1,5 +1,6 @@
 // The dialog of a card: its full text, its chapter and its moment, the notes that it mentions.
-// Save keeps the changes; Cancel, Esc or a click outside drop them.
+// Save keeps the changes; Cancel drops them. Esc, a click outside, the close button, a mentioned
+// note and "Open the chapter" keep them too: typed text is never lost (a toast with Undo tells it).
 
 import { useEffect, useMemo, useState } from 'react'
 import { BookOpenText, Trash } from '@phosphor-icons/react'
@@ -47,17 +48,40 @@ export function CardDialog({ cardId, board, chapters, notes, onClose }: Props): 
     // Only when another card opens, not when the board changes.
   }, [cardId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  /** The board with the changes of the dialog, or null when nothing changed. An empty text keeps the old text. */
+  const edited = (): Board | null => {
+    if (!card || !placeNow) return null
+    let next = board
+    const newText = text.trim() ? text : card.text
+    if (newText !== card.text) next = updateCard(next, card.id, newText)
+    // A new place goes at the end of the column.
+    if (chapter !== placeNow.chapter) next = placeCard(next, 'chapter', card.id, chapter, Infinity, chapters)
+    if (moment !== placeNow.moment) next = placeCard(next, 'order', card.id, moment, Infinity, chapters)
+    return next === board ? null : next
+  }
+
   const save = (): void => {
     if (!card || !placeNow) return
     if (!text.trim()) {
       setError(true)
       return
     }
-    let next = updateCard(board, card.id, text)
-    // A new place goes at the end of the column.
-    if (chapter !== placeNow.chapter) next = placeCard(next, 'chapter', card.id, chapter, Infinity, chapters)
-    if (moment !== placeNow.moment) next = placeCard(next, 'order', card.id, moment, Infinity, chapters)
-    saveBoard(next)
+    const next = edited()
+    if (next) saveBoard(next)
+    onClose()
+  }
+
+  /**
+   * Close and keep the changes: Esc, a click outside, the close button, a note or the chapter.
+   * Typed text is never lost. `tell`: a toast says so, with Undo.
+   */
+  const keepAndClose = (tell: boolean): void => {
+    const next = edited()
+    if (next) {
+      const before = board
+      saveBoard(next)
+      if (tell) toast(t.plan.line.cardSaved, { ms: 8000, action: { label: t.common.undo, run: () => undoBoard(before, next) } })
+    }
     onClose()
   }
 
@@ -81,14 +105,15 @@ export function CardDialog({ cardId, board, chapters, notes, onClose }: Props): 
 
   const openChapter = (): void => {
     if (!chapterId) return
-    onClose()
+    keepAndClose(false)
     useBook.getState().selectChapter(chapterId)
   }
 
   return (
     <Dialog
       open={Boolean(card)}
-      onOpenChange={(v) => !v && onClose()}
+      // Esc, a click outside and the close button keep the typed text (Cancel drops it).
+      onOpenChange={(v) => !v && keepAndClose(true)}
       title={t.plan.line.cardTitle}
       width={560}
       className="line-dialog"
@@ -158,7 +183,7 @@ export function CardDialog({ cardId, board, chapters, notes, onClose }: Props): 
                     key={n.id}
                     className="mention-link"
                     onClick={() => {
-                      onClose()
+                      keepAndClose(false)
                       useBook.getState().selectEntry(n.id)
                     }}
                   >

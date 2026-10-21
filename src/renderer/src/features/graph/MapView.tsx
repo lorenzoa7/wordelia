@@ -6,6 +6,7 @@ import clsx from 'clsx'
 import { markdownToPlain } from '@shared/book'
 import { isStoryLine } from '@shared/storyline'
 import { buildPlanningMap, filterMap, searchMap, type MapNode } from '@shared/planning/graph'
+import { topFolder } from '@shared/planning/notes'
 import { Button, Tooltip } from '@/ui'
 import { categoryName, folderCategoryName, useT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
@@ -76,7 +77,7 @@ export function MapView(): React.JSX.Element {
     [entries, ui.chapters ? chapters : null, ui.chapters]
   )
   const hidden = useMemo(() => new Set(ui.hidden), [ui.hidden])
-  const map = useMemo(() => (hidden.size ? filterMap(full, (n) => n.kind === 'chapter' || !hidden.has(n.category ?? '')) : full), [full, hidden])
+  const map = useMemo(() => (hidden.size ? filterMap(full, (n) => n.kind === 'chapter' || !hidden.has(topFolder(n.category ?? ''))) : full), [full, hidden])
   const matches = useMemo(() => searchMap(map, ui.query), [map, ui.query])
 
   const slots = useMemo(() => new Map(categories.map((c, i) => [c.folder, i])), [categories])
@@ -84,16 +85,17 @@ export function MapView(): React.JSX.Element {
   const entryById = useMemo(() => new Map(entries.map((e) => [e.id, e])), [entries])
   const counts = useMemo(() => {
     const m = new Map<string, number>()
-    for (const e of entries) m.set(e.category, (m.get(e.category) ?? 0) + 1)
+    // A note in a folder under a category folder counts in that category.
+    for (const e of entries) m.set(topFolder(e.category), (m.get(topFolder(e.category)) ?? 0) + 1)
     return m
   }, [entries])
   const chips = categories.filter((c) => counts.get(c.folder))
 
   const shownEntries = map.nodes.filter((n) => n.kind === 'entry').length
-  const colorOf = (n: MapNode): number => (n.kind === 'chapter' ? -1 : (slots.get(n.category ?? '') ?? 7))
+  const colorOf = (n: MapNode): number => (n.kind === 'chapter' ? -1 : (slots.get(topFolder(n.category ?? '')) ?? 7))
   const labelOf = (n: MapNode): string => (n.kind === 'chapter' ? `${n.order + 1}. ${n.label}` : n.label)
-  const iconOf = (n: MapNode): string => byFolder.get(n.category ?? '')?.icon ?? 'Folder'
-  const catLabel = (folder: string): string => folderCategoryName(t, folder, categories)
+  const iconOf = (n: MapNode): string => byFolder.get(topFolder(n.category ?? ''))?.icon ?? 'Folder'
+  const catLabel = (folder: string): string => (topFolder(folder) ? folderCategoryName(t, topFolder(folder), categories) : t.plan.sidebar.outside)
 
   const open = (n: MapNode): void => {
     if (n.kind === 'chapter') useBook.getState().selectChapter(n.ref)

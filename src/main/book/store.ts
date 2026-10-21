@@ -258,12 +258,14 @@ export async function openBook(root: string, opts: OpenBookOptions = {}): Promis
     const src = (await readTextOr(safeJoin(root, `${PLANNING_DIR}/${file}`), '')) ?? ''
     entries.push(entryFromFile(file, src, `en_${hashText(file)}`))
   }
-  // Categories for folders that other apps made
+  // Categories for folders that other apps made. A folder under a folder is part of the category of
+  // the top folder (the Plan view shows its notes there); a note at the root of planning/ has no category.
   const known = new Set(manifest.planning.categories.map((c) => c.folder))
   for (const e of entries) {
-    if (e.category && !known.has(e.category) && !e.category.includes('/')) {
-      manifest.planning.categories.push({ id: newId('cat'), name: e.category, folder: e.category, icon: 'Folder' })
-      known.add(e.category)
+    const top = e.category.split('/')[0]
+    if (top && !known.has(top)) {
+      manifest.planning.categories.push({ id: newId('cat'), name: top, folder: top, icon: 'Folder' })
+      known.add(top)
     }
   }
 

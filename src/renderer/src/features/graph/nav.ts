@@ -10,6 +10,7 @@
 // line to the overview.
 
 import { create } from 'zustand'
+import { topFolder } from '@shared/planning/notes'
 import { useBook } from '@/stores/book'
 
 export const MAP_PAGE = ':map'
@@ -62,7 +63,8 @@ function exists(p: PlanPlace): boolean {
 function parent(): PlanPlace | null {
   const s = useBook.getState()
   const entry = s.entries.find((e) => e.id === s.activeEntryId)
-  if (entry) return { category: entry.category, entry: null }
+  // A note in a folder under a category goes up to the category; a note in no category, to the overview.
+  if (entry) return { category: topFolder(entry.category) || null, entry: null }
   if (s.activeCategory) return { category: null, entry: null }
   return null
 }

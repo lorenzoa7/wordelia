@@ -134,7 +134,8 @@ export interface IpcInvokeMap {
   'import:pick': [[], string | null]
   'import:read': [[path: string], ImportedBook]
   /** Choose Markdown notes (for the planning). Returns their names and text. */
-  'import:pickNotes': [[], Array<{ name: string; text: string }>]
+  /** `left`: the picked files after the limit of `max` files, which the import does not read */
+  'import:pickNotes': [[], { notes: Array<{ name: string; text: string }>; left: number; max: number }]
 
   'app:defaultBooksDir': [[], string]
   'app:version': [[], string]

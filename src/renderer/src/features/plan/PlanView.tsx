@@ -1,13 +1,16 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { motion } from 'motion/react'
-import { ArrowLeft, BookOpenText, CaretRight, ChatCircleText, Check, DownloadSimple, Graph, ImageSquare, Path, Plus, SquaresFour, Trash, X } from '@phosphor-icons/react'
+import { ArrowLeft, BookOpenText, CaretDown, CaretRight, ChatCircleText, Check, DownloadSimple, Graph, ImageSquare, Path, Plus, SquaresFour, Trash, X } from '@phosphor-icons/react'
 import { markdownToPlain } from '@shared/book'
 import { entryNames } from '@shared/prompts/context'
+import { createNameMatcher } from '@shared/planning/graph'
+import { compareNames, inFolder, subFolder, topFolder } from '@shared/planning/notes'
 import type { Entry } from '@shared/types'
-import { Button, IconButton, Tooltip } from '@/ui'
+import { Button, IconButton, Menu, MenuItem, Tooltip } from '@/ui'
 import { askConfirm } from '@/ui/prompt'
 import { invoke } from '@/lib/api'
 import { useAssetUrl } from '@/lib/assets'
+import { registerFlusher } from '@/lib/flush'
 import { categoryName, useT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
 import { useNotes } from './line/model'
@@ -21,7 +24,8 @@ import { LineView } from './line/LineView'
 import { NoteEditor } from './NoteEditor'
 import { CategoryIcon, CategoryMenu } from './PlanSidebar'
 import { importNotes } from './importNotes'
-import { BuildPlanningButton } from './SyncPanel'
+import { addAlias, deleteNote, moveNote, removePortrait, renameNote } from './noteActions'
+import { BuildPlanningButton, SyncButton } from './SyncPanel'
 import './plan.css'
 
 /** Back to the page before, as in a browser (features/graph/nav.ts); with no page before, one level up. */
@@ -33,15 +37,22 @@ function isTyping(el: EventTarget | null): boolean {
   return el instanceof HTMLElement && (el.isContentEditable || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')
 }
 
+/** On macOS, Option+← moves the caret one word: in a text box it stays a text key. */
+const MAC = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform)
+
 export function PlanView(): React.JSX.Element {
   const activeEntry = useBook((s) => s.entries.find((e) => e.id === s.activeEntryId))
   const activeCategory = useBook((s) => s.activeCategory)
 
-  // Alt+Left goes back one level, as in a browser.
+  // Alt+Left goes back one level, as in a browser: also from a text box (it saves first).
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.key !== 'ArrowLeft' || isTyping(e.target)) return
+      if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.key !== 'ArrowLeft') return
+      const target = e.target instanceof HTMLElement ? e.target : null
+      if ((MAC && isTyping(target)) || target?.closest('[role="dialog"], [role="menu"], [role="listbox"]')) return
       e.preventDefault()
+      // A box saves when it loses the focus: the name, an alias, a card.
+      if (isTyping(document.activeElement)) (document.activeElement as HTMLElement).blur()
       goBack()
     }
     window.addEventListener('keydown', onKey)
@@ -79,7 +90,7 @@ function BackLink(): React.JSX.Element | null {
   const entry = useBook((s) => (place?.entry ? s.entries.find((e) => e.id === place.entry) : undefined))
   const categories = useBook((s) => s.manifest?.planning.categories ?? [])
   if (!place) return null
-  const folder = entry ? entry.category : place.category
+  const folder = topFolder(entry ? entry.category : (place.category ?? ''))
   const category = categories.find((c) => c.folder === folder)
   let label: string = t.plan.sidebar.overview
   let icon: ReactNode = <SquaresFour size={13} />
@@ -92,9 +103,9 @@ function BackLink(): React.JSX.Element | null {
   } else if (place.category === LINE_PAGE) {
     label = t.plan.line.title
     icon = <Path size={13} />
-  } else if (place.category) {
-    label = category ? categoryName(t, category) : place.category
-    icon = <CategoryIcon name={category?.icon ?? 'Folder'} size={13} />
+  } else if (place.category && category) {
+    label = categoryName(t, category)
+    icon = <CategoryIcon name={category.icon} size={13} />
   }
   return (
     <Tooltip label={t.plan.backTo(label)} shortcut="Alt+←">
@@ -138,14 +149,30 @@ function ProposedPortrait({ image }: { image: string }): React.JSX.Element {
 /* Category grid                                                        */
 /* ------------------------------------------------------------------ */
 
+/** Where the overview and each category page were scrolled, for each book: back on a page, it is there again. */
+const scrolls = new Map<string, number>()
+
 function CategoryGrid({ folder }: { folder: string | null }): React.JSX.Element {
   const t = useT()
   const manifest = useBook((s) => s.manifest)
+  const root = useBook((s) => s.root)
+  const hasText = useBook((s) => s.chapters.some((c) => c.body.trim()))
+  const sidebarOpen = useApp((s) => s.settings?.ui.sidebarOpen ?? true)
   const entries = useNotes()
   const categories = manifest?.planning.categories ?? []
   // An unknown folder (a deleted category, an old link) shows the overview.
   const category = categories.find((c) => c.folder === folder)
   const shown = category ? [category] : categories
+  // Notes at the root of planning/ (no category folder) show in a section of their own.
+  const outside = useMemo(() => (category ? [] : entries.filter((e) => !e.category).sort((a, b) => compareNames(a.name, b.name))), [category, entries])
+
+  // The scroll of the page: it comes back when the writer comes back to the page.
+  const box = useRef<HTMLDivElement>(null)
+  const place = `${root}:${folder ?? ''}`
+  useLayoutEffect(() => {
+    const top = scrolls.get(place)
+    if (box.current && top) box.current.scrollTop = top
+  }, [place])
 
   const add = async (cat: string): Promise<void> => {
     const e = await useBook.getState().createEntry(cat, t.plan.newEntryName)
@@ -154,10 +181,10 @@ function CategoryGrid({ folder }: { folder: string | null }): React.JSX.Element 
   }
 
   const total = entries.length
-  const count = (f: string): number => entries.filter((e) => e.category === f).length
+  const listOf = (f: string): Entry[] => entries.filter((e) => inFolder(e, f)).sort((a, b) => compareNames(a.name, b.name))
 
   return (
-    <div className="plan-scroll">
+    <div className="plan-scroll" ref={box} onScroll={(e) => scrolls.set(place, e.currentTarget.scrollTop)}>
       <div className="plan-inner">
         {category ? (
           <header className="plan-hero plan-hero-category">
@@ -167,15 +194,16 @@ function CategoryGrid({ folder }: { folder: string | null }): React.JSX.Element 
               <span>{categoryName(t, category)}</span>
             </h1>
             <div className="plan-hero-row">
-              <p className="plan-hero-count">{t.plan.category.count(count(category.folder))}</p>
+              <p className="plan-hero-count">{t.plan.category.count(listOf(category.folder).length)}</p>
               <div className="plan-hero-tools">
+                {!sidebarOpen && <SyncButton compact />}
                 <Button size="sm" variant="ghost" icon={<DownloadSimple size={14} />} onClick={() => void importNotes(category.folder)}>
                   {t.plan.category.importNotes}
                 </Button>
                 <Button size="sm" icon={<Plus size={14} weight="bold" />} onClick={() => void add(category.folder)}>
                   {t.plan.category.newEntry}
                 </Button>
-                <CategoryMenu category={category} notes={count(category.folder)} />
+                <CategoryMenu category={category} notes={listOf(category.folder).length} />
               </div>
             </div>
           </header>
@@ -186,15 +214,17 @@ function CategoryGrid({ folder }: { folder: string | null }): React.JSX.Element 
               <PlanViewSwitch active="cards" />
             </div>
             <p>{t.plan.overview.intro}</p>
-            {total === 0 && (
+            {/* With the sidebar hidden, the sync button is here. The build button needs text to read. */}
+            {(!sidebarOpen || (total === 0 && hasText)) && (
               <div className="plan-hero-actions">
-                <BuildPlanningButton />
+                {!sidebarOpen && <SyncButton compact />}
+                {total === 0 && hasText && <BuildPlanningButton />}
               </div>
             )}
           </header>
         )}
         {shown.map((c, ci) => {
-          const list = entries.filter((e) => e.category === c.folder).sort((a, b) => a.name.localeCompare(b.name))
+          const list = listOf(c.folder)
           return (
             <section key={c.id} className="plan-section">
               {!category && (
@@ -202,25 +232,15 @@ function CategoryGrid({ folder }: { folder: string | null }): React.JSX.Element 
                   <button className="plan-section-link" onClick={() => useBook.getState().selectCategory(c.folder)}>
                     <CategoryIcon name={c.icon} size={16} />
                     <span>{categoryName(t, c)}</span>
-                    <span className="plan-section-count">{list.length}</span>
+                    {/* As in the sidebar: an empty category shows no number. */}
+                    <span className="plan-section-count">{list.length || ''}</span>
                     <CaretRight className="plan-section-go" size={11} weight="bold" aria-hidden />
                   </button>
                 </h2>
               )}
               <div className="entry-grid">
                 {list.map((e, i) => (
-                  <motion.button
-                    key={e.id}
-                    className="entry-card grain"
-                    onClick={() => useBook.getState().selectEntry(e.id)}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: Math.min(0.03 * (i + ci * 3), 0.4), duration: 0.35 }}
-                  >
-                    {c.folder === 'Characters' || e.image ? <Portrait entry={e} size="card" /> : null}
-                    <span className="entry-card-name">{e.name}</span>
-                    <span className="entry-card-summary">{e.summary || firstSentence(e.body) || t.plan.overview.noNotesYet}</span>
-                  </motion.button>
+                  <EntryCard key={e.id} entry={e} delay={Math.min(0.03 * (i + ci * 3), 0.4)} portrait={c.folder === 'Characters'} />
                 ))}
                 <button className="entry-card entry-card-new" onClick={() => void add(c.folder)}>
                   <Plus size={18} />
@@ -230,8 +250,47 @@ function CategoryGrid({ folder }: { folder: string | null }): React.JSX.Element 
             </section>
           )
         })}
+        {outside.length > 0 && (
+          <section className="plan-section">
+            <h2 className="plan-section-title">
+              <span className="plan-section-plain">
+                <CategoryIcon name="Folder" size={16} />
+                <span>{t.plan.sidebar.outside}</span>
+                <span className="plan-section-count">{outside.length}</span>
+              </span>
+            </h2>
+            <div className="entry-grid">
+              {outside.map((e, i) => (
+                <EntryCard key={e.id} entry={e} delay={Math.min(0.03 * i, 0.4)} portrait={false} />
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </div>
+  )
+}
+
+function EntryCard({ entry, delay, portrait }: { entry: Entry; delay: number; portrait: boolean }): React.JSX.Element {
+  const t = useT()
+  const folder = subFolder(entry.category)
+  return (
+    <motion.button
+      className="entry-card grain"
+      onClick={() => useBook.getState().selectEntry(entry.id)}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay, duration: 0.35 }}
+    >
+      {portrait || entry.image ? <Portrait entry={entry} size="card" /> : null}
+      {folder && (
+        <span className="entry-card-folder" title={t.plan.entry.inFolder(folder)}>
+          {folder}
+        </span>
+      )}
+      <span className="entry-card-name">{entry.name}</span>
+      <span className="entry-card-summary">{entry.summary || firstSentence(entry.body) || t.plan.overview.noNotesYet}</span>
+    </motion.button>
   )
 }
 
@@ -245,10 +304,68 @@ function firstSentence(md: string): string {
 /* Entry editor                                                         */
 /* ------------------------------------------------------------------ */
 
+/** The chapters that use the names of a note: how many times, and the name that comes first in each. */
+function useMentions(entry: Entry): Array<{ id: string; title: string; index: number; n: number; first: string }> {
+  const chapters = useBook((s) => s.chapters)
+  return useMemo(() => {
+    const names = entryNames(entry)
+    if (!names.length) return []
+    // The matcher of the map: each name once (an alias "Marta" next to the name "Marta" counts
+    // once), the longest name first, and [[links]] too.
+    const matcher = createNameMatcher([entry])
+    return chapters
+      .map((c, i) => {
+        const n = matcher.count(c.body).get(entry.id)?.n ?? 0
+        if (!n) return null
+        const plain = markdownToPlain(c.body)
+        let first = names[0]
+        let at = Infinity
+        for (const nm of names) {
+          const body = nm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+          const m = new RegExp(`(?<![\\p{L}\\p{N}])${body}(?![\\p{L}\\p{N}])`, 'iu').exec(plain)
+          if (m && m.index < at) {
+            at = m.index
+            first = nm
+          }
+        }
+        return { id: c.id, title: c.title, index: i, n, first }
+      })
+      .filter((m): m is NonNullable<typeof m> => m !== null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chapters, entry.name, entry.aliases.join('|')])
+}
+
+/** "Characters ▾" at the top of a note: the category of the note, and a menu to move it. */
+function CategoryPicker({ entry }: { entry: Entry }): React.JSX.Element {
+  const t = useT()
+  const categories = useBook((s) => s.manifest?.planning.categories ?? [])
+  const top = topFolder(entry.category)
+  const current = categories.find((c) => c.folder === top)
+  const label = current ? categoryName(t, current) : t.plan.sidebar.outside
+  const folder = subFolder(entry.category)
+  return (
+    <Menu
+      align="end"
+      trigger={
+        <button className="entry-category" aria-label={t.plan.entry.moveTo(label)} title={t.plan.entry.moveTo(label)}>
+          <CategoryIcon name={current?.icon ?? 'Folder'} size={13} />
+          <span>{folder ? `${label} / ${folder}` : label}</span>
+          <CaretDown size={10} weight="bold" />
+        </button>
+      }
+    >
+      {categories.map((c) => (
+        <MenuItem key={c.id} icon={<CategoryIcon name={c.icon} size={14} />} checked={c.folder === top} onSelect={() => c.folder !== top && void moveNote(entry.id, c.folder)}>
+          {categoryName(t, c)}
+        </MenuItem>
+      ))}
+    </Menu>
+  )
+}
+
 function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
   const t = useT()
   const root = useBook((s) => s.root)
-  const chapters = useBook((s) => s.chapters)
   const rev = useBook((s) => s.externalRev[entry.id] ?? 0)
   const [name, setName] = useState(entry.name)
   const [aliasDraft, setAliasDraft] = useState('')
@@ -257,23 +374,52 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
   // A portrait that the chat proposes shows in the place of the portrait, with Use and Reject.
   const proposal = useInlineProposals((s) => s.portraits.filter((p) => p.docId === entry.id).at(-1) ?? null)
   const shown = proposal?.image ?? entry.image
+  const mentions = useMentions(entry)
 
-  const mentions = useMemo(() => {
-    const names = entryNames(entry)
-    if (!names.length) return []
-    return chapters
-      .map((c, i) => {
-        const plain = markdownToPlain(c.body)
-        let n = 0
-        for (const nm of names) {
-          const re = new RegExp(`(?<![\\p{L}\\p{N}])${nm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}\\p{N}])`, 'giu')
-          n += plain.match(re)?.length ?? 0
-        }
-        return { id: c.id, title: c.title, index: i, n }
-      })
-      .filter((m) => m.n > 0)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chapters, entry.name, entry.aliases.join('|')])
+  // The name and the alias save when their box loses the focus. A page that closes (a shortcut, a
+  // link) fires no blur: the draft saves then too. `sent` is the last name that went to the store.
+  const draft = useRef({ name, alias: aliasDraft, sent: entry.name })
+  draft.current.name = name
+  draft.current.alias = aliasDraft
+  useEffect(() => {
+    draft.current.sent = entry.name
+  }, [entry.name])
+  const commitName = (): void => {
+    const d = draft.current
+    if (!d.name.trim() || d.name === d.sent) return
+    d.sent = d.name
+    void renameNote(entry.id, d.name).then((ok) => {
+      // Refused (the name of another note): the box shows the name again.
+      if (!ok) {
+        const now = useBook.getState().entries.find((x) => x.id === entry.id)?.name ?? entry.name
+        draft.current.sent = now
+        setName(now)
+      }
+    })
+  }
+  const commitAlias = (): void => {
+    const a = draft.current.alias.trim()
+    draft.current.alias = ''
+    setAliasDraft('')
+    if (a) addAlias(entry.id, a)
+  }
+  useEffect(() => {
+    const flush = (): void => {
+      const d = draft.current
+      if (d.name.trim() && d.name !== d.sent) {
+        d.sent = d.name
+        void renameNote(entry.id, d.name)
+      }
+      const a = d.alias.trim()
+      d.alias = ''
+      if (a) addAlias(entry.id, a)
+    }
+    const unregister = registerFlusher(flush)
+    return () => {
+      unregister()
+      flush()
+    }
+  }, [entry.id])
 
   const update = useBook.getState().updateEntry
   const pickImage = async (): Promise<void> => {
@@ -283,11 +429,6 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
     const rel = await invoke('book:importAsset', root, path)
     update(entry.id, { image: rel })
   }
-  const addAlias = (): void => {
-    const a = aliasDraft.trim()
-    if (a && !entry.aliases.includes(a)) update(entry.id, { aliases: [...entry.aliases, a] })
-    setAliasDraft('')
-  }
   const remove = async (): Promise<void> => {
     const ok = await askConfirm({
       title: t.plan.entry.deleteTitle(entry.name),
@@ -295,13 +436,14 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
       confirm: t.common.delete,
       danger: true
     })
-    if (ok) await useBook.getState().deleteEntry(entry.id)
+    if (ok) await deleteNote(entry.id)
   }
 
   return (
     <div className="plan-scroll">
       <motion.article
         className="entry-page grain"
+        data-entry={entry.id}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
@@ -309,6 +451,7 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
         <div className="entry-crumbs">
           <BackLink />
           <span className="entry-tools">
+            <CategoryPicker entry={entry} />
             <IconButton
               label={t.plan.entry.askChat}
               onClick={() => {
@@ -326,7 +469,7 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
         </div>
         <header className="entry-head">
           <div className="entry-portrait-col">
-            {/* The image is square here: a click shows it whole. "Change" is a button of its own. */}
+            {/* The image is square here: a click shows it whole. "Change" and "Remove" are buttons of their own. */}
             <div className={`entry-portrait${proposal ? ' is-proposed' : ''}`}>
               <button
                 className="entry-portrait-img"
@@ -336,9 +479,16 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
                 {proposal ? <ProposedPortrait image={proposal.image} /> : <Portrait entry={entry} size="large" />}
               </button>
               {!proposal && (
-                <button className="entry-portrait-hint" onClick={() => void pickImage()} aria-label={t.plan.entry.chooseImage}>
-                  <ImageSquare size={14} /> {entry.image ? t.plan.entry.changeImage : t.plan.entry.addImage}
-                </button>
+                <div className="entry-portrait-bar">
+                  <button className="entry-portrait-hint" onClick={() => void pickImage()} aria-label={t.plan.entry.chooseImage}>
+                    <ImageSquare size={14} /> {entry.image ? t.plan.entry.changeImage : t.plan.entry.addImage}
+                  </button>
+                  {entry.image && (
+                    <button className="entry-portrait-remove" onClick={() => removePortrait(entry.id)} aria-label={t.plan.entry.removeImageLabel}>
+                      <X size={12} /> {t.plan.entry.removeImage}
+                    </button>
+                  )}
+                </div>
               )}
             </div>
             {proposal && (
@@ -360,8 +510,16 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
               value={name}
               aria-label={t.plan.name}
               onChange={(e) => setName(e.target.value)}
-              onBlur={() => name.trim() && name !== entry.name && void useBook.getState().renameEntry(entry.id, name)}
-              onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+              onBlur={commitName}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur()
+                if (e.key === 'Escape') {
+                  // Esc puts the name back, and nothing changes.
+                  draft.current.name = entry.name
+                  setName(entry.name)
+                  e.currentTarget.blur()
+                }
+              }}
             />
             {/* One line of text that wraps, so a long summary stays in view */}
             <textarea
@@ -392,12 +550,17 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
                 className="alias-input"
                 value={aliasDraft}
                 placeholder={t.plan.entry.aliasPlaceholder}
+                aria-label={t.plan.entry.alsoCalled}
                 onChange={(e) => setAliasDraft(e.target.value)}
-                onBlur={addAlias}
+                onBlur={commitAlias}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ',') {
                     e.preventDefault()
-                    addAlias()
+                    commitAlias()
+                  }
+                  if (e.key === 'Escape') {
+                    draft.current.alias = ''
+                    setAliasDraft('')
                   }
                 }}
               />
@@ -420,16 +583,19 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
             <span className="caps">{t.plan.entry.inManuscript}</span>
             <div>
               {mentions.map((m) => (
-                <button
-                  key={m.id}
-                  className="mention-link"
-                  onClick={() => {
-                    useBook.getState().selectChapter(m.id)
-                    useUi.getState().setFindOpen(true)
-                  }}
-                >
-                  <BookOpenText size={12} /> {m.index + 1}. {m.title} <span>×{m.n}</span>
-                </button>
+                <Tooltip key={m.id} label={t.plan.entry.findInChapter(m.first)}>
+                  <button
+                    className="mention-link"
+                    data-chapter={m.id}
+                    onClick={() => {
+                      // The chapter opens with the find bar on the name, at its first mention.
+                      useUi.getState().openFind(m.first, m.id)
+                      useBook.getState().selectChapter(m.id)
+                    }}
+                  >
+                    <BookOpenText size={12} /> {m.index + 1}. {m.title} <span>×{m.n}</span>
+                  </button>
+                </Tooltip>
               ))}
             </div>
           </footer>

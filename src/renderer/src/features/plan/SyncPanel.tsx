@@ -23,8 +23,11 @@ import {
 
 const NO_IDS: string[] = []
 
-/** The sync button. While the sync runs: its progress and Cancel. */
-export function SyncButton(): React.JSX.Element {
+/**
+ * The sync button. While the sync runs: its progress and Cancel. `compact`: the button on a Plan
+ * page when the sidebar is hidden.
+ */
+export function SyncButton({ compact = false }: { compact?: boolean }): React.JSX.Element {
   const t = useT()
   const chapters = useBook((s) => s.chapters)
   const syncState = useBook((s) => s.syncState)
@@ -34,7 +37,7 @@ export function SyncButton(): React.JSX.Element {
   if (job.state === 'running') {
     const step = job.writing ? t.plan.sync.writing(job.found) : t.plan.sync.reading(job.chapters)
     return (
-      <div className="sync-btn is-running" role="status">
+      <div className={clsx('sync-btn is-running', compact && 'is-compact')} role="status">
         <span className="sync-spin" aria-hidden>
           <Spinner size={14} />
         </span>
@@ -44,7 +47,7 @@ export function SyncButton(): React.JSX.Element {
             {job.parts > 1 ? `${t.plan.sync.part(job.part, job.parts)} · ${step}` : step}
           </span>
         </span>
-        <IconButton className="sync-cancel" label={t.plan.sync.cancel} side="right" onClick={cancelPlanningSync}>
+        <IconButton className="sync-cancel" label={t.plan.sync.cancel} side={compact ? 'bottom' : 'right'} onClick={cancelPlanningSync}>
           <X size={13} />
         </IconButton>
       </div>
@@ -55,7 +58,7 @@ export function SyncButton(): React.JSX.Element {
   const upToDate = pending === 0
   return (
     <Tooltip
-      side="right"
+      side={compact ? 'bottom' : 'right'}
       label={
         <span className="sync-tip">
           <span>{t.plan.sidebar.updateNotesHint}</span>
@@ -64,7 +67,7 @@ export function SyncButton(): React.JSX.Element {
       }
     >
       <button
-        className={clsx('sync-btn', pending > 0 && 'has-pending')}
+        className={clsx('sync-btn', compact && 'is-compact', pending > 0 && 'has-pending')}
         aria-label={t.plan.sidebar.sync}
         aria-disabled={upToDate || undefined}
         onClick={() => !upToDate && void startPlanningSync()}

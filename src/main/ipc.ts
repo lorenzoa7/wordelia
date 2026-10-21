@@ -36,6 +36,8 @@ const E2E = process.env['WORDELIA_E2E'] === '1'
 const MAX_CHAT_IMAGE = 12 * 1024 * 1024
 /** A portrait that the renderer draws for the chat is not larger than this */
 const MAX_ASSET_READ = 30 * 1024 * 1024
+/** The most notes that one import reads (a test can set a smaller limit) */
+const maxImportNotes = (): number => Number(process.env['WORDELIA_IMPORT_MAX']) || 200
 
 function defaultBooksDir(): string {
   // Tests set WORDELIA_BOOKS_DIR, so they never write to the user's Documents folder.
@@ -276,13 +278,15 @@ export function registerIpc(): void {
       filters: [{ name: t.markdownNotes, extensions: ['md', 'markdown', 'txt'] }]
     }
     const res = w ? await dialog.showOpenDialog(w, opts) : await dialog.showOpenDialog(opts)
-    if (res.canceled) return []
-    const out: Array<{ name: string; text: string }> = []
-    for (const p of res.filePaths.slice(0, 200)) {
+    const max = maxImportNotes()
+    if (res.canceled) return { notes: [], left: 0, max }
+    const notes: Array<{ name: string; text: string }> = []
+    for (const p of res.filePaths.slice(0, max)) {
       const text = await readTextOr(p, null)
-      if (text != null) out.push({ name: basename(p, extname(p)), text })
+      if (text != null) notes.push({ name: basename(p, extname(p)), text })
     }
-    return out
+    // The renderer tells the writer about the files after the limit.
+    return { notes, left: Math.max(0, res.filePaths.length - max), max }
   })
 
   handle('import:read', (_e, path) => {

@@ -6,9 +6,12 @@
 //   They leave the text and the state of the thread, but their cards keep Accept and Reject.
 
 import type { ChatMessage, HunkState } from '../types'
-import { hunkKey, parseProposals, type Segment } from './parse'
+import { hunkKey, isFileSegment, parseProposals, type Segment } from './parse'
 
-/** The keys of the proposals in a message that wait for a decision. Only complete proposals can wait. */
+/**
+ * The keys of the proposals in a message that wait for a decision. Only complete proposals can wait.
+ * The comments of a read (note, read, resolved) are not proposals: they have no hunks and never wait.
+ */
 export function pendingKeys(segments: Segment[], states: Record<string, HunkState> = {}): string[] {
   const keys: string[] = []
   for (const s of segments) {
@@ -18,9 +21,9 @@ export function pendingKeys(segments: Segment[], states: Record<string, HunkStat
   return keys.filter((k) => !states[k] || states[k] === 'pending')
 }
 
-/** True when a reply has a proposal that it did not finish. */
+/** True when a reply has a proposal that it did not finish. A comment of a read that is not finished does not count. */
 export function hasIncomplete(segments: Segment[]): boolean {
-  return segments.some((s) => (s.kind === 'edit' ? !s.complete || s.hunks.some((h) => !h.complete) : s.kind !== 'text' && !s.complete))
+  return segments.some((s) => isFileSegment(s) && (s.kind === 'edit' ? !s.complete || s.hunks.some((h) => !h.complete) : !s.complete))
 }
 
 /**

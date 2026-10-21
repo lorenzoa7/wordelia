@@ -16,7 +16,7 @@ import {
 } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import { modelLabel } from '@shared/ai/effort'
-import { hasProposals, parseProposals, replyProse, type Segment } from '@shared/proposals/parse'
+import { hasProposals, isFileSegment, parseProposals, replyProse, type Segment } from '@shared/proposals/parse'
 import { Selection } from '@tiptap/pm/state'
 import { toast } from '@/stores/ui'
 import { describeError } from '@/lib/ai'
@@ -268,9 +268,9 @@ function AssistantMessage({ message, thread, after, canAct }: Props): React.JSX.
           <div key={i} className="msg-ai-text prose">
             <Markdown text={cut && i === segments.length - 1 ? closeMarkdown(s.text) : s.text} />
           </div>
-        ) : (
+        ) : isFileSegment(s) ? (
           <ProposalCard key={i} segment={s} message={message} thread={thread} />
-        )
+        ) : null
       )}
       {message.stopped && (
         <p className="msg-stopped" title={t.chat.stoppedHint}>
@@ -296,7 +296,7 @@ function ReplyReview({ segments, message, thread }: { segments: Segment[]; messa
     const keys = new Set(pending)
     const labels: string[] = []
     for (const s of segments) {
-      if (s.kind === 'text') continue
+      if (!isFileSegment(s)) continue
       const mine = segmentKeys(s).some((k) => keys.has(k))
       const label = resolveTarget(s.file).label
       if (mine && !labels.includes(label)) labels.push(label)
@@ -309,7 +309,7 @@ function ReplyReview({ segments, message, thread }: { segments: Segment[]; messa
     let line = 0
     const inLine = new Set<string>()
     for (const s of segments) {
-      if (s.kind === 'text' || !isLineSegment(s)) continue
+      if (!isFileSegment(s) || !isLineSegment(s)) continue
       const mine = segmentKeys(s).filter((k) => keys.has(k))
       mine.forEach((k) => inLine.add(k))
       if (mine.length) line++
@@ -514,9 +514,9 @@ export function StreamingMessage({ streaming }: { streaming: Streaming }): React
           <div key={i} className="msg-ai-text prose">
             <Markdown text={i === segments.length - 1 ? closeMarkdown(s.text) : s.text} />
           </div>
-        ) : (
+        ) : isFileSegment(s) ? (
           <ProposalCard key={i} segment={s} streaming />
-        )
+        ) : null
       )}
       {writing && <ThinkingLine phase={phase} />}
       {phase.kind === 'text' && <span className="stream-caret" />}

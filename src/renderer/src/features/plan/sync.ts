@@ -12,7 +12,7 @@ import { create } from 'zustand'
 import { PLANNING_DIR, entryToFile, hashText, newId } from '@shared/book'
 import { buildSyncSystem, buildSyncUser } from '@shared/prompts/sync'
 import { estimateTokens } from '@shared/prompts/context'
-import { parseProposals, type Segment } from '@shared/proposals/parse'
+import { isFileSegment, parseProposals, type Segment } from '@shared/proposals/parse'
 import type { Chapter, ChatMessage, HunkState, Thread } from '@shared/types'
 import { friendlyError, runCompletion } from '@/lib/ai'
 import { getT } from '@/lib/i18n'
@@ -155,7 +155,7 @@ export function syncResult(thread: Thread | undefined, messageIds: string[]): Sy
     const pending = new Set(pendingKeys(segments, m.hunks))
     out.pending += pending.size
     for (const s of segments) {
-      if (s.kind === 'text') continue
+      if (!isFileSegment(s)) continue
       const mine = segmentKeys(s).some((k) => pending.has(k))
       const label = resolveTarget(s.file).label
       if (mine && !out.notes.includes(label)) out.notes.push(label)

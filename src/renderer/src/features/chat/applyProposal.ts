@@ -2,7 +2,7 @@
 
 import { MANUSCRIPT_DIR, PLANNING_DIR, entryToFile, fileNameFromTitle } from '@shared/book'
 import { applyHunk } from '@shared/proposals/apply'
-import { hunkKey, type Hunk, type Segment } from '@shared/proposals/parse'
+import { hunkKey, type FileSegment, type Hunk, type Segment } from '@shared/proposals/parse'
 import { pendingKeys } from '@shared/proposals/state'
 import type { Chapter, Entry, HunkState, Thread } from '@shared/types'
 import { useBook } from '@/stores/book'
@@ -181,7 +181,7 @@ export function setHunkStates(thread: Thread, messageId: string, updates: Record
 }
 
 /** The keys of a proposal: one for a new entry or a portrait, one for each change of an edit. */
-export function segmentKeys(s: Exclude<Segment, { kind: 'text' }>): string[] {
+export function segmentKeys(s: FileSegment): string[] {
   return s.kind === 'edit' ? s.hunks.map((_, i) => hunkKey(s.index, i)) : [hunkKey(s.index, 0)]
 }
 

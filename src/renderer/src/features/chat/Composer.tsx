@@ -15,7 +15,7 @@ import { registerComposer, useChat } from './chatStore'
 import { sendMessage, stopReply } from './send'
 import { saveThreadChange } from './threads'
 import { ChatInput } from './ChatInput'
-import { attachImages, imageFiles } from './images'
+import { attachImages, imageFiles, trashUnusedImages } from './images'
 
 export function Composer({ thread }: { thread: Thread | null }): React.JSX.Element {
   const t = useT()
@@ -34,13 +34,15 @@ export function Composer({ thread }: { thread: Thread | null }): React.JSX.Eleme
   // The content of the store when the composer shows (for example after the thread list).
   const [initial] = useState(() => useChat.getState().draftDoc)
 
-  // Code outside the composer changed the draft (a suggestion, a mention from the Plan view, a sent message): load it.
+  // Code outside the composer changed the draft (a suggestion, a mention from the Plan view, a sent message), or
+  // another thread shows with its own draft: load it. Only a change of the draft takes the focus.
   const loadedRev = useRef(draftRev)
   useEffect(() => {
     if (!editor || editor.isDestroyed || loadedRev.current === draftRev) return
     loadedRev.current = draftRev
     editor.commands.setContent((useChat.getState().draftDoc ?? '') as object, { emitUpdate: false })
-    editor.commands.focus('end')
+    if (useChat.getState().draftQuiet) editor.commands.setTextSelection(editor.state.doc.content.size - 1)
+    else editor.commands.focus('end')
   }, [draftRev, editor])
 
   const submit = (): void => {
@@ -104,6 +106,7 @@ export function Composer({ thread }: { thread: Thread | null }): React.JSX.Eleme
           onChange={syncDraft}
           onEnter={submit}
           onPasteImages={(files) => void attachImages(files)}
+          threadId={thread?.id ?? null}
           onReady={(e) => {
             setEditor(e)
             registerComposer(e)
@@ -161,7 +164,14 @@ function ImageChip({ image }: { image: ChatImage }): React.JSX.Element {
   return (
     <span className="image-chip" title={image.name}>
       {url && <img src={url} alt={image.name} />}
-      <button onClick={() => useChat.getState().removeImage(image.file)} aria-label={t.chat.removeImage(image.name)}>
+      <button
+        onClick={() => {
+          useChat.getState().removeImage(image.file)
+          // The image was never sent: its file goes to the trash of the book.
+          void trashUnusedImages([image.file])
+        }}
+        aria-label={t.chat.removeImage(image.name)}
+      >
         <X size={10} weight="bold" />
       </button>
     </span>

@@ -1,29 +1,29 @@
 // Send a chat message: build the context, stream the reply, update the digest.
 // Also: ask again for the last reply, and send an edited message again.
 
-import { newId } from '@shared/book'
-import { buildChatSystem, buildChatUserTurn, imageLines } from '@shared/prompts/chat'
-import { buildDigestSystem, buildDigestUser, buildTitleSystem } from '@shared/prompts/background'
-import { proposalSummary } from '@shared/proposals/parse'
-import type { ChatMessage, ChatTurn, Mention, ModelChoice, Thread } from '@shared/types'
+import { newId, THREADS_DIR } from '@shared/book'
+import { buildChatSystem, buildChatUserTurn, chatHistory } from '@shared/prompts/chat'
+import type { ChatMessage, CompletionResult, Mention, ModelChoice, Thread } from '@shared/types'
 import { messagesFor, type Messages } from '@shared/i18n'
-import { friendlyError, runCompletion } from '@/lib/ai'
+import { describeError, runCompletion } from '@/lib/ai'
+import { invoke } from '@/lib/api'
 import { getT } from '@/lib/i18n'
 import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
 import { toast, useUi } from '@/stores/ui'
 import { flushEditor } from '@/features/editor/registry'
-import { patchStreaming, useChat } from './chatStore'
+import { NEW_THREAD_TITLE, patchStreaming, useChat } from './chatStore'
+import { afterReply } from './digest'
 import { portraitImages } from './portraits'
 import { confirmAndRewind } from './rewind'
 import { summariesFor } from './summaries'
+
+export { NEW_THREAD_TITLE }
 
 const HISTORY_LIMIT = 24
 
 /** The stored title of a new thread, in English in every language. afterReply() replaces it with a title from the AI. */
 const EN = messagesFor('en')
-
-export const NEW_THREAD_TITLE = 'New thread'
 
 /** The title to show for a thread. A new thread, and the planning sync thread of an older book, show their title in the interface language. */
 export function threadTitle(t: Messages, title: string): string {
@@ -96,6 +96,41 @@ export async function sendMessage(text: string): Promise<void> {
   await requestReply(thread.id)
 }
 
+/** The tokens and the cost of a reply: from the result, else from the last `usage` event. */
+function usageOf(result: CompletionResult, fromEvents: CompletionResult['usage']): ChatMessage['usage'] {
+  const u = result.usage ?? fromEvents
+  if (!u || (!u.inputTokens && !u.outputTokens && u.costUsd === undefined)) return undefined
+  return {
+    ...(u.inputTokens ? { inputTokens: u.inputTokens } : {}),
+    ...(u.outputTokens ? { outputTokens: u.outputTokens } : {}),
+    ...(typeof u.costUsd === 'number' ? { costUsd: u.costUsd } : {})
+  }
+}
+
+/**
+ * The book closed while the reply streamed (the author went back to the library, or opened another
+ * book). The reply goes into the thread file of its book, so it is there when the book opens again.
+ */
+async function saveToClosedBook(root: string, threadId: string, reply: ChatMessage): Promise<void> {
+  const rel = `${THREADS_DIR}/${threadId}.json`
+  try {
+    const text = await invoke('book:readFile', root, rel)
+    if (!text) return
+    const thread = JSON.parse(text) as Thread
+    if (thread.messages.some((m) => m.id === reply.id)) return
+    const next: Thread = { ...thread, messages: [...thread.messages, reply], updatedAt: new Date().toISOString() }
+    // The book is open again (the same book): the store saves it.
+    if (useBook.getState().root === root) {
+      const live = useBook.getState().threads.find((t) => t.id === threadId)
+      if (live) useBook.getState().saveThread({ ...live, messages: [...live.messages, reply], updatedAt: next.updatedAt }, true)
+      return
+    }
+    await invoke('book:writeFile', root, rel, JSON.stringify(next, null, 2))
+  } catch {
+    // The file is gone or cannot be read: the thread was deleted.
+  }
+}
+
 /** Ask the AI to answer the last message of a thread. That message must be a message of the user. */
 export async function requestReply(threadId: string): Promise<void> {
   const thread = useBook.getState().threads.find((t) => t.id === threadId)
@@ -110,14 +145,17 @@ export async function requestReply(threadId: string): Promise<void> {
 
   flushEditor()
   const fresh = useBook.getState()
+  const root = fresh.root
   const quotes = last.quotes ?? []
   const mentions = last.mentions ?? []
   const images = last.images ?? []
   const message = last.content
   const assistantId = newId('m')
+  const t = getT()
 
-  // Show the reply at once, also while long books get their summaries. Stop works in that phase too.
-  let stopped = false
+  // Show the reply at once, also while long books get their summaries. Stop works in that phase too:
+  // it stops the summaries of this message, and the summaries that are done stay in the cache.
+  const stop = new AbortController()
   useChat.setState((s) => ({
     streaming: {
       ...s.streaming,
@@ -126,7 +164,7 @@ export async function requestReply(threadId: string): Promise<void> {
         text: '',
         requestId: '',
         cancel: () => {
-          stopped = true
+          stop.abort()
           useChat.setState((st) => ({ streaming: { ...st.streaming, [threadId]: undefined } }))
         }
       }
@@ -140,10 +178,14 @@ export async function requestReply(threadId: string): Promise<void> {
   for (const i of [idx - 1, idx, idx + 1]) if (fresh.chapters[i]) keepFull.add(fresh.chapters[i].id)
   for (const m of mentions) if (m.kind === 'chapter') keepFull.add(m.id)
   const settingsNow = useApp.getState().settings
-  const summaries = fresh.root
-    ? await summariesFor(fresh.root, fresh.chapters, keepFull, budget, settingsNow?.routes.background ?? route)
+  const summaries = root
+    ? await summariesFor(root, fresh.chapters, keepFull, budget, settingsNow?.routes.background ?? route, {
+        signal: stop.signal,
+        onProgress: (done, total) => patchStreaming(threadId, { status: t.chat.summarizing(done, total) })
+      })
     : {}
-  if (stopped) return
+  if (stop.signal.aborted) return
+  patchStreaming(threadId, { status: undefined })
 
   const system = buildChatSystem({
     book: { manifest: fresh.manifest!, writingRules: fresh.writingRules, chapters: fresh.chapters, entries: fresh.entries, threads: fresh.threads },
@@ -159,33 +201,37 @@ export async function requestReply(threadId: string): Promise<void> {
 
   // Thinking is never part of the history: only the text of each message goes back to the AI.
   // The images of earlier messages go too (the main process keeps the most recent ones), so the AI
-  // can still talk about them.
-  const history: ChatTurn[] = thread.messages.slice(0, -1).slice(-HISTORY_LIMIT).map((m) => ({
-    role: m.role,
-    content: m.role === 'assistant' ? proposalSummary(m.content, m.hunks ?? {}) : renderUser(m),
-    ...(m.role === 'user' && m.images?.length ? { images: m.images } : {})
-  }))
+  // can still talk about them. Failed and empty replies stay out.
+  const history = chatHistory(thread.messages.slice(0, -1), HISTORY_LIMIT)
   // The portraits of the notes, so the AI sees how the characters, places and things look.
-  const portraits = fresh.root
-    ? await portraitImages(fresh.root, fresh.entries, {
+  const portraits = root
+    ? await portraitImages(root, fresh.entries, {
         mentions,
         currentEntryId: fresh.view === 'plan' ? fresh.activeEntryId : null,
         text: [message, ...quotes.map((q) => q.text)].join('\n')
       })
     : []
-  if (stopped) return
+  if (stop.signal.aborted) return
   const asked = message || (images.length ? 'Here is an image.' : 'What do you think about this passage?')
-  history.push({
-    role: 'user',
+  const turn = {
+    role: 'user' as const,
     content: buildChatUserTurn(asked, quotes, mentions, fresh.threads, fresh.chapters, images),
     ...(images.length ? { images } : {}),
     ...(portraits.length ? { portraits } : {})
-  })
+  }
+  // A message of the author without a reply before it (the reply failed): one turn of the author.
+  const prev = history[history.length - 1]
+  if (prev?.role === 'user') {
+    history[history.length - 1] = { ...turn, content: `${prev.content}\n\n${turn.content}`, images: [...(prev.images ?? []), ...images] }
+    if (!history[history.length - 1].images?.length) delete history[history.length - 1].images
+  } else history.push(turn)
 
-  const handle = runCompletion({ route, purpose: 'chat', system, messages: history, ...(fresh.root ? { root: fresh.root } : {}) }, (e, soFar) => {
+  let usage: CompletionResult['usage']
+  const handle = runCompletion({ route, purpose: 'chat', system, messages: history, ...(root ? { root } : {}) }, (e, soFar) => {
     if (e.type === 'text') patchStreaming(threadId, { text: soFar })
     else if (e.type === 'thinking') patchStreaming(threadId, (s) => ({ thinking: (s.thinking ?? '') + e.delta }))
     else if (e.type === 'status') patchStreaming(threadId, { status: e.message })
+    else if (e.type === 'usage') usage = { inputTokens: e.inputTokens, outputTokens: e.outputTokens, costUsd: e.costUsd }
   })
   patchStreaming(threadId, { requestId: handle.id, cancel: handle.cancel })
 
@@ -196,18 +242,32 @@ export async function requestReply(threadId: string): Promise<void> {
     ...(thought ? { thoughts: { ...s.thoughts, [assistantId]: thought } } : {})
   }))
 
-  if (!result.ok && !result.text && result.errorKind === 'cancelled') return
-  const latest = useBook.getState().threads.find((t) => t.id === threadId)
-  // The thread was deleted while the reply streamed.
-  if (!latest) return
+  const stopped = !result.ok && result.errorKind === 'cancelled'
+  // Stopped before the first word: nothing to keep.
+  if (stopped && !result.text.trim()) return
+  const used = usageOf(result, usage)
+  // A stop is the choice of the author, not an error. An error keeps its kind and the words of the
+  // provider, so the chat shows "Details" and the button that fixes it.
+  const failed = result.ok || stopped ? null : describeError(result)
   const reply: ChatMessage = {
     id: assistantId,
     role: 'assistant',
     content: result.text,
     createdAt: new Date().toISOString(),
     model: result.model,
-    ...(result.ok ? {} : { error: friendlyError(result) })
+    ...(result.provider ? { provider: result.provider } : {}),
+    ...(failed ? { error: failed.message, errorKind: failed.kind, ...(failed.detail ? { errorDetail: failed.detail } : {}) } : {}),
+    ...(stopped ? { stopped: true } : {}),
+    ...(used ? { usage: used } : {})
   }
+  // The book closed meanwhile: keep the reply in its book.
+  if (root && useBook.getState().root !== root) {
+    await saveToClosedBook(root, threadId, reply)
+    return
+  }
+  const latest = useBook.getState().threads.find((th) => th.id === threadId)
+  // The thread was deleted while the reply streamed.
+  if (!latest) return
   const done: Thread = { ...latest, messages: [...latest.messages, reply], updatedAt: new Date().toISOString() }
   useBook.getState().saveThread(done, true)
 
@@ -247,57 +307,6 @@ export async function resendEdited(threadId: string, messageId: string, text: st
   useBook.getState().saveThread({ ...kept, messages: [...kept.messages, edited], updatedAt: new Date().toISOString() }, true)
   void requestReply(threadId)
   return true
-}
-
-function renderUser(m: ChatMessage): string {
-  const q = (m.quotes ?? []).map((x) => `> ${x.text.split('\n').join('\n> ')}`).join('\n\n')
-  return [imageLines(m.images), q, m.content].filter(Boolean).join('\n\n')
-}
-
-/** Background work after a reply: a title for new threads, and the digest. */
-async function afterReply(threadId: string): Promise<void> {
-  const settings = useApp.getState().settings
-  const route = settings?.routes.background ?? settings?.routes.chat
-  if (!route) return
-  const get = (): Thread | undefined => useBook.getState().threads.find((t) => t.id === threadId)
-  let t = get()
-  if (!t) return
-
-  if (t.title === NEW_THREAD_TITLE && t.messages.length >= 2) {
-    const first = t.messages[0]
-    const r = await runCompletion({
-      route,
-      purpose: 'background',
-      system: buildTitleSystem(),
-      messages: [{ role: 'user', content: first.content || first.quotes?.[0]?.text || 'A question about the book' }],
-      maxTokens: 60
-    }).done
-    t = get()
-    if (r.ok && t) {
-      const title = (r.text.trim().split('\n')[0] ?? '')
-        .replace(/^[-*#\s]+/, '')
-        .replace(/^["'“]|["'”.]$/g, '')
-        .trim()
-        .slice(0, 60)
-      if (title) useBook.getState().saveThread({ ...t, title })
-    }
-  }
-
-  t = get()
-  if (!t) return
-  const fresh = t.messages.slice(t.digestedCount)
-  if (fresh.length < 2) return
-  const r = await runCompletion({
-    route,
-    purpose: 'background',
-    system: buildDigestSystem({ title: useBook.getState().manifest?.title ?? '', chapters: useBook.getState().chapters.map((c) => c.title) }),
-    messages: [{ role: 'user', content: buildDigestUser(t.digest, fresh) }],
-    maxTokens: 800
-  }).done
-  t = get()
-  if (r.ok && t) {
-    useBook.getState().saveThread({ ...t, digest: r.text.trim(), digestedCount: t.messages.length })
-  }
 }
 
 export function stopReply(threadId: string): void {

@@ -1,6 +1,7 @@
 // System prompt for the chat. Stable blocks first, for prompt caching.
 
-import type { Chapter, ChatImage, Entry, Mention, Quote, Thread } from '../types'
+import type { Chapter, ChatImage, ChatMessage, ChatTurn, Entry, Mention, Quote, Thread } from '../types'
+import { proposalSummary } from '../proposals/parse'
 import { findStoryLine, isStoryLine } from '../storyline'
 import {
   bookBlock,
@@ -205,6 +206,48 @@ export function buildChatSystem(input: ChatPromptInput): string {
   return sections.filter(Boolean).join('\n\n')
 }
 
+/** A message of the author as the AI reads it in the history: the images, the quotes, then the text. */
+export function renderUserMessage(m: ChatMessage): string {
+  const q = (m.quotes ?? []).map((x) => `> ${x.text.split('\n').join('\n> ')}`).join('\n\n')
+  return [imageLines(m.images), q, m.content].filter(Boolean).join('\n\n')
+}
+
+/** A reply that failed, or that has no text, never goes back to the AI. */
+export function isUsableReply(m: ChatMessage): boolean {
+  return m.role === 'assistant' && !m.error && m.content.trim().length > 0
+}
+
+/**
+ * The earlier messages of a thread as turns for the AI, at most `limit` messages.
+ * - A failed or empty reply is left out: an API refuses an empty turn, and then every later message fails.
+ * - A reply that the author stopped keeps its text, with a note that it stops there.
+ * - Two turns of one role in a row become one turn. The history starts with a turn of the author.
+ * Each reply has its proposals as short lines that say what the author did with them.
+ */
+export function chatHistory(messages: ChatMessage[], limit: number): ChatTurn[] {
+  const turns: ChatTurn[] = []
+  for (const m of messages.slice(-limit)) {
+    let turn: ChatTurn
+    if (m.role === 'user') {
+      turn = { role: 'user', content: renderUserMessage(m), ...(m.images?.length ? { images: m.images } : {}) }
+    } else {
+      if (!isUsableReply(m)) continue
+      const text = proposalSummary(m.content, m.hunks ?? {}).trim()
+      if (!text) continue
+      turn = { role: 'assistant', content: m.stopped ? `${text}\n\n[The author stopped this reply here.]` : text }
+    }
+    const last = turns[turns.length - 1]
+    if (last && last.role === turn.role) {
+      last.content = [last.content, turn.content].filter(Boolean).join('\n\n')
+      if (turn.images?.length) last.images = [...(last.images ?? []), ...turn.images]
+      continue
+    }
+    turns.push(turn)
+  }
+  while (turns.length && turns[0].role !== 'user') turns.shift()
+  return turns
+}
+
 /** The lines that tell the AI which images a message has, so a proposal can use their files. */
 export function imageLines(images: ChatImage[] = []): string {
   return images.map((i) => `<image file="${i.file.replace(/"/g, '')}" name="${i.name.replace(/"/g, "'")}"/>`).join('\n')
@@ -221,7 +264,11 @@ export function buildChatUserTurn(message: string, quotes: Quote[], mentions: Me
     if (mt.kind === 'thread') {
       const t = threads.find((x) => x.id === mt.id)
       if (!t) continue
-      const recent = t.messages.slice(-8).map((msg) => `${msg.role === 'user' ? 'Author' : 'Assistant'}: ${msg.content}`)
+      // Failed and empty replies are left out; proposals are short lines.
+      const recent = t.messages
+        .slice(-8)
+        .filter((msg) => msg.role === 'user' || isUsableReply(msg))
+        .map((msg) => `${msg.role === 'user' ? 'Author' : 'Assistant'}: ${msg.role === 'user' ? msg.content : proposalSummary(msg.content, msg.hunks ?? {}).trim()}`)
       parts.push(`<thread_excerpt title="${t.title.replace(/"/g, "'")}">\n${recent.join('\n\n')}\n</thread_excerpt>`)
     }
     if (mt.kind === 'chapter') {

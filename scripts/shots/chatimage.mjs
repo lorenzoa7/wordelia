@@ -57,8 +57,17 @@ export default async function ({ page, shot, openBook, book }) {
   await page.locator('.composer-images .image-chip').nth(1).locator('button').click()
   if ((await chips()) !== 1) fail('the image did not go out of the message')
 
+  // The image that went out was never sent: its file goes to the trash of the book.
+  let trashed = []
+  for (let i = 0; i < 50 && !trashed.length; i++) {
+    await new Promise((r) => setTimeout(r, 100))
+    trashed = (await readdir(join(book, '.wordelia', 'trash')).catch(() => [])).filter((f) => f.endsWith('.webp'))
+  }
+  if (trashed.length !== 1) fail('the image that went out of the message is not in the trash of the book')
+
   // The image is a file of the book, made small.
   const files = await readdir(join(book, 'planning', '_assets', 'chat'))
+  if (files.length !== 1) fail(`the chat folder has ${files.length} images, not 1`)
   console.log(JSON.stringify({ files: files.length, first }))
   if (files.length < 1 || !files.every((f) => f.endsWith('.webp'))) fail(`the images are not in the book: ${files.join(', ')}`)
 

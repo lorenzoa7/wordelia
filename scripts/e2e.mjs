@@ -47,6 +47,7 @@ const SCENARIOS = [
   { args: ['plannotes'], areas: ['plan', 'store'], s: 12 },
   { args: ['sync', '--en'], areas: ['plan', 'chat'], s: 20 },
   { args: ['chat', '--en'], areas: ['chat'], s: 40 },
+  { args: ['proposals', '--en'], areas: ['chat', 'editor'], s: 35 },
   { args: ['chatview'], areas: ['chat'], s: 58 },
   { args: ['chatimage'], areas: ['chat', 'plan'], s: 10 },
   { args: ['storyline'], areas: ['plan', 'chat', 'shell', 'store'], s: 16 },

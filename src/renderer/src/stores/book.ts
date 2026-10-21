@@ -118,7 +118,10 @@ interface BookState {
   moveEntry(id: string, category: string): Promise<void>
 
   saveThread(thread: Thread, immediate?: boolean): void
-  deleteThread(id: string): Promise<void>
+  /** Move a thread to the trash of the book. Returns the file in the trash, or null. */
+  deleteThread(id: string): Promise<string | null>
+  /** Bring a deleted thread back (Undo). `trash`: its file in the trash, which goes away. */
+  restoreThread(thread: Thread, trash: string | null): Promise<void>
   setWritingRules(text: string): void
   setSyncState(state: SyncState): void
   setActions(actions: AiAction[]): void
@@ -644,10 +647,24 @@ export const useBook = create<BookState>((set, get) => {
 
     async deleteThread(id) {
       const { threads, root } = get()
-      if (!root) return
-      saver.cancel(root, `${THREADS_DIR}/${id}.json`)
-      await invoke('book:deleteFile', root, `${THREADS_DIR}/${id}.json`)
-      set({ threads: threads.filter((t) => t.id !== id) })
+      const th = threads.find((t) => t.id === id)
+      if (!root || !th) return null
+      // The thread goes to the trash of the book, like a chapter or a note: Undo can bring it back.
+      const rel = `${THREADS_DIR}/${id}.json`
+      const trash = `.wordelia/trash/${new Date().toISOString().replace(/[:.]/g, '-')} thread ${id}.json`
+      saver.cancel(root, rel)
+      set({ threads: get().threads.filter((t) => t.id !== id) })
+      await invoke('book:writeFile', root, trash, JSON.stringify(th, null, 2))
+      await invoke('book:deleteFile', root, rel)
+      return trash
+    },
+
+    async restoreThread(thread, trash) {
+      const root = get().root
+      if (!root || get().threads.some((t) => t.id === thread.id)) return
+      get().saveThread(thread, true)
+      await saver.flush()
+      if (trash) await invoke('book:deleteFile', root, trash)
     },
 
     setWritingRules(text) {

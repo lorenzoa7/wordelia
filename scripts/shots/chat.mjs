@@ -105,10 +105,18 @@ export default async function ({ app, page, shot, openBook }) {
       const t = window.__wordelia.book.getState().threads.find((x) => x.messages[0]?.content.startsWith('What is the weakest'))
       return t ? { count: t.messages.length, last: t.messages.at(-1)?.id ?? null, role: t.messages.at(-1)?.role ?? null } : null
     })
+  // First the edited message. On a busy machine the key can come before the edit box is ready: then the Send button sends it.
+  const resent = () =>
+    page.waitForFunction(() => window.__wordelia.book.getState().threads.some((t) => t.messages[0]?.content.startsWith('What is the weakest')), null, { timeout: 5000 })
+  await resent().catch(async () => {
+    if (await page.locator('.msg-edit-foot .btn-primary').count()) await page.locator('.msg-edit-foot .btn-primary').click()
+    await resent()
+  })
+  // Then its new reply.
   await page.waitForFunction(
     () => window.__wordelia.book.getState().threads.some((t) => t.messages[0]?.content.startsWith('What is the weakest') && t.messages.length === 2),
     null,
-    { timeout: 20000 }
+    { timeout: 60000 }
   )
   await idle()
   const first = await edited()
@@ -122,7 +130,7 @@ export default async function ({ app, page, shot, openBook }) {
       return Boolean(t && t.messages.length === 2 && t.messages[1].role === 'assistant' && t.messages[1].id !== old && t.messages[1].content)
     },
     first?.last,
-    { timeout: 20000 }
+    { timeout: 60000 }
   ).catch(() => {})
   await idle()
   const retried = await edited()

@@ -3,6 +3,7 @@
 import { MANUSCRIPT_DIR, PLANNING_DIR, entryToFile, fileNameFromTitle } from '@shared/book'
 import { applyHunk } from '@shared/proposals/apply'
 import { hunkKey, type Hunk, type Segment } from '@shared/proposals/parse'
+import { pendingKeys } from '@shared/proposals/state'
 import type { Chapter, Entry, HunkState, Thread } from '@shared/types'
 import { useBook } from '@/stores/book'
 import { applyToChapter, flushEditor, type ApplyResult } from '@/features/editor/registry'
@@ -42,6 +43,8 @@ export function resolveTarget(file: string): Target {
 }
 
 export function applyEditHunk(file: string, hunk: Hunk): ApplyResult {
+  // A change that the reply did not finish is never applied: its text is cut.
+  if (!hunk.complete) return { ok: false, reason: getT().chat.changeIncomplete }
   const t = resolveTarget(file)
   if (t.kind === 'chapter') return applyToChapter(t.chapter.id, hunk.find, typesetForBook(hunk.replace))
   if (t.kind === 'entry') {
@@ -164,6 +167,7 @@ export function setHunkStates(thread: Thread, messageId: string, updates: Record
   const latest = useBook.getState().threads.find((t) => t.id === thread.id)
   // The thread was deleted meanwhile: do not bring it back.
   if (!latest) return
+  queueMicrotask(() => decided.forEach((fn) => fn(thread.id)))
   const messages = latest.messages.map((m) =>
     m.id === messageId
       ? {
@@ -181,14 +185,14 @@ export function segmentKeys(s: Exclude<Segment, { kind: 'text' }>): string[] {
   return s.kind === 'edit' ? s.hunks.map((_, i) => hunkKey(s.index, i)) : [hunkKey(s.index, 0)]
 }
 
-/** The keys of the proposals in a message that wait for a decision. */
-export function pendingKeys(segments: Segment[], states: Record<string, HunkState> = {}): string[] {
-  const keys: string[] = []
-  for (const s of segments) {
-    if (s.kind === 'create' || s.kind === 'portrait') keys.push(hunkKey(s.index, 0))
-    if (s.kind === 'edit') s.hunks.forEach((h, i) => h.complete && keys.push(hunkKey(s.index, i)))
-  }
-  return keys.filter((k) => !states[k] || states[k] === 'pending')
+/** The keys of the proposals in a message that wait for a decision. A proposal that the reply did not finish never waits. */
+export { pendingKeys }
+
+const decided = new Set<(threadId: string) => void>()
+
+/** Call `fn` after each decision on a proposal of a thread (the digest waits for the decisions). */
+export function onDecision(fn: (threadId: string) => void): void {
+  decided.add(fn)
 }
 
 /**

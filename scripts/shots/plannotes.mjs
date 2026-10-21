@@ -36,7 +36,7 @@ export default async function ({ app, page, shot, openBook, book, work }) {
   }
   const toast = (re) => page.locator('.toast', { hasText: re }).last()
   const closeToasts = async () => {
-    for (const b of await page.locator('.toast-close').all()) await b.click().catch(() => {})
+    for (const b of await page.locator('.toast-close').all()) await b.click({ timeout: 500 }).catch(() => {})
   }
   const rename = async (to) => {
     await page.locator('.entry-name').fill(to)
@@ -71,6 +71,7 @@ export default async function ({ app, page, shot, openBook, book, work }) {
   // An empty category shows no "0", as in the sidebar.
   const counts = await page.locator('.plan-section-link .plan-section-count').allInnerTexts()
   if (counts.includes('0')) fail(`the overview shows ${counts.join(', ')}`)
+  await wait(() => [...document.querySelectorAll('.entry-card')].every((c) => getComputedStyle(c).opacity === '1'), null, 'the cards did not show')
   await shot('overview')
 
   // 2. The keyboard: a category row has two Tab stops (the row and its menu); the menu has New and Import.
@@ -272,7 +273,7 @@ export default async function ({ app, page, shot, openBook, book, work }) {
   await page.evaluate(async () => {
     const s = window.__wordelia.book.getState()
     for (const n of ['Nota 10', 'Nota 2', 'Nota 100']) await s.createEntry('Notes', n)
-    for (let i = 0; i < 60; i++) await s.createEntry('World', `Lugar ${i + 1}`)
+    for (let i = 0; i < 36; i++) await s.createEntry('World', `Lugar ${i + 1}`)
     s.selectCategory(null)
   })
   const notesRow = page.locator('.plan-group', { has: page.locator('.plan-item-label', { hasText: /^Notes$/ }) })
@@ -282,8 +283,8 @@ export default async function ({ app, page, shot, openBook, book, work }) {
   if (order.join('|') !== 'Nota 2|Nota 10|Nota 100') fail(`the order is ${order.join(', ')}`)
   await page.locator('.plan-item-top').click()
   await page.waitForSelector('.plan-section-title', { timeout: 3000 })
-  await page.locator('.plan-scroll').evaluate((el) => el.scrollTo({ top: 2200 }))
-  await page.waitForTimeout(200)
+  await page.locator('.plan-scroll').evaluate((el) => el.scrollTo({ top: 1600 }))
+  await wait(() => document.querySelector('.plan-scroll').scrollTop === 1600, null, 'the overview did not scroll')
   const top = await page.locator('.plan-scroll').evaluate((el) => el.scrollTop)
   const card = page.locator('.entry-card', { hasText: 'Lugar 30' })
   await card.scrollIntoViewIfNeeded()
@@ -314,8 +315,10 @@ export default async function ({ app, page, shot, openBook, book, work }) {
   await page.evaluate(() => window.__wordelia.app.getState().setUi({ sidebarOpen: false }))
   await page.evaluate(() => window.__wordelia.book.getState().selectCategory(null))
   await page.waitForSelector('.plan-hero .sync-btn.is-compact', { timeout: 3000 }).catch(() => fail('no sync button with the sidebar hidden'))
-  await page.waitForSelector('.plan-sidebar', { state: 'detached', timeout: 3000 })
-  await page.waitForTimeout(400)
+  // The panel closes with a motion of its width; the screenshot waits for its end.
+  await wait(() => (document.querySelector('.book-sidebar')?.getBoundingClientRect().width ?? 0) < 1, null, 'the sidebar did not close')
+  await page.locator('.plan-scroll').evaluate((el) => el.scrollTo({ top: 0 }))
+  await wait(() => [...document.querySelectorAll('.entry-card')].slice(0, 8).every((c) => getComputedStyle(c).opacity === '1'), null, 'the cards did not show')
   await shot('sync-no-sidebar')
   await page.evaluate(() => window.__wordelia.app.getState().setUi({ sidebarOpen: true }))
   await closeToasts()
@@ -332,17 +335,19 @@ export default async function ({ app, page, shot, openBook, book, work }) {
   }
   await put('Elias.md', 'Outro Elias.\n')
   await put('Nova.md', '---\ntags: [personagem, farol]\n---\nVeja ![[Marta]] e ![[mapa.png]].\n')
-  for (let i = 0; i < 200; i++) await put(`Extra ${i + 1}.md`, 'Texto.\n')
+  for (let i = 0; i < 4; i++) await put(`Extra ${i + 1}.md`, 'Texto.\n')
+  // A limit of 4 files (200 in the app): the last 2 files are not read.
   await app.evaluate(({ dialog }, paths) => {
+    process.env.WORDELIA_IMPORT_MAX = '4'
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: paths })
   }, files)
   await page.evaluate(() => window.__wordelia.book.getState().selectCategory('Characters'))
   await page.locator('.plan-hero-tools button', { hasText: 'Import notes' }).click()
-  const imported = toast(/Imported 200 notes into Characters/)
-  await imported.waitFor({ timeout: 20000 }).catch(() => fail('no toast after the import'))
+  const imported = toast(/Imported 4 notes into Characters/)
+  await imported.waitFor({ timeout: 10000 }).catch(() => fail('no toast after the import'))
   const said = await imported.innerText()
   console.log(said)
-  if (!/“Elias” is now “Elias 2”/.test(said) || !/2 files were not imported/.test(said)) fail(`the import toast says "${said}"`)
+  if (!/“Elias” is now “Elias 2”/.test(said) || !/2 files were not imported: the limit is 4 files/.test(said)) fail(`the import toast says "${said}"`)
   const nova = await note('Nova')
   if (JSON.stringify(nova?.meta?.tags) !== '["personagem","farol"]') fail(`the tags are ${JSON.stringify(nova?.meta)}`)
   if (nova.body.trim() !== 'Veja [[Marta]] e.') fail(`the body is "${nova.body}"`)

@@ -1,0 +1,21 @@
+/* Settings → Actions (ActionsTab.tsx): the parts that the general settings styles do not have. */
+
+/* Move up, move down and Delete, at the end of the form */
+.action-foot-end {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+}
+/* The Delete button of the main action is off; its wrapper gets the focus and the tooltip */
+.action-delete-off {
+  display: inline-flex;
+  border-radius: var(--radius-sm);
+}
+.action-delete-off:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+/* An empty action name */
+.action-name-empty {
+  color: var(--ribbon);
+}

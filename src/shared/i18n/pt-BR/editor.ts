@@ -47,7 +47,14 @@ export const editor: typeof en = {
       words: 'Palavra a palavra',
       stacked: 'Antes e depois',
       new: 'Só o texto novo'
-    }
+    },
+    barLabel: (action) => `Revisão de ${action}`,
+    working: (action) => `${action}: a IA trabalha no trecho. Você pode escrever no resto do capítulo.`,
+    readyStatus: (action, added, removed) =>
+      `${action}: a mudança está pronta, ${added} adicionadas e ${removed} removidas. Enter aceita, Esc rejeita, Tab vai para a barra.`,
+    lockedShort: 'Bloqueado',
+    lockedWorking: 'O trecho fica bloqueado enquanto a IA trabalha. Esc para.',
+    lockedReady: 'O trecho fica bloqueado até você decidir. Enter aceita, Esc rejeita.'
   },
   find: {
     replaceToggle: 'Substituir',

@@ -54,11 +54,13 @@ export async function readTextOr(path: string, fallback: string | null): Promise
   }
 }
 
+/** A JSON file, or `fallback` when it is not there or does not parse. (The book manifest has its own reader: `readManifestFile`.) */
 export async function readJson<T>(path: string, fallback: T): Promise<T> {
   const text = await readTextOr(path, null)
   if (text == null) return fallback
   try {
-    return JSON.parse(text) as T
+    // A byte order mark at the start (Notepad writes one) is not part of the JSON.
+    return JSON.parse(text.replace(/^﻿/, '')) as T
   } catch {
     return fallback
   }

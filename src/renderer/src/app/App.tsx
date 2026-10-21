@@ -8,7 +8,8 @@ import { invoke, isE2E, on } from '@/lib/api'
 import { runFlushers } from '@/lib/flush'
 import { installUpdate, watchUpdates } from '@/lib/update'
 import { getT } from '@/lib/i18n'
-import { toast } from '@/stores/ui'
+import { toast, useUi } from '@/stores/ui'
+import { PROVIDER_LABELS, readyProviders } from '@shared/ai/routes'
 import { saver } from '@/stores/saver'
 import { LibraryView } from '@/features/library/LibraryView'
 import { BookView } from '@/features/book/BookView'
@@ -66,6 +67,34 @@ export function App(): React.JSX.Element {
     }
   }, [])
 
+  // The writer comes back to the app and the chat has no working AI (for example after an install or a
+  // login in the browser): check the providers again, and give the tasks to one that works now.
+  // Settings → AI does its own checks.
+  useEffect(() => {
+    let last = 0
+    const onFocus = (): void => {
+      const app = useApp.getState()
+      const s = app.settings
+      const ui = useUi.getState()
+      if (!s?.onboarded || (ui.settingsOpen && ui.settingsTab === 'ai')) return
+      const route = s.routes.chat
+      if (route && readyProviders(s, app.status).includes(route.provider)) return
+      if (Date.now() - last < 5000) return
+      last = Date.now()
+      void app
+        .checkAllProviders({ quiet: true })
+        .then(() => useApp.getState().autoRoute())
+        .then((r) => {
+          if (!r?.provider) return
+          const t = getT()
+          const name = PROVIDER_LABELS[r.provider].name
+          toast(r.changed.length === 4 ? t.settings.ai.connectedAll(name) : t.settings.ai.connectedSome(name, r.changed.map((k) => t.common.tasks[k].name).join(', ')))
+        })
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [])
+
   useGlobalShortcuts()
 
   // A file dropped outside an editor must not open in the window.
@@ -98,7 +127,8 @@ export function App(): React.JSX.Element {
     <MotionConfig reducedMotion="user">
     <TooltipProvider>
       <div className="app">
-        <TitleBar />
+        {/* The welcome is modal: the title bar and the page take no focus and no clicks behind it. */}
+        <TitleBar inert={!onboarded} />
         <main className="app-main" inert={!onboarded}>
           {/* A fade in with CSS: a quick close and open of another book can never leave a view invisible. */}
           {ready &&

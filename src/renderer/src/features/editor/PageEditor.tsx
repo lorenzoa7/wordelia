@@ -301,8 +301,8 @@ export function PageEditor(): React.JSX.Element | null {
             {ids.length ? <PageEnd /> : <EmptyManuscript />}
             <PageCounter />
           </div>
-          {/* Outside the scaled pages: the bar keeps its size at every zoom. */}
-          {active && <ReviewBar editor={active.editor} />}
+          {/* Outside the scaled pages: the bar keeps its size at every zoom. It stays with its review, in any chapter. */}
+          <ReviewBar />
         </div>
       </div>
       {active && <SelectionMenu editor={active.editor} />}

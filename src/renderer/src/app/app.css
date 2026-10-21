@@ -268,12 +268,13 @@ button.titlebar-logo:active {
 .provider-badge:active {
   background: var(--ribbon-soft);
 }
-/* A narrow window with an update ready: the AI warning keeps its icon and drops its text. */
-@media (max-width: 1120px) {
-  .titlebar-right:has(.update-badge) .provider-badge {
-    padding: 0 6px;
-  }
-  .titlebar-right:has(.update-badge) .provider-badge > span {
-    display: none;
-  }
+/* The tools do not fit in their column (TitleBar.tsx, useFitTools): first the AI warning keeps only its
+   icon, then the update badge too. Their tooltips and labels keep the text. */
+.titlebar-right.fit-1 .provider-badge,
+.titlebar-right.fit-2 .update-badge {
+  padding: 0 6px;
+}
+.titlebar-right.fit-1 .provider-badge > span,
+.titlebar-right.fit-2 .update-badge > span {
+  display: none;
 }

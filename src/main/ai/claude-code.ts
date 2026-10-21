@@ -5,10 +5,11 @@ import { app } from 'electron'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { CompletionResult, ModelInfo, ProviderStatus, StreamEvent } from '@shared/types'
+import { cleanProgramPath } from '@shared/ai/paths'
 import { mainT } from '../i18n'
 import { getSettings } from '../settings'
 import { claudeCandidates, resolveBin, type ResolvedBin } from './resolve-bin'
-import { classifyError, flattenConversation, runCli, type ProviderTransport } from './transport'
+import { failure, flattenConversation, runCli, type ProviderTransport } from './transport'
 import { allImages, claudeStreamInput, type AiRequest } from './images'
 import { latestVersion } from './updates'
 import { claudeModels, rememberResolved } from './claude-models'
@@ -34,7 +35,10 @@ export const claudeCode: ProviderTransport = {
   async status(): Promise<ProviderStatus> {
     const b = await bin()
     const t = (await mainT()).main.ai
-    if (!b) return { provider: 'claude-code', installed: false, loggedIn: false, detail: t.claudeNotFound }
+    if (!b) {
+      const custom = cleanProgramPath((await getSettings()).providers['claude-code'].binPath)
+      return { provider: 'claude-code', installed: false, loggedIn: false, detail: t.claudeNotFound, ...(custom ? { pathIgnored: true } : {}) }
+    }
     const ver = await runCli(b, ['--version'], { timeoutMs: 15000 })
     const version = ver.stdout.trim().split(/\s+/)[0] || undefined
     const [auth, latest] = await Promise.all([runCli(b, ['auth', 'status'], { timeoutMs: 15000 }), latestVersion('claude-code')])
@@ -54,7 +58,9 @@ export const claudeCode: ProviderTransport = {
       version,
       latestVersion: latest,
       account,
-      detail: loggedIn === false ? t.claudeLogin : b.path
+      path: b.path,
+      ...(b.customIgnored ? { pathIgnored: true } : {}),
+      ...(loggedIn === false ? { detail: t.claudeLogin } : {})
     }
   },
 
@@ -228,5 +234,5 @@ async function runOnce(
     return { result: { ok: true, text: text || done.result || '', model, usage: done.usage } }
   }
   const error = (done?.result || assistantError || res.stderr.trim() || t.claudeExited(res.code)).slice(0, 600)
-  return { result: { ok: false, text, model, error, errorKind: classifyError(error) } }
+  return { result: failure(error, { text, model }) }
 }

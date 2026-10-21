@@ -24,7 +24,8 @@ export const settings: typeof en = {
       none: 'Tienes la versión más nueva.',
       downloading: (v, p) => `Descargando la versión ${v}… ${p}%`,
       ready: (v) => `La versión ${v} está lista. Reinicia para instalarla.`,
-      error: (m) => `No se pudieron buscar actualizaciones: ${m}`
+      error: 'No se pudieron buscar actualizaciones. Inténtalo más tarde.',
+      offline: 'No se pudieron buscar actualizaciones: no hay conexión a internet.'
     },
     language: 'Idioma',
     interfaceLanguage: 'Idioma de la interfaz',
@@ -128,10 +129,12 @@ export const settings: typeof en = {
     free: 'Wordelia es gratis. Conecta la IA que ya pagas.',
     help: {
       'claude-code':
-        'Usa tu plan Claude Pro o Max. Instala Claude Code y luego ejecuta `claude auth login` en una terminal. Wordelia ejecuta tu propio programa `claude`; nunca ve tu contraseña ni tus tokens.',
-      codex: 'Usa tu plan de ChatGPT. Instala Codex CLI y luego ejecuta `codex login` en una terminal. Wordelia ejecuta tu propio programa `codex`.',
-      anthropic: 'Pago por uso, con una clave de API de console.anthropic.com. La clave se guarda cifrada en esta computadora.',
-      openai: 'Pago por uso, con una clave de API de platform.openai.com. La clave se guarda cifrada en esta computadora.'
+        'Usa tu plan Claude Pro o Max. Instala Claude Code y haz clic en “Iniciar sesión…”. Wordelia ejecuta tu propio programa `claude`; nunca ve tu contraseña.',
+      codex: 'Usa tu plan de ChatGPT. Instala Codex y haz clic en “Iniciar sesión…”. Wordelia ejecuta tu propio programa `codex`.',
+      anthropic:
+        'Pago por uso: Anthropic cobra cada solicitud en tu cuenta de API. Un plan Claude Pro o Max no paga la API; para usar tu plan, usa Claude Code. La clave se guarda cifrada en esta computadora.',
+      openai:
+        'Pago por uso: OpenAI cobra cada solicitud en tu cuenta de API. Un plan de ChatGPT no paga la API; para usar tu plan, usa Codex. La clave se guarda cifrada en esta computadora.'
     },
     connected: 'Conectado',
     notInstalled: 'No instalado',
@@ -139,21 +142,18 @@ export const settings: typeof en = {
     expired: 'Sesión vencida',
     off: 'Apagado',
     checking: 'Comprobando…',
-    updateAvailable: (version) => `ya salió la versión ${version}`,
     logIn: 'Iniciar sesión…',
     update: 'Actualizar…',
-    install: 'Instalar…',
+    install: 'Cómo instalar',
     addKey: 'Agregar clave',
     turnOn: 'Activar',
     details: 'Detalles',
     checkAgain: 'Volver a comprobar',
     use: (provider) => `Usar ${provider}`,
     providerConnected: (provider) => `${provider} conectado.`,
-    keyFailed: (detail) => `La clave no funcionó: ${detail}`,
     allTasksUse: (provider) => `Ahora todas las tareas usan ${provider}.`,
     version: (version) => `Versión ${version}.`,
     newVersion: (version) => `Ya salió la versión ${version}. Los modelos nuevos suelen necesitar la versión más reciente.`,
-    updateCodex: 'Actualiza Codex con la herramienta que lo instaló.',
     apiKey: 'Clave de API',
     keyPlaceholderSaved: 'Hay una clave guardada. Pega una nueva para reemplazarla.',
     keyPlaceholder: 'Pega tu clave de API',
@@ -169,13 +169,39 @@ export const settings: typeof en = {
     effort: 'Esfuerzo',
     effortHelp: 'Cuánto piensa el modelo. Más esfuerzo da mejores respuestas, pero tardan más y usan más de tu plan.',
     connectFirst: 'Conecta un proveedor arriba para elegir los modelos.',
-    cliDefault: 'Predeterminado del programa',
+    cliDefault: 'Modelo predeterminado',
     providerAria: (task) => `Proveedor (${task})`,
     modelAria: (task) => `Modelo (${task})`,
     effortAria: (task) => `Esfuerzo (${task})`,
-    defaultEffort: (effort, cli) =>
-      effort ? `Predeterminado (${effort})` : cli ? 'Predeterminado (decide el programa)' : 'Predeterminado (decide el modelo)',
-    noEffort: 'Sin ajuste de esfuerzo'
+    defaultEffort: (effort, cli) => (effort ? `Predeterminado (${effort})` : cli ? 'Predeterminado (automático)' : 'Predeterminado (decide el modelo)'),
+    noEffort: 'Sin ajuste de esfuerzo',
+    optional: 'No instalado (opcional)',
+    notLoggedIn: 'Sin sesión',
+    noKey: 'Sin clave',
+    badKey: 'La clave no funcionó',
+    noCredit: 'Sin crédito',
+    offline: 'No se pudo comprobar ahora',
+    waitingLogin: 'Esperando el inicio de sesión…',
+    waitingInstall: 'Esperando la instalación…',
+    waitingUpdate: 'Esperando la actualización…',
+    newVersionShort: (version) => `Ya salió la versión ${version}.`,
+    howToUpdate: 'Cómo actualizar',
+    addCredit: 'Agregar crédito',
+    getKey: 'Obtener una clave',
+    removeKey: 'Quitar clave',
+    detailsAria: (provider) => `Detalles: ${provider}`,
+    actionAria: (action, provider) => `${action}: ${provider}`,
+    program: (path) => `Programa: ${path}`,
+    pathIgnored: 'Wordelia no puede usar esta ruta. Escribe la ruta completa del archivo del programa. Mientras tanto, Wordelia usa el programa que encuentre.',
+    connectedAll: (provider) => `${provider} conectado. Ahora todas las tareas lo usan.`,
+    connectedSome: (provider, tasks) => `${provider} conectado. Ahora hace: ${tasks}.`,
+    movedTo: (off, to) => `${off} está apagado. Las tareas usan ${to} ahora.`,
+    noAiLeft: (off) => `${off} está apagado. Conecta una IA para usar el chat y las acciones.`,
+    keyRejected: (provider) => `La clave no funcionó con ${provider}. Revisa que la copiaste completa.`,
+    keyUnchecked: (provider) => `Clave guardada. Wordelia no pudo conectar con ${provider} para comprobarla.`,
+    keyRemoved: 'Clave quitada.',
+    keyNotSaved: (reason) => `La clave no se guardó. ${reason}`,
+    nowOff: (provider) => `${provider} está apagado.`
   },
   actions: {
     newAction: 'Nueva acción',
@@ -251,6 +277,13 @@ export const settings: typeof en = {
     toBookMessage: 'Los otros libros no tendrán esta acción. Para devolvérsela, abre este libro y elige “Todos los libros”.',
     toBookConfirm: 'Usar solo en este libro',
     movedWithoutShortcut: (name, keys, other) => `“${name}” se quedó sin atajo: ${keys} es el atajo de “${other}”.`,
-    shortcutInBook: (keys, other) => `En este libro, ${keys} ejecuta “${other}”.`
+    shortcutInBook: (keys, other) => `En este libro, ${keys} ejecuta “${other}”.`,
+    unnamed: 'Acción sin nombre',
+    nameEmpty: 'Una acción necesita un nombre.',
+    mainCannotDelete: 'La acción principal no se puede eliminar. Primero, haz que otra acción sea la principal.',
+    moveUp: 'Subir',
+    moveDown: 'Bajar',
+    sameAsActionsWith: (model) => `El mismo de Acciones (${model})`,
+    modelMissing: (provider) => `${provider} no está conectado en esta computadora. Esta acción usa el modelo de Acciones.`
   }
 }

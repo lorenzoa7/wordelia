@@ -7,16 +7,17 @@ import type { AiRequest } from './images'
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
+// Spaces only ([ \t]), never a new line: the paragraphs and the scene breaks of a passage stay.
 const SWAPS: Array<[RegExp, string]> = [
-  [/\bmuito\s+/gi, ''],
-  [/\bvery\s+/gi, ''],
+  [/\bmuito[ \t]+/gi, ''],
+  [/\bvery[ \t]+/gi, ''],
   [/\bdisse\b/g, 'murmurou'],
   [/\bsaid\b/g, 'murmured'],
-  [/\bentão,?\s*/gi, ''],
-  [/\bthen\s+/gi, ''],
+  [/\bentão,?[ \t]*/gi, ''],
+  [/\bthen[ \t]+/gi, ''],
   [/\bolhou\b/g, 'fitou'],
   [/\blooked\b/g, 'gazed'],
-  [/\s{2,}/g, ' ']
+  [/[ \t]{2,}/g, ' ']
 ]
 
 function polish(text: string): string {
@@ -25,8 +26,32 @@ function polish(text: string): string {
   out = out.replace(/(^|[.!?]\s+)([a-zà-ú])/g, (_m, a: string, b: string) => a + b.toUpperCase())
   // A selection that starts in the middle of a sentence keeps its small first letter.
   if (/^[a-zà-ú]/.test(text)) out = out.charAt(0).toLowerCase() + out.slice(1)
-  if (out === text) out = text.replace(/,\s*/, ' — ')
+  if (out === text) out = text.replace(/,[ \t]*/, ' — ')
   return out
+}
+
+/**
+ * Scripted rewrites for the scenarios, by the words of the action instructions:
+ * - "one paragraph": the passage becomes one paragraph, without its scene breaks;
+ * - "without italics": the italics go, the words stay;
+ * - "only a comment": a reply without <rewrite> tags.
+ * Other instructions polish the passage (`polish`).
+ */
+function actionReply(instructions: string, sel: string): string {
+  if (/only a comment/i.test(instructions)) return 'This passage already reads well. I would keep it as it is.'
+  if (/one paragraph/i.test(instructions)) return `<rewrite>\n${sel.replace(/\s*\n\s*\n\s*(?:\* \* \*\s*\n\s*\n\s*)?/g, ' ')}\n</rewrite>`
+  if (/without italics/i.test(instructions)) return `<rewrite>\n${sel.replace(/\*([^*\n]+)\*/g, '$1')}\n</rewrite>`
+  return `<rewrite>\n${polish(sel)}\n</rewrite>`
+}
+
+/** A failure for the scenarios: instructions with "scripted error: not-logged-in" (or another kind). */
+function scriptedError(req: AiRequest): CompletionResult | null {
+  if (req.purpose !== 'action') return null
+  const last = req.messages[req.messages.length - 1]?.content ?? ''
+  const m = /scripted error: ([a-z-]+)/i.exec(between(last, '<instructions>', '</instructions>') ?? '')
+  if (!m) return null
+  const kind = m[1] as NonNullable<CompletionResult['errorKind']>
+  return { ok: false, text: '', error: kind === 'not-logged-in' ? 'Not logged in. Run claude and log in.' : 'Scripted failure.', errorKind: kind }
 }
 
 function between(src: string, open: string, close: string): string | null {
@@ -133,7 +158,7 @@ function reply(req: AiRequest): string {
   }
   if (req.purpose === 'action') {
     const sel = between(last, '<selection>\n', '\n</selection>') ?? between(last, '<selection>', '</selection>') ?? last
-    return `<rewrite>\n${polish(sel.trim())}\n</rewrite>`
+    return actionReply(between(last, '<instructions>', '</instructions>') ?? '', sel.trim())
   }
   if (req.purpose === 'background' && /short title/i.test(req.system)) return 'The opening paragraph'
   if (req.purpose === 'background') {
@@ -256,6 +281,8 @@ export function mockProvider(id: ProviderId): ProviderTransport {
       ]
     },
     async complete(req: AiRequest, onEvent: (e: StreamEvent) => void, signal: AbortSignal): Promise<CompletionResult> {
+      const failure = scriptedError(req)
+      if (failure) return failure
       const text = reply(req)
       // Screenshot scenarios can slow the reply down (milliseconds for each piece).
       const delay = Number(process.env['WORDELIA_MOCK_DELAY'] ?? '') || 12

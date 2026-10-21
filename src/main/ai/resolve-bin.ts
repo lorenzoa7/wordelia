@@ -6,6 +6,7 @@
 import { readFile, stat } from 'node:fs/promises'
 import { delimiter, dirname, isAbsolute, join } from 'node:path'
 import { homedir } from 'node:os'
+import { cleanProgramPath } from '@shared/ai/paths'
 
 export interface ResolvedBin {
   /** Program to spawn */
@@ -16,6 +17,8 @@ export interface ResolvedBin {
   env: Record<string, string>
   /** For display */
   path: string
+  /** True when the program path of the settings did not work, so the app found the program itself */
+  customIgnored?: boolean
 }
 
 async function isFile(p: string): Promise<boolean> {
@@ -64,19 +67,27 @@ export function clearBinCache(): void {
   cache.clear()
 }
 
+/** True when the program path of the settings can run: a full path to a file. */
+export async function usableProgramPath(path: string | undefined): Promise<boolean> {
+  const p = cleanProgramPath(path)
+  return Boolean(p && isAbsolute(p) && (await isFile(p)))
+}
+
 /**
- * Resolve a CLI by name. `extraCandidates` are absolute paths to try after PATH.
+ * Resolve a CLI by name. `extraCandidates` are absolute paths to try after PATH. A custom path that
+ * does not work (not a full path, or no file there) is skipped, and the result says so (`customIgnored`).
  */
 export async function resolveBin(
   name: string,
-  customPath?: string,
+  rawCustomPath?: string,
   extraCandidates: string[] = []
 ): Promise<ResolvedBin | null> {
+  const customPath = cleanProgramPath(rawCustomPath)
   const key = `${name}|${customPath ?? ''}`
   if (cache.has(key)) return cache.get(key) ?? null
 
-  const result = await (async (): Promise<ResolvedBin | null> => {
-    if (customPath && isAbsolute(customPath) && (await isFile(customPath))) {
+  const found = await (async (): Promise<ResolvedBin | null> => {
+    if (customPath && (await usableProgramPath(customPath))) {
       if (customPath.toLowerCase().endsWith('.cmd')) {
         const t = await shimTarget(customPath)
         if (t) return fromTarget(t)
@@ -102,6 +113,7 @@ export async function resolveBin(
     for (const c of extraCandidates) if (await isFile(c)) return fromTarget(c)
     return null
   })()
+  const result = found && customPath && !(await usableProgramPath(customPath)) ? { ...found, customIgnored: true } : found
 
   cache.set(key, result)
   return result

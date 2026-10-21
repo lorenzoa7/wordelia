@@ -19,7 +19,8 @@ import {
   normalizeManifest,
   uniqueName
 } from '@shared/book'
-import type { AiAction, BookManifest, BookSnapshot, CategoryDef, Chapter, Entry, SyncState, Thread } from '@shared/types'
+import type { AiAction, BookManifest, BookNotice, BookSnapshot, CategoryDef, Chapter, ChapterRef, Entry, SyncState, Thread } from '@shared/types'
+import { keepMissingChapters } from '@shared/manifest'
 import { bookActionsFile, parseBookActions } from '@shared/ai/scopes'
 import { boardView, findStoryLine, headingName, isStoryLine, parseBoard, renameChapterInBody } from '@shared/storyline'
 import { invoke, on } from '@/lib/api'
@@ -28,6 +29,7 @@ import { untitledChapter } from '@shared/export/model'
 import { runFlushers } from '@/lib/flush'
 import { getT } from '@/lib/i18n'
 import { openingPlace } from '@/features/write/place'
+import { toast, useUi } from './ui'
 
 export type BookView = 'write' | 'plan'
 
@@ -53,7 +55,11 @@ interface BookState {
   chapterJump: { id: string; n: number; focus?: boolean } | null
 
   open(snap: BookSnapshot): void
-  close(): Promise<void>
+  /**
+   * Save everything, then close the book. When some text could not be saved, the book stays open and the
+   * result is false, unless `force` (the writer chose "Close anyway").
+   */
+  close(opts?: { force?: boolean }): Promise<boolean>
   setView(view: BookView): void
   /** Open a chapter: it becomes active and the pages scroll to it */
   selectChapter(id: string): void
@@ -107,6 +113,31 @@ function entryRel(e: Pick<Entry, 'file'>): string {
 }
 
 let offExternal: (() => void) | null = null
+/**
+ * Chapters in the manifest whose files were not there when the book opened (a sync client did not deliver
+ * them yet). The manifest keeps their places; a file that arrives becomes a chapter in its place.
+ */
+let missingRefs: ChapterRef[] = []
+
+/**
+ * The chapter file names that a new name must not take: the files of the chapters, and the files of the
+ * missing chapters, which keep their places in the manifest until their files arrive.
+ */
+function takenChapterFiles(chapters: Chapter[], exceptId?: string): string[] {
+  return [...chapters.filter((c) => c.id !== exceptId).map((c) => c.file), ...missingRefs.map((r) => r.file)]
+}
+
+/** Tell the writer what the app found in the files of the book when it opened. */
+function showNotices(root: string, notices: BookNotice[], forgetMissing: () => void): void {
+  const t = getT().library
+  for (const n of notices) {
+    if (n.kind === 'manifestRepaired') {
+      toast(t.manifestRepaired[n.from], { ms: 30000, action: { label: t.showOldFile, run: () => void invoke('book:reveal', root, n.backup) } })
+    } else {
+      toast(t.chaptersMissing(n.files.map((f) => f.replace(/\.md$/i, ''))), { ms: 30000, action: { label: t.forgetMissing(n.files.length), run: forgetMissing } })
+    }
+  }
+}
 
 export const useBook = create<BookState>((set, get) => {
   const persistManifest = (m: BookManifest, immediate = false): void => {
@@ -145,10 +176,20 @@ export const useBook = create<BookState>((set, get) => {
     if (rel.startsWith(`${MANUSCRIPT_DIR}/`) && rel.endsWith('.md')) {
       const file = rel.slice(MANUSCRIPT_DIR.length + 1)
       const existing = st.chapters.find((c) => c.file === file)
+      // The file of a missing chapter arrives (a sync client delivered it): the chapter comes back in its place.
+      const lost = !existing && content != null ? missingRefs.find((r) => r.file === file) : undefined
+      if (lost && content != null) {
+        missingRefs = missingRefs.filter((r) => r !== lost)
+        const order = (st.manifest?.chapters ?? []).map((r) => r.id)
+        const back = { ...chapterFromFile(file, content, lost.id), id: lost.id }
+        set({ chapters: [...st.chapters, back].sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id)) })
+        return
+      }
       if (content == null) return
       if (!existing) {
-        // A new chapter file (put back from the trash, or from a sync client) joins the book at the
-        // end, as it does when the book opens. A file in a folder, or with the id of a chapter, does not.
+        // Another new chapter file (put back from the trash by hand, or from a sync client) joins the
+        // book at the end, as it does when the book opens. A file in a folder, or with the id of a
+        // chapter, does not.
         if (file.includes('/')) return
         const added = chapterFromFile(file, content, `ch_${hashText(file)}`)
         if (st.chapters.some((c) => c.id === added.id)) return
@@ -200,6 +241,9 @@ export const useBook = create<BookState>((set, get) => {
 
     open(snap) {
       offExternal?.()
+      // The find bar, the history and the export of the last book do not stay open in this one.
+      useUi.getState().resetForBook()
+      missingRefs = snap.manifest.chapters.filter((r) => !snap.chapters.some((c) => c.id === r.id))
       void invoke('window:setSpellLanguage', snap.manifest.language)
       offExternal = on('book:externalChange', (e) => {
         if (e.root === get().root) handleExternal(e.rel, e.content)
@@ -221,16 +265,29 @@ export const useBook = create<BookState>((set, get) => {
         undoableRev: {},
         chapterJump: null
       })
+      if (snap.notices?.length) {
+        showNotices(snap.root, snap.notices, () => {
+          // "Forget": the missing chapters leave the order of the book (if the book is still open).
+          if (get().root !== snap.root) return
+          missingRefs = []
+          get().updateManifest({ chapters: get().chapters.map((c) => ({ id: c.id, file: c.file })) })
+        })
+      }
     },
 
-    async close() {
+    async close(opts = {}) {
       runFlushers()
-      await saver.flush()
+      const saved = await saver.flush()
+      // Some text is not on disk: the book stays open, and the caller asks the writer (like the window close).
+      if (!saved && !opts.force) return false
       const root = get().root
       if (root) await invoke('book:close', root)
       offExternal?.()
       offExternal = null
+      missingRefs = []
+      useUi.getState().resetForBook()
       set({ root: null, manifest: null, chapters: [], entries: [], threads: [], actions: [], activeChapterId: null, activeEntryId: null })
+      return true
     },
 
     setView(view) {
@@ -256,6 +313,8 @@ export const useBook = create<BookState>((set, get) => {
       const m = get().manifest
       if (!m) return
       const next = { ...m, ...patch, updatedAt: now() }
+      // Chapters whose files are missing for now keep their places in the order.
+      if (patch.chapters && missingRefs.length) next.chapters = keepMissingChapters(patch.chapters, m.chapters, new Set(missingRefs.map((r) => r.id)))
       set({ manifest: next })
       persistManifest(next)
       if (patch.language && patch.language !== m.language) void invoke('window:setSpellLanguage', patch.language)
@@ -276,8 +335,7 @@ export const useBook = create<BookState>((set, get) => {
       const ch = chapters.find((c) => c.id === id)
       if (!ch || !root) return
       const clean = title.trim() || getT().common.untitled
-      const others = chapters.filter((c) => c.id !== id).map((c) => c.file)
-      const file = uniqueName(fileNameFromTitle(clean), others)
+      const file = uniqueName(fileNameFromTitle(clean), takenChapterFiles(chapters, id))
       const oldRel = chapterRel(ch)
       // Point the store at the new file first, so every later write goes there.
       set({ chapters: get().chapters.map((c) => (c.id === id ? { ...c, title: clean, file } : c)) })
@@ -331,7 +389,7 @@ export const useBook = create<BookState>((set, get) => {
       const planned = heading ? headingName(heading) : undefined
       // Else a title without a number: a number in the title would be wrong after the chapter moves.
       const t = title ?? (planned || untitledChapter(get().manifest?.language ?? 'en'))
-      const file = uniqueName(fileNameFromTitle(t), chapters.map((c) => c.file))
+      const file = uniqueName(fileNameFromTitle(t), takenChapterFiles(chapters))
       const ch: Chapter = { id: newId('ch'), file, title: t, body, meta: {} }
       const next = [...chapters.slice(0, idx), ch, ...chapters.slice(idx)]
       set({ chapters: next, activeChapterId: ch.id, view: 'write', chapterJump: { id: ch.id, n: (get().chapterJump?.n ?? 0) + 1, focus: true } })
@@ -363,7 +421,7 @@ export const useBook = create<BookState>((set, get) => {
         const st = get()
         if (st.root !== root || st.chapters.some((c) => c.id === ch.id)) return
         // Its old place, among the chapters that are still there; another file with its name keeps it.
-        const file = uniqueName(ch.file, st.chapters.map((c) => c.file))
+        const file = uniqueName(ch.file, takenChapterFiles(st.chapters))
         const back = { ...ch, file }
         const at = Math.min(idx, st.chapters.length)
         const list = [...st.chapters.slice(0, at), back, ...st.chapters.slice(at)]

@@ -39,7 +39,12 @@ export const write: typeof en = {
     connectFirst: 'Conecta una IA primero.',
     openSettings: 'Abrir ajustes',
     nothingToChange: 'La IA no encontró nada que cambiar.',
-    noRewrite: 'La IA no envió la nueva versión. Inténtalo de nuevo.'
+    noRewrite: 'La IA no envió la nueva versión. Inténtalo de nuevo.',
+    nothingSelected: 'Selecciona un texto o pon el cursor en un párrafo con texto.',
+    aiSays: (words) => `La IA no reescribió el pasaje: “${words}”`,
+    readyIn: (action, chapter) => `El cambio de ${action} está listo en “${chapter}”.`,
+    show: 'Mostrar',
+    changedMeanwhile: 'El pasaje cambió mientras la IA trabajaba. Su cambio no se guardó.'
   },
   newChapterAfterOne: (title) => `Nuevo capítulo después de “${title}”`,
   addChapterAtEnd: 'Nuevo capítulo al final',

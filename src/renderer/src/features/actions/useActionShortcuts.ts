@@ -16,6 +16,10 @@ export function useActionShortcuts(): void {
       if (e.repeat || useBook.getState().view !== 'write') return
       // The settings record shortcuts: do not run an action behind the dialog.
       if (useUi.getState().settingsOpen) return
+      // Only in the text of a chapter, or on the review bar (a retry). Not in the chat composer, the
+      // find bar or a chapter title: there the old selection of the text is not what the author sees.
+      const focus = e.target instanceof Element ? e.target : null
+      if (!focus?.closest('.manuscript, .review-bar')) return
       const a = actionForKeys(
         {
           key: e.key,

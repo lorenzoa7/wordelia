@@ -25,7 +25,7 @@ export function hasConflictMarkers(text: string): boolean {
 export function resolveConflict(text: string, side: 'ours' | 'theirs'): string {
   const out: string[] = []
   let part: 'none' | 'ours' | 'base' | 'theirs' = 'none'
-  for (const line of text.split(/\r?\n/)) {
+  for (const line of text.split(/\r\n|\r|\n/)) {
     if (/^<{7}( |$)/.test(line)) part = 'ours'
     else if (part !== 'none' && /^\|{7}( |$)/.test(line)) part = 'base'
     else if (part !== 'none' && /^={7}$/.test(line)) part = 'theirs'

@@ -106,13 +106,22 @@ export default async function ({ page, shot, openBook, book }) {
   const keyList = keys.map((k) => k.replace(/\s+/g, ' ').trim()).filter((k) => /Alt\+2|Tighten|Narrator/.test(k))
   if (keyList.join() !== 'Narrator voice Alt+2') fail(`the keyboard list shows ${keyList.join()}`)
   await page.keyboard.press('Escape')
-  await page.waitForTimeout(400)
+  // Wait until Settings has closed: a click on the page while the dialog fades out does not reach the text.
+  await page.waitForFunction(() => !document.querySelector('[role="dialog"]'), null, { timeout: 10000 })
 
   // The selection menu lists the book action, and Alt+2 runs it.
   const p = page.locator('.manuscript p').nth(2)
-  await p.click()
-  await page.keyboard.press('Home')
-  await page.keyboard.press('Shift+End')
+  const select = async () => {
+    await p.click()
+    await page.keyboard.press('Home')
+    await page.keyboard.press('Shift+End')
+  }
+  await select()
+  // On a busy machine the first click can come before the editor takes the focus: select once more.
+  if (!(await page.locator('.selection-menu .sel-more').isVisible())) {
+    await page.waitForTimeout(500)
+    if (!(await page.locator('.selection-menu .sel-more').isVisible())) await select()
+  }
   await page.waitForSelector('.selection-menu .sel-more', { state: 'visible' })
   await page.locator('.selection-menu .sel-more').click()
   await page.waitForSelector('[role="menu"]', { state: 'visible' })

@@ -23,7 +23,7 @@ const backups = async (): Promise<string[]> => (await readdir(join(book, '.worde
 describe('a wordelia.json that does not parse', () => {
   it('git conflict markers: one side comes back, and the damaged file stays as a copy', async () => {
     const good = await manifestText()
-    const broken = good.replace(/^(\s*"title": .*)$/m, '<<<<<<< HEAD\n$1\n=======\n  "title": "O Farol",\n>>>>>>> outro-computador')
+    const broken = good.replace(/^([ \t]*"title": .*)$/m, '<<<<<<< HEAD\n$1\n=======\n  "title": "O Farol",\n>>>>>>> outro-computador')
     await writeFile(join(book, 'wordelia.json'), broken)
     const snap = await openBook(book)
     expect(snap.manifest.id).toBe('bk_sample01')

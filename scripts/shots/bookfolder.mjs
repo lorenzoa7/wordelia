@@ -25,7 +25,7 @@ export default async function ({ page, shot, book }) {
 
   // 1. Git conflict markers in the manifest.
   const good = await readFile(manifestFile, 'utf8')
-  const broken = good.replace(/^(\s*"title": .*)$/m, '<<<<<<< HEAD\n$1\n=======\n  "title": "O Farol (outro computador)",\n>>>>>>> outro')
+  const broken = good.replace(/^([ \t]*"title": .*)$/m, '<<<<<<< HEAD\n$1\n=======\n  "title": "O Farol (outro computador)",\n>>>>>>> outro')
   await writeFile(manifestFile, broken)
   await open()
   const m = await page.evaluate(() => window.__wordelia.book.getState().manifest)

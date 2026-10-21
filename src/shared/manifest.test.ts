@@ -33,6 +33,17 @@ describe('a manifest that does not parse', () => {
     expect(parseManifestText(resolveConflict(text, 'theirs'))?.title).toBe('O Farol')
   })
 
+  it('git conflict markers with Windows line ends, also a lone carriage return before a marker', () => {
+    const lines = manifest().split('\n')
+    const i = lines.findIndex((l) => l.includes('"title"'))
+    const crlf = [...lines.slice(0, i), '<<<<<<< HEAD', lines[i], '=======', '  "title": "O Farol",', '>>>>>>> other-computer', ...lines.slice(i + 1)].join('\r\n')
+    expect(parseManifestText(resolveConflict(crlf, 'ours'))?.title).toBe('O Farol de Santa Ilha')
+    // A marker after a lone "\r" is at the start of a line for hasConflictMarkers: the repair must agree.
+    const lone = crlf.replace('\r\n<<<<<<< HEAD', '\r<<<<<<< HEAD')
+    expect(hasConflictMarkers(lone)).toBe(true)
+    expect(parseManifestText(resolveConflict(lone, 'theirs'))?.title).toBe('O Farol')
+  })
+
   it('a file that stops in the middle (a sync client did not finish): the id, the language and the chapter order come back', () => {
     const full = manifest()
     const half = full.slice(0, full.indexOf('"export"') + 30)

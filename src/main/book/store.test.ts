@@ -111,3 +111,41 @@ describe('a folder that is not a book', () => {
     expect(await inspectFolder(join(book, 'planning', 'Characters'))).toMatchObject({ kind: 'inside', root: book })
   })
 })
+
+describe('the threads of a book', () => {
+  const msg = (id: string, over: Record<string, unknown> = {}): Record<string, unknown> => ({ id, role: 'user', content: 'Leitura', createdAt: '2026-10-21T10:00:00.000Z', ...over })
+
+  async function writeThread(file: string, t: Record<string, unknown>): Promise<void> {
+    await mkdir(join(book, 'ai', 'threads'), { recursive: true })
+    await writeFile(join(book, 'ai', 'threads', file), JSON.stringify(t))
+  }
+
+  it('a read thread keeps the chapter of its reads and the request of each read', async () => {
+    await writeThread('th_read.json', {
+      id: 'th_read',
+      title: 'Leitura · A Tempestade',
+      messages: [
+        msg('m1', { read: { chapterId: 'ch_sample01', lens: 'style', inProgress: true, selection: { text: 'Elias acendeu a lâmpada.' } } }),
+        msg('m2', { role: 'assistant', content: 'Uma carta curta.' })
+      ],
+      readChapterId: 'ch_sample01'
+    })
+    const [thread] = (await openBook(book)).threads
+    expect(thread.readChapterId).toBe('ch_sample01')
+    expect(thread.messages[0].read).toEqual({ chapterId: 'ch_sample01', lens: 'style', inProgress: true, selection: { text: 'Elias acendeu a lâmpada.' } })
+    expect(thread.messages[1]).not.toHaveProperty('read')
+  })
+
+  it('a read of the wrong shape and a chapter that is not a text are dropped, and the messages stay', async () => {
+    await writeThread('th_bad.json', {
+      id: 'th_bad',
+      title: 'Conversa',
+      messages: [msg('m1', { read: { chapterId: 'ch_sample01', lens: 'plot', inProgress: false } }), msg('m2', { read: 'ler' })],
+      readChapterId: 7
+    })
+    const [thread] = (await openBook(book)).threads
+    expect(thread).not.toHaveProperty('readChapterId')
+    expect(thread.messages.map((m) => m.id)).toEqual(['m1', 'm2'])
+    expect(thread.messages.every((m) => !('read' in m))).toBe(true)
+  })
+})

@@ -1,6 +1,8 @@
 // A scripted provider for end-to-end tests and screenshots (WORDELIA_MOCK_AI=1).
 // It never calls a real AI. Its replies follow the same protocols as real replies.
 
+import { markdownToPlainBlocks } from '@shared/book'
+import { READ_MARK } from '@shared/prompts/read'
 import type { CompletionResult, ModelInfo, ProviderId, ProviderStatus, StreamEvent } from '@shared/types'
 import type { ProviderTransport } from './transport'
 import type { AiRequest } from './images'
@@ -61,9 +63,87 @@ function between(src: string, open: string, close: string): string | null {
   return b < 0 ? null : src.slice(a + open.length, b)
 }
 
+/** The open chapter in the system prompt: its file (group 1) and its Markdown (group 2). */
+const OPEN_CHAPTER = /<chapter file="([^"]+)"[^>]*current="true"[^>]*>\n([\s\S]*?)\n<\/chapter>/
+
+/** The words of an author who asks for an editor's read, in the three languages of the app. */
+const READ_WORDS = /leitura de editor|lectura (?:de|del) editor|editor['’]s read/i
+
+/** One comment of the scripted read: the lens, and the text in Portuguese and in English. */
+const READ_NOTES: Array<{ lens: string; pt: string; en: string }> = [
+  {
+    lens: 'style',
+    pt: 'Três frases seguidas abrem do mesmo jeito. Varie o ritmo da abertura.',
+    en: 'Three sentences in a row open the same way. Vary the rhythm of the opening.'
+  },
+  {
+    lens: 'structure',
+    pt: 'O conflito demora a aparecer: o leitor só sabe do barco que falta no segundo parágrafo.',
+    en: 'The conflict arrives late: the reader learns about the missing boat only in the second paragraph.'
+  },
+  {
+    lens: 'continuity',
+    pt: 'Marta já aparece aqui com café, mas a nota dela fala só do cuidado com o visitante. Confira o papel dela.',
+    en: 'Marta already appears here with coffee, but her note only speaks about caring for the visitor. Check her role.'
+  }
+]
+
+const MARTA_SOURCE = {
+  pt: 'Cuida do visitante durante a febre e registra o que ele diz.',
+  en: 'She nurses the visitor through his fever and records what he says.'
+}
+
+/**
+ * Scripted editor's read (the prompt is in src/shared/prompts/read.ts):
+ * - A read block: a letter of two lines and one comment on each of the first three paragraphs of the
+ *   open chapter (style, structure, continuity). The passage is the first six words of the paragraph in
+ *   plain text, so the app finds it again. The first open comment of the block is said to be fixed.
+ * - The words "editor's read" outside a read block: the offer of a read of the open chapter.
+ * - Else `null`: the other scripted replies answer.
+ */
+export function readReply(system: string, last: string, english: boolean): string | null {
+  const chapter = OPEN_CHAPTER.exec(system)
+  if (!last.includes(READ_MARK)) {
+    if (!chapter || !READ_WORDS.test(last)) return null
+    return [english ? "I can run an editor's read of this chapter." : 'Posso fazer a leitura de editor deste capítulo.', '', `<read chapter="${chapter[1]}" lens="structure"/>`].join('\n')
+  }
+  const letter = english
+    ? [
+        '**What works:** the lamp, the sea and the missing boat open the chapter with a strong image.',
+        '**What I would look at first:** the rhythm of the opening (style, → 1), how late the conflict starts (structure, → 2) and what Marta may know (continuity, → 3).'
+      ]
+    : [
+        '**O que funciona:** a lâmpada, o mar e o barco que falta abrem o capítulo com uma imagem forte.',
+        '**O que eu olharia primeiro:** o ritmo da abertura (estilo, → 1), a demora do conflito (estrutura, → 2) e o que Marta pode saber (continuidade, → 3).'
+      ]
+  const paragraphs = markdownToPlainBlocks(chapter?.[2] ?? '')
+    .split('\n\n')
+    .filter(Boolean)
+  const notes = paragraphs.slice(0, READ_NOTES.length).map((p, i) => {
+    const note = READ_NOTES[i]
+    const find = p.split(/\s+/).filter(Boolean).slice(0, 6).join(' ')
+    return [
+      `<note lens="${note.lens}" rank="${i + 1}">`,
+      `<find>${find}</find>`,
+      `<text>${english ? note.en : note.pt}</text>`,
+      ...(note.lens === 'continuity' ? [`<source file="planning/Characters/Marta.md">${english ? MARTA_SOURCE.en : MARTA_SOURCE.pt}</source>`] : []),
+      '</note>'
+    ].join('\n')
+  })
+  // The block lists the open comments as `<id> [lens] "passage" — text`.
+  const fixed = /^Open comments[^\n]*\n(\S+) \[/m.exec(last)?.[1]
+  return [letter.join('\n\n'), '', ...notes.flatMap((n) => [n, '']), ...(fixed ? [`<resolved ids="${fixed}"/>`] : [])].join('\n').trimEnd()
+}
+
 function reply(req: AiRequest): string {
   const last = req.messages[req.messages.length - 1]?.content ?? ''
   const english = /language="[^"]*English/.test(req.system)
+  // An editor's read, or the request for one. First of all: a read block talks about the story line and
+  // about edits, and the other scripted replies would take it for a request of theirs.
+  if (req.purpose === 'chat') {
+    const read = readReply(req.system, last, english)
+    if (read !== null) return read
+  }
   // A message with images: describe the person, and propose the image as the portrait of the entry
   // that the message names. The count is the images that the main process read from the book.
   const images = req.messages[req.messages.length - 1]?.images ?? []
@@ -210,7 +290,7 @@ function reply(req: AiRequest): string {
     ].join('\n')
   }
   // Chat: propose an edit to the first paragraph of the current chapter.
-  const chapter = /<chapter file="([^"]+)"[^>]*current="true"[^>]*>\n([\s\S]*?)\n<\/chapter>/.exec(req.system)
+  const chapter = OPEN_CHAPTER.exec(req.system)
   // The first paragraph with words to improve, so the diff shows real changes.
   const paras = chapter?.[2].split(/\n\n/).filter((p) => p.trim().length > 40) ?? []
   const improvable = (p: string): boolean => SWAPS.slice(0, -1).some(([re]) => new RegExp(re.source, re.flags.replace('g', '')).test(p))
@@ -253,6 +333,13 @@ function reply(req: AiRequest): string {
 function thinking(req: AiRequest): string {
   if (req.purpose !== 'chat') return ''
   const last = req.messages[req.messages.length - 1]?.content ?? ''
+  if (last.includes(READ_MARK)) {
+    return [
+      'Reading the chapter as an editor, with the planning notes and the story line at hand.',
+      'Three places stand out: the rhythm of the opening, the start of the conflict, and what Marta knows.',
+      'I will rank them, write the letter first and then one comment for each place.'
+    ].join('\n\n')
+  }
   const edit = /edit|change|improve|rewrite|melhor|mude|reescrev/i.test(last)
   return [
     'Reading the request against the current chapter and the planning notes.',

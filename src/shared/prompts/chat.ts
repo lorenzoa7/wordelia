@@ -18,6 +18,7 @@ import {
   writingRulesBlock,
   type BookContext
 } from './context'
+import { READ_OFFER_RULES } from './read'
 
 export interface ChatPromptInput {
   book: BookContext
@@ -121,7 +122,9 @@ Rules for images:
 - For a new entry with a portrait, put "image: _assets/chat/…" in the front matter of the <create>, after the summary.
 - When you describe a person or a place from an image, write the description in the language of the book and follow the writing rules.
 
-Write one short sentence before each proposal to say what it does and why. Never put proposals inside code blocks.`
+Write one short sentence before each proposal to say what it does and why. Never put proposals inside code blocks.
+
+${READ_OFFER_RULES}`
 
 function selectEntries(input: ChatPromptInput): Entry[] {
   const { book, mentions, quotes, message, currentChapterId, currentEntryId } = input

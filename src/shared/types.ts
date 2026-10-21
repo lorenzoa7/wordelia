@@ -1,6 +1,8 @@
 // Domain types shared by the main process and the renderer.
 // Terms follow GLOSSARY.md.
 
+import type { LensChoice } from './comments'
+
 export type Id = string
 
 /* ------------------------------------------------------------------ */
@@ -348,6 +350,16 @@ export interface Mention {
 
 export type HunkState = 'pending' | 'accepted' | 'rejected' | 'failed'
 
+/** The request of an editor's read. The message of the author carries it; the read block of the prompt comes from it. */
+export interface ReadRequest {
+  chapterId: Id
+  lens: LensChoice
+  /** The chapter is not finished: the AI does not comment on a missing end. */
+  inProgress: boolean
+  /** The plain text of the selected part. The read comments only on it. */
+  selection?: { text: string }
+}
+
 export interface ChatMessage {
   id: Id
   role: 'user' | 'assistant'
@@ -357,6 +369,8 @@ export interface ChatMessage {
   mentions?: Mention[]
   /** Images that the writer added to the message */
   images?: ChatImage[]
+  /** The message asks for an editor's read of a chapter (only on the message of the author). */
+  read?: ReadRequest
   /**
    * Proposal hunk key to state. The changes of a story line proposal have their own keys,
    * `line:<change id>` (features/plan/line/proposal.ts).
@@ -406,6 +420,8 @@ export interface Thread {
    * Threads from before this field have none: they count as seen.
    */
   readAt?: string
+  /** The thread is the thread of the editor's reads of this chapter (one thread for each chapter). */
+  readChapterId?: Id
 }
 
 /* ------------------------------------------------------------------ */

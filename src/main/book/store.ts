@@ -24,7 +24,8 @@ import {
 import { writingRulesTemplate } from '@shared/ai/defaults'
 import { parseBookActions } from '@shared/ai/scopes'
 import { untitledChapter } from '@shared/export/model'
-import type { BookManifest, BookNotice, BookSnapshot, Chapter, Entry, SyncState, Thread } from '@shared/types'
+import { parseReadRequest } from '@shared/prompts/read'
+import type { BookManifest, BookNotice, BookSnapshot, Chapter, ChatMessage, Entry, SyncState, Thread } from '@shared/types'
 import type { FolderInfo, OpenBookOptions } from '@shared/ipc'
 import { hasConflictMarkers, parseManifestText, resolveConflict, salvageManifest } from '@shared/manifest'
 import { atomicWrite, readJson, readTextOr, safeJoin } from '../fsutil'
@@ -288,6 +289,14 @@ export async function openBook(root: string, opts: OpenBookOptions = {}): Promis
   return { root, manifest, chapters, entries, threads, writingRules, syncState, actions, ...(notices.length ? { notices } : {}) }
 }
 
+/** A message of a thread file. A read request of the wrong shape goes away; the message stays. */
+function normalizeMessage(m: ChatMessage): ChatMessage {
+  if (typeof m !== 'object' || m === null || !('read' in m)) return m
+  const { read, ...rest } = m
+  const request = parseReadRequest(read)
+  return request ? { ...rest, read: request } : rest
+}
+
 function normalizeThread(t: Thread): Thread {
   return {
     id: t.id,
@@ -299,7 +308,8 @@ function normalizeThread(t: Thread): Thread {
     updatedAt: t.updatedAt ?? t.createdAt ?? new Date().toISOString(),
     pinned: Boolean(t.pinned),
     route: t.route ?? null,
-    messages: t.messages,
-    ...(typeof t.readAt === 'string' ? { readAt: t.readAt } : {})
+    messages: t.messages.map(normalizeMessage),
+    ...(typeof t.readAt === 'string' ? { readAt: t.readAt } : {}),
+    ...(typeof t.readChapterId === 'string' && t.readChapterId ? { readChapterId: t.readChapterId } : {})
   }
 }

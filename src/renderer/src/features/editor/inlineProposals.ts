@@ -85,24 +85,25 @@ export const useInlineProposals = create<InlineState>(() => ({ list: [], portrai
 /** Old proposals that the author brought back to the text with "Show in text", for this session */
 const revived = new Set<string>()
 
+/** Where the current replies of a thread start. The planning sync has its own review: all its proposals are current. */
+function currentOf(thread: Thread): number {
+  return thread.id === SYNC_THREAD_ID ? 0 : currentFrom(thread.messages)
+}
+
 /** The current replies of a thread (the newest first), and the old replies with a proposal that the author brought back. */
-function repliesOf(thread: Thread, all = false): ChatMessage[] {
-  // The planning sync has its own review: all its proposals are current.
-  const from = all || thread.id === SYNC_THREAD_ID ? 0 : currentFrom(thread.messages)
+function repliesOf(thread: Thread): ChatMessage[] {
+  const from = currentOf(thread)
   return thread.messages.filter((m, i) => m.role === 'assistant' && (i >= from || [...revived].some((id) => id.startsWith(`${thread.id}:${m.id}:`)))).reverse()
 }
 
-/**
- * The changes of a thread to chapters and planning entries that wait for a decision, the newest first.
- * `all`: also the changes of the old replies.
- */
-export function pendingProposals(thread: Thread, all = false): InlineProposal[] {
+/** The changes of a thread to chapters and planning entries that wait for a decision and show in the text, the newest first. */
+export function pendingProposals(thread: Thread): InlineProposal[] {
   const out: InlineProposal[] = []
-  for (const m of repliesOf(thread, all)) {
+  const from = currentOf(thread)
+  for (const m of repliesOf(thread)) {
     if (!m.content.includes('<edit')) continue
     const states = m.hunks ?? {}
-    const from = currentFrom(thread.messages)
-    const old = thread.id !== SYNC_THREAD_ID && thread.messages.indexOf(m) < from
+    const old = thread.messages.indexOf(m) < from
     const mine: InlineProposal[] = []
     for (const seg of parseProposals(m.content)) {
       if (seg.kind !== 'edit') continue
@@ -114,7 +115,7 @@ export function pendingProposals(thread: Thread, all = false): InlineProposal[] 
         const state = states[key]
         const id = inlineProposalId(thread.id, m.id, key)
         if (!h.complete || (state && state !== 'pending')) return
-        if (old && !all && !revived.has(id)) return
+        if (old && !revived.has(id)) return
         mine.push({ id, threadId: thread.id, messageId: m.id, key, ...doc, file: seg.file, find: h.find.trim() ? h.find : '', replace: h.replace })
       })
     }

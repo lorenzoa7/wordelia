@@ -10,7 +10,7 @@ import { useT } from '@/lib/i18n'
 import { toast } from '@/stores/ui'
 import { oldPending } from '@shared/proposals/state'
 import { SYNC_THREAD_ID } from '@/features/plan/sync'
-import { composerEditor, ensureBlank, focusComposer, useChat, worthKeeping } from './chatStore'
+import { composerEditor, draftKey, ensureBlank, focusComposer, useChat, worthKeeping } from './chatStore'
 import { askConfirm } from '@/ui/prompt'
 import { newThread, stopReply, threadBrief, threadTitle } from './send'
 import { MessageView, StreamingMessage } from './MessageView'
@@ -134,7 +134,7 @@ export function ChatPanel(): React.JSX.Element {
             const s = useChat.getState()
             useChat.setState({
               kept: { ...s.kept, [root]: [th, ...(s.kept[root] ?? []).filter((x) => x.id !== th.id)] },
-              drafts: { ...s.drafts, [`${root}\n${th.id}`]: gone }
+              drafts: { ...s.drafts, [draftKey(root, th.id)]: gone }
             })
           }
         }

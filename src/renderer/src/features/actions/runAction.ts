@@ -22,6 +22,7 @@ import { SNAPSHOT_EN, snapshot } from '@/features/history/snapshots'
 import { actionInstructions, getT } from '@/lib/i18n'
 import { typesetForBook } from '@/lib/typeset'
 import { nearestEffort } from '@shared/ai/effort'
+import { PROVIDER_LABELS } from '@shared/ai/routes'
 import { findAction } from './allActions'
 import { actionLabel } from './names'
 
@@ -104,6 +105,8 @@ function keepForReturn(data: ReviewData): void {
 
 /** False when the provider is not on this computer or not connected; undefined when the app does not know yet. */
 export function providerReady(p: ProviderId): boolean | undefined {
+  // A provider that this version of the app does not know (a book from a newer version)
+  if (!(p in PROVIDER_LABELS)) return false
   const app = useApp.getState()
   if (app.settings?.providers[p]?.enabled === false) return false
   const st = app.status[p]

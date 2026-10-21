@@ -91,7 +91,7 @@ export function ModelPicker({ action, onChange }: { action: AiAction; onChange: 
           </>
         )}
       </Menu>
-      {missing && <span className="field-hint">{ta.modelMissing(PROVIDER_LABELS[missing].name)}</span>}
+      {missing && <span className="field-hint">{ta.modelMissing(PROVIDER_LABELS[missing]?.name ?? missing)}</span>}
     </>
   )
 }

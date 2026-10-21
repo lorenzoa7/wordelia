@@ -155,7 +155,7 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
                     <Select
                       value={String(s.typography.fontSize)}
                       onValueChange={(v) => setTypo({ fontSize: Number(v) })}
-                      options={[9, 10, 10.5, 11, 11.5, 12, 13, 14].map((n) => ({ value: String(n), label: `${t.common.number(n)} pt` }))}
+                      options={withValue([9, 10, 10.5, 11, 11.5, 12, 13, 14], s.typography.fontSize).map((n) => ({ value: String(n), label: `${t.common.number(n)} pt` }))}
                       ariaLabel={t.exportDialog.size}
                     />
                   </Field>
@@ -163,7 +163,7 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
                     <Select
                       value={String(s.typography.lineHeight)}
                       onValueChange={(v) => setTypo({ lineHeight: Number(v) })}
-                      options={[1.15, 1.3, 1.45, 1.5, 1.6, 2].map((n) => ({ value: String(n), label: n === 2 ? t.exportDialog.double : t.common.number(n) }))}
+                      options={withValue([1.15, 1.3, 1.45, 1.5, 1.6, 2], s.typography.lineHeight).map((n) => ({ value: String(n), label: n === 2 ? t.exportDialog.double : t.common.number(n) }))}
                       ariaLabel={t.exportDialog.lineSpacing}
                     />
                   </Field>
@@ -266,6 +266,11 @@ function PagePreview({ settings: s }: { settings: ExportSettings }): React.JSX.E
       <span className="preview-caption">{t.exportDialog.pageSizes[s.pageSize]}</span>
     </div>
   )
+}
+
+/** A list of choices with the value now in it: the book typography can have a size that the list does not have. */
+function withValue(list: number[], value: number): number[] {
+  return list.includes(value) ? list : [...list, value].sort((x, y) => x - y)
 }
 
 /** The export has the pages of the Write view: the same page size, margins and type. */

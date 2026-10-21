@@ -253,7 +253,7 @@ export function PageEditor(): React.JSX.Element | null {
     markActive()
   }, [chapterIds, ids, markActive])
 
-  useEditorStats(active?.editor ?? null)
+  useEditorStats(active?.editor ?? null, active?.chapterId ?? null)
   const zoomBadge = useDeskZoom(deskRef, sizerRef, innerRef)
   // The first page number of each chapter: the pages of the chapters before it, plus one.
   const { pages } = usePagesOf()

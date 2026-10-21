@@ -34,7 +34,8 @@ export function chapterWordCount(ch: Pick<Chapter, 'id' | 'body'>): number {
   return words
 }
 
-export function useEditorStats(editor: Editor | null): void {
+/** The counts of the chapter of `editor` (the chapter with the cursor) and of the book. */
+export function useEditorStats(editor: Editor | null, chapterId: string | null): void {
   useEffect(() => {
     if (!editor) return
     let timer: ReturnType<typeof setTimeout> | undefined
@@ -43,9 +44,10 @@ export function useEditorStats(editor: Editor | null): void {
       // A late timer of an editor that is no longer the active one must not win.
       if (stopped || editor.isDestroyed) return
       const chapterWords = countWords(editor.state.doc.textBetween(0, editor.state.doc.content.size, '\n', ' '))
-      const { chapters, activeChapterId, root } = useBook.getState()
-      // Only the chapter that changed is counted again (`chapterWordCount` keeps the others).
-      const others = chapters.reduce((n, c) => (c.id === activeChapterId ? n : n + chapterWordCount(c)), 0)
+      const { chapters, root } = useBook.getState()
+      // The other chapters from the store: only a chapter that changed is counted again
+      // (`chapterWordCount` keeps the others). The chapter of the editor counts from its live text.
+      const others = chapters.reduce((n, c) => (c.id === chapterId ? n : n + chapterWordCount(c)), 0)
       useStats.setState({ root, chapterWords, bookWords: others + chapterWords })
     }
     const onUpdate = (): void => {
@@ -72,5 +74,5 @@ export function useEditorStats(editor: Editor | null): void {
       editor.off('selectionUpdate', onSelection)
       unsub()
     }
-  }, [editor])
+  }, [editor, chapterId])
 }

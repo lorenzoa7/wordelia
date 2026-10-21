@@ -273,13 +273,19 @@ A `<portrait>` proposes an image of the chat as the portrait of an existing entr
 
 The renderer parses the tags while the reply streams. It shows each tag as a diff card. A hunk applies to the live editor when the chapter is open (one undo step). Else it applies to the file text. The match is exact first, then with whitespace and quote normalization.
 
-- **Proposals in the text** (`src/renderer/src/features/editor/inlineProposals.ts`). Every pending change of the open thread to a chapter or to a planning entry shows in its text (the chapter editor, or the note editor of the entry) as a word diff, with the pills "Accept" and "Reject" after it. The card and the text show the same proposal: a decision in one place sets the hunk state, and the other place follows. A passage that is not in the chapter once (the user changed it, or it occurs two times) does not show in the text; the card still shows it.
-- "Show in text" on a change, and a click on the name of a proposal, call `revealProposal`: it scrolls from where the user is to the change and marks it for a moment. It never decides the proposal. From another page (Plan), or for a chapter far from the screen (no editor yet), it opens the chapter first (`selectChapter`) and goes to the change when the editor of the chapter is there. When a new reply of the open thread has chapter proposals, the text scrolls to the last new one by itself. When its first change is for a planning entry (or for the story line), the app opens that page (`openNewPlace`). The replies of the planning sync never move the author.
+- **Only complete proposals wait** (`src/shared/proposals/state.ts`). A change or a note that the reply did not finish (the author pressed Stop, or the reply failed) can never be applied: not in its card, not in "Apply all", not in the text. Its card shows the cut text and says that the reply stopped. A stopped reply keeps its text (`ChatMessage.stopped`) with a quiet "Stopped" mark; the chat closes the cut Markdown marks of its last paragraph (`features/chat/markdown.ts`).
+- **Current and old proposals.** The proposals of the replies after the last message of the author are current (`currentFrom`). When the author sends a new message, the proposals of the earlier replies are old: they leave the text and the state of the thread, and their cards keep Accept and Reject. "Show in text" on an old card brings its change back to the text. The thread menu has "Dismiss old proposals (3)", which rejects them (with Undo). The planning sync thread has its own review: all its proposals are current.
+- **Proposals in the text** (`src/renderer/src/features/editor/inlineProposals.ts`). Every current pending change of the open thread to a chapter or to a planning entry shows in its text (the chapter editor, or the note editor of the entry) as a word diff, with the pills "Accept" and "Reject" after it. The card and the text show the same proposal: a decision in one place sets the hunk state, and the other place follows. A passage that is not in the chapter once (the user changed it, or it occurs two times) does not show in the text; the card still shows it. When two proposals change the same words, the newest one shows; the card of the older one says "A newer proposal changes the same text." A change with an empty `<find>` adds text at the end: its new paragraphs show after the last paragraph.
+- "Show in text" on a change, and a click on the name of a proposal, call `revealProposal`: it scrolls from where the user is to the change and marks it for a moment. It never decides the proposal. From another page (Plan), or for a chapter far from the screen (no editor yet), it opens the chapter first (`selectChapter`) and goes to the change when the editor of the chapter is there. A change with an empty `<find>` goes to the end of the chapter.
+- **A new reply goes to its change, but never while the author types.** When a new reply of the thread that shows in the chat has chapter proposals, the text scrolls to the newest one. When its first change is for a planning entry (or for the story line), the app opens that page. While the author types (the focus is in a text field or an editor outside the chat panel, or a key went down there in the last 4 seconds, `features/chat/typing.ts`), the app does not move: a toast "Changes ready · Show" waits, and the move happens only on "Show". A reply of a thread that does not show (another thread, a new thread, the thread list) never moves the author. The replies of the planning sync never move the author.
 - The text of an editor has a paragraph for each list item, without its mark ("- ", "1. "). The passage of a proposal is compared in the same form (`markdownToPlainBlocks` in `src/shared/book.ts`), so a change to a list in a note shows as a diff.
 - A `<portrait>` of the open thread that waits shows on the page of its entry, in the place of the portrait, with a green ring, "Use" and "Reject". A click on a portrait opens it whole (`ImageViewer` in `features/chat/ChatImages.tsx`, also for the images of the chat); "Change" under the portrait chooses another image.
 - **Undo of an accepted change.** The app remembers the chapter changes that the author accepted in the session. When the text of the chapter shows the old words again (Ctrl+Z), the change is pending again and shows in the text; when the new words come back (Ctrl+Y), it is accepted again. Ctrl+Z with the focus outside a text (for example on the Accept button of the chat) undoes the last accepted change in its chapter.
 - A reply with two or more open proposals has a bar for all of them ("Apply all 3", "Reject all"). The icon and the text take the free room of the line; the buttons go to their own line when they do not fit beside the text, and there they share the width. When the two buttons do not fit side by side, each one takes a line, so a button is never cut. The files line shows three names (with "…" when they are long) and then a count of the others ("+29"); a tooltip shows all the names. The `chatview` scenario checks 32 proposals with long names at 320 to 680 px.
-- An accepted `<create>` that replaces an entry keeps the old entry file in the message (`ChatMessage.replaced`).
+- An accepted `<create>` that replaces an entry keeps the old entry file in the message (`ChatMessage.replaced`). Before the decision, the card of such a `<create>` shows a diff of the note (summary, other names, text) and says what the note loses: other names, fields and sections (`noteReplace` in `src/shared/proposals/replace.ts`).
+- **Undo.** Accept, Create, Replace, Use and "Apply all" show a toast with Undo. For notes, portraits and "Apply all", Undo takes the change out of the book where the text of the AI is still there (`undoAccepted` in `features/chat/undo.ts`, with the code of the rewind). Reject, "Reject all", Dismiss and the Reject pill in the text also show a toast with Undo, which sets the proposals back to pending.
+- **Not found.** A change that was not found has "Try again" (after the author fixed the text) and "The text it looks for".
+- **Copy and Insert.** Copy and "Insert at cursor" take the prose of a reply only (`replyProse`): never proposals and never words about them. Insert puts new paragraphs after the paragraph of the cursor; a selection stays. A reply with proposals has no Insert.
 
 #### Rewind, Edit and Retry
 
@@ -293,7 +299,13 @@ The digest of the thread starts again when it covered removed messages.
 
 #### Thread states
 
-The thread list shows a state for each thread (`src/renderer/src/features/chat/status.tsx`): proposals wait for a decision, a reply that the user did not see (`Thread.readAt`, set when the thread shows in the open chat), or a reply in progress. The chat button in the title bar has a dot when the chat is closed and a thread needs the user.
+The thread list shows a state for each thread (`src/renderer/src/features/chat/status.tsx`): proposals of the current replies wait for a decision, a reply that the user did not see (`Thread.readAt`, set when the thread shows in the open chat), or a reply in progress. The chat button in the title bar has a dot when the chat is closed and a thread needs the user.
+
+Delete thread stops its reply in progress and moves the thread file to `.wordelia/trash/` of the book. A toast has Undo (`restoreThread`).
+
+Each reply keeps its tokens and its cost when the provider tells them (`ChatMessage.usage`, from the `usage` events and the result). The line of the model under a reply shows them, and "Title and purpose" shows the total of the thread. A failed reply keeps the kind of its error (`ChatMessage.errorKind`): a login error has a button to Settings → AI.
+
+A failed or empty reply never goes back to the AI (`chatHistory` in `src/shared/prompts/chat.ts`): an API refuses an empty turn, and then each later message of the thread would fail. Two turns of the author in a row become one turn. A reply that ends after its book closed goes into the thread file of its book.
 
 #### The chat panel
 
@@ -310,7 +322,7 @@ A thread exists only after its first message (`src/renderer/src/features/chat/th
 
 - "New thread" shows a blank thread (`useChat.blank`). The blank thread is not in the book, not in the thread list, not in the "@" list and not on disk. `activeThreadId` keeps the thread that was open before, so Esc in the thread list goes back to it.
 - The title, the purpose and the model of the blank thread stay in the chat store (`saveThreadChange`). The first message saves the thread with them (`sendMessage`).
-- The thread list, another thread and a book change remove the blank thread.
+- The thread list, another thread and a book change remove the blank thread, unless the user gave it a title, a purpose, a model or a draft. Then it stays in the chat store (`useChat.kept`, for each book, in memory) and shows in the thread list ("No messages yet") until its first message. Esc in the list goes back to it.
 - With no open thread (a book without threads, or after the open thread is deleted), the chat shows a blank thread.
 - When a book opens, the chat shows the most recently changed thread with messages. The app also deletes the empty threads that older versions saved: no messages, no purpose, the default title. An older empty thread with a purpose stays on disk, but it does not show.
 
@@ -330,6 +342,8 @@ The composer (`Composer.tsx`) and the edit box of a sent message use `ChatInput.
 - "@" and up to 30 letters after a space open the list of chapters, entries and threads. Up, Down, Enter, Tab and Esc work in the list. The choice becomes a pill in the text, with a space after it. Backspace (or Delete) next to a pill removes the whole pill.
 - Enter sends. Shift+Enter starts a new line. A paste is plain text.
 - The draft stays in the chat store as TipTap JSON (`draftDoc`), with its text (`draft`) and its mentions. Code outside the composer (a suggestion, "Mention in chat", "Ask the chat about this entry") changes the draft through the store and increments `draftRev`. Then the composer loads the draft and puts the cursor at the end.
+- Each thread has its own draft (text, mentions, quotes and images), for each book (`useChat.drafts`). When another thread shows, its draft comes back; the composer loads it without the focus (`draftQuiet`). A suggestion never takes the place of a typed draft: it goes on a new line after it. An image that the author takes out of a draft goes to the trash of the book, when no message, note or other draft uses it.
+- The list finds other names of a note ("@keep" finds Elias, "the keeper") and names with spaces ("@Saint I"); the first character after "@" is not a space (`features/chat/mentions.ts`). The list does not offer the thread of the composer.
 - `src/renderer/src/features/chat/draft.ts` reads and writes the draft (pure functions with tests). A sent message keeps the text with each mention as "@Label", and `mentions` with the ids. The prompt builder reads the ids, as before. The chat finds "@Label" in the text again (`splitMentions`) to show each mention as a pill in its place. Older messages have their mentions apart from the text: the chat shows these above the text.
 
 ### 5.4 Actions
@@ -353,7 +367,7 @@ The global actions are in the app settings (`AppSettings.actions`). The actions 
 
 ### 5.5 Thread digests
 
-After each AI reply, a background job (Background route) updates the digest of the thread: the old digest plus the last exchange gives the new digest (12 bullets or fewer).
+After each AI reply, a background job (Background route) updates the digest of the thread: the old digest plus the last exchange gives the new digest (12 bullets or fewer). The digest waits for the decisions of the author: it covers the messages up to the first current reply with proposals that wait (`digestEnd`). When the author decides them, the digest runs again 2.5 seconds after the last decision (`features/chat/digest.ts`). The title from the AI never takes the place of a title that the author set while the AI worked.
 
 ### 5.6 Planning sync
 
@@ -485,14 +499,14 @@ The story line is a board of cards: each card is one event of the story. The boa
 - The store writes files through `saver` (500 ms debounce for each file, ordered writes).
 - Editors register a flusher (`src/renderer/src/lib/flush.ts`). Closing a book runs all flushers, then `saver.flush()`.
 - Closing the window: the main process stops the close, sends `app:flushRequest`, and closes when the renderer answers `app:flushDone` (or after 4 s).
-- Deleted chapters and entries move to `.wordelia/trash/`. Nothing is deleted for good.
+- Deleted chapters, entries and chat threads move to `.wordelia/trash/`. Nothing is deleted for good.
 - Accepted AI proposals show an **Undo** toast. It restores the text from before the change.
 - **Version history** (`src/renderer/src/features/history/`). The app saves a version of a chapter when the chapter opens, when the author leaves it, every 8 minutes, and before AI changes (the newest 60 for each chapter, in `.wordelia/history/`). The dialog compares the chapter with the selected version, word by word. When a version shows, the compare view glides to its first change, with 30% of the view above it for context. The glide takes the time of the `--dur-slow` token, also in a long chapter; with reduced motion it jumps. A wheel, a key or a click stops it.
   - When the author selects another version, nothing in the dialog flashes or moves. The compare view keeps the last version until the text of the new version is there; a spinner shows only when a version takes more than 300 ms. The line "If you restore this version: +12 −3 words" keeps its height when it has no numbers. "Close" and "Restore this version" do not change: Restore is off only when the chapter has no versions or the selected version cannot be read. A click on Restore while a version loads waits for the text of the selected version, never the text on screen. The dialog keeps the versions that it read, so a version that the author selects again shows at once. While the list of versions loads, the dialog has the height of the list. The `history` scenario records the two buttons and the compare view in each frame, and each change of an attribute in the footer, while it goes through all the versions.
 
 ## 9. Long books
 
-When the manuscript does not fit the token budget of the chat, the chat sends the open chapter and its neighbors in full, and summaries of the other chapters. The background model makes the summaries. They are cached by content hash in `.wordelia/cache/summaries.json`.
+When the manuscript does not fit the token budget of the chat, the chat sends the open chapter and its neighbors in full, and summaries of the other chapters. The background model makes the summaries. They are cached by content hash in `.wordelia/cache/summaries.json`. While they are made, the reply shows "Summarizing chapters: 3 of 12". Each summary goes to the cache when it is done. Stop cancels the summary requests of the message; a second message waits for a summary that is in progress, and does not ask for it again.
 
 ## 10. Test hooks
 

@@ -56,6 +56,15 @@ export function BookView(): React.JSX.Element {
 
   useEffect(() => startAutoSnapshots(), [])
 
+  // Spell check (Settings → General) for every text of the book: the chapters, the notes and the
+  // chat. Their texts have no attribute of their own, so they take the one of the page, at once.
+  const spellcheck = useApp((s) => s.settings?.editor.spellcheck ?? true)
+  useEffect(() => {
+    const html = document.documentElement
+    if (spellcheck) html.removeAttribute('spellcheck')
+    else html.setAttribute('spellcheck', 'false')
+  }, [spellcheck])
+
   useActionShortcuts()
   // Chat proposals in the text of chapters (Write) and notes (Plan)
   useInlineProposalSync()
@@ -80,14 +89,15 @@ export function BookView(): React.JSX.Element {
 
       <div className={clsx('book-main', !sidebarOpen && 'is-sidebar-closed')}>
         <ShowSidebarButton open={sidebarOpen} />
-        <AnimatePresence mode="wait" initial={false}>
-          {view === 'write' ? (
-            <motion.div key="write" className="book-pane" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
-              <PageEditor />
-              <StatusBar />
-            </motion.div>
-          ) : (
-            <motion.div key="plan" className="book-pane" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+        {/* The Write view stays mounted under the Plan view: back in Write, the scroll, the cursor
+            and the undo history are as they were. While Plan shows, it is hidden and inert. */}
+        <div className={clsx('book-pane book-pane-write', view !== 'write' && 'is-away')} inert={view !== 'write'}>
+          <PageEditor />
+          <StatusBar />
+        </div>
+        <AnimatePresence initial={false}>
+          {view === 'plan' && (
+            <motion.div key="plan" className="book-pane book-pane-plan" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
               <PlanView />
             </motion.div>
           )}

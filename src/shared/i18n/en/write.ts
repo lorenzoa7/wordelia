@@ -2,8 +2,6 @@
 
 export const write = {
   chapters: 'Chapters',
-  newChapter: 'New chapter',
-  addChapter: 'Add chapter',
   chapterTitle: 'Chapter title',
   chapterOptions: 'Chapter options',
   /** aria-label of a chapter in the sidebar */
@@ -20,8 +18,8 @@ export const write = {
   versionHistoryMenu: 'Version history…',
   deleteChapter: 'Delete chapter',
   deleteTitle: (title: string): string => `Delete “${title}”?`,
-  deleteMessage: "The file moves to the book's .wordelia/trash folder. You can get it back from there.",
-  deleted: (title: string): string => `“${title}” moved to the trash folder.`,
+  deleteMessage: 'You can undo it right after. The file also stays in the book folder, in .wordelia/trash.',
+  deleted: (title: string): string => `Deleted “${title}”.`,
   /** The status bar under the page */
   status: {
     /** After the number of selected words */
@@ -45,5 +43,20 @@ export const write = {
     openSettings: 'Open settings',
     nothingToChange: 'The AI found nothing to change.',
     noRewrite: 'The AI sent no rewrite. Try again.'
-  }
+  },
+  /** The "+" in the header of the chapter list: the new chapter goes after the chapter on screen */
+  newChapterAfterOne: (title: string): string => `New chapter after “${title}”`,
+  /** The button under the chapter list */
+  addChapterAtEnd: 'Add a chapter at the end',
+  /** Why the app cannot save, in plain words */
+  saveProblems: {
+    readOnly: 'The file is read-only, or the system does not let Wordelia change it.',
+    busy: 'Another program holds the file, for example a sync app.',
+    missing: 'The book folder is not there. It moved, or its drive is not connected.',
+    diskFull: 'The disk is full.',
+    other: 'Wordelia cannot write the file.'
+  },
+  notSavedToast: (reason: string): string => `Your last changes are not saved. ${reason} Wordelia tries again by itself.`,
+  /** The tooltip of "Not saved" in the status bar, after the reason */
+  clickToRetry: 'Click to try again.'
 }

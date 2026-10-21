@@ -8,7 +8,7 @@ import { Button, Dialog, Spinner } from '@/ui'
 import { invoke } from '@/lib/api'
 import { useBook } from '@/stores/book'
 import { toast } from '@/stores/ui'
-import { flushEditor } from '@/features/editor/registry'
+import { flushEditor, getChapterEditor } from '@/features/editor/registry'
 import type { Messages } from '@shared/i18n'
 import { useT } from '@/lib/i18n'
 import { SNAPSHOT_EN, snapshot, snapshotLabel } from './snapshots'
@@ -169,8 +169,20 @@ export function HistoryDialog({ chapterId, onClose }: { chapterId: string | null
       return
     }
     snapshot(chapter.id, SNAPSHOT_EN.labels.beforeRestore)
-    useBook.getState().restoreChapter(chapter.id, text)
-    toast(t.history.restored(chapter.title, when(t, items?.find((i) => i.id === id)?.at ?? '')))
+    const id_ = chapter.id
+    const before = useBook.getState().chapters.find((c) => c.id === id_)?.body ?? chapter.body
+    // An open chapter loads the version as one step: Ctrl+Z undoes it. The toast has an Undo too.
+    useBook.getState().restoreChapter(id_, text)
+    toast(t.history.restored(chapter.title, when(t, items?.find((i) => i.id === id)?.at ?? '')), {
+      action: {
+        label: t.common.undo,
+        run: () => {
+          getChapterEditor(id_)?.flush()
+          // Only while the chapter is as the restore left it.
+          if (useBook.getState().chapters.find((c) => c.id === id_)?.body === text) useBook.getState().restoreChapter(id_, before)
+        }
+      }
+    })
     onClose()
   }
   // Off only when there is nothing to restore: no versions, or the selected version cannot be read.

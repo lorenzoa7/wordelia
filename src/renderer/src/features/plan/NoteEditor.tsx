@@ -69,7 +69,7 @@ export function NoteEditor({
       extensions,
       content: parseMarkdown(value) as object,
       editorProps: {
-        attributes: { class: 'note-text prose', spellcheck: 'true', lang: language, 'aria-label': quoteLabel ? t.plan.noteEditor.notesAbout(quoteLabel) : t.plan.noteEditor.notes },
+        attributes: { class: 'note-text prose', lang: language, 'aria-label': quoteLabel ? t.plan.noteEditor.notesAbout(quoteLabel) : t.plan.noteEditor.notes },
         // Notes are Markdown: pasted text such as "## Rules" or "- item" becomes a heading or a list, not literal signs.
         clipboardTextParser: (text, _context, _plain, view) => sliceFromMarkdown(view.state.schema, text)
       },

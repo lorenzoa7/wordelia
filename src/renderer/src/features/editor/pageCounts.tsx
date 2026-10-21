@@ -10,7 +10,7 @@ import { getSchema } from '@tiptap/core'
 import { DOMSerializer } from '@tiptap/pm/model'
 import { create } from 'zustand'
 import { parseMarkdown } from '@shared/markdown/parse'
-import { chapterWord } from '@shared/export/model'
+import { chapterLabel } from '@shared/export/model'
 import { estimatePages } from '@shared/export/pages'
 import { countMarkdownWords } from '@shared/book'
 import type { BookManifest, Chapter } from '@shared/types'
@@ -167,7 +167,7 @@ export function PageCounter(): React.JSX.Element | null {
   return (
     <article ref={sheetRef} className="page page-measure" aria-hidden="true">
       <header className="chapter-head">
-        <div className="chapter-label caps">{chapterWord(manifest.language, job.index + 1)}</div>
+        <div className="chapter-label caps">{chapterLabel(manifest.language)}</div>
         <div className="chapter-number">{job.index + 1}</div>
         <textarea className="chapter-title" rows={1} value={job.ch.title} readOnly tabIndex={-1} />
         <div className="chapter-rule">

@@ -14,6 +14,10 @@
   overflow-anchor: auto;
   scroll-padding-top: 80px;
 }
+/* The book opens: the desk shows when it is at the place of the author (deskPlace.ts). */
+.desk.is-placing .desk-zoom {
+  visibility: hidden;
+}
 /* The zoom (zoom.ts): the pages are laid out at 100 % in .desk-inner, which is scaled with a
    transform; .desk-zoom has the scaled size, so the desk scrolls over the scaled pages. */
 .desk-zoom {
@@ -277,12 +281,13 @@
   box-shadow: 0 0 0 1.5px var(--ribbon);
 }
 
-/* Focus mode: dim everything but the paragraph of the cursor */
+/* Focus mode: dim everything but the paragraph of the cursor. Every chapter editor has a cursor;
+   only the paragraph in the chapter with the cursor of the author (.is-current) stays lit. */
 .focus-mode .manuscript > * {
   opacity: 0.22;
   transition: opacity var(--dur-slow) var(--ease-out);
 }
-.focus-mode .manuscript > .is-focus,
+.focus-mode .page.is-current .manuscript > .is-focus,
 .focus-mode .manuscript > .pm-page-gap,
 .focus-mode .manuscript > .pm-page-tail {
   opacity: 1;
@@ -764,6 +769,52 @@
 }
 .find-other-n {
   color: var(--ink-4);
+}
+/* "Replace in all chapters…", under the replace row */
+.find-row-all {
+  justify-content: flex-end;
+}
+.find-link-btn {
+  height: 24px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.find-link-btn:hover:not(:disabled) {
+  background: var(--desk-2);
+  color: var(--ink);
+}
+.find-link-btn:disabled {
+  opacity: 0.4;
+}
+/* The confirm of "Replace in all chapters": each chapter and its matches */
+.replace-book-list {
+  max-height: 260px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+.replace-book-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-4);
+  padding: 6px 2px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.replace-book-n {
+  flex-shrink: 0;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---------- Page end ---------- */

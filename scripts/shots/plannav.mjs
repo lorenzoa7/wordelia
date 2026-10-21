@@ -9,11 +9,94 @@ const shotPath = (name) => {
   return resolve('test-results/shots', `plannav${flags}-${name}.png`)
 }
 
+/** The place of the author in the Write view: the scroll, the chapter, the cursor, the text. */
+const writePlace = (page) =>
+  page.evaluate(() => {
+    const s = window.__wordelia.book.getState()
+    const ed = window.__activeEditor.getState().active
+    const focused = document.activeElement?.closest('.page[data-chapter]')
+    return {
+      view: s.view,
+      top: Math.round(document.querySelector('.desk').scrollTop),
+      active: s.activeChapterId,
+      focus: focused?.dataset.chapter ?? null,
+      cursor: ed ? { chapter: ed.chapterId, head: ed.editor.state.selection.head } : null
+    }
+  })
+
+/**
+ * Write ↔ Plan keeps the place of the author, and a book opens where the author was:
+ * - A new open puts the cursor in the text at once.
+ * - Ctrl+2, then Ctrl+1: the same scroll, chapter, cursor and undo history.
+ * - Close the book and open it again: the same chapter, scroll and cursor; then the same view.
+ */
+async function placeChecks(page, openBook) {
+  const fail = (msg) => {
+    throw new Error(`Place: ${msg}`)
+  }
+  // A book that opens has the cursor in the text: keys go there.
+  const first = await page.evaluate(() => document.activeElement?.closest('.page[data-chapter]')?.dataset.chapter ?? null)
+  const firstId = await page.evaluate(() => window.__wordelia.book.getState().chapters[0].id)
+  if (first !== firstId) fail(`no cursor in the text after the book opened (focus: ${first})`)
+
+  // Type in the middle of chapter 2, a little down the desk.
+  const p2 = page.locator('.page[data-chapter]').nth(1).locator('.manuscript > p')
+  const mid = p2.nth(Math.floor((await p2.count()) / 2))
+  await mid.click()
+  await page.keyboard.press('End')
+  await page.keyboard.type(' LUGAR-MARCADO')
+  await page.evaluate(() => document.querySelector('.desk').scrollBy(0, -120))
+  await page.waitForTimeout(600)
+  const before = await writePlace(page)
+  console.log('before Plan:', JSON.stringify(before))
+  await page.keyboard.press('Control+2')
+  await page.waitForTimeout(600)
+  await page.keyboard.press('Control+1')
+  await page.waitForTimeout(600)
+  const back = await writePlace(page)
+  console.log('back in Write:', JSON.stringify(back))
+  if (Math.abs(back.top - before.top) > 2) fail(`the desk moved: ${before.top} → ${back.top}`)
+  if (back.active !== before.active) fail('another chapter is active')
+  if (back.focus !== before.cursor?.chapter || back.cursor?.head !== before.cursor?.head) fail('the cursor is not where it was')
+  await page.keyboard.type('X')
+  await page.keyboard.press('Control+z')
+  await page.keyboard.press('Control+z')
+  await page.waitForTimeout(400)
+  const undone = await page.evaluate(() => !document.querySelectorAll('.page[data-chapter]')[1].textContent.includes('LUGAR-MARCADO'))
+  if (!undone) fail('Ctrl+Z did not undo the typing from before the Plan view')
+  await page.keyboard.press('Control+y')
+  await page.keyboard.press('Control+y')
+  await page.waitForTimeout(800)
+
+  // Close the book and open it again: the place comes back.
+  const saved = await writePlace(page)
+  await page.evaluate(() => window.__wordelia.book.getState().close())
+  await openBook()
+  await page.waitForTimeout(1500)
+  const reopened = await writePlace(page)
+  console.log('reopened:', JSON.stringify({ saved, reopened }))
+  if (reopened.view !== 'write' || reopened.active !== saved.active) fail('the book did not open at the chapter of the author')
+  if (Math.abs(reopened.top - saved.top) > 40) fail(`the book did not open at the scroll of the author: ${saved.top} → ${reopened.top}`)
+  if (reopened.focus !== saved.cursor?.chapter || reopened.cursor?.head !== saved.cursor?.head) fail('the cursor did not come back')
+  // The view comes back too.
+  await page.keyboard.press('Control+2')
+  await page.waitForTimeout(500)
+  await page.evaluate(() => window.__wordelia.book.getState().close())
+  await openBook()
+  await page.waitForTimeout(800)
+  const view = await page.evaluate(() => window.__wordelia.book.getState().view)
+  if (view !== 'plan') fail(`the book did not open in the Plan view (${view})`)
+  await page.keyboard.press('Control+1')
+  await page.waitForTimeout(500)
+  console.log('place ok')
+}
+
 export default async function ({ page, shot, openBook }) {
   if (process.env.I18N_LANG) {
     await page.evaluate((l) => window.__wordelia.app.getState().updateSettings({ language: l }), process.env.I18N_LANG)
   }
   await openBook()
+  await placeChecks(page, openBook)
   const where = () =>
     page.evaluate(() => {
       const s = window.__wordelia.book.getState()

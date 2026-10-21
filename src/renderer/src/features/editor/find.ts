@@ -92,38 +92,71 @@ function nearestIndex(matches: FindMatch[], pos: number): number {
   return i < 0 ? 0 : i
 }
 
+/**
+ * The match to select after a replace, like a word processor: the first match after the new text
+ * (it ends at `to`). The new text is never a match again, also when it contains the search text
+ * ("Elias" → "Elias Silva"), and a replace does not go back to the start of the chapter: Next does.
+ * -1 when no match is after the new text.
+ */
+export function matchAfterReplace(matches: FindMatch[], to: number): number {
+  return matches.findIndex((m) => m.from >= to)
+}
+
+/**
+ * Replace the current match in `tr`, then select the next match after the new text (or put the
+ * cursor after the new text when no match is after it). Returns false when no match is current.
+ */
+export function replaceCurrentMatch(state: EditorState, tr: Transaction, text: string): boolean {
+  const s = findKey.getState(state)
+  const m = s?.matches[s.current]
+  if (!s || !m) return false
+  if (text) tr.insertText(text, m.from, m.to)
+  else tr.delete(m.from, m.to)
+  const end = m.from + text.length
+  const matches = findMatches(tr.doc, s.query, s.caseSensitive, s.wholeWord)
+  const next = matchAfterReplace(matches, end)
+  tr.setMeta(findKey, { current: next })
+  tr.setSelection(next >= 0 ? TextSelection.create(tr.doc, matches[next].from, matches[next].to) : TextSelection.create(tr.doc, end))
+  tr.scrollIntoView()
+  return true
+}
+
+/** The find plugin: the search, its matches and the current match of one editor. */
+export function findPlugin(): Plugin<FindState> {
+  return new Plugin<FindState>({
+    key: findKey,
+    state: {
+      init: () => empty,
+      apply(tr: Transaction, prev: FindState, _old: EditorState, next: EditorState): FindState {
+        const meta = tr.getMeta(findKey) as Partial<FindState> | 'clear' | undefined
+        if (meta === 'clear') return empty
+        if (meta) {
+          const merged = { ...prev, ...meta }
+          const matches =
+            meta.query !== undefined || meta.caseSensitive !== undefined || meta.wholeWord !== undefined || tr.docChanged
+              ? findMatches(next.doc, merged.query, merged.caseSensitive, merged.wholeWord)
+              : merged.matches
+          const current = meta.current ?? (matches.length ? nearestIndex(matches, next.selection.from) : -1)
+          return build({ ...merged, matches, current: Math.min(current, matches.length - 1) }, next.doc)
+        }
+        if (tr.docChanged && prev.query) {
+          const matches = findMatches(next.doc, prev.query, prev.caseSensitive, prev.wholeWord)
+          return build({ ...prev, matches, current: Math.min(prev.current, matches.length - 1) }, next.doc)
+        }
+        return prev
+      }
+    },
+    props: {
+      decorations: (state) => findKey.getState(state)?.decorations
+    }
+  })
+}
+
 export const FindReplace = Extension.create({
   name: 'findReplace',
 
   addProseMirrorPlugins() {
-    return [
-      new Plugin<FindState>({
-        key: findKey,
-        state: {
-          init: () => empty,
-          apply(tr: Transaction, prev: FindState, _old: EditorState, next: EditorState): FindState {
-            const meta = tr.getMeta(findKey) as Partial<FindState> | 'clear' | undefined
-            if (meta === 'clear') return empty
-            if (meta) {
-              const merged = { ...prev, ...meta }
-              const matches = meta.query !== undefined || meta.caseSensitive !== undefined || meta.wholeWord !== undefined
-                ? findMatches(next.doc, merged.query, merged.caseSensitive, merged.wholeWord)
-                : merged.matches
-              const current = meta.current ?? (matches.length ? nearestIndex(matches, next.selection.from) : -1)
-              return build({ ...merged, matches, current: Math.min(current, matches.length - 1) }, next.doc)
-            }
-            if (tr.docChanged && prev.query) {
-              const matches = findMatches(next.doc, prev.query, prev.caseSensitive, prev.wholeWord)
-              return build({ ...prev, matches, current: Math.min(prev.current, matches.length - 1) }, next.doc)
-            }
-            return prev
-          }
-        },
-        props: {
-          decorations: (state) => findKey.getState(state)?.decorations
-        }
-      })
-    ]
+    return [findPlugin()]
   },
 
   addCommands() {
@@ -170,12 +203,8 @@ export const FindReplace = Extension.create({
         (text) =>
         ({ state, tr, dispatch }) => {
           const s = findKey.getState(state)
-          if (!s || s.current < 0) return false
-          const m = s.matches[s.current]
-          if (dispatch) {
-            if (text) tr.insertText(text, m.from, m.to)
-            else tr.delete(m.from, m.to)
-          }
+          if (!s || !s.matches[s.current]) return false
+          if (dispatch) replaceCurrentMatch(state, tr, text)
           return true
         },
       replaceAll:

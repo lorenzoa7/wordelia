@@ -192,7 +192,6 @@ export function ChatInput({ initial, className, ariaLabel, placeholder, autoFocu
           'aria-multiline': 'true',
           'aria-autocomplete': 'list',
           'aria-controls': listId,
-          spellcheck: 'true'
         },
         handleKeyDown: (_view, event) => {
           const s = live.current

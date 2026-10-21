@@ -75,5 +75,16 @@ export const editor: typeof en = {
     notFound: 'O texto a mudar não foi encontrado no capítulo. Talvez ele tenha mudado.',
     manyMatches: 'O texto a mudar aparece mais de uma vez no capítulo. Peça à IA um trecho maior.',
     noChapter: 'O capítulo não existe.'
-  }
+  },
+  chapterTextOf: (n, title) => `Texto do capítulo ${n}: ${title}`,
+  fontIs: (font) => `Fonte: ${font}`,
+  fontSizeIs: (size) => `Tamanho da fonte: ${size}`,
+  replaceInAllChapters: 'Substituir em todos os capítulos…',
+  replaceInBookTitle: 'Substituir em todos os capítulos',
+  replaceInBookWhat: (find, replace) => (replace ? `“${find}” vira “${replace}” nestes capítulos:` : `“${find}” sai destes capítulos:`),
+  replaceInBookNone: (find) => `Nenhum capítulo tem “${find}”.`,
+  replaceInBookButton: (n) => (n === 1 ? 'Substituir 1 vez' : `Substituir ${n} vezes`),
+  replaceCount: (n) => (n === 1 ? '1 vez' : `${n} vezes`),
+  replacedInBook: (n, chapters) => `${n === 1 ? '1 substituição' : `${n} substituições`} em ${chapters === 1 ? '1 capítulo' : `${chapters} capítulos`}.`,
+  replaceUndoPartly: (n) => (n === 1 ? 'Um capítulo mudou depois da substituição. Ele fica como está.' : `${n} capítulos mudaram depois da substituição. Eles ficam como estão.`)
 }

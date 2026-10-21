@@ -4,8 +4,6 @@ const n = (v: number): string => v.toLocaleString('es')
 
 export const write: typeof en = {
   chapters: 'Capítulos',
-  newChapter: 'Nuevo capítulo',
-  addChapter: 'Agregar capítulo',
   chapterTitle: 'Título del capítulo',
   chapterOptions: 'Opciones del capítulo',
   /** Pages of a chapter in the chapter list */
@@ -21,8 +19,8 @@ export const write: typeof en = {
   versionHistoryMenu: 'Historial de versiones…',
   deleteChapter: 'Eliminar capítulo',
   deleteTitle: (title) => `¿Eliminar “${title}”?`,
-  deleteMessage: 'El archivo pasa a la carpeta .wordelia/trash del libro. Puedes recuperarlo desde ahí.',
-  deleted: (title) => `“${title}” se movió a la carpeta de la papelera.`,
+  deleteMessage: 'Puedes deshacerlo justo después. El archivo también queda en la carpeta del libro, en .wordelia/trash.',
+  deleted: (title) => `Se eliminó “${title}”.`,
   status: {
     selected: 'seleccionadas',
     wordsInChapter: 'palabras en el capítulo',
@@ -42,5 +40,16 @@ export const write: typeof en = {
     openSettings: 'Abrir ajustes',
     nothingToChange: 'La IA no encontró nada que cambiar.',
     noRewrite: 'La IA no envió la nueva versión. Inténtalo de nuevo.'
-  }
+  },
+  newChapterAfterOne: (title) => `Nuevo capítulo después de “${title}”`,
+  addChapterAtEnd: 'Agregar un capítulo al final',
+  saveProblems: {
+    readOnly: 'El archivo es de solo lectura, o el sistema no deja que Wordelia lo cambie.',
+    busy: 'Otro programa está usando el archivo, por ejemplo una app de sincronización.',
+    missing: 'La carpeta del libro no está. Se movió, o su disco no está conectado.',
+    diskFull: 'El disco está lleno.',
+    other: 'Wordelia no puede escribir el archivo.'
+  },
+  notSavedToast: (reason) => `Tus últimos cambios no se guardaron. ${reason} Wordelia lo intenta de nuevo solo.`,
+  clickToRetry: 'Haz clic para intentarlo de nuevo.'
 }

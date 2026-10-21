@@ -14,6 +14,7 @@ import {
   entryFromFile,
   entryToFile,
   fileNameFromTitle,
+  hashText,
   newId,
   normalizeManifest,
   uniqueName
@@ -23,9 +24,10 @@ import { bookActionsFile, parseBookActions } from '@shared/ai/scopes'
 import { boardView, findStoryLine, headingName, isStoryLine, parseBoard, renameChapterInBody } from '@shared/storyline'
 import { invoke, on } from '@/lib/api'
 import { saver } from './saver'
-import { chapterWord } from '@shared/export/model'
+import { untitledChapter } from '@shared/export/model'
 import { runFlushers } from '@/lib/flush'
 import { getT } from '@/lib/i18n'
+import { openingPlace } from '@/features/write/place'
 
 export type BookView = 'write' | 'plan'
 
@@ -45,6 +47,8 @@ interface BookState {
   activeCategory: string | null
   /** Bumped when a file changes outside the app, so open editors reload */
   externalRev: Record<string, number>
+  /** The reload of a chapter that Ctrl+Z can undo (a restored version): its value of `externalRev` */
+  undoableRev: Record<string, number>
   /** A request to scroll the pages to a chapter (the sidebar, the history, the chat). `n` makes each request new. */
   chapterJump: { id: string; n: number; focus?: boolean } | null
 
@@ -62,7 +66,8 @@ interface BookState {
   setChapterBody(id: string, body: string): void
   renameChapter(id: string, title: string): Promise<void>
   addChapter(afterId?: string | null, title?: string, body?: string): Promise<Chapter>
-  deleteChapter(id: string): Promise<void>
+  /** Delete a chapter. Returns a function that puts it back in its place, with its text (Undo). */
+  deleteChapter(id: string): Promise<(() => Promise<void>) | null>
   moveChapter(id: string, toIndex: number): void
   reorderChapters(ids: string[]): void
   /** Put back an older text (undo); open editors reload */
@@ -140,7 +145,18 @@ export const useBook = create<BookState>((set, get) => {
     if (rel.startsWith(`${MANUSCRIPT_DIR}/`) && rel.endsWith('.md')) {
       const file = rel.slice(MANUSCRIPT_DIR.length + 1)
       const existing = st.chapters.find((c) => c.file === file)
-      if (!existing || content == null) return
+      if (content == null) return
+      if (!existing) {
+        // A new chapter file (put back from the trash, or from a sync client) joins the book at the
+        // end, as it does when the book opens. A file in a folder, or with the id of a chapter, does not.
+        if (file.includes('/')) return
+        const added = chapterFromFile(file, content, `ch_${hashText(file)}`)
+        if (st.chapters.some((c) => c.id === added.id)) return
+        const chapters = [...st.chapters, added]
+        set({ chapters })
+        get().updateManifest({ chapters: chapters.map((c) => ({ id: c.id, file: c.file })) })
+        return
+      }
       const parsed = chapterFromFile(file, content, existing.id)
       if (parsed.body === existing.body && parsed.title === existing.title) return
       set({
@@ -179,6 +195,7 @@ export const useBook = create<BookState>((set, get) => {
     activeEntryId: null,
     activeCategory: null,
     externalRev: {},
+    undoableRev: {},
     chapterJump: null,
 
     open(snap) {
@@ -196,11 +213,13 @@ export const useBook = create<BookState>((set, get) => {
         writingRules: snap.writingRules,
         syncState: snap.syncState,
         actions: snap.actions ?? [],
-        view: 'write',
-        activeChapterId: snap.chapters[0]?.id ?? null,
+        // The view and the chapter where the author was (features/write/place.ts); no old jump.
+        ...openingPlace(snap.root, snap.chapters.map((c) => c.id)),
         activeEntryId: null,
         activeCategory: null,
-        externalRev: {}
+        externalRev: {},
+        undoableRev: {},
+        chapterJump: null
       })
     },
 
@@ -310,7 +329,8 @@ export const useBook = create<BookState>((set, get) => {
       const story = idx === chapters.length && !title ? findStoryLine(get().entries) : null
       const heading = story ? boardView(parseBoard(story.body), 'chapter', chapters).find((c) => c.kind === 'planned')?.title : undefined
       const planned = heading ? headingName(heading) : undefined
-      const t = title ?? (planned || chapterWord(get().manifest?.language ?? 'en', chapters.length + 1))
+      // Else a title without a number: a number in the title would be wrong after the chapter moves.
+      const t = title ?? (planned || untitledChapter(get().manifest?.language ?? 'en'))
       const file = uniqueName(fileNameFromTitle(t), chapters.map((c) => c.file))
       const ch: Chapter = { id: newId('ch'), file, title: t, body, meta: {} }
       const next = [...chapters.slice(0, idx), ch, ...chapters.slice(idx)]
@@ -325,7 +345,7 @@ export const useBook = create<BookState>((set, get) => {
       await saver.flush()
       const { chapters, root, activeChapterId } = get()
       const ch = chapters.find((c) => c.id === id)
-      if (!ch || !root) return
+      if (!ch || !root) return null
       // Leave the chapter first, so no editor writes it again.
       const next = chapters.filter((c) => c.id !== id)
       const idx = chapters.findIndex((c) => c.id === id)
@@ -336,8 +356,23 @@ export const useBook = create<BookState>((set, get) => {
       saver.cancel(root, chapterRel(ch))
       // Move to a hidden trash folder instead of deleting: text is precious.
       const stamp = new Date().toISOString().replace(/[:.]/g, '-')
-      await invoke('book:renameFile', root, chapterRel(ch), `.wordelia/trash/${stamp} ${ch.file}`)
+      const trash = `.wordelia/trash/${stamp} ${ch.file}`
+      await invoke('book:renameFile', root, chapterRel(ch), trash)
       get().updateManifest({ chapters: get().chapters.map((c) => ({ id: c.id, file: c.file })) })
+      return async () => {
+        const st = get()
+        if (st.root !== root || st.chapters.some((c) => c.id === ch.id)) return
+        // Its old place, among the chapters that are still there; another file with its name keeps it.
+        const file = uniqueName(ch.file, st.chapters.map((c) => c.file))
+        const back = { ...ch, file }
+        const at = Math.min(idx, st.chapters.length)
+        const list = [...st.chapters.slice(0, at), back, ...st.chapters.slice(at)]
+        set({ chapters: list, activeChapterId: back.id, view: 'write', chapterJump: { id: back.id, n: (st.chapterJump?.n ?? 0) + 1 } })
+        // The file of the trash comes back; the text in memory is the same.
+        await invoke('book:renameFile', root, trash, chapterRel(back)).catch(() => saver.write(root, chapterRel(back), chapterToFile(back), true))
+        if (file !== ch.file) saver.write(root, chapterRel(back), chapterToFile(back), true)
+        get().updateManifest({ chapters: list.map((c) => ({ id: c.id, file: c.file })) })
+      }
     },
 
     moveChapter(id, toIndex) {
@@ -352,7 +387,9 @@ export const useBook = create<BookState>((set, get) => {
 
     restoreChapter(id, body) {
       get().setChapterBody(id, body)
-      set({ externalRev: { ...get().externalRev, [id]: (get().externalRev[id] ?? 0) + 1 } })
+      // An open editor loads the text as one step that Ctrl+Z can undo.
+      const rev = (get().externalRev[id] ?? 0) + 1
+      set({ externalRev: { ...get().externalRev, [id]: rev }, undoableRev: { ...get().undoableRev, [id]: rev } })
     },
 
     restoreEntry(id, body, summary) {

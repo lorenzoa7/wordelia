@@ -1,5 +1,6 @@
 import { useId } from 'react'
 import clsx from 'clsx'
+import { RadioGroup } from 'radix-ui'
 import type { ExportSettings, PageSize, SceneBreakStyle, Typography } from '@shared/types'
 import { PAGE_SIZES } from '@shared/export/model'
 import { quotesFor } from '@shared/text/quotes'
@@ -136,22 +137,22 @@ export function BookTab(): React.JSX.Element | null {
       <div className="typing-label" id="dialogue-style-label">
         {tr.dialogueStyle}
       </div>
-      <div className="dialogue-styles" role="radiogroup" aria-labelledby="dialogue-style-label">
+      {/* Radio groups: one Tab stop, and the arrow keys choose. */}
+      <RadioGroup.Root
+        className="dialogue-styles"
+        value={t.dialogueStyle}
+        onValueChange={(v) => setT({ dialogueStyle: v as Typography['dialogueStyle'] })}
+        aria-labelledby="dialogue-style-label"
+      >
         {(['dash', 'quotes'] as const).map((style) => (
-          <button
-            key={style}
-            role="radio"
-            aria-checked={t.dialogueStyle === style}
-            className={clsx('dialogue-style', t.dialogueStyle === style && 'is-active')}
-            onClick={() => setT({ dialogueStyle: style })}
-          >
+          <RadioGroup.Item key={style} value={style} className={clsx('dialogue-style', t.dialogueStyle === style && 'is-active')}>
             <span className="dialogue-style-name">{style === 'dash' ? tr.dialogueStyleDash : tr.dialogueStyleQuotes}</span>
             <span className="dialogue-style-example" style={font}>
               {style === 'dash' ? tr.dashExample(t.dialogueDash) : tr.quotesExample(q.doubleOpen, q.doubleClose)}
             </span>
-          </button>
+          </RadioGroup.Item>
         ))}
-      </div>
+      </RadioGroup.Root>
 
       <div className="typing-rows">
         <TypingRow label={tr.dialogueDash} before="--" after={t.dialogueDash} font={font}>
@@ -159,8 +160,8 @@ export function BookTab(): React.JSX.Element | null {
             value={t.dialogueDash}
             onValueChange={(v) => setT({ dialogueDash: v as Typography['dialogueDash'] })}
             options={[
-              { value: '—', label: `—  ${tr.emDash}` },
-              { value: '―', label: `―  ${tr.horizontalBar}` }
+              { value: '—', label: <DashChoice dash="—" name={tr.emDash} font={font} /> },
+              { value: '―', label: <DashChoice dash="―" name={tr.horizontalBar} font={font} /> }
             ]}
             ariaLabel={tr.dialogueDash}
           />
@@ -175,20 +176,23 @@ export function BookTab(): React.JSX.Element | null {
           <span className="typing-name" id="scene-break-label">
             {tr.sceneBreak}
           </span>
-          <div className="scene-breaks" role="radiogroup" aria-labelledby="scene-break-label">
+          <RadioGroup.Root
+            className="scene-breaks"
+            value={t.sceneBreak}
+            onValueChange={(v) => setT({ sceneBreak: v as SceneBreakStyle })}
+            aria-labelledby="scene-break-label"
+          >
             {SCENE_BREAKS.map((b) => (
-              <button
+              <RadioGroup.Item
                 key={b.value}
-                role="radio"
-                aria-checked={t.sceneBreak === b.value}
+                value={b.value}
                 className={clsx('scene-break', t.sceneBreak === b.value && 'is-active', !b.label && 'is-text')}
                 style={b.label ? font : undefined}
-                onClick={() => setT({ sceneBreak: b.value })}
               >
                 {b.label ?? tr.blankLine}
-              </button>
+              </RadioGroup.Item>
             ))}
-          </div>
+          </RadioGroup.Root>
         </div>
       </div>
     </div>
@@ -247,6 +251,18 @@ function MarginsField({ settings, onChange }: { settings: ExportSettings; onChan
       </div>
       <span className="field-hint">{tr.marginsHint}</span>
     </div>
+  )
+}
+
+/** A dialogue dash in the list: the dash large, in the book font (the two dashes look alike in the UI font), and its name. */
+function DashChoice({ dash, name, font }: { dash: string; name: string; font: React.CSSProperties }): React.JSX.Element {
+  return (
+    <span className="dash-choice">
+      <span className="dash-choice-glyph" style={font} aria-hidden>
+        {dash}
+      </span>
+      {name}
+    </span>
   )
 }
 

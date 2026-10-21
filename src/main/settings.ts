@@ -6,6 +6,7 @@ import { DEFAULT_ACTIONS, DEFAULT_ACTION_ID, withoutRetiredActions } from '@shar
 import type { AiAction, AppSettings, ModelRoutes, ProviderId, TaskKind } from '@shared/types'
 import { TASK_EFFORT } from '@shared/ai/effort'
 import { withDefaultShortcuts } from '@shared/ai/shortcuts'
+import { localeForSystem } from '@shared/i18n'
 import { atomicWrite, readJson } from './fsutil'
 
 const settingsFile = (): string => join(app.getPath('userData'), 'settings.json')
@@ -17,7 +18,8 @@ const SETTINGS_VERSION = 5
 export function defaultSettings(): AppSettings {
   return {
     version: SETTINGS_VERSION,
-    language: 'en',
+    // The language of the system, until the writer chooses one (the book language is guessed the same way).
+    language: localeForSystem(app.getLocale()),
     autoUpdate: true,
     theme: 'light',
     ui: { sidebarOpen: true, chatOpen: true, focusMode: false, typewriterScroll: false, zoom: 1, chatWidth: 400, sidebarWidth: 256 },
@@ -50,7 +52,7 @@ export async function getSettings(): Promise<AppSettings> {
     providers: { ...d.providers, ...(raw.providers ?? {}) },
     routes: migrateRoutes(raw.version, { ...d.routes, ...(raw.routes ?? {}) }),
     actions: migrateActions(raw.version, actions, raw.defaultActionId ?? d.defaultActionId),
-    language: raw.language === 'pt-BR' || raw.language === 'es' ? raw.language : 'en',
+    language: raw.language === 'pt-BR' || raw.language === 'es' || raw.language === 'en' ? raw.language : d.language,
     version: SETTINGS_VERSION
   }
   return cache
@@ -91,6 +93,14 @@ function migrateRoutes(version: number | undefined, routes: ModelRoutes): ModelR
   return out
 }
 
+const listeners = new Set<(s: AppSettings) => void>()
+
+/** Call `fn` after each change of the settings (for example the updater, for "Download updates automatically"). */
+export function onSettingsChanged(fn: (s: AppSettings) => void): () => void {
+  listeners.add(fn)
+  return () => listeners.delete(fn)
+}
+
 export async function setSettings(patch: Partial<AppSettings>): Promise<AppSettings> {
   const current = await getSettings()
   const next: AppSettings = {
@@ -103,19 +113,22 @@ export async function setSettings(patch: Partial<AppSettings>): Promise<AppSetti
   }
   cache = next
   await atomicWrite(settingsFile(), JSON.stringify(next, null, 2))
+  for (const fn of listeners) fn(next)
   return next
 }
 
 type SecretStore = Partial<Record<ProviderId, string>>
 
-export async function setSecret(provider: ProviderId, value: string | null): Promise<void> {
+/** Save or remove (null) the API key of a provider. False: the system key store is not available, so the key is not saved. */
+export async function setSecret(provider: ProviderId, value: string | null): Promise<boolean> {
   const store = await readJson<SecretStore>(secretsFile(), {})
   if (value == null || value === '') delete store[provider]
   else {
-    if (!safeStorage.isEncryptionAvailable()) throw new Error('The system key store is not available.')
+    if (!safeStorage.isEncryptionAvailable()) return false
     store[provider] = safeStorage.encryptString(value).toString('base64')
   }
   await atomicWrite(secretsFile(), JSON.stringify(store))
+  return true
 }
 
 export async function getSecret(provider: ProviderId): Promise<string | null> {

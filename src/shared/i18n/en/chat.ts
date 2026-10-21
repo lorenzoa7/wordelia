@@ -83,7 +83,7 @@ export const chat = {
   effort: 'Effort',
   /** The "Default" effort: the default level of the model, or who decides */
   defaultEffort: (level: string | undefined, cli: boolean): string =>
-    level ? `Default (${level})` : cli ? 'Default (the CLI decides)' : 'Default (the model decides)',
+    level ? `Default (${level})` : cli ? 'Default (automatic)' : 'Default (the model decides)',
 
   // Messages
   bulkPartial: (ok: number, total: number, failed: number): string =>

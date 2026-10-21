@@ -45,9 +45,12 @@
   padding-top: var(--s-4);
 }
 
-/* A book card is a manuscript: a sheet on top of two sheets. */
+/* A book card is a manuscript: a sheet on top of two sheets. The cards of a row have the height of
+   the tallest one: the page fills the card (3:4 at least), so the sheets behind it never hang below. */
 .book-card {
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 .book-card::before,
 .book-card::after {
@@ -77,6 +80,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  flex: 1 0 auto;
   width: 100%;
   aspect-ratio: 3 / 4;
   padding: var(--s-6) var(--s-5) var(--s-4);
@@ -207,12 +211,30 @@
   display: flex;
   justify-content: center;
 }
+/* A button: a click on the sheet starts the first book. */
 .empty-sheet {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   width: min(520px, 100%);
   padding: 56px 64px 48px;
+  border: 0;
   border-radius: 3px;
   background: var(--paper);
   box-shadow: var(--shadow-page);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform var(--dur-slow) var(--ease-out),
+    box-shadow var(--dur-slow) var(--ease-out);
+}
+.empty-sheet:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-page), 0 24px 40px -20px rgba(64, 48, 28, 0.35);
+}
+.empty-sheet:focus-visible {
+  outline-offset: 4px;
 }
 .empty-line {
   margin: 0 0 var(--s-6);
@@ -220,6 +242,22 @@
   font-size: 28px;
   font-style: italic;
   color: var(--ink);
+}
+.empty-start {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--s-5);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--ribbon);
+}
+.empty-start svg {
+  translate: 0 var(--icon-lift);
+}
+.empty-sheet:hover .empty-start {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .empty-caret {
   display: inline-block;
@@ -268,8 +306,9 @@
   margin-bottom: var(--s-2);
   font-weight: 700;
 }
+/* The list gets shorter in a low window, so the choices under it stay in view. */
 .import-chapters {
-  max-height: 200px;
+  max-height: clamp(96px, calc(100vh - 520px), 200px);
   overflow-y: auto;
   margin: 0 0 var(--s-5);
   padding: var(--s-2);
@@ -286,20 +325,50 @@
   font-size: var(--text-sm);
   color: var(--ink-2);
 }
+.import-ch-num {
+  flex-shrink: 0;
+  min-width: 3ch;
+  text-align: right;
+  color: var(--ink-4);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
 .import-ch-title {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* A chapter without a title in the file: the app names it. */
+.import-ch-title.is-fallback {
+  color: var(--ink-3);
+  font-style: italic;
+}
 .import-ch-words {
   color: var(--ink-4);
   font-size: var(--text-xs);
 }
+.import-empty {
+  margin: 0 0 var(--s-5);
+  padding: var(--s-4);
+  border: 1px dashed var(--rule);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+}
 .import-fields {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--s-4);
+  column-gap: var(--s-4);
+}
+.import-fields .select {
+  width: 100%;
+}
+.plain-folder p {
+  margin: 0 0 var(--s-4);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--ink-2);
 }
 .import-note {
   margin: -4px 0 0;

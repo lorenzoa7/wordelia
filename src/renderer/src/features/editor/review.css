@@ -1,0 +1,99 @@
+/* The review of an action in the text (review.ts) and its bar (ReviewBar.tsx). */
+
+/* The passage under review: a light ink wash under the lines, so the author sees what the AI
+   rewrites. Not green: green is new text. */
+.ai-range {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  border-radius: 2px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+/* The room for the review bar above the paragraph of the passage: the bar never covers text.
+   ReviewBar.tsx sets the height (the bar at the zoom of the page). */
+.manuscript > * {
+  transition: padding-top var(--dur-med) var(--ease-out);
+}
+.manuscript .review-room {
+  padding-top: var(--review-room-h, 46px);
+}
+
+/* A removed paragraph break or line break: a struck mark at the end of the line */
+.ai-del-break {
+  display: inline-block;
+  margin: 0 0.15em;
+  padding: 0 0.15em;
+  font-size: 0.85em;
+  text-indent: 0;
+}
+
+/* A removed scene break or page break: the mark is struck through */
+.scene-break.ai-del-block {
+  border-radius: var(--radius-sm);
+  background: var(--strike-soft);
+}
+.scene-break.ai-del-block span::before {
+  color: var(--strike);
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+}
+.page-break.ai-del-block::after {
+  content: '\21a1';
+  position: absolute;
+  left: 50%;
+  top: -0.7em;
+  color: var(--strike);
+  text-decoration: line-through;
+  background: var(--strike-soft);
+  border-radius: 2px;
+  padding: 0 0.3em;
+}
+
+/* A new scene break: on its own line, in the middle, like a scene break of the page */
+.ai-ins-scene {
+  display: block;
+  margin: 0.6em 0;
+  text-align: center;
+  text-indent: 0;
+  letter-spacing: 0.5em;
+}
+
+/* A refused key in the locked passage: a short ring around the bar */
+.review-cue {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: review-cue 700ms var(--ease-out) both;
+}
+@keyframes review-cue {
+  0% {
+    box-shadow: 0 0 0 0 var(--ribbon);
+  }
+  30% {
+    box-shadow: 0 0 0 3px var(--ribbon-wash);
+  }
+  100% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+/* The name of the action and the cue share one place: the cue shows for a moment, the bar keeps its width. */
+.review-bar .review-label {
+  display: inline-grid;
+  align-items: center;
+}
+.review-label-text,
+.review-locked {
+  grid-area: 1 / 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.review-label-text.is-hidden,
+.review-locked.is-hidden {
+  visibility: hidden;
+}
+.review-locked {
+  color: var(--ribbon);
+  font-size: var(--text-xs);
+}

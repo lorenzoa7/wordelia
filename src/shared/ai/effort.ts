@@ -65,7 +65,7 @@ export function effortChoices(model: Pick<ModelInfo, 'efforts'> | undefined, cur
 /** Label of the "Default" choice: what happens when Wordelia sends no effort. */
 export function defaultEffortLabel(model: Pick<ModelInfo, 'defaultEffort'> | undefined, cli: boolean): string {
   if (model?.defaultEffort) return `Default (${EFFORT_LABELS[model.defaultEffort]})`
-  return cli ? 'Default (the CLI decides)' : 'Default (the model decides)'
+  return cli ? 'Default (automatic)' : 'Default (the model decides)'
 }
 
 /** Read the model aliases and the effort levels from the help text of the claude CLI. */

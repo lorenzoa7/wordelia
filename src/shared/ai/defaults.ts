@@ -131,6 +131,41 @@ export function withoutRetiredActions(actions: AiAction[], mainId: string, anySh
   return next.length ? next : actions
 }
 
+/** The first line of the template under its title: a note for the author, not a rule. */
+const TEMPLATE_NOTE = 'These rules guide every AI action and chat for this book. Write them in any language. Edit them freely.'
+/** An example line of the template: "- (Example: …)". The author can translate the word. */
+const EXAMPLE_LINE = /^\s*(?:[-*+]\s+)?\((?:example|examples|exemplo|exemplos|ejemplo|ejemplos)\s*:[^)]*\)\.?\s*$/i
+
+/**
+ * The writing rules as the AI gets them. The template of a new book has notes and example lines for
+ * the author ("- (Example: … The story takes place in 1899.)"). They are hints, not rules: they never
+ * go to the AI. A heading that has no rule under it goes too. Rules with only headings become empty,
+ * so the prompt says that the author has not written rules yet.
+ */
+export function rulesForAi(rules: string): string {
+  const lines = rules
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .filter((l) => l.trim() !== TEMPLATE_NOTE && !EXAMPLE_LINE.test(l))
+  // Remove the headings with no text under them (up to the next heading of the same or a higher level).
+  const level = (l: string): number => /^(#{1,6})\s/.exec(l)?.[1].length ?? 0
+  const keep = lines.map((l, i) => {
+    const h = level(l)
+    if (!h) return true
+    for (let k = i + 1; k < lines.length; k++) {
+      const next = level(lines[k])
+      if (next && next <= h) return false
+      if (!next && lines[k].trim()) return true
+    }
+    return false
+  })
+  return lines
+    .filter((_, i) => keep[i])
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
 export function writingRulesTemplate(language: string): string {
   return `# Writing rules
 

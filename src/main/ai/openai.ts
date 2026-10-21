@@ -4,12 +4,15 @@ import OpenAI from 'openai'
 import type { CompletionResult, ModelInfo, ProviderStatus, StreamEvent } from '@shared/types'
 import { mainT } from '../i18n'
 import { getSecret } from '../settings'
-import { classifyError, type ProviderTransport } from './transport'
+import { isGeneralOpenAiModel, openaiEfforts, openaiModelLabel } from '@shared/ai/openai'
+import { failure, keyStatus, type ProviderTransport } from './transport'
 import { openaiContent, type AiRequest } from './images'
 
 let modelCache: { at: number; models: ModelInfo[] } | null = null
 /** False after the API refused reasoning summaries for this key (the organization is not verified). */
 let summaryAllowed = true
+/** Models that refused a reasoning effort. The app sends them none. */
+const noEffort = new Set<string>()
 
 async function client(): Promise<OpenAI | null> {
   const key = await getSecret('openai')
@@ -19,7 +22,7 @@ async function client(): Promise<OpenAI | null> {
 /** Keep chat models only. The list endpoint also returns embedding, audio and image models. */
 function isChatModel(id: string): boolean {
   if (!/^(gpt-|o\d|chatgpt-)/.test(id)) return false
-  return !/(embedding|tts|whisper|audio|realtime|transcribe|image|dall-e|search|moderation|instruct|-\d{4}-\d{2}-\d{2}$)/.test(id)
+  return !/(embedding|tts|whisper|audio|realtime|transcribe|image|dall-e|search|research|computer-use|moderation|instruct|-\d{4}-\d{2}-\d{2}$)/.test(id)
 }
 
 export const openaiApi: ProviderTransport = {
@@ -33,8 +36,7 @@ export const openaiApi: ProviderTransport = {
       await c.models.list()
       return { provider: 'openai', installed: true, loggedIn: true, detail: t.apiKeyWorks }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      return { provider: 'openai', installed: true, loggedIn: false, detail: msg.slice(0, 200) }
+      return keyStatus('openai', err, err instanceof OpenAI.AuthenticationError || err instanceof OpenAI.PermissionDeniedError)
     }
   },
 
@@ -46,11 +48,13 @@ export const openaiApi: ProviderTransport = {
     try {
       for await (const m of c.models.list()) {
         if (!isChatModel(m.id)) continue
+        const efforts = openaiEfforts(m.id)
         out.push({
           id: m.id,
-          label: m.id,
+          label: openaiModelLabel(m.id),
           created: m.created,
-          tier: /mini|nano/.test(m.id) ? 'fast' : 'best'
+          tier: /mini|nano/.test(m.id) ? 'fast' : isGeneralOpenAiModel(m.id) ? 'best' : 'balanced',
+          ...(efforts ? { efforts } : {})
         })
       }
     } catch {
@@ -69,7 +73,9 @@ export const openaiApi: ProviderTransport = {
     const model = req.route.model
     let text = ''
     try {
-      const create = (summary: boolean) =>
+      // 'summary': the effort and a summary of the reasoning; 'effort': the effort only; 'none': no reasoning settings.
+      type Reasoning = 'summary' | 'effort' | 'none'
+      const create = (mode: Reasoning) =>
         c.responses.create(
           {
             model,
@@ -77,18 +83,30 @@ export const openaiApi: ProviderTransport = {
             input: req.messages.map((m, i) => (m.role === 'user' && req.images?.[i]?.length ? { role: m.role, content: openaiContent(m.content, req.images[i]) } : { role: m.role, content: m.content })),
             stream: true,
             // Reasoning summaries show what the model thinks about while it works.
-            ...(req.route.effort ? { reasoning: { effort: req.route.effort, ...(summary ? { summary: 'auto' as const } : {}) } } : {})
+            ...(mode !== 'none' && req.route.effort
+              ? { reasoning: { effort: req.route.effort === 'minimal' ? ('low' as const) : (req.route.effort as 'low' | 'medium' | 'high'), ...(mode === 'summary' ? { summary: 'auto' as const } : {}) } }
+              : {})
           },
           { signal }
         )
+      let mode: Reasoning = !req.route.effort || noEffort.has(model) ? 'none' : summaryAllowed ? 'summary' : 'effort'
       let stream: Awaited<ReturnType<typeof create>>
-      try {
-        stream = await create(summaryAllowed && Boolean(req.route.effort))
-      } catch (err) {
-        // Some organizations must be verified before they get reasoning summaries. Then ask without them.
-        if (!(err instanceof OpenAI.BadRequestError) || !/summar|verif/i.test(err.message) || !req.route.effort) throw err
-        summaryAllowed = false
-        stream = await create(false)
+      for (;;) {
+        try {
+          stream = await create(mode)
+          break
+        } catch (err) {
+          if (!(err instanceof OpenAI.BadRequestError) || mode === 'none') throw err
+          if (mode === 'summary' && /summar|verif/i.test(err.message)) {
+            // Some organizations must be verified before they get reasoning summaries. Then ask without them.
+            summaryAllowed = false
+            mode = 'effort'
+          } else if (/reasoning|effort/i.test(err.message)) {
+            // A model without reasoning rejects the effort. Ask again without it, and remember the model.
+            noEffort.add(model)
+            mode = 'none'
+          } else throw err
+        }
       }
       onEvent({ type: 'start', model })
       let usage: CompletionResult['usage']
@@ -109,17 +127,18 @@ export const openaiApi: ProviderTransport = {
             onEvent({ type: 'usage', ...usage })
           }
         } else if (ev.type === 'response.failed') {
-          const msg = ev.response.error?.message ?? t.requestFailed
-          return { ok: false, text, model, error: msg, errorKind: classifyError(msg) }
+          return failure(ev.response.error?.message ?? t.requestFailed, { text, model, api: true })
         } else if (ev.type === 'error') {
-          return { ok: false, text, model, error: ev.message, errorKind: classifyError(ev.message) }
+          return failure(ev.message, { text, model, api: true })
         }
       }
       return { ok: true, text, model, usage }
     } catch (err) {
       if (signal.aborted) return { ok: false, text, model, error: t.cancelled, errorKind: 'cancelled' }
-      const msg = err instanceof Error ? err.message : String(err)
-      return { ok: false, text, model, error: msg, errorKind: classifyError(msg) }
+      const r = failure(err instanceof Error ? err.message : String(err), { text, model, api: true })
+      if (err instanceof OpenAI.APIConnectionError) return { ...r, errorKind: 'network' }
+      if ((err instanceof OpenAI.AuthenticationError || err instanceof OpenAI.PermissionDeniedError) && r.errorKind !== 'no-credit') return { ...r, errorKind: 'bad-key' }
+      return r
     }
   }
 }

@@ -40,6 +40,11 @@ function change(list: EditorComment[]): void {
   persist()
 }
 
+/** The writer hears once that a newer Wordelia wrote the file. */
+function sayNewer(): void {
+  toast(getT().read.newerFile, { ms: 12000 })
+}
+
 /**
  * Show the comments of a book: the book opens, or its file changed. The list of another book goes away.
  * `version` is the version of the file: a newer one than 1 is shown and never written, and the writer
@@ -49,19 +54,27 @@ export function loadComments(root: string | null, list: EditorComment[], version
   const before = useComments.getState()
   const readOnly = version > 1
   useComments.setState({ root, list: uniqueById(list), readOnly })
-  if (root && readOnly && !(before.readOnly && before.root === root)) toast(getT().read.newerFile, { ms: 12000 })
+  if (root && readOnly && !(before.readOnly && before.root === root)) sayNewer()
 }
 
 /**
  * The file `ai/comments.json` changed outside the app (a sync client, git). Show the new list, unless
  * the app has a change of its own that waits to be written: that change wins and the next write puts
  * it in the file. Text that is not a comments file (a sync client has not finished the write) changes
- * nothing.
+ * nothing, except a newer Wordelia that changed the shape of the file: the list stays, and the app does
+ * not write the file any more.
  */
 export function commentsChangedOutside(root: string, content: string | null): void {
   if (useComments.getState().root !== root || saver.isPending(root, COMMENTS_FILE)) return
   const file = readCommentsFile(content)
-  if (file.valid) loadComments(root, file.comments, file.version)
+  if (file.valid) {
+    loadComments(root, file.comments, file.version)
+    return
+  }
+  if (file.version > 1 && !useComments.getState().readOnly) {
+    useComments.setState({ readOnly: true })
+    sayNewer()
+  }
 }
 
 /**

@@ -198,6 +198,13 @@ describe('the comments of a book', () => {
     expect(snap.commentsVersion).toBe(2)
   })
 
+  it('tells the version of a newer file that has another shape, and it has no comments', async () => {
+    await writeComments(JSON.stringify({ version: 2, items: [comment] }))
+    const snap = await openBook(book)
+    expect(snap.comments).toEqual([])
+    expect(snap.commentsVersion).toBe(2)
+  })
+
   it('does not write the file when it opens the book', async () => {
     await openBook(book)
     expect((await readdir(join(book, 'ai'))).includes('comments.json')).toBe(false)

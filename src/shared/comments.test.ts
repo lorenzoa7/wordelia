@@ -119,6 +119,16 @@ describe('the text of the file', () => {
     expect(readCommentsFile('{"version":1}').valid).toBe(false)
     expect(readCommentsFile('42').valid).toBe(false)
   })
+
+  it('tells the version of a file with another shape, so a newer file is not taken for version 1', () => {
+    expect(readCommentsFile('{"version":2,"items":[]}')).toEqual({ comments: [], version: 2, valid: false })
+    expect(readCommentsFile('{"version":3,"comments":{"a":1}}')).toEqual({ comments: [], version: 3, valid: false })
+    // No version, a bad version and text that is not an object are version 1.
+    expect(readCommentsFile('{"items":[]}')).toEqual({ comments: [], version: 1, valid: false })
+    expect(readCommentsFile('{"version":"2","items":[]}').version).toBe(1)
+    expect(readCommentsFile('[2]').version).toBe(1)
+    expect(readCommentsFile('{"version":2,"items"').version).toBe(1)
+  })
 })
 
 describe('serializeComments', () => {

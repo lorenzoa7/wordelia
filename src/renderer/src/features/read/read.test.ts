@@ -452,6 +452,29 @@ describe('changes from outside', () => {
     expect(store.useComments.getState().list).toHaveLength(1)
   })
 
+  it('a newer file with another shape that arrives keeps the list, says so once and is not written', async () => {
+    store.loadComments(ROOT, [comment()])
+    const newer = JSON.stringify({ version: 2, items: [{ id: 'x' }] })
+    store.commentsChangedOutside(ROOT, newer)
+    expect(store.useComments.getState()).toMatchObject({ readOnly: true, list: [comment()] })
+    expect(useUi.getState().toasts.map((t) => t.message)).toEqual([expect.stringContaining('newer version of Wordelia')])
+    store.commentsChangedOutside(ROOT, newer)
+    expect(useUi.getState().toasts).toHaveLength(1)
+    store.setCommentState(['cm_aaaaaaaa'], 'done')
+    await saver.flush()
+    expect(calls).toEqual([])
+    // The file goes back to version 1: the comments are written again.
+    store.commentsChangedOutside(ROOT, text([comment()]))
+    expect(store.useComments.getState().readOnly).toBe(false)
+  })
+
+  it('a partial write with no version changes nothing and does not make the list read-only', () => {
+    store.loadComments(ROOT, [comment()])
+    store.commentsChangedOutside(ROOT, '{"version":2,"comme')
+    expect(store.useComments.getState()).toMatchObject({ readOnly: false, list: [comment()] })
+    expect(useUi.getState().toasts).toHaveLength(0)
+  })
+
   it('a file of a newer Wordelia that arrives is shown and not written', async () => {
     store.loadComments(ROOT, [comment()])
     store.commentsChangedOutside(ROOT, JSON.stringify({ version: 2, comments: [comment({ id: 'cm_bbbbbbbb' })] }))

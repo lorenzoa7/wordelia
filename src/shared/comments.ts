@@ -109,7 +109,10 @@ export function uniqueById(list: EditorComment[]): EditorComment[] {
 /** What the text of `ai/comments.json` holds. */
 export interface CommentsFile {
   comments: EditorComment[]
-  /** The `version` of the file. A file with no version, and a missing file, are version 1. */
+  /**
+   * The `version` of the file. A file with no version, a missing file and text that is not JSON are version 1.
+   * A file of another shape still has its version: a newer Wordelia can change the shape.
+   */
   version: number
   /** False when the text is not a comments file: a partial write of a sync client, or JSON of another shape. */
   valid: boolean
@@ -128,8 +131,8 @@ export function readCommentsFile(text: string | null): CommentsFile {
   } catch {
     return { comments: [], version: 1, valid: false }
   }
-  if (!isObject(raw) || !Array.isArray(raw.comments)) return { comments: [], version: 1, valid: false }
-  const version = typeof raw.version === 'number' && Number.isFinite(raw.version) ? raw.version : 1
+  const version = isObject(raw) && typeof raw.version === 'number' && Number.isFinite(raw.version) ? raw.version : 1
+  if (!isObject(raw) || !Array.isArray(raw.comments)) return { comments: [], version, valid: false }
   return { comments: uniqueById(raw.comments.map(parseComment).filter((c): c is EditorComment => c !== null)), version, valid: true }
 }
 

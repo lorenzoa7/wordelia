@@ -87,8 +87,32 @@ export default async function ({ page, shot, openBook }) {
   const pageSize = await page.evaluate(() => window.__wordelia.book.getState().manifest.export.pageSize)
   if (pageSize !== 'Letter') throw new Error(`The page size was not saved: ${pageSize}`)
   spaces.book = await bottomSpace()
+  // The choice groups (dialogue style, scene break) work like radio buttons: one Tab stop, and the
+  // arrow keys choose the next or the previous choice.
+  const sceneBreak = () => page.evaluate(() => window.__wordelia.book.getState().manifest.typography.sceneBreak)
+  const savedBreak = await sceneBreak()
+  for (const group of ['.dialogue-styles', '.scene-breaks']) {
+    // The group itself can be the Tab stop: then it gives the focus to the chosen radio.
+    const stops = await page.locator(`${group}:not([tabindex="-1"]), ${group} [role="radio"]:not([tabindex="-1"])`).count()
+    if (stops !== 1) throw new Error(`The choice group ${group} has ${stops} Tab stops, not 1`)
+  }
+  await page.locator('.scene-breaks [role="radio"][aria-checked="true"]').focus()
+  // Key down, the choice changes, key up: as a person presses a key (the group moves the focus a moment after the key goes down).
+  await page.keyboard.down('ArrowRight')
+  await page.waitForFunction((b) => window.__wordelia.book.getState().manifest.typography.sceneBreak !== b, savedBreak, { timeout: 3000 })
+  await page.keyboard.up('ArrowRight')
+  if ((await page.evaluate(() => document.activeElement?.getAttribute('aria-checked'))) !== 'true') throw new Error('The arrow key did not move the focus to the new choice')
+  await page.keyboard.down('ArrowLeft')
+  await page.waitForFunction((b) => window.__wordelia.book.getState().manifest.typography.sceneBreak === b, savedBreak, { timeout: 3000 })
+  await page.keyboard.up('ArrowLeft')
+  if ((await sceneBreak()) !== savedBreak) throw new Error('The arrow keys did not go back to the first scene break')
   await page.waitForTimeout(300)
   await shot('book-typing')
+  // The two dialogue dashes show in the book font, large, so they look different.
+  await page.getByRole('combobox', { name: 'Dialogue dash' }).click()
+  await page.getByRole('option').first().waitFor()
+  await shot('book-dashes')
+  await page.keyboard.press('Escape')
   await tab('Writing rules')
   await page.waitForTimeout(300)
   await shot('rules')

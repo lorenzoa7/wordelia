@@ -8,7 +8,7 @@ import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey, type EditorState } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { create } from 'zustand'
-import { markdownToPlain } from '@shared/book'
+import { markdownToPlainBlocks } from '@shared/book'
 import { findText } from '@shared/proposals/apply'
 import { hunkKey, parseProposals } from '@shared/proposals/parse'
 import { wordDiff } from '@shared/text/diff'
@@ -18,7 +18,8 @@ import { toast } from '@/stores/ui'
 import { getT } from '@/lib/i18n'
 import { typesetForBook } from '@/lib/typeset'
 import { useChat } from '@/features/chat/chatStore'
-import { applyEditHunk, markAfter, resolveTarget, restoreSnapshot, setHunkStates, snapshotOf } from '@/features/chat/applyProposal'
+import { applyEditHunk, applyPortrait, markAfter, resolveTarget, restoreSnapshot, setHunkStates, snapshotOf } from '@/features/chat/applyProposal'
+import { SYNC_THREAD_ID } from '@/features/plan/sync'
 import { currentDiffView, diffDecorations, proposedPlain, textWithMap } from './review'
 import { useApp } from '@/stores/app'
 import { chapterHasText, getChapterEditor, locateInChapter, scrollToPos, whenChapterEditor } from './registry'
@@ -40,17 +41,33 @@ export interface InlineProposal {
   replace: string
 }
 
+/** An image of the chat that the open thread proposes as the portrait of a note */
+export interface PortraitProposal {
+  /** `thread:message:hunk key` */
+  id: string
+  threadId: string
+  messageId: string
+  key: string
+  /** The id of the planning entry */
+  docId: string
+  file: string
+  /** The image, `_assets/…` */
+  image: string
+}
+
 export function inlineProposalId(threadId: string, messageId: string, key: string): string {
   return `${threadId}:${messageId}:${key}`
 }
 
 interface InlineState {
   list: InlineProposal[]
+  /** Portraits that wait for a decision: the note shows the newest one in its portrait */
+  portraits: PortraitProposal[]
   /** The proposal that "Show in text" points at, for a moment */
   focus: string | null
 }
 
-export const useInlineProposals = create<InlineState>(() => ({ list: [], focus: null }))
+export const useInlineProposals = create<InlineState>(() => ({ list: [], portraits: [], focus: null }))
 
 /** The changes of a thread to chapters and planning entries that wait for a decision. */
 export function pendingProposals(thread: Thread): InlineProposal[] {
@@ -81,6 +98,78 @@ export function pendingProposals(thread: Thread): InlineProposal[] {
     }
   }
   return out
+}
+
+/** The portraits that a thread proposes for notes and that wait for a decision. */
+export function pendingPortraits(thread: Thread): PortraitProposal[] {
+  const out: PortraitProposal[] = []
+  for (const m of thread.messages) {
+    if (m.role !== 'assistant' || !m.content.includes('<portrait')) continue
+    for (const seg of parseProposals(m.content)) {
+      if (seg.kind !== 'portrait' || !seg.complete || !seg.image) continue
+      const target = resolveTarget(seg.file)
+      if (target.kind !== 'entry') continue
+      const key = hunkKey(seg.index, 0)
+      const state = m.hunks?.[key]
+      if (state && state !== 'pending') continue
+      out.push({ id: inlineProposalId(thread.id, m.id, key), threadId: thread.id, messageId: m.id, key, docId: target.entry.id, file: seg.file, image: seg.image })
+    }
+  }
+  return out
+}
+
+/** Use the image of a portrait proposal as the portrait of its note. */
+export function acceptPortrait(thread: Thread, messageId: string, key: string, file: string, image: string): void {
+  const res = applyPortrait(file, image)
+  // Keep the image from before, so a rewind of the thread can bring it back.
+  setHunkStates(thread, messageId, { [key]: res.ok ? 'accepted' : 'failed' }, res.ok ? { [key]: res.previous ?? '' } : undefined)
+  if (!res.ok) toast(res.reason, { kind: 'error' })
+  else toast(getT().chat.portraitSet(resolveTarget(file).label))
+}
+
+export function acceptPortraitProposal(p: PortraitProposal): void {
+  const thread = threadOf(p)
+  if (thread) acceptPortrait(thread, p.messageId, p.key, p.file, p.image)
+}
+
+export function rejectPortraitProposal(p: PortraitProposal): void {
+  const thread = threadOf(p)
+  if (thread) setHunkStates(thread, p.messageId, { [p.key]: 'rejected' })
+}
+
+/** Replies that took the author to the place of their changes, or that were there before. */
+const opened = new Set<string>()
+
+/**
+ * The note of the first change of a reply that is ready: '' for a change to a chapter (it shows in
+ * its text by itself), null when no change is ready yet.
+ */
+function placeOf(content: string): string | null {
+  if (!content.includes('<edit') && !content.includes('<portrait')) return null
+  for (const seg of parseProposals(content)) {
+    if (seg.kind !== 'edit' && seg.kind !== 'portrait') continue
+    if (seg.kind === 'edit' ? !seg.hunks.some((h) => h.complete) : !seg.complete) continue
+    const target = resolveTarget(seg.file)
+    if (target.kind === 'chapter') return ''
+    if (target.kind === 'entry') return target.entry.id
+  }
+  return null
+}
+
+/**
+ * A new reply of the open thread proposes a change to a note (or to the story line): open that page,
+ * as a change to a chapter shows in its text. The replies that the author saw before, and the
+ * replies of the planning sync, do not move the author.
+ */
+function openNewPlace(thread: Thread | undefined, sameThread: boolean): void {
+  if (!thread) return
+  for (const m of thread.messages) {
+    if (m.role !== 'assistant' || opened.has(m.id)) continue
+    const place = placeOf(m.content)
+    if (place === null) continue
+    opened.add(m.id)
+    if (place && sameThread && thread.id !== SYNC_THREAD_ID) useBook.getState().selectEntry(place)
+  }
 }
 
 function sameList(a: InlineProposal[], b: InlineProposal[]): boolean {
@@ -117,7 +206,7 @@ function remember(list: InlineProposal[], p: InlineProposal): void {
 
 /** Count of a passage in a document, in plain text: 0, 1 or 2 (two or more). */
 function countIn(text: string, markdown: string): number {
-  const needle = markdownToPlain(markdown).trim()
+  const needle = markdownToPlainBlocks(markdown)
   if (!needle) return 0
   const m = findText(text, needle)
   return m ? Math.min(2, m.count) : 0
@@ -186,16 +275,20 @@ export function useInlineProposalSync(): void {
     // The open thread; with no open thread, the thread with the newest activity.
     const thread = threads.find((t) => t.id === activeId) ?? [...threads].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]
     const list = thread ? pendingProposals(thread) : []
-    const prev = useInlineProposals.getState().list
+    const portraits = thread ? pendingPortraits(thread) : []
+    const sameThread = thread?.id === lastThread.current
+    lastThread.current = thread?.id ?? null
+    openNewPlace(thread, sameThread)
+    const state = useInlineProposals.getState()
+    if (state.portraits.map((p) => p.id).join('|') !== portraits.map((p) => p.id).join('|')) useInlineProposals.setState({ portraits })
+    const prev = state.list
     if (sameList(prev, list)) return
     // Proposals that left the list because the author accepted them: Ctrl+Z can bring them back.
     for (const p of prev) if (!list.some((x) => x.id === p.id) && stateOf(p) === 'accepted') remember(accepted, p)
     useInlineProposals.setState({ list })
     // A new reply with proposals in the same thread: show the last new one in the text.
-    const sameThread = thread?.id === lastThread.current
     const fresh = list.filter((p) => !seen.has(p.id) && p.kind === 'chapter')
     for (const p of list) seen.add(p.id)
-    lastThread.current = thread?.id ?? null
     if (sameThread && fresh.length) {
       const p = fresh[fresh.length - 1]
       setTimeout(() => revealProposal(p.docId, p.find, p.id), 200)
@@ -207,7 +300,7 @@ export function useInlineProposalSync(): void {
 /* Decisions from the text                                              */
 /* ------------------------------------------------------------------ */
 
-function threadOf(p: InlineProposal): Thread | undefined {
+function threadOf(p: { threadId: string }): Thread | undefined {
   return useBook.getState().threads.find((t) => t.id === p.threadId)
 }
 
@@ -342,7 +435,8 @@ function build(state: EditorState, list: InlineProposal[], focus: string | null)
   const taken: Array<{ from: number; to: number }> = []
   const decos: Decoration[] = []
   for (const p of list) {
-    const needle = markdownToPlain(p.find).trim()
+    // Block by block, like the editor: a list item of a note has no "- " in the text.
+    const needle = markdownToPlainBlocks(p.find)
     if (!needle) continue
     const m = findText(text, needle)
     if (!m || m.count > 1) continue

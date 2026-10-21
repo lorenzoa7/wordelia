@@ -11,6 +11,7 @@ import {
   findStoryLine,
   hereKey,
   isStoryLine,
+  linkMentions,
   mentionPieces,
   moveColumn,
   applyOrder,
@@ -565,6 +566,14 @@ describe('the entry and mentions', () => {
     expect(chapterOf('the storm', chapters)).toBe('ch1')
     expect(chapterOf('The Vísitor.md', chapters)).toBe('ch2')
     expect(chapterOf('Nothing', chapters)).toBeNull()
+  })
+
+  it('marks the names of notes that a text has without @', () => {
+    const notes = [entry('Elias'), entry('Marta'), entry('Farol de Santa Ilha', ['o farol']), entry('Ana'), entry('Ana Lúcia')]
+    expect(linkMentions('Elias leva Marta ao @Farol de Santa Ilha, e Ana Lúcia espera.', notes)).toBe('@Elias leva @Marta ao @Farol de Santa Ilha, e @Ana Lúcia espera.')
+    // Not inside a word, not two times, and an alias in small letters stays as it is.
+    expect(linkMentions('Martas e @Elias voltam para o farol.', notes)).toBe('Martas e @Elias voltam para o farol.')
+    expect(linkMentions('elias', notes)).toBe('elias')
   })
 
   it('finds the longest mention', () => {

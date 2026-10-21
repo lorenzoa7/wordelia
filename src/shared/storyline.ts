@@ -1016,6 +1016,39 @@ export function mentionPieces(text: string, entries: Pick<Entry, 'id' | 'name' |
   return out
 }
 
+/**
+ * Put "@" before the names of notes that a text has without it (the AI forgets it at times). A name
+ * is the name of a note or an alias that starts with a capital letter, as a whole word, with its case.
+ * The longest name wins; a mention stays as it is.
+ */
+export function linkMentions(text: string, entries: Pick<Entry, 'id' | 'name' | 'aliases'>[]): string {
+  const names = [...new Set(entries.flatMap((e) => [e.name, ...e.aliases]).filter((n) => /^\p{Lu}/u.test(n)))].sort((a, b) => b.length - a.length)
+  if (!names.length) return text
+  let out = ''
+  for (const piece of mentionPieces(text, entries)) {
+    if (piece.kind === 'mention') {
+      out += piece.text
+      continue
+    }
+    const s = piece.text
+    let i = 0
+    while (i < s.length) {
+      const before = i === 0 ? out.slice(-1) : s[i - 1]
+      if (!/[\p{L}\p{N}@]/u.test(before)) {
+        const hit = names.find((n) => s.startsWith(n, i) && !/[\p{L}\p{N}]/u.test(s[i + n.length] ?? ''))
+        if (hit) {
+          out += `@${hit}`
+          i += hit.length
+          continue
+        }
+      }
+      out += s[i]
+      i++
+    }
+  }
+  return out
+}
+
 /** The text of a card without the "@" of its mentions, for short views. */
 export function plainText(text: string): string {
   return text.replace(/(^|[^\p{L}\p{N}])@(?=\p{L})/gu, '$1')

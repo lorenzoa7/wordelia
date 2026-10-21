@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { motion } from 'motion/react'
-import { ArrowLeft, BookOpenText, CaretRight, ChatCircleText, DownloadSimple, Graph, ImageSquare, Path, Plus, SquaresFour, Trash, X } from '@phosphor-icons/react'
+import { ArrowLeft, BookOpenText, CaretRight, ChatCircleText, Check, DownloadSimple, Graph, ImageSquare, Path, Plus, SquaresFour, Trash, X } from '@phosphor-icons/react'
 import { markdownToPlain } from '@shared/book'
 import { entryNames } from '@shared/prompts/context'
 import type { Entry } from '@shared/types'
@@ -13,6 +13,8 @@ import { useBook } from '@/stores/book'
 import { useNotes } from './line/model'
 import { useUi } from '@/stores/ui'
 import { useChat } from '@/features/chat/chatStore'
+import { ImageViewer } from '@/features/chat/ChatImages'
+import { acceptPortraitProposal, rejectPortraitProposal, useInlineProposals } from '@/features/editor/inlineProposals'
 import { useApp } from '@/stores/app'
 import { LINE_PAGE, MAP_PAGE, MapView, PlanViewSwitch, planBack, useBackPlace } from '@/features/graph'
 import { LineView } from './line/LineView'
@@ -124,6 +126,12 @@ function Portrait({ entry, size }: { entry: Entry; size: 'card' | 'large' }): Re
   ) : (
     <span className={`portrait portrait-${size} portrait-empty`}>{initials}</span>
   )
+}
+
+/** The image that the chat proposes as the portrait of a note */
+function ProposedPortrait({ image }: { image: string }): React.JSX.Element {
+  const url = useAssetUrl(image)
+  return url ? <img className="portrait portrait-large" src={url} alt="" draggable={false} /> : <span className="portrait portrait-large portrait-empty" />
 }
 
 /* ------------------------------------------------------------------ */
@@ -244,7 +252,11 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
   const rev = useBook((s) => s.externalRev[entry.id] ?? 0)
   const [name, setName] = useState(entry.name)
   const [aliasDraft, setAliasDraft] = useState('')
+  const [viewing, setViewing] = useState<string | null>(null)
   useEffect(() => setName(entry.name), [entry.name])
+  // A portrait that the chat proposes shows in the place of the portrait, with Use and Reject.
+  const proposal = useInlineProposals((s) => s.portraits.filter((p) => p.docId === entry.id).at(-1) ?? null)
+  const shown = proposal?.image ?? entry.image
 
   const mentions = useMemo(() => {
     const names = entryNames(entry)
@@ -313,12 +325,35 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
           </span>
         </div>
         <header className="entry-head">
-          <button className="entry-portrait" onClick={() => void pickImage()} aria-label={t.plan.entry.chooseImage}>
-            <Portrait entry={entry} size="large" />
-            <span className="entry-portrait-hint">
-              <ImageSquare size={14} /> {entry.image ? t.plan.entry.changeImage : t.plan.entry.addImage}
-            </span>
-          </button>
+          <div className="entry-portrait-col">
+            {/* The image is square here: a click shows it whole. "Change" is a button of its own. */}
+            <div className={`entry-portrait${proposal ? ' is-proposed' : ''}`}>
+              <button
+                className="entry-portrait-img"
+                onClick={() => (shown ? setViewing(shown) : void pickImage())}
+                aria-label={shown ? t.plan.entry.viewImage : t.plan.entry.chooseImage}
+              >
+                {proposal ? <ProposedPortrait image={proposal.image} /> : <Portrait entry={entry} size="large" />}
+              </button>
+              {!proposal && (
+                <button className="entry-portrait-hint" onClick={() => void pickImage()} aria-label={t.plan.entry.chooseImage}>
+                  <ImageSquare size={14} /> {entry.image ? t.plan.entry.changeImage : t.plan.entry.addImage}
+                </button>
+              )}
+            </div>
+            {proposal && (
+              <div className="entry-portrait-decide" role="group" aria-label={t.plan.entry.proposedPortrait}>
+                <span className="caps">{t.plan.entry.proposedPortrait}</span>
+                <button className="pm-prop-btn is-accept" onClick={() => acceptPortraitProposal(proposal)}>
+                  <Check size={11} weight="bold" /> {t.plan.entry.usePortrait}
+                </button>
+                <button className="pm-prop-btn is-reject" onClick={() => rejectPortraitProposal(proposal)}>
+                  <X size={11} weight="bold" /> {t.common.reject}
+                </button>
+              </div>
+            )}
+          </div>
+          <ImageViewer file={viewing} name={entry.name} onClose={() => setViewing(null)} />
           <div className="entry-fields">
             <input
               className="entry-name"

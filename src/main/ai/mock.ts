@@ -42,8 +42,14 @@ function reply(req: AiRequest): string {
   // A message with images: describe the person, and propose the image as the portrait of the entry
   // that the message names. The count is the images that the main process read from the book.
   const images = req.messages[req.messages.length - 1]?.images ?? []
+  const loaded = req.images?.[req.messages.length - 1] ?? []
+  // The portraits of the notes: the author asks about them.
+  const notes = loaded.filter((i) => i.label)
+  if (req.purpose === 'chat' && notes.length && /retratos das notas|portraits of the notes/i.test(last)) {
+    return [english ? `I see ${notes.length} image(s) of the notes:` : `Vejo ${notes.length} imagem(ns) das notas:`, ...notes.map((i) => `- ${i.label}`)].join('\n')
+  }
   if (req.purpose === 'chat' && images.length) {
-    const seen = req.images?.[req.messages.length - 1]?.length ?? 0
+    const seen = loaded.filter((i) => !i.label).length
     const entry = [...req.system.matchAll(/^- (planning\/[^:]+\.md): ([^(—\n]+)/gm)].find((m) => last.includes(m[2].trim()))
     const name = entry?.[2].trim() ?? (english ? 'this person' : 'esta pessoa')
     return [

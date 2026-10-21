@@ -17,6 +17,7 @@ import { LineBoard } from './Board'
 import { CardDialog } from './CardDialog'
 import { ReviewBoard } from './ReviewBoard'
 import { useLineUi, useStoryLine } from './model'
+import { keepBoard, restoreColumn } from './anchor'
 import { acceptLineProposal, rejectLineProposal, useLineProposal, useLineWriting, type LineProposal } from './proposal'
 import './line.css'
 
@@ -81,7 +82,8 @@ export function LineView(): React.JSX.Element {
   // "You are here" is on screen when the view opens. The board then starts at a column, so no
   // column is cut at the left edge.
   const root = useBook((s) => s.root)
-  const place = `${root}:${view}${review ? ':review' : ''}`
+  // One place for a view, with or without a proposal: the board does not jump when a review starts or ends.
+  const place = `${root}:${view}`
   useLayoutEffect(() => {
     const box = scroll.current
     const here = box?.querySelector<HTMLElement>('.line-col.is-here')
@@ -113,7 +115,7 @@ export function LineView(): React.JSX.Element {
     if (!box) return
     const onScroll = (e: Event): void => {
       const el = e.target as HTMLElement
-      const saved = scrolls.get(place) ?? { left: 0, columns: {} }
+      const saved = scrolls.get(place) ?? { left: box.scrollLeft, columns: {} }
       if (el === box) saved.left = box.scrollLeft
       else if (el.classList?.contains('line-col-body')) {
         const key = el.closest<HTMLElement>('.line-col')?.dataset.column
@@ -124,6 +126,9 @@ export function LineView(): React.JSX.Element {
     box.addEventListener('scroll', onScroll, true)
     return () => box.removeEventListener('scroll', onScroll, true)
   }, [place])
+  // After a decision on a proposal, the column that the author worked on is where it was (anchor.ts).
+  // This runs last, so nothing above moves the board after it.
+  useLayoutEffect(() => restoreColumn(scroll.current))
 
   let bar: React.ReactNode = null
   if (review) {
@@ -136,10 +141,25 @@ export function LineView(): React.JSX.Element {
         <IconButton label={t.plan.line.showInChat} onClick={() => showInChat(review)}>
           <ChatCircleText size={15} />
         </IconButton>
-        <Button size="sm" variant="secondary" onClick={() => rejectLineProposal(review)}>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => {
+            keepBoard()
+            rejectLineProposal(review)
+          }}
+        >
           {t.plan.line.rejectAll}
         </Button>
-        <Button size="sm" variant="primary" icon={<Check size={13} weight="bold" />} onClick={() => void acceptLineProposal(review)}>
+        <Button
+          size="sm"
+          variant="primary"
+          icon={<Check size={13} weight="bold" />}
+          onClick={() => {
+            keepBoard()
+            void acceptLineProposal(review)
+          }}
+        >
           {t.plan.line.applyAll}
         </Button>
       </div>

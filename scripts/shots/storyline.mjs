@@ -1,6 +1,6 @@
 // The story line board: the empty board and its banner, a fill by the AI shown as a diff on the
 // board (accept and reject), the two views, "you are here", and a move asked in the chat.
-export default async function ({ page, shot, openBook }) {
+export default async function ({ app, page, shot, openBook }) {
   const fail = (what) => {
     throw new Error(`Story line scenario: ${what}`)
   }
@@ -65,6 +65,20 @@ export default async function ({ page, shot, openBook }) {
   await idle()
   await page.waitForSelector('.proposal.is-line', { timeout: 10000 })
   await shot('chat-card')
+  // The card: the name at the left, the count at the right; the two buttons on one line; the link under them.
+  const cardLayout = await page.evaluate(() => {
+    const c = document.querySelector('.proposal.is-line')
+    const head = c.querySelector('.proposal-head').getBoundingClientRect()
+    const count = c.querySelector('.line-proposal-count').getBoundingClientRect()
+    const buttons = [...c.querySelectorAll('.line-proposal-actions .proposal-btn')].map((b) => Math.round(b.getBoundingClientRect().top))
+    const actions = c.querySelector('.line-proposal-actions').getBoundingClientRect()
+    const show = c.querySelector('.line-proposal-show').getBoundingClientRect()
+    return { countGap: Math.round(head.right - count.right), buttons, showBelow: show.top >= actions.bottom }
+  })
+  console.log(JSON.stringify({ cardLayout }))
+  if (cardLayout.buttons.length !== 2 || cardLayout.buttons[0] !== cardLayout.buttons[1]) fail(`the buttons of the chat card are not on one line: ${cardLayout.buttons}`)
+  if (cardLayout.countGap > 16) fail(`the count of changes is not at the right: ${cardLayout.countGap}px from the edge`)
+  if (!cardLayout.showBelow) fail('"Show in the line" is not under the buttons')
 
   // 3. The proposal shows on the board: all new, nothing saved yet.
   await page.waitForSelector('.line-board.is-review', { timeout: 5000 })
@@ -161,8 +175,36 @@ export default async function ({ page, shot, openBook }) {
   })
   await page.waitForTimeout(300)
   if (await page.locator('.line-slot.is-remove', { hasText: 'Um cartão do autor' }).count()) fail('the card of the author shows as a change of the proposal')
-  await page.locator('.line-bar.is-review .btn-primary').click()
+  // The decision ends the review: the board stays where the author is (a narrow window, the board
+  // scrolled to its end). The board must not go back to where it was before the proposal.
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1000, 900))
+  await page.waitForTimeout(300)
+  const firstOnScreen = () =>
+    page.evaluate(() => {
+      const box = document.querySelector('.line-scroll')
+      box.dataset.left = String(box.scrollLeft)
+      const left = box.getBoundingClientRect().left
+      const col = [...box.querySelectorAll('.line-col')].find((c) => c.getBoundingClientRect().right > left + 20)
+      return col ? { key: col.dataset.column, x: Math.round(col.getBoundingClientRect().left), left: box.scrollLeft, max: box.scrollWidth - box.clientWidth } : null
+    })
+  await page.evaluate(() => {
+    const box = document.querySelector('.line-scroll')
+    box.scrollLeft = box.scrollWidth
+  })
+  await page.waitForTimeout(200)
+  const kept = await firstOnScreen()
+  const applyAll = await page.locator('.line-bar.is-review .btn-primary').boundingBox()
+  await page.mouse.click(applyAll.x + applyAll.width / 2, applyAll.y + applyAll.height / 2)
   await page.waitForTimeout(500)
+  const stays = await page.evaluate((k) => {
+    const col = [...document.querySelectorAll('.line-col')].find((c) => c.dataset.column === k)
+    return col ? Math.round(col.getBoundingClientRect().left) : null
+  }, kept?.key)
+  console.log(JSON.stringify({ kept, stays }))
+  if (!kept || kept.max < 40) fail('the board does not scroll sideways in a narrow window')
+  if (stays === null || Math.abs(stays - kept.x) > 2) fail(`the board moved when the review ended: ${kept.x} → ${stays}`)
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1440, 900))
+  await page.waitForTimeout(300)
   if (await page.locator('.line-board.is-review').count()) fail('the board still shows the proposal')
   if (!(await story()).body.includes('Um cartão do autor.')) fail('"Apply all" deleted a card that the proposal does not have')
   // The mock moves the last card of the last moment with cards: "Um estranho…" (c5).

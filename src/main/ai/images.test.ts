@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mkdtemp, mkdir, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { ChatImage, CompletionRequest } from '@shared/types'
@@ -35,6 +35,25 @@ describe('the content of a message with images, for each AI', () => {
   it('Codex: the text, then each image as a file', () => {
     expect(codexInput('Describe her', [img])).toEqual([
       { type: 'text', text: 'Describe her' },
+      { type: 'localImage', path: img.path }
+    ])
+  })
+
+  it('the label of an image (a portrait of a note) comes right before it, for each AI', () => {
+    const portrait: LoadedImage = { ...img, label: 'Portrait of Marta' }
+    expect(anthropicContent('Hi', [portrait])).toEqual([
+      { type: 'text', text: 'Portrait of Marta' },
+      { type: 'image', source: { type: 'base64', media_type: 'image/webp', data: 'QUJD' } },
+      { type: 'text', text: 'Hi' }
+    ])
+    expect(openaiContent('Hi', [portrait])).toEqual([
+      { type: 'input_text', text: 'Hi' },
+      { type: 'input_text', text: 'Portrait of Marta' },
+      { type: 'input_image', image_url: 'data:image/webp;base64,QUJD', detail: 'auto' }
+    ])
+    expect(codexInput('Hi', [portrait])).toEqual([
+      { type: 'text', text: 'Hi' },
+      { type: 'text', text: 'Portrait of Marta' },
       { type: 'localImage', path: img.path }
     ])
   })
@@ -84,6 +103,17 @@ describe('loadImages', () => {
       request(root, [{ role: 'user', content: 'a', images: [{ ...images[0], file: '_assets/chat/gone.webp' }, { ...images[0], file: '_assets/chat/notes.txt' }, images[0]] }])
     )
     expect(req.images![0]).toHaveLength(1)
+  })
+
+  it('adds the portraits of the notes that the app made for a message, after the images of the author', async () => {
+    const { root, images } = await setup(1)
+    const sheet = { mime: 'image/webp' as const, data: Buffer.from('sheet').toString('base64'), label: 'Portraits of the notes' }
+    const req = await loadImages(request(root, [{ role: 'user', content: 'a', images: [images[0]], portraits: [sheet] }]))
+    const got = req.images![0]
+    expect(got.map((i) => i.label ?? null)).toEqual([null, 'Portraits of the notes'])
+    expect(got[1].data).toBe(sheet.data)
+    // A file too, for the AIs that read images from files (Codex).
+    expect(await readFile(got[1].path, 'utf8')).toBe('sheet')
   })
 
   it('never reads outside an open book', async () => {

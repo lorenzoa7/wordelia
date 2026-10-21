@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { BookOpenText, Trash } from '@phosphor-icons/react'
 import { TRAY, boardView, deleteCard, placeCard, placesOf, updateCard, type Board } from '@shared/storyline'
 import type { Chapter, Entry } from '@shared/types'
-import { Button, Dialog, Field, Select } from '@/ui'
+import { Button, Dialog, Select } from '@/ui'
 import { useT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
 import { toast } from '@/stores/ui'
@@ -101,9 +101,6 @@ export function CardDialog({ cardId, board, chapters, notes, onClose }: Props): 
           <Button variant="ghost" className="line-dialog-delete" icon={<Trash size={14} />} onClick={remove}>
             {t.plan.line.deleteCard}
           </Button>
-          <Button variant="ghost" icon={<BookOpenText className="is-book" size={14} />} onClick={openChapter} disabled={!chapterId}>
-            {t.plan.line.openChapter}
-          </Button>
           <span className="line-dialog-spacer" />
           <Button variant="ghost" onClick={onClose}>
             {t.common.cancel}
@@ -134,12 +131,23 @@ export function CardDialog({ cardId, board, chapters, notes, onClose }: Props): 
             {error ? t.plan.line.textRequired : ''}
           </p>
           <div className="line-dialog-places">
-            <Field label={t.plan.line.chapter}>
-              <Select value={chapter} onValueChange={setChapter} options={chapterOptions} />
-            </Field>
-            <Field label={t.plan.line.momentField}>
-              <Select value={moment} onValueChange={setMoment} options={momentOptions} />
-            </Field>
+            <div className="line-dialog-place">
+              <div className="line-dialog-place-head">
+                <span className="field-label">{t.plan.line.chapter}</span>
+                {/* Always there, so the two fields keep one line; it works for a chapter of the book. */}
+                <button className="line-dialog-open" onClick={openChapter} disabled={!chapterId}>
+                  <BookOpenText className="is-book" size={12} />
+                  {t.plan.line.openChapter}
+                </button>
+              </div>
+              <Select value={chapter} onValueChange={setChapter} options={chapterOptions} ariaLabel={t.plan.line.chapter} />
+            </div>
+            <div className="line-dialog-place">
+              <div className="line-dialog-place-head">
+                <span className="field-label">{t.plan.line.momentField}</span>
+              </div>
+              <Select value={moment} onValueChange={setMoment} options={momentOptions} ariaLabel={t.plan.line.momentField} />
+            </div>
           </div>
           <div className="line-dialog-notes">
             <span className="field-label">{t.plan.line.mentions}</span>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ChatImage } from '@shared/types'
 import { Dialog } from '@/ui'
 import { useAssetUrl } from '@/lib/assets'
@@ -12,7 +12,7 @@ export function MessageImages({ images }: { images: ChatImage[] }): React.JSX.El
       {images.map((img) => (
         <MessageImage key={img.file} image={img} onOpen={() => setOpen(img)} />
       ))}
-      <ImageViewer image={open} onClose={() => setOpen(null)} />
+      <ImageViewer file={open?.file ?? null} name={open?.name ?? ''} width={open?.width} onClose={() => setOpen(null)} />
     </div>
   )
 }
@@ -28,13 +28,28 @@ function MessageImage({ image, onOpen }: { image: ChatImage; onOpen: () => void 
   )
 }
 
-function ImageViewer({ image, onClose }: { image: ChatImage | null; onClose: () => void }): React.JSX.Element {
-  const url = useAssetUrl(image?.file ?? null)
+/**
+ * An image at its size, in a dialog. Without a width (a portrait), the dialog opens when the image
+ * is loaded and has its width.
+ */
+export function ImageViewer({ file, name, width, onClose }: { file: string | null; name: string; width?: number; onClose: () => void }): React.JSX.Element {
+  const url = useAssetUrl(file)
+  const [loaded, setLoaded] = useState<{ url: string; width: number } | null>(null)
+  useEffect(() => {
+    if (!url || width) return
+    const img = new Image()
+    img.onload = () => setLoaded({ url, width: img.naturalWidth })
+    img.src = url
+    return () => {
+      img.onload = null
+    }
+  }, [url, width])
+  const w = width ?? (loaded && loaded.url === url ? loaded.width : null)
   // As wide as the image, but not wider than the window.
-  const width = image ? Math.min(Math.max(image.width, 320) + 48, Math.round(window.innerWidth * 0.9)) : 520
+  const dialogWidth = w ? Math.min(Math.max(w, 320) + 48, Math.round(window.innerWidth * 0.9)) : 520
   return (
-    <Dialog open={image !== null} onOpenChange={(v) => !v && onClose()} title={image?.name ?? ''} width={width} className="image-dialog">
-      {url && image && <img className="image-dialog-img" src={url} alt={image.name} />}
+    <Dialog open={file !== null && w !== null} onOpenChange={(v) => !v && onClose()} title={name} width={dialogWidth} className="image-dialog">
+      {url && <img className="image-dialog-img" src={url} alt={name} />}
     </Dialog>
   )
 }

@@ -4,7 +4,7 @@
 import type { Editor } from '@tiptap/core'
 import { create } from 'zustand'
 import { applyHunk, findText } from '@shared/proposals/apply'
-import { markdownToPlain } from '@shared/book'
+import { markdownToPlainBlocks } from '@shared/book'
 import { useBook } from '@/stores/book'
 import { getT } from '@/lib/i18n'
 import { sliceFromMarkdown, textWithMap } from './review'
@@ -82,7 +82,7 @@ export type ApplyResult = { ok: true } | { ok: false; reason: string }
 function locate(editor: Editor, find: string): { from: number; to: number } | { reason: string } {
   const { state } = editor
   const { text, map } = textWithMap(state.doc, 0, state.doc.content.size)
-  const m = findText(text, markdownToPlain(find).trim())
+  const m = findText(text, markdownToPlainBlocks(find))
   if (!m) return { reason: getT().editor.apply.notFound }
   if (m.count > 1) return { reason: getT().editor.apply.manyMatches }
   return { from: map[m.start], to: map[m.end - 1] + 1 }
@@ -145,7 +145,7 @@ export function chapterHasText(chapterId: string, find: string): boolean {
   const live = getChapterEditor(chapterId)
   if (live) return !('reason' in locate(live.editor, find))
   const ch = useBook.getState().chapters.find((c) => c.id === chapterId)
-  const m = ch ? findText(markdownToPlain(ch.body), markdownToPlain(find).trim()) : null
+  const m = ch ? findText(markdownToPlainBlocks(ch.body), markdownToPlainBlocks(find)) : null
   return Boolean(m && m.count === 1)
 }
 

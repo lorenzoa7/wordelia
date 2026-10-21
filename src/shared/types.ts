@@ -216,6 +216,17 @@ export interface ChatTurn {
   content: string
   /** Images of a message of the writer. The main process reads them from the book (`root`). */
   images?: ChatImage[]
+  /** The portraits of the planning entries, made by the app for this message (features/chat/portraits.ts) */
+  portraits?: InlineImage[]
+}
+
+/** An image that the app makes for one request. It is not a file of the book. */
+export interface InlineImage {
+  mime: 'image/webp' | 'image/png' | 'image/jpeg'
+  /** The image, in Base64 */
+  data: string
+  /** The line that the AI reads right before the image: what it shows */
+  label: string
 }
 
 /** An image that the writer added to a chat message. It is a file of the book. */

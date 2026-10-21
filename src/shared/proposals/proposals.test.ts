@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { applyHunk, findText } from './apply'
 import { parseProposals, proposalSummary } from './parse'
 import { wordDiff } from '../text/diff'
+import { markdownToPlainBlocks } from '../book'
 
 describe('parseProposals', () => {
   it('splits text and a complete edit', () => {
@@ -119,5 +120,25 @@ describe('portrait proposals', () => {
 
   it('says what the author did with it in the history', () => {
     expect(proposalSummary(reply, { '0:0': 'accepted' })).toContain('[Proposed the image _assets/chat/marta.webp as the portrait of planning/Characters/Marta.md: accepted by the author]')
+  })
+})
+
+describe('the plain text of a passage, block by block', () => {
+  // A note in the editor: each list item is a paragraph of its own, with no "- " in front.
+  const note = 'Born in Saint Isle.\n\nWears a hat of leather.\n\nCarries a lamp.'
+
+  it('finds a list passage in the text of the editor', () => {
+    const needle = markdownToPlainBlocks('- Wears a hat of leather.\n- Carries a lamp.')
+    expect(needle).toBe('Wears a hat of leather.\n\nCarries a lamp.')
+    expect(findText(note, needle)?.count).toBe(1)
+  })
+
+  it('removes the marks of numbered and nested items', () => {
+    expect(markdownToPlainBlocks('1. One\n2) Two\n   - **Three**')).toBe('One\n\nTwo\n\nThree')
+  })
+
+  it('drops a scene break and keeps a plain paragraph', () => {
+    expect(markdownToPlainBlocks('First line\n\n* * *\n\n- item\nSecond')).toBe('First line\n\nitem\n\nSecond')
+    expect(markdownToPlainBlocks('A - B is not an item.')).toBe('A - B is not an item.')
   })
 })

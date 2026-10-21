@@ -11,7 +11,7 @@ import { PLANNING_DIR, entryToFile } from '@shared/book'
 import { readFrontmatter } from '@shared/markdown/frontmatter'
 import { applyHunk } from '@shared/proposals/apply'
 import { hunkKey, parseProposals, type Segment } from '@shared/proposals/parse'
-import { STORY_LINE_TYPE, applyBoardChange, applyOrder, boardChanges, cascadeRejects, findStoryLine, impliedChanges, isStoryLine, liveChanges, parseBoard, type Board, type BoardChange } from '@shared/storyline'
+import { STORY_LINE_TYPE, applyBoardChange, applyOrder, boardChanges, cascadeRejects, findStoryLine, impliedChanges, isStoryLine, linkMentions, liveChanges, parseBoard, type Board, type BoardChange } from '@shared/storyline'
 import type { ChatMessage, HunkState, Thread } from '@shared/types'
 import { getT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
@@ -68,9 +68,16 @@ function idsIn(body: string): string[] {
   return [...body.matchAll(/\^([A-Za-z0-9_-]+)/g)].map((m) => m[1])
 }
 
-/** The proposed board, parsed: its new ids keep away from the ids of the line it changes. */
+/**
+ * The proposed board, parsed: its new ids keep away from the ids of the line it changes. A new or
+ * changed card names its notes with "@" (the AI forgets it at times): the author sees the mentions
+ * on the board before the decision.
+ */
 export function proposedBoard(p: Pick<LineProposal, 'after' | 'base' | 'before'>): Board {
-  return parseBoard(p.after ?? '', [...idsIn(p.base), ...idsIn(p.before)])
+  const board = parseBoard(p.after ?? '', [...idsIn(p.base), ...idsIn(p.before)])
+  const notes = useBook.getState().entries.filter((e) => !isStoryLine(e))
+  const was = new Map(parseBoard(p.base).cards.map((c) => [c.id, c.text]))
+  return { ...board, cards: board.cards.map((c) => (was.get(c.id) === c.text ? c : { ...c, text: linkMentions(c.text, notes) })) }
 }
 
 /** The proposals of one message for the story line that wait for a decision, or null. */

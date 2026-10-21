@@ -88,8 +88,9 @@ export function planningIndex(entries: Entry[]): string {
   if (!entries.length) return '<planning_index>\n(No planning entries yet.)\n</planning_index>'
   const lines = entries.map((e) => {
     const aliases = e.aliases.length ? ` (also: ${e.aliases.join(', ')})` : ''
+    const portrait = e.image ? ' (has a portrait)' : ''
     const summary = e.summary ? ` — ${e.summary}` : ''
-    return `- ${entryRef(e)}: ${e.name}${aliases}${summary}`
+    return `- ${entryRef(e)}: ${e.name}${aliases}${portrait}${summary}`
   })
   return `<planning_index>\n${lines.join('\n')}\n</planning_index>`
 }
@@ -121,6 +122,7 @@ export function entryBlock(e: Entry): string {
   const meta: string[] = []
   if (e.aliases.length) meta.push(`aliases: ${e.aliases.join(', ')}`)
   if (e.summary) meta.push(`summary: ${e.summary}`)
+  if (e.image) meta.push('portrait: yes (in the images of the message)')
   const head = meta.length ? `${meta.join('\n')}\n\n` : ''
   return `<planning_entry file="${escapeAttr(entryRef(e))}" name="${escapeAttr(e.name)}">\n${head}${e.body.trim()}\n</planning_entry>`
 }

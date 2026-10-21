@@ -12,6 +12,7 @@ import type { Chapter, Entry } from '@shared/types'
 import { useT } from '@/lib/i18n'
 import { CardView, ColumnShell, movable } from './Board'
 import { applyLineChanges, proposedBoard, rejectLineChanges, type LineProposal } from './proposal'
+import { keepColumn } from './anchor'
 
 function Diff({ before, after }: { before: string; after: string }): React.JSX.Element {
   const ops = useMemo(() => wordDiff(plainText(before), plainText(after)), [before, after])
@@ -28,11 +29,23 @@ function Decision({ tone, label, subject, ids, p }: { tone: 'add' | 'remove'; la
   return (
     <div className={clsx('line-decide', `is-${tone}`)} role="group" aria-label={`${label}: ${subject}`}>
       <span className="line-decide-label">{label}</span>
-      <button className="line-decide-btn" onClick={() => rejectLineChanges(p, ids)}>
+      <button
+        className="line-decide-btn"
+        onClick={(e) => {
+          keepColumn(e.currentTarget)
+          rejectLineChanges(p, ids)
+        }}
+      >
         <X size={11} weight="bold" />
         {t.plan.line.rejectOne}
       </button>
-      <button className="line-decide-btn is-apply" onClick={() => applyLineChanges(p, ids)}>
+      <button
+        className="line-decide-btn is-apply"
+        onClick={(e) => {
+          keepColumn(e.currentTarget)
+          applyLineChanges(p, ids)
+        }}
+      >
         <Check size={11} weight="bold" />
         {t.plan.line.apply}
       </button>

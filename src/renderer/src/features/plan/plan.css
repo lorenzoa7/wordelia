@@ -698,14 +698,40 @@
   padding-bottom: var(--s-6);
   border-bottom: 1px solid var(--rule-soft);
 }
+.entry-portrait-col {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: var(--s-2);
+  width: 116px;
+}
 .entry-portrait {
   position: relative;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+/* A portrait that the chat proposes: the ring of an AI change that waits */
+.entry-portrait.is-proposed {
+  overflow: visible;
+}
+.entry-portrait.is-proposed .portrait {
+  outline: 2px solid var(--pen);
+  outline-offset: 2px;
+}
+.entry-portrait-img {
+  display: block;
   padding: 0;
   border: 0;
   border-radius: var(--radius-md);
   background: transparent;
-  flex-shrink: 0;
-  overflow: hidden;
+  cursor: zoom-in;
+}
+.entry-portrait-img:has(.portrait-empty) {
+  cursor: pointer;
+}
+.entry-portrait-img:focus-visible {
+  outline: 2px solid var(--ribbon);
+  outline-offset: 2px;
 }
 .entry-portrait-hint {
   position: absolute;
@@ -715,16 +741,34 @@
   justify-content: center;
   gap: 4px;
   padding: 6px;
+  border: 0;
   background: linear-gradient(transparent, rgba(30, 22, 12, 0.6));
   color: #fff;
   font-size: var(--text-2xs);
   font-weight: 700;
+  cursor: pointer;
   opacity: 0;
   transition: opacity var(--dur-fast) var(--ease-out);
 }
+.entry-portrait-hint:hover {
+  background: linear-gradient(transparent, rgba(30, 22, 12, 0.8));
+}
 .entry-portrait:hover .entry-portrait-hint,
-.entry-portrait:focus-visible .entry-portrait-hint {
+.entry-portrait:focus-within .entry-portrait-hint {
   opacity: 1;
+}
+.entry-portrait-decide {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.entry-portrait-decide .caps {
+  color: var(--pen);
+  text-align: center;
+}
+.entry-portrait-decide .pm-prop-btn {
+  justify-content: center;
+  box-shadow: none;
 }
 .entry-fields {
   flex: 1;

@@ -74,6 +74,15 @@ export default async function ({ page, shot, openBook, book }) {
   if (sent !== 1) fail('the sent message does not show its image')
   await shot('portrait-proposal')
 
+  // The reply opens the note of Marta by itself: the proposed portrait waits in the place of the portrait.
+  const opened = await page.evaluate(() => {
+    const b = window.__wordelia.book.getState()
+    return { view: b.view, entry: b.entries.find((e) => e.id === b.activeEntryId)?.name ?? null }
+  })
+  console.log(JSON.stringify({ opened }))
+  if (opened.view !== 'plan' || opened.entry !== 'Marta') fail(`the reply did not open the note of Marta: ${JSON.stringify(opened)}`)
+  await page.waitForSelector('.entry-portrait.is-proposed img', { timeout: 5000 }).catch(() => fail('the note does not show the proposed portrait'))
+
   // 5. Use it as the portrait.
   const marta = () => page.evaluate(() => window.__wordelia.book.getState().entries.find((e) => e.name === 'Marta')?.image ?? null)
   const before = await marta()
@@ -83,14 +92,27 @@ export default async function ({ page, shot, openBook, book }) {
   console.log(JSON.stringify({ before, set }))
   if (!set?.startsWith('_assets/chat/')) fail(`Marta did not get the portrait: ${set}`)
 
-  // The Plan view shows the portrait on the card of Marta.
-  await page.keyboard.press('Control+2')
+  // The note of Marta shows the portrait as hers now; the cards of the Plan view show it too.
+  await page.waitForSelector('.entry-portrait.is-proposed', { state: 'detached', timeout: 5000 }).catch(() => fail('the portrait stays a proposal after Use'))
+  const inNote = await page.evaluate(() => document.querySelector('.entry-portrait img')?.getAttribute('src')?.startsWith('wordelia-asset://') ?? false)
+  if (!inNote) fail('the note does not show the portrait')
+  await page.evaluate(() => window.__wordelia.book.getState().selectCategory(null))
   await page.waitForTimeout(800)
   const shown = await page.evaluate(() => [...document.querySelectorAll('img')].some((i) => i.closest('[class*="card"]') && i.getAttribute('src')?.startsWith('wordelia-asset://')))
   if (!shown) fail('the Plan view does not show the portrait')
   await shot('plan-portrait')
   await page.keyboard.press('Control+1')
   await page.waitForTimeout(600)
+
+  // The portraits of the notes go with the next message: a sheet with all of them, and Marta larger.
+  await page.locator('.composer-input').fill('Olhe os retratos das notas. Como é a Marta?')
+  await page.keyboard.press('Enter')
+  await page.waitForSelector('.composer-send:not(.is-stop)', { timeout: 30000 })
+  await page.waitForFunction(() => [...document.querySelectorAll('.msg-ai')].pop()?.innerText.includes('das notas'), null, { timeout: 10000 }).catch(() => {})
+  const seenNotes = await page.locator('.msg-ai').last().innerText()
+  console.log(JSON.stringify({ seenNotes: seenNotes.slice(0, 260) }))
+  if (!/Vejo 2 imagem\(ns\) das notas/.test(seenNotes) || !/Portraits of the planning entries/.test(seenNotes) || !/entry "Marta"/.test(seenNotes))
+    fail(`the AI did not get the portraits of the notes: "${seenNotes.slice(0, 200)}"`)
 
   // 6. A rewind of the conversation puts the portrait from before back.
   await page.locator('.msg-user-wrap').first().locator('.msg-rewind-btn').click()

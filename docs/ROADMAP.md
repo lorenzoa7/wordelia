@@ -4,8 +4,8 @@ This file is the source of truth for progress. Update it after each task. Mark a
 
 ## Current focus
 
-> **Milestone:** Version 0.12 — story line review and Plan navigation
-> **Next task:** Collect feedback on 0.12.0. Then fix what the author finds.
+> **Milestone:** Version 0.13 — portraits for the AI, proposals in notes
+> **Next task:** Collect feedback on 0.13.0. Then fix what the author finds.
 > **Not verified:** Codex and the two API transports. The user has no Codex account, and no API keys are set. The scripted provider (`WORDELIA_MOCK_AI=1`) covers their UI flows.
 
 ## M0 — Foundation
@@ -343,6 +343,14 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] A new last chapter takes the title of the first planned chapter; the AI names planned chapters in the style of the book
 - [x] Rename and delete categories
 - [x] The icon of Reply in the selection menu is on the middle of its text (the `icons` scenario measures it)
+
+## Version 0.13 — portraits for the AI, proposals in notes
+
+- [x] The chat sends the portraits of the notes: sheets with names, and the notes in focus larger (`portraitPlan`, `features/chat/portraits.ts`)
+- [x] A change to a list in a note shows as a diff (`markdownToPlainBlocks`); a new reply opens the note or the line that it changes
+- [x] A proposed portrait waits on the page of the note; a click on a portrait shows it whole
+- [x] The board keeps its place after Apply and Reject (`anchor.ts`; the `storyline` scenario checks the last decision in a narrow window)
+- [x] The chat card of a line proposal, the footer of the card dialog, @ for every note name in AI cards
 
 ## Tests and CI
 

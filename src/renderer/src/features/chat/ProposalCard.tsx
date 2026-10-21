@@ -15,11 +15,11 @@ import { typesetForBook } from '@/lib/typeset'
 import { useAssetUrl } from '@/lib/assets'
 import { toast } from '@/stores/ui'
 import { folderCategoryName, useT } from '@/lib/i18n'
-import { inlineProposalId, revealProposal } from '@/features/editor/inlineProposals'
+import { acceptPortrait, inlineProposalId, revealProposal } from '@/features/editor/inlineProposals'
 import { openLine } from '@/features/graph'
 import { acceptLineProposal, isLineSegment, lineStateOf, messageLineProposal, rejectLineProposal, type LineSegment } from '@/features/plan/line/proposal'
 import { useChat } from './chatStore'
-import { applyCreate, applyEditHunk, applyPortrait, markAfter, resolveTarget, restoreSnapshot, setHunkStates, snapshotOf, type Snapshot } from './applyProposal'
+import { applyCreate, applyEditHunk, markAfter, resolveTarget, restoreSnapshot, setHunkStates, snapshotOf, type Snapshot } from './applyProposal'
 
 type EditSeg = Extract<Segment, { kind: 'edit' }>
 type CreateSeg = Extract<Segment, { kind: 'create' }>
@@ -363,12 +363,7 @@ function PortraitCard({ segment, message, thread, streaming }: Props & { segment
   const url = useAssetUrl(segment.complete ? segment.image : null)
 
   const use = (): void => {
-    if (!thread || !message) return
-    const res = applyPortrait(segment.file, segment.image)
-    // Keep the image from before, so a rewind of the thread can bring it back.
-    setHunkStates(thread, message.id, { [key]: res.ok ? 'accepted' : 'failed' }, res.ok ? { [key]: res.previous ?? '' } : undefined)
-    if (!res.ok) toast(res.reason, { kind: 'error' })
-    else toast(t.chat.portraitSet(target.label))
+    if (thread && message) acceptPortrait(thread, message.id, key, segment.file, segment.image)
   }
 
   return (
@@ -427,35 +422,33 @@ function LineCard({ segment, message, thread, streaming }: Props & { segment: Li
   }
   return (
     <motion.div className="proposal is-line" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-      <header className="proposal-head">
-        <div className="proposal-title">
-          <button className="proposal-file" onClick={show} title={t.plan.line.showInLine}>
-            <Path size={14} />
-            <span>{t.plan.line.title}</span>
-          </button>
-          {p && p.after !== null && <span className="proposal-cat">{t.plan.line.changes(p.changes.length)}</span>}
-        </div>
-        <div className="proposal-tools">{streaming || !segment.complete ? <Spinner size={12} /> : !p && <HunkBadge state={state} />}</div>
+      {/* The name on the left, the count (or the decision) on the right; then the two buttons side by side; then the link. */}
+      <header className="proposal-head line-proposal-head">
+        <button className="proposal-file" onClick={show} title={t.plan.line.showInLine}>
+          <Path size={14} />
+          <span>{t.plan.line.title}</span>
+        </button>
+        <span className="line-proposal-count">
+          {streaming || !segment.complete ? <Spinner size={12} /> : p ? p.after !== null && t.plan.line.changes(p.changes.length) : <HunkBadge state={state} />}
+        </span>
       </header>
-      {/* The decision has its own line: the panel of the chat is narrow. */}
       {p && (
-        <div className="proposal-line">
+        <div className="line-proposal-body">
           {p.after === null ? (
-            <span className="proposal-line-stale">{t.plan.line.reviewStale}</span>
+            <p className="proposal-line-stale">{t.plan.line.reviewStale}</p>
           ) : (
-            <button className="hunk-reveal" onClick={show}>
-              <Crosshair size={12} /> {t.plan.line.showInLine}
-            </button>
+            <div className="line-proposal-actions">
+              <button className="proposal-btn" onClick={() => rejectLineProposal(p)}>
+                {t.plan.line.rejectAll}
+              </button>
+              <button className="proposal-btn is-accept" onClick={() => void acceptLineProposal(p)}>
+                <Check size={12} weight="bold" /> {t.plan.line.applyAll}
+              </button>
+            </div>
           )}
-          <span className="proposal-spacer" />
-          <button className="proposal-btn" onClick={() => rejectLineProposal(p)}>
-            {t.plan.line.rejectAll}
+          <button className="hunk-reveal line-proposal-show" onClick={show}>
+            <Crosshair size={12} /> {t.plan.line.showInLine}
           </button>
-          {p.after !== null && (
-            <button className="proposal-btn is-accept" onClick={() => void acceptLineProposal(p)}>
-              <Check size={12} weight="bold" /> {t.plan.line.applyAll}
-            </button>
-          )}
         </div>
       )}
     </motion.div>

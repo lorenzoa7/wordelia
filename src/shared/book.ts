@@ -215,6 +215,24 @@ export function markdownToPlain(md: string): string {
     .replace(/^<!--\s*page\s*break\s*-->$/gim, '')
 }
 
+/**
+ * Plain text block by block, as an editor shows it: each list item is a paragraph of its own,
+ * without its mark ("- ", "1. "), and the blocks are joined by one empty line.
+ */
+export function markdownToPlainBlocks(md: string): string {
+  const lines = md.split(/\r?\n/).map((line) => {
+    // A scene break ("* * *", "---") is not a list item.
+    if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) return line.trim()
+    const item = /^[ \t]*(?:[-*+]|\d+[.)])[ \t]+(.*)$/.exec(line)
+    return item ? `\n${item[1]}\n` : line
+  })
+  return markdownToPlain(lines.join('\n'))
+    .split(/\n{2,}/)
+    .map((p) => p.replace(/\\\n/g, '\n').trim())
+    .filter(Boolean)
+    .join('\n\n')
+}
+
 const WORD_RE = /[\p{L}\p{N}]+(?:['’\-][\p{L}\p{N}]+)*/gu
 
 export function countWords(text: string): number {

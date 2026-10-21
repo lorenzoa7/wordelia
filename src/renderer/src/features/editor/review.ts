@@ -6,7 +6,7 @@ import { Plugin, PluginKey, type EditorState, type Transaction } from '@tiptap/p
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { Slice, type Node as PMNode, type Schema } from '@tiptap/pm/model'
 import { parseMarkdown } from '@shared/markdown/parse'
-import { markdownToPlain } from '@shared/book'
+import { markdownToPlainBlocks } from '@shared/book'
 import { wordDiff, type DiffOp } from '@shared/text/diff'
 import { useApp } from '@/stores/app'
 
@@ -87,11 +87,7 @@ export function textWithMap(doc: PMNode, from: number, to: number): { text: stri
 }
 
 export function proposedPlain(markdown: string): string {
-  return markdownToPlain(markdown)
-    .split(/\n{2,}/)
-    .map((p) => p.replace(/\\\n/g, '\n').trim())
-    .filter(Boolean)
-    .join('\n\n')
+  return markdownToPlainBlocks(markdown)
 }
 
 

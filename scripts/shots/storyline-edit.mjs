@@ -125,6 +125,34 @@ export default async function ({ page, shot, openBook }) {
   await card('Marta encontra um anel').click()
   await page.waitForSelector('.line-dialog', { timeout: 3000 })
   await shot('dialog')
+  // Every button of the footer is inside the dialog, and "Open the chapter" sits by its field.
+  const fits = await page.evaluate(() => {
+    const box = document.querySelector('.line-dialog').getBoundingClientRect()
+    const out = [...document.querySelectorAll('.line-dialog .dialog-foot button')].filter((b) => {
+      const r = b.getBoundingClientRect()
+      return r.left < box.left - 0.5 || r.right > box.right + 0.5
+    })
+    return { out: out.map((b) => b.textContent), open: Boolean(document.querySelector('.line-dialog .line-dialog-place-head .line-dialog-open')) }
+  })
+  if (fits.out.length) fail(`buttons out of the dialog: ${fits.out.join(', ')}`)
+  if (!fits.open) fail('"Open the chapter" is not by the chapter field')
+  // The Portuguese words are longer: the footer fits there too.
+  const language = await page.evaluate(() => window.__wordelia.app.getState().settings?.language ?? null)
+  await page.evaluate(() => window.__wordelia.app.getState().updateSettings({ language: 'pt-BR' }))
+  await page.waitForTimeout(300)
+  const fitsPt = await page.evaluate(() => {
+    const box = document.querySelector('.line-dialog').getBoundingClientRect()
+    return [...document.querySelectorAll('.line-dialog .dialog-foot button, .line-dialog .line-dialog-open')]
+      .filter((b) => {
+        const r = b.getBoundingClientRect()
+        return r.left < box.left - 0.5 || r.right > box.right + 0.5
+      })
+      .map((b) => b.textContent)
+  })
+  await shot('dialog-pt')
+  await page.evaluate((l) => window.__wordelia.app.getState().updateSettings({ language: l }), language)
+  await page.waitForTimeout(300)
+  if (fitsPt.length) fail(`buttons out of the dialog in Portuguese: ${fitsPt.join(', ')}`)
   // Escape with the list of notes open closes the list, not the dialog.
   await page.locator('.line-dialog textarea').press('End')
   await page.keyboard.type(' @Eli')

@@ -14,6 +14,7 @@ import { useBook } from '@/stores/book'
 import { toast, useUi } from '@/stores/ui'
 import { flushEditor } from '@/features/editor/registry'
 import { patchStreaming, useChat } from './chatStore'
+import { portraitImages } from './portraits'
 import { confirmAndRewind } from './rewind'
 import { summariesFor } from './summaries'
 
@@ -164,8 +165,22 @@ export async function requestReply(threadId: string): Promise<void> {
     content: m.role === 'assistant' ? proposalSummary(m.content, m.hunks ?? {}) : renderUser(m),
     ...(m.role === 'user' && m.images?.length ? { images: m.images } : {})
   }))
+  // The portraits of the notes, so the AI sees how the characters, places and things look.
+  const portraits = fresh.root
+    ? await portraitImages(fresh.root, fresh.entries, {
+        mentions,
+        currentEntryId: fresh.view === 'plan' ? fresh.activeEntryId : null,
+        text: [message, ...quotes.map((q) => q.text)].join('\n')
+      })
+    : []
+  if (stopped) return
   const asked = message || (images.length ? 'Here is an image.' : 'What do you think about this passage?')
-  history.push({ role: 'user', content: buildChatUserTurn(asked, quotes, mentions, fresh.threads, fresh.chapters, images), ...(images.length ? { images } : {}) })
+  history.push({
+    role: 'user',
+    content: buildChatUserTurn(asked, quotes, mentions, fresh.threads, fresh.chapters, images),
+    ...(images.length ? { images } : {}),
+    ...(portraits.length ? { portraits } : {})
+  })
 
   const handle = runCompletion({ route, purpose: 'chat', system, messages: history, ...(fresh.root ? { root: fresh.root } : {}) }, (e, soFar) => {
     if (e.type === 'text') patchStreaming(threadId, { text: soFar })

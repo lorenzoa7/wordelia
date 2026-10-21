@@ -1,9 +1,9 @@
 // IPC handlers. The contract is in src/shared/ipc.ts.
 
 import { app, BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
-import { copyFile, mkdir, rename, rm, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, extname, join, resolve } from 'node:path'
-import { ASSETS_DIR, CHAT_IMAGES_DIR, fileNameFromTitle, uniqueName } from '@shared/book'
+import { ASSETS_DIR, CHAT_IMAGES_DIR, PLANNING_DIR, fileNameFromTitle, uniqueName } from '@shared/book'
 import type { InvokeArgs, InvokeChannel, InvokeResult } from '@shared/ipc'
 import { cancel, complete, providerModels, providerStatus } from './ai'
 import { openLogin } from './ai/login'
@@ -34,6 +34,8 @@ function handle<C extends InvokeChannel>(channel: C, fn: Handler<C>): void {
 const E2E = process.env['WORDELIA_E2E'] === '1'
 /** The largest image of a chat message, in bytes */
 const MAX_CHAT_IMAGE = 12 * 1024 * 1024
+/** A portrait that the renderer draws for the chat is not larger than this */
+const MAX_ASSET_READ = 30 * 1024 * 1024
 
 function defaultBooksDir(): string {
   // Tests set WORDELIA_BOOKS_DIR, so they never write to the user's Documents folder.
@@ -169,6 +171,20 @@ export function registerIpc(): void {
   handle('book:assetUrl', (_e, root, rel) => {
     assertRoot(root)
     return assetUrl(root, rel)
+  })
+
+  handle('book:readAsset', async (_e, root, rel) => {
+    assertRoot(root)
+    const clean = String(rel).replace(/\\/g, '/')
+    if (!clean.startsWith('_assets/')) return null
+    try {
+      const path = safeJoin(root, `${PLANNING_DIR}/${clean}`)
+      const info = await stat(path)
+      if (!info.isFile() || info.size > MAX_ASSET_READ) return null
+      return new Uint8Array(await readFile(path))
+    } catch {
+      return null
+    }
   })
 
   handle('chat:saveImage', async (_e, root, data, name) => {

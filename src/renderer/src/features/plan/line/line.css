@@ -841,14 +841,40 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--s-4);
 }
-.line-dialog-places .field,
-.line-dialog-places .field-main {
-  min-width: 0;
-  margin-bottom: 0;
-}
-.line-dialog-places .field-control {
+.line-dialog-place {
   display: flex;
+  flex-direction: column;
+  gap: 6px;
   min-width: 0;
+}
+.line-dialog-place-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  height: 20px;
+}
+.line-dialog-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 0 4px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--ink-3);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.line-dialog-open:hover:not(:disabled) {
+  background: var(--desk-2);
+  color: var(--ink);
+}
+.line-dialog-open:disabled {
+  visibility: hidden;
 }
 .line-dialog-places .select {
   width: 100%;
@@ -875,8 +901,10 @@
 .line-dialog-links .mention-link span {
   color: var(--ink-2);
 }
+/* The buttons start at the left: a footer that is too long never goes out at the left side. */
 .line-dialog .dialog-foot {
   align-items: center;
+  justify-content: flex-start;
 }
 .line-dialog-spacer {
   flex: 1;

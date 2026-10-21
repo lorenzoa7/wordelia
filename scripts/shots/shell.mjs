@@ -72,7 +72,7 @@ export default async function ({ page, shot, openBook }) {
   // 4. The button that updates the notes from the chapters, with a tooltip that says what it does.
   const sync = page.locator('.sync-btn')
   const label = (await sync.innerText()).replace(/\s+/g, ' ')
-  if (!/^Sync( |$)/.test(label.trim())) fail(`The sync button says "${label}"`)
+  if (!/^Update notes( |$)/.test(label.trim())) fail(`The sync button says "${label}"`)
   await sync.hover()
   await page.waitForSelector('.sync-tip', { timeout: 3000 })
   const tip = await page.locator('.sync-tip').innerText()

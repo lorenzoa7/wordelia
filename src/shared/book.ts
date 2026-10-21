@@ -12,6 +12,8 @@ export const WRITING_RULES_FILE = 'ai/writing-rules.md'
 export const SYNC_STATE_FILE = 'ai/sync-state.json'
 /** The actions of this book (Settings → Actions → This book). The app settings keep the actions for all books. */
 export const ACTIONS_FILE = 'ai/actions.json'
+/** The comments of the editor's reads of this book. */
+export const COMMENTS_FILE = 'ai/comments.json'
 export const ASSETS_DIR = 'planning/_assets'
 /** Images that the writer adds to chat messages */
 export const CHAT_IMAGES_DIR = `${ASSETS_DIR}/chat`

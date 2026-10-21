@@ -161,12 +161,18 @@ export function chapterToFile(ch: Chapter): string {
   return writeFrontmatter({ id: ch.id, title: ch.title, ...ch.meta }, ch.body)
 }
 
+/** The file name of an entry without its folders and its extension. */
+export function entryFileStem(file: string): string {
+  return file.slice(file.lastIndexOf('/') + 1).replace(/\.md$/i, '')
+}
+
 export function entryFromFile(file: string, src: string, fallbackId: string): Entry {
   const { data, body } = readFrontmatter(lf(src))
-  const { id, aliases, summary, image, ...meta } = data
+  const { id, title, aliases, summary, image, ...meta } = data
   const slash = file.lastIndexOf('/')
   const category = slash > 0 ? file.slice(0, slash) : ''
-  const name = file.slice(slash + 1).replace(/\.md$/i, '')
+  // A name with signs that a file name cannot have ("Dr. Silva: o médico") is in the front matter.
+  const name = typeof title === 'string' && title.trim() ? title.trim() : entryFileStem(file)
   return {
     id: typeof id === 'string' && id ? id : fallbackId,
     category,
@@ -184,6 +190,7 @@ export function entryToFile(e: Entry): string {
   return writeFrontmatter(
     {
       id: e.id,
+      title: e.name !== entryFileStem(e.file) ? e.name : undefined,
       aliases: e.aliases.length ? e.aliases : undefined,
       summary: e.summary || undefined,
       image: e.image ?? undefined,

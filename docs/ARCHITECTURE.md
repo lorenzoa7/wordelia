@@ -199,13 +199,14 @@ The model lists come from the providers, so new models appear without an app upd
 | Claude Code | The aliases in `claude --help` ("fable", "opus", "sonnet"), plus "opus", "sonnet" and "haiku". The CLI maps each alias to the newest model of its family. A newer CLI brings newer models. | From the `--effort` line of `claude --help`. An old CLI without `--effort` gets none. |
 | Codex | `model/list` of `codex app-server`. | `supportedReasoningEfforts` and `defaultReasoningEffort` of each model. |
 | Anthropic API | `models.list`. | `capabilities.effort` of each model (Haiku 4.5 has none). |
-| OpenAI API | `models.list`. | Low, medium and high for reasoning models. |
+| OpenAI API | `models.list`, without audio, image, search and research models. Suggested routes use general chat models only (`isGeneralOpenAiModel` in `src/shared/ai/openai.ts`): never a pro, research, coding or chat-latest model. | Low, medium and high for reasoning models (o-series, GPT-5 and newer; a pro model only high). None for older and chat-latest models. A model that rejects the effort gets the request again without it. |
 
 `src/main/ai/claude-models.ts` reads the help text again when the `claude` program changes (path, size, time). Model lists show the version of each model ("Opus 5.5", `modelLabel` in `src/shared/ai/effort.ts`):
 
 - **Claude Code:** an alias has no version. So, once for each version of the CLI and in the background, the app starts `claude -p --output-format stream-json` for each alias, reads the first event (`system`/`init` names the real model) and stops the CLI at once. The API address of that run is a closed local port, so no request can reach the API and no tokens are used. The result goes to `claude-models.json` in the app data folder, together with the model that answered each real request. When the labels change, the main process sends `ai:modelsChanged` and the renderer reads the model list again.
 - **Anthropic API:** the display name without "Claude ".
-- **Codex and OpenAI API:** their names have the version already.
+- **Codex:** its names have the version already.
+- **OpenAI API:** a readable name from the id ("gpt-5-mini" → "GPT-5 mini", `openaiModelLabel`).
 
 Each task route (`ModelChoice`) has an explicit effort. Settings version 2 gave old Claude Code routes the suggested effort of their task (`TASK_EFFORT` in `src/shared/ai/effort.ts`: chat medium, actions medium, sync high, background low; settings version 3 moved Claude Code chat routes from high to medium). An action can override the effort of its route (`AiAction.effort`). When the model does not support an effort, the app uses the nearest lower level (`nearestEffort`).
 
@@ -225,9 +226,23 @@ The chat shows the thinking in one line while the reply streams, and keeps it in
 #### Provider status
 
 - **Claude Code:** `claude --version` and `claude auth status`.
-- **Codex:** `codex login status` only reads the saved file. A login can look fine and still fail. So the app also asks `codex app-server` for `account/read` with `refreshToken: true`. When the account is null, the login has expired.
-- A failed request with a login error marks the provider "Not connected" in the app, also when the status check said that it was logged in.
-- The app compares the CLI version with the newest version on npm (`src/main/ai/updates.ts`) and shows an update hint.
+- **Codex:** `codex login status` only reads the saved file. A login can look fine and still fail. So the app also asks `codex app-server` for `account/read` with `refreshToken: true`. When the account is null, the login has expired. "Log in…" runs `codex logout` first, then opens `codex login` in a terminal.
+- **Anthropic API / OpenAI API:** `models.list` with the key. A rejected key gives `reason: 'bad-key'`; no connection or a server error gives `reason: 'offline'` (the app cannot tell). `models.list` does not show an account without credit: a failed request does (`reason: 'no-credit'`).
+- `ProviderStatus.path` is the program that the app runs. A program path in the settings loses its quotes ("Copy as path"); when the app cannot use it, `pathIgnored` is true and the app finds the program itself (`src/main/ai/resolve-bin.ts`).
+- A failed request marks the provider in the app (`learnStatus` in `src/renderer/src/lib/ai.ts`): a login error marks it "Not connected", also when the status check said that it was logged in.
+- The app compares the CLI version with the newest version on npm (`src/main/ai/updates.ts`) and shows an update hint under the status line.
+- Settings → AI checks the providers when it opens and when the window gets the focus. After "Log in…", "How to install" or "Update…", the row checks every 3 seconds, for at most 3 minutes, until the status changes. The install pages are in `src/shared/ai/install.ts` (Settings → AI and the welcome screen use the same pages).
+
+#### Errors
+
+`classifyError` (`src/shared/ai/errors.ts`) gives each failed request a kind (`AiErrorKind`): `not-installed`, `not-logged-in`, `login-expired`, `bad-key`, `no-credit`, `rate-limit` (the usage limit of a plan, with `resets` when the provider gives the time), `overloaded` (a busy server, or too many requests in a short time), `network`, `refused`, `off`, `cancelled` or `other`. `CompletionResult.error` keeps the text of the provider, short (`errorDetail`). The renderer shows `describeError(result)` (`src/renderer/src/lib/ai.ts`): a plain message in the interface language, the text of the provider for "Details", and a fix button ("Open settings") that opens the row of the provider in Settings → AI. `friendlyError` gives the message only.
+
+#### Providers that are off, and routes
+
+- The main process refuses a request to a provider that is off (`complete` in `src/main/ai/index.ts`, kind `off`). This is the last gate: a provider that is off never runs, also when a route still names it.
+- `runCompletion` gives a route of a provider that is off (the route of a thread or of an action) the route of its task, when that one works.
+- `autoRoute(prefer?)` (`src/renderer/src/stores/app.ts`, with `repairRoutes` in `src/shared/ai/routes.ts`) gives each task without a route, and each task of a provider that is off, the suggested routes of `prefer` or of the first provider that works. With no working provider, those routes become empty and the app says "Connect an AI". It runs at start, when a provider connects in Settings → AI or in the welcome screen, when a provider is turned off, and when the window gets the focus while the chat has no working AI.
+- A provider that is off has no status and no models in the app, so no model picker shows it.
 
 ### 5.2 Prompt building (renderer)
 
@@ -379,7 +394,7 @@ The sync is a background job. `useSyncJob` keeps its state: idle, running, done 
 
 The interface is in English (the default), Portuguese (Brazil) and Spanish (`AppSettings.language`). The texts are in `src/shared/i18n/<locale>/<namespace>.ts`. The translations have the type of the English texts, so a missing key is a type error. React code uses `useT()`, other renderer code `getT()`, and the main process `mainT()`. Rules and a terms table: `src/shared/i18n/README.md`.
 
-Some texts are stored in English and translated only when the app shows them, so that a book looks the same in every language: the title "New thread" (it also tells the app to make a title), the title and the purpose of the planning sync thread, and the labels of chapter versions ("Opened", "Before Polish"). Built-in actions and default categories show translated names until the user renames them (`actionName`, `categoryName`). The instructions of built-in actions also show in the interface language until the user changes them, and the AI gets that same text (`actionInstructions`). Effort names (Low, Medium, High…) stay in English in every language.
+Some texts are stored in English and translated only when the app shows them, so that a book looks the same in every language: the title "New thread" (it also tells the app to make a title), the title and the purpose of the planning sync thread, and the labels of chapter versions ("Opened", "Before Polish"). Built-in actions and default categories show translated names until the user renames them (`actionName`, `categoryName`). The instructions of built-in actions also show in the interface language until the user changes them, and the AI gets that same text (`actionInstructions`). Effort names (Low, Medium, High…) are translated for display; the settings keep the English id.
 
 The language of a book is a different setting. It controls the AI output, the dialogue style, the chapter word ("Capítulo Um"), spell check, hyphenation (the page has `lang` = book language) and export. AI prompts stay in English.
 
@@ -389,7 +404,8 @@ The language of a book is a different setting. It controls the AI output, the di
 
 - The installed app looks for a new version 15 seconds after start and then every 6 hours, when `AppSettings.autoUpdate` is on. Settings → General → Updates also has a manual check.
 - The app downloads the new version in the background. Then the title bar shows "Update ready" and a toast offers "Restart now".
-- "Restart now" closes the window through the normal close path, so the renderer saves everything first. Then `quitForUpdate()` runs the installer without questions and starts the new version. When the user quits without a restart, the update installs on quit.
+- "Restart now" closes the window through the normal close path, so the renderer saves everything first. Then `quitForUpdate()` runs the installer without questions and starts the new version. When the writer keeps the window open (some text was not saved), `cancelUpdateInstall()` makes a later quit a normal quit. When the user quits without a restart, the update installs on quit, but only while "Download updates automatically" is on (`onSettingsChanged` in `src/main/settings.ts`).
+- General → Updates shows plain words for an error ("no internet connection" or "try again later"). The text of the updater is in the tooltip of the line.
 - Updates are off in development, in test runs (`WORDELIA_E2E=1`) and on other platforms. The state reaches the renderer as the `app:update` event (`UpdateState`).
 
 ## 6. Settings and secrets
@@ -398,7 +414,7 @@ App data folder (`app.getPath('userData')`):
 
 - `settings.json`: theme, editor preferences, providers, model routes, the actions for all books. The actions of one book are in its folder (§5.4).
 - `library.json`: known books. Each card keeps the title, the author, the words, the chapters, the pages (an estimate, see §7a) and the first words of the book (`bookFacts` in `src/main/library.ts`). The main process writes them when a book opens, when it closes (after the renderer saved everything), and when the window closes with a book open. A card of an older version without pages gets them the next time the library shows: the main process reads the book from its folder one time.
-- `secrets.json`: API keys, encrypted with `safeStorage`.
+- `secrets.json`: API keys, encrypted with `safeStorage`. Without the key store of the system, `setSecret` saves nothing and `ai:setKey` returns a message. Settings → AI removes a key ("Remove key", which also turns the API off) and does not keep a key that the API rejects.
 
 ## 7. Export
 

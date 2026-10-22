@@ -57,6 +57,14 @@ Outside React (stores, plain functions): `getT()` from `@/lib/i18n`. In the main
 | All books / This book (where an action is kept) | Todos os livros / Este livro | Todos los libros / Este libro |
 | Reply (send to chat) | Responder | Responder |
 | Mention | Menção | Mención |
+| Editor's read | Leitura de editor | Lectura de editor |
+| Comment (of an editor's read; not a planning note) | Comentário | Comentario |
+| Lens / All lenses | Olhar / Todos os olhares | Mirada / Todas las miradas |
+| Structure / Reader / Style / Continuity / Proofread (lenses) | Estrutura / Leitor / Estilo / Continuidade / Revisão | Estructura / Lector / Estilo / Continuidad / Revisión |
+| Passage | Trecho | Fragmento |
+| Done / Ignore / It's intentional (a comment) | Feito / Ignorar / É intencional | Hecho / Ignorar / Es intencional |
+| Revision list | Lista de revisão | Lista de revisión |
+| Chapter in progress | Capítulo em andamento | Capítulo en curso |
 | Version / Version history | Versão / Histórico de versões | Versión / Historial de versiones |
 | Trash | Lixeira | Papelera |
 | Model / Effort / Provider | Modelo / Esforço / Provedor | Modelo / Esfuerzo / Proveedor |

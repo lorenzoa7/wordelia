@@ -4,8 +4,8 @@ This file is the source of truth for progress. Update it after each task. Mark a
 
 ## Current focus
 
-> **Milestone:** Version 0.14 — the fixes of the full review
-> **Next task:** Collect feedback on 0.14.0. Proposed next feature, waiting for the user's decision: the "Editor's read" (notes in the margin with four lenses — structure, reader, line, continuity — and one revision list; mockups in test-results/mockups).
+> **Milestone:** Version 0.15 — the editor's read
+> **Next task:** Collect feedback on 0.15.0 (the editor's read with a real AI, on a real chapter).
 > **Not verified:** Codex and the two API transports. The user has no Codex account, and no API keys are set. The scripted provider (`WORDELIA_MOCK_AI=1`) covers their UI flows.
 
 ## M0 — Foundation
@@ -363,6 +363,17 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] Settings: routes on connect; a provider that is off is never used; plain error kinds with a fix button
 - [x] Library: scene breaks and chapter headings on import; repair of a damaged manifest; questions before a folder becomes a book
 - [x] New scenarios: review, actions-tab, proposals, plannotes, settings-ai, importfiles, bookfolder, librarycards; 54 scenarios, 463 unit tests
+
+## Version 0.15 — the editor's read
+
+- [x] Spec and plan: `docs/superpowers/specs/2026-10-21-editors-read-design.md`, `docs/superpowers/plans/2026-10-21-editors-read.md` (10 tasks, each with a review)
+- [x] Comments in `ai/comments.json`: merge by id, read-only for a newer file, trash with the chapter
+- [x] The read: toolbar popover (chapter or selection, lens, chapter in progress), read thread, offer card in the chat, comments from the tags of the reply
+- [x] Marks on the passages: they follow the text, "The passage changed", Undo
+- [x] The margin: cards beside the page, room at the author's click, Hide, popovers in a narrow window, status bar count
+- [x] Actions: Go to passage, Discuss in chat, Polish passage (with the comment), Update the note, It's intentional, Ignore, Done; links "(→ N)" in the letter
+- [x] The revision list, and a second read that knows the first
+- [x] Scenarios `comments` and `editorread`; {SCEN} scenarios, {UNIT} unit tests
 
 ## Tests and CI
 

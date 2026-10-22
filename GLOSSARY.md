@@ -50,6 +50,10 @@ This file is the ubiquitous language of Wordelia. Use these words in code, docs 
 | **Chat image** | An image that the author adds to a chat message. The app makes it small (WebP, at most 1568 px on the long side) and keeps it in the book, in `planning/_assets/chat/`. | `ChatImage` |
 | **Reply** | To quote selected text into the chat composer. | `reply` |
 | **Mention** | A chapter, an entry or a thread that the user names in a chat message with "@". It shows as a pill in the text. | `Mention` |
+| **Editor's read** | The AI reads a chapter, or a part of it, as an editor. It writes a short letter in the chat and leaves comments on passages. It never changes the text. | `ReadRequest`, `features/read` |
+| **Comment** | One finding of an editor's read, on one passage of a chapter. It is not a planning note. Its state is open, done, ignored or intentional. | `EditorComment` |
+| **Lens** | The way an editor's read looks at a chapter: structure, reader, style, continuity or proofread. "All lenses" uses all of them. | `Lens`, `LensChoice` |
+| **Read thread** | The thread of the reads of one chapter: "Read · <chapter title>". | `Thread.readChapterId` |
 
 ## Views
 
@@ -61,3 +65,5 @@ This file is the ubiquitous language of Wordelia. Use these words in code, docs 
 | **Map** | A graph of all entries in the Plan view. A line links two entries when one mentions the other. |
 | **Desk** | The background of the app, around the page. |
 | **Page** | The paper surface where the user writes. |
+| **Margin** | The column of comment cards to the right of the page, on the desk. |
+| **Revision list** | The page with all the comments of the book, by chapter, with filters by lens and by state. It covers the desk in the Write view. |

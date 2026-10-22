@@ -2,6 +2,26 @@
 
 Each version has its Windows installer in GitHub Releases. The release workflow copies the section of the version from this file to the release notes.
 
+## 0.15.0 (2026-10-22)
+
+This version adds the editor's read: the AI reads a chapter as an editor and leaves comments in the margin. It never changes your text.
+
+### The editor's read
+- The glasses button of the toolbar reads the open chapter, or only the selected part. Choose all lenses or one: Structure, Reader, Style, Continuity or Proofread. Turn on "Chapter in progress" to read a chapter that is not finished.
+- The read is a message in the thread "Read · <chapter>". You see the reply come in, and you can stop it or talk about it. The reply is a short letter ("What works", "What I would look at first") and at most 7 comments (5 for one lens).
+- In the chat, ask for a read in your own words. The AI answers with a card, and one click starts the read.
+
+### Comments in the margin
+- Each comment is on a passage, with a number beside the text and a card to the right of the page. The first read makes room for the cards one time. "Hide" gives the room back.
+- A comment follows its passage while you write. When the passage is gone, the card says "The passage changed".
+- Each card has actions: Discuss in chat, Polish passage (the AI gets the comment, and you review the change as usual), Update the note (for Continuity), It's intentional (with a reason), Ignore and Done. Each one has Undo.
+- In the letter, "(→ 2)" goes to comment 2 in the margin.
+
+### The revision list
+- The first item of the chapter list opens all the comments of the book, by chapter. Filter them by lens and by state.
+- A second read of a chapter knows the first one. It does not repeat comments that you closed. When it thinks that a comment is fixed, it asks you.
+- The comments are in the book folder (`ai/comments.json`), so they go with the book.
+
 ## 0.14.0 (2026-10-21)
 
 This version fixes the 136 problems of a full review of the app, screen by screen.

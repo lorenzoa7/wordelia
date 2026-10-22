@@ -3,15 +3,15 @@
 
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import clsx from 'clsx'
-import { BookOpenText, ChatCircleText, Check, Notebook, NotePencil, Path, Sparkle, Warning, X } from '@phosphor-icons/react'
-import type { CommentState, EditorComment } from '@shared/comments'
+import { BookOpenText, ChatCircleText, Check, Notebook, NotePencil, Path, SealCheck, Sparkle, Warning, X } from '@phosphor-icons/react'
+import type { EditorComment } from '@shared/comments'
 import { chapterRef, entryRef } from '@shared/prompts/context'
 import { isStoryLine } from '@shared/storyline'
 import type { Chapter, Entry } from '@shared/types'
 import { useT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
 import { Tooltip } from '@/ui'
-import { discussComment, markIntentional, polishComment, updateNoteFor } from './actions'
+import { commentActions, discussComment, markIntentional, polishComment, updateNoteFor, type CommentWork } from './actions'
 import { decideComments } from './ui'
 import './read.css'
 
@@ -57,36 +57,6 @@ export function CommentCard({ card, chapterNumber, readOnly, selected, onSelect,
   const sources = continuity ? c.sources.map((s) => ({ ...sourceOf(s.file, chapters, entries, t), quote: s.quote })) : []
   const subject = sources.find((s) => s.note)?.note
 
-  // The decisions go through decideComments, with Undo; a comments file of a newer Wordelia cannot change. The
-  // work opens the chat or the editor (actions.ts) and never changes the text without the author.
-  const decide = (state: CommentState): void => {
-    if (!readOnly) decideComments([c.id], state)
-  }
-  // One row: the work on the comment with the chat or the editor, a smaller decision, and "Done" on the right.
-  const work = lost
-    ? []
-    : continuity
-      ? [<Act key="note" kind="work" icon={<NotePencil size={13} />} label={m.updateNote} onClick={() => void updateNoteFor(c)} />]
-      : [
-          <Act key="discuss" kind="work" icon={<ChatCircleText size={13} />} label={m.discuss} onClick={() => discussComment(c)} />,
-          <Act key="polish" kind="work" icon={<Sparkle size={13} />} label={m.polish} onClick={() => void polishComment(c)} />
-        ]
-  const minor =
-    continuity && !lost ? (
-      <Act
-        key="intentional"
-        kind="minor"
-        className="cm-act-intentional"
-        icon={<Check size={13} />}
-        label={m.intentional}
-        off={readOnly}
-        offTip={m.readOnly}
-        onClick={() => void markIntentional(c)}
-      />
-    ) : (
-      <Act key="ignore" kind="minor" className="cm-act-ignore" icon={<X size={13} />} label={m.ignore} off={readOnly} offTip={m.readOnly} onClick={() => decide('ignored')} />
-    )
-  const done = <Act key="done" kind="done" className="cm-act-done" icon={<Check size={13} weight="bold" />} label={m.done} off={readOnly} offTip={m.readOnly} onClick={() => decide('done')} />
   const rowRef = useFitRow()
 
   return (
@@ -131,12 +101,39 @@ export function CommentCard({ card, chapterNumber, readOnly, selected, onSelect,
         </div>
       )}
       <div ref={rowRef} className="cm-actions">
-        {work}
-        {minor}
-        {done}
+        {commentButtons(c, lost, readOnly, t)}
       </div>
     </article>
   )
+}
+
+const WORK_ICONS: Record<CommentWork, React.ReactNode> = {
+  discuss: <ChatCircleText size={13} />,
+  polish: <Sparkle size={13} />,
+  updateNote: <NotePencil size={13} />
+}
+
+/**
+ * The buttons of the actions of a comment (`commentActions`): the work with the chat or the editor, the smaller
+ * decision, and "Done". The card and the row of the revision list show them. The work opens the chat or the
+ * editor (actions.ts) and never changes the text without the author. The decisions go through decideComments,
+ * with Undo; in a comments file of a newer Wordelia they are off.
+ */
+export function commentButtons(c: EditorComment, lost: boolean, readOnly: boolean, t: T): React.ReactNode[] {
+  const m = t.read.margin
+  const set = commentActions(c, lost)
+  const work: Record<CommentWork, { label: string; run: () => void }> = {
+    discuss: { label: m.discuss, run: () => discussComment(c) },
+    polish: { label: m.polish, run: () => void polishComment(c) },
+    updateNote: { label: m.updateNote, run: () => void updateNoteFor(c) }
+  }
+  const buttons = set.work.map((w) => <Act key={w} kind="work" icon={WORK_ICONS[w]} label={work[w].label} onClick={work[w].run} />)
+  if (set.minor === 'intentional')
+    buttons.push(<Act key="intentional" kind="minor" className="cm-act-intentional" icon={<SealCheck size={13} />} label={m.intentional} off={readOnly} offTip={m.readOnly} onClick={() => void markIntentional(c)} />)
+  if (set.minor === 'ignore')
+    buttons.push(<Act key="ignore" kind="minor" className="cm-act-ignore" icon={<X size={13} />} label={m.ignore} off={readOnly} offTip={m.readOnly} onClick={() => decideComments([c.id], 'ignored')} />)
+  if (set.done) buttons.push(<Act key="done" kind="done" className="cm-act-done" icon={<Check size={13} weight="bold" />} label={m.done} off={readOnly} offTip={m.readOnly} onClick={() => decideComments([c.id], 'done')} />)
+  return buttons
 }
 
 /**
@@ -173,8 +170,8 @@ function useFitRow(): React.RefObject<HTMLDivElement | null> {
 
 /**
  * A button of a card (and of a row of the revision list). `kind`: a work with the chat or the editor (a light
- * button), a smaller decision, or "Done". `off`: it does nothing, and its tooltip says why. `named`: its label
- * always shows, so it has no tooltip with its name.
+ * button), a smaller decision, "Done", or "Go to passage" (the list). `off`: it does nothing, and its tooltip
+ * says why. `named`: its label always shows, so it has no tooltip with its name.
  */
 export function Act({
   kind,
@@ -186,7 +183,7 @@ export function Act({
   offTip,
   named
 }: {
-  kind: 'work' | 'minor' | 'done'
+  kind: 'work' | 'minor' | 'done' | 'go'
   icon: React.ReactNode
   label: string
   className?: string

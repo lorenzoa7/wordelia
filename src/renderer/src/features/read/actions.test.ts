@@ -23,7 +23,7 @@ vi.mock('@/features/editor/registry', () => ({
   scrollToPos: () => {}
 }))
 
-const { askDoneAfterPolish, updateNoteFor } = await import('./actions')
+const { askDoneAfterPolish, commentActions, updateNoteFor } = await import('./actions')
 const { decideComments } = await import('./ui')
 const { loadComments, useComments } = await import('./store')
 const { useApp } = await import('@/stores/app')
@@ -141,5 +141,21 @@ describe('the question after the Polish of a comment', () => {
     useUi.setState({ toasts: [] })
     askDoneAfterPolish('cm_marta001')
     expect(toasts()).toEqual([])
+  })
+})
+
+describe('the actions of a comment (its card and its row in the revision list)', () => {
+  it('Continuity: "Update the note", "It is intentional" and "Done"; the other lenses: discuss, polish, "Ignore" and "Done"', () => {
+    expect(commentActions({ lens: 'continuity', state: 'open' }, false)).toEqual({ work: ['updateNote'], minor: 'intentional', done: true })
+    expect(commentActions({ lens: 'style', state: 'open' }, false)).toEqual({ work: ['discuss', 'polish'], minor: 'ignore', done: true })
+  })
+
+  it('a comment whose passage is gone has no work, and "Ignore" also for Continuity', () => {
+    expect(commentActions({ lens: 'continuity', state: 'open' }, true)).toEqual({ work: [], minor: 'ignore', done: true })
+    expect(commentActions({ lens: 'reader', state: 'open' }, true)).toEqual({ work: [], minor: 'ignore', done: true })
+  })
+
+  it('a closed comment has none', () => {
+    for (const state of ['done', 'ignored', 'intentional'] as const) expect(commentActions({ lens: 'style', state }, false)).toEqual({ work: [], minor: null, done: false })
   })
 })

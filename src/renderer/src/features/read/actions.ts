@@ -27,6 +27,34 @@ import { chapterName, readThreadFor } from './start'
 import { useComments } from './store'
 import { decideComments, makeRoomForComments, selectComment, showCardPopover, useReadUi } from './ui'
 
+/** A work on a comment with the chat or the editor */
+export type CommentWork = 'discuss' | 'polish' | 'updateNote'
+
+/** The actions that a comment offers: its card in the margin and its row in the revision list show the same. */
+export interface CommentActionSet {
+  /** The work with the chat or the editor */
+  work: CommentWork[]
+  /** The smaller decision */
+  minor: 'ignore' | 'intentional' | null
+  /** "Done" */
+  done: boolean
+}
+
+/**
+ * The actions of a comment. An open Continuity comment asks for a change of the planning ("Update the note") or
+ * says that the text is intentional; the other lenses discuss the comment, polish the passage or ignore the
+ * comment; all have "Done". A comment whose passage is gone has no work, and "Ignore". A closed comment has none.
+ */
+export function commentActions(c: Pick<EditorComment, 'lens' | 'state'>, lost: boolean): CommentActionSet {
+  if (c.state !== 'open') return { work: [], minor: null, done: false }
+  const continuity = c.lens === 'continuity'
+  return {
+    work: lost ? [] : continuity ? ['updateNote'] : ['discuss', 'polish'],
+    minor: continuity && !lost ? 'intentional' : 'ignore',
+    done: true
+  }
+}
+
 /** The longest wait for the editor of a chapter to find the passages of its comments */
 const PASSAGES_WAIT_MS = 2000
 

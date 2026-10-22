@@ -40,3 +40,19 @@ describe('effort names', () => {
     expect(MESSAGES['pt-BR'].common.efforts.medium).toBe('Médio')
   })
 })
+
+describe("the texts of the editor's read", () => {
+  it('Portuguese quotes with “…”, as the rest of the interface', () => {
+    const read = MESSAGES['pt-BR'].read
+    expect(read.margin.quote('Elias acendeu o farol')).toBe('“Elias acendeu o farol”')
+    expect(read.aboutComment(2, 'A frase repete uma palavra.')).toBe('Sobre o comentário 2 (“A frase repete uma palavra.”): ')
+    expect(read.aboutComment(null, 'A frase repete uma palavra.')).toBe('Sobre o comentário “A frase repete uma palavra.”: ')
+    expect(read.updateNoteAsk('Marta não sabe do barco.', ['@Marta'])).toMatch(/O comentário: “Marta não sabe do barco\.”$/)
+  })
+
+  it('Spanish calls a passage "fragmento"', () => {
+    const ask = MESSAGES.es.read.ask('A Tempestade', 'all', { selection: true, inProgress: false })
+    expect(ask).toContain('solo el fragmento seleccionado')
+    expect(ask).not.toContain('pasaje')
+  })
+})

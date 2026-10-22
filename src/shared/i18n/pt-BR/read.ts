@@ -64,7 +64,7 @@ export const read: typeof en = {
     chapter: (n) => `Cap. ${n}`,
     storyLine: 'Linha',
     note: 'Nota',
-    quote: (text) => `«${text}»`,
+    quote: (text) => `“${text}”`,
     card: (n, lens) => (n === null ? `Comentário · ${lens}` : `Comentário ${n} · ${lens}`)
   },
   status: {
@@ -72,10 +72,10 @@ export const read: typeof en = {
     show: 'Mostrar os comentários na margem',
     goTo: 'Ir aos comentários'
   },
-  aboutComment: (n, text) => (n === null ? `Sobre o comentário «${text}»: ` : `Sobre o comentário ${n} («${text}»): `),
+  aboutComment: (n, text) => (n === null ? `Sobre o comentário “${text}”: ` : `Sobre o comentário ${n} (“${text}”): `),
   updateNoteAsk: (text, targets) => {
     const what = targets.length ? (targets.length === 1 ? targets[0] : `${targets.slice(0, -1).join(', ')} e ${targets[targets.length - 1]}`) : 'a nota do planejamento ou a linha da história'
-    return `O texto deste capítulo está certo. Atualize ${what} para concordar com o trecho. Não mude este capítulo. O comentário: «${text}»`
+    return `O texto deste capítulo está certo. Atualize ${what} para concordar com o trecho. Não mude este capítulo. O comentário: “${text}”`
   },
   polished: 'Marcar o comentário como feito?',
   noPassage: 'O trecho deste comentário não está mais no texto.',

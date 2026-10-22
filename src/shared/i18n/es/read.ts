@@ -28,7 +28,7 @@ export const read: typeof en = {
       continuity: `Lee el capítulo “${chapter}” como editor de continuidad`,
       proofread: `Lee el capítulo “${chapter}” como corrector`
     }
-    const extra = [how.selection ? 'solo el pasaje seleccionado' : '', how.inProgress ? 'capítulo en curso' : ''].filter(Boolean)
+    const extra = [how.selection ? 'solo el fragmento seleccionado' : '', how.inProgress ? 'capítulo en curso' : ''].filter(Boolean)
     return `${base[lens]}${extra.length ? ` (${extra.join(', ')})` : ''}.`
   },
   run: 'Leer',

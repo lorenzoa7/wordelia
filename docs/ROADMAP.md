@@ -5,7 +5,7 @@ This file is the source of truth for progress. Update it after each task. Mark a
 ## Current focus
 
 > **Milestone:** Version 0.15 — the editor's read
-> **Next task:** Collect feedback on 0.15.0 (the editor's read with a real AI, on a real chapter).
+> **Next task:** Run `live-read` with the real AI on a copy of the author's book after the author logs in to Claude Code again, then collect feedback on 0.15.0.
 > **Not verified:** Codex and the two API transports. The user has no Codex account, and no API keys are set. The scripted provider (`WORDELIA_MOCK_AI=1`) covers their UI flows.
 
 ## M0 — Foundation
@@ -374,6 +374,8 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] Actions: Go to passage, Discuss in chat, Polish passage (with the comment), Update the note, It's intentional, Ignore, Done; links "(→ N)" in the letter
 - [x] The revision list, and a second read that knows the first
 - [x] Scenarios `comments` and `editorread`; 56 scenarios, 708 unit tests
+- [x] After 0.15.0: a read that ends with no open comment (an error, a stop) gives the room back; live scenario `live-read`
+- [ ] Run `live-read` with the real AI on a copy of the author's book (waits for a new `claude auth login` on this computer)
 
 ## Tests and CI
 

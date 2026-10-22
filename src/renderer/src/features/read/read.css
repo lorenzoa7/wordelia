@@ -210,25 +210,31 @@
 }
 
 /* ---------- The passages of the comments in the text (marks.ts) ---------- */
+/* Each lens: its color, its wash, and its ink (the text of a tag or a number, 4.5:1 or more) */
 .cm-structure {
   --lens: var(--lens-structure);
   --lens-wash: var(--lens-structure-wash);
+  --lens-ink: var(--lens-structure-ink);
 }
 .cm-reader {
   --lens: var(--lens-reader);
   --lens-wash: var(--lens-reader-wash);
+  --lens-ink: var(--lens-reader-ink);
 }
 .cm-style {
   --lens: var(--lens-style);
   --lens-wash: var(--lens-style-wash);
+  --lens-ink: var(--lens-style-ink);
 }
 .cm-continuity {
   --lens: var(--lens-continuity);
   --lens-wash: var(--lens-continuity-wash);
+  --lens-ink: var(--lens-continuity-ink);
 }
 .cm-proofread {
   --lens: var(--lens-proofread);
   --lens-wash: var(--lens-proofread-wash);
+  --lens-ink: var(--lens-proofread-ink);
 }
 
 /* A soft wash in the color of the lens */
@@ -248,7 +254,8 @@
 }
 
 /* The numbers of the comments in the right margin of the page, on the first line of each passage.
-   The text of the chapter (.ProseMirror) is the box of the position. */
+   The text of the chapter (.ProseMirror) is the box of the position. The numbers of two passages that
+   start on one line go one under the other (--cm-shift, marks.ts). A click selects the card. */
 .cm-nums {
   position: absolute;
   right: calc(var(--page-mr) / -2);
@@ -257,8 +264,8 @@
   gap: 3px;
   margin-top: calc((1lh - 18px) / 2);
   text-indent: 0;
-  translate: 50% 0;
-  cursor: default;
+  translate: 50% var(--cm-shift, 0px);
+  cursor: pointer;
   user-select: none;
 }
 .cm-num {
@@ -268,8 +275,8 @@
   height: 18px;
   border-radius: 50%;
   background: var(--paper);
-  box-shadow: inset 0 0 0 1px var(--lens);
-  color: var(--lens);
+  box-shadow: inset 0 0 0 1.5px var(--lens);
+  color: var(--lens-ink);
   font-family: var(--font-ui);
   font-size: var(--text-2xs);
   font-style: normal;
@@ -277,4 +284,322 @@
   font-variant-numeric: tabular-nums;
   line-height: 1;
   text-decoration: none;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.cm-num:hover {
+  background: var(--lens-wash);
+}
+
+/* ---------- The margin beside the page (Margin.tsx) ---------- */
+/* The layer has the size of the scaled pages and scrolls with them. Only the cards take clicks. */
+.cm-margin {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.cm-column {
+  position: absolute;
+  top: 0;
+}
+.cm-column .cm-head,
+.cm-column .cm-card {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  pointer-events: auto;
+}
+/* A card in the column shows when it is next to its passage. */
+.cm-column .cm-card:not([data-placed]),
+.cm-column .cm-head:not([style]) {
+  visibility: hidden;
+}
+
+.cm-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cm-head-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-2);
+}
+.cm-head-title svg {
+  flex: none;
+  color: var(--ribbon);
+  translate: 0 var(--icon-lift);
+}
+.cm-head-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+}
+.cm-filter,
+.cm-hide {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink-2);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  white-space: nowrap;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.cm-hide {
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-3);
+}
+.cm-filter:hover,
+.cm-filter[data-state='open'],
+.cm-hide:hover {
+  border-color: var(--ink-4);
+  background: var(--paper-2);
+  color: var(--ink);
+}
+.cm-filter svg,
+.cm-hide svg {
+  flex: none;
+  translate: 0 var(--icon-lift);
+}
+
+/* ---------- A card ---------- */
+.cm-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-3) 14px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  box-shadow: var(--shadow-page);
+  cursor: default;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+.cm-card.is-selected {
+  border-color: var(--lens);
+  box-shadow:
+    0 0 0 1px var(--lens),
+    var(--shadow-pop);
+}
+.cm-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+  height: 18px;
+}
+.cm-badge {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px var(--lens);
+  color: var(--lens-ink);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.cm-card.is-selected .cm-badge {
+  background: var(--lens-ink);
+  box-shadow: none;
+  color: var(--paper);
+}
+.cm-tag {
+  flex: none;
+  padding: 2px 7px;
+  border-radius: var(--radius-xs);
+  background: var(--lens-wash);
+  color: var(--lens-ink);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+.cm-subject {
+  overflow: hidden;
+  color: var(--ink-3);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.cm-text {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-prose);
+  font-size: var(--text-md);
+  line-height: 1.45;
+}
+.cm-lost {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+.cm-lost svg {
+  flex: none;
+  translate: 0 var(--icon-lift);
+}
+.cm-card.is-lost .cm-text {
+  color: var(--ink-2);
+}
+
+/* Continuity: the passage and the source in conflict, in a tinted box */
+.cm-quotes {
+  display: flex;
+  flex-direction: column;
+  border-left: 2px solid var(--lens);
+  border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
+  background: var(--lens-wash);
+}
+.cm-quote {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+}
+.cm-quote + .cm-quote {
+  border-top: 1px dashed color-mix(in srgb, var(--lens) 40%, transparent);
+}
+.cm-quote-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.cm-quote-label svg {
+  flex: none;
+  translate: 0 var(--icon-lift);
+}
+.cm-quote-label .icon-book {
+  translate: 0 var(--icon-lift-book);
+}
+.cm-quote-text {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--ink);
+  font-family: var(--font-prose);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+.cm-quote-text.is-passage {
+  text-decoration: underline wavy var(--lens);
+  text-decoration-thickness: 1px;
+  text-decoration-skip-ink: none;
+  text-underline-offset: 0.24em;
+}
+
+/* The buttons of a card: the work with the chat or the editor (light buttons), then the decisions with
+   "Done" on the right */
+.cm-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cm-actions-work,
+.cm-actions-decide {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.cm-actions-work {
+  gap: 2px;
+  margin-left: -6px;
+}
+.cm-actions-work .cm-act {
+  padding: 0 6px;
+  border-color: transparent;
+  background: transparent;
+}
+.cm-act {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink-2);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  white-space: nowrap;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.cm-act svg {
+  flex: none;
+  translate: 0 var(--icon-lift);
+}
+.cm-act:hover:not([aria-disabled]) {
+  border-color: var(--ink-4);
+  background: var(--paper-2);
+  color: var(--ink);
+}
+.cm-act[aria-disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.cm-act-done {
+  margin-left: auto;
+  border-color: color-mix(in srgb, var(--pen) 45%, var(--rule));
+  color: var(--pen);
+}
+.cm-act-done:hover:not([aria-disabled]) {
+  border-color: var(--pen);
+  background: var(--pen-wash);
+  color: var(--pen);
+}
+
+/* The line from the number of the selected comment to its card */
+.cm-link {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+}
+.cm-link path {
+  fill: none;
+  stroke: var(--lens);
+  stroke-width: 1.25;
+  opacity: 0.8;
+}
+
+/* ---------- The card of a number in a narrow window (Margin.tsx) ---------- */
+.cm-pop {
+  z-index: 60;
+  width: 290px;
+  max-width: calc(100vw - var(--s-6));
+  animation: pop-in var(--dur-med) var(--ease-out);
+}
+.cm-pop .cm-card {
+  box-shadow: var(--shadow-pop);
 }

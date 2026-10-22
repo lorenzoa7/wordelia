@@ -7,7 +7,7 @@ import type { EditorComment } from '@shared/comments'
 import { schemaExtensions } from '@/features/editor/extensions'
 import { RELOAD_META } from '@/features/editor/keep'
 import { textWithMap } from '@/features/editor/review'
-import { anchorComments, changesToWrite, commentMarksKey, commentMarksPlugin, inChapterOrder, passageAt, passageChanges, type Range } from './marks'
+import { anchorComments, changesToWrite, commentMarksKey, commentMarksPlugin, inChapterOrder, marksOf, passageAt, passageChanges, type Range } from './marks'
 
 const schema = getSchema(schemaExtensions())
 const NOW = '2026-10-21T10:00:00.000Z'
@@ -207,5 +207,23 @@ describe('the passages of comments in the text', () => {
     const all = [marta, structure, lost, style]
     const order = inChapterOrder(all, anchorComments(st.doc, all, new Map()))
     expect(order.map((c) => c.id)).toEqual(['cm_style001', 'cm_struct01', 'cm_marta001'])
+  })
+
+  it('a filter by lens draws only the marks of that lens, and keeps their numbers', () => {
+    const style = comment({ id: 'cm_style001', lens: 'style', rank: 1, passage: 'Elias acendeu o farol' })
+    const marta = comment({ rank: 2 })
+    const st = stateOf(CHAPTER)
+    const ranges = anchorComments(st.doc, [style, marta], new Map())
+    const shown = (lens: string): { id: string; lens: EditorComment['lens']; rank: number; visible: boolean }[] =>
+      [style, marta].map((c) => ({ id: c.id, lens: c.lens, rank: c.rank, visible: lens === 'all' || c.lens === lens }))
+    const numbers = (lens: string): string[] =>
+      marksOf(st.doc, shown(lens), ranges)
+        .find()
+        .map((d) => (d.spec as { key?: string }).key ?? '')
+        .filter((k) => k.startsWith('cm-num:'))
+    expect(numbers('all')).toEqual(['cm-num:cm_style001.style.1', 'cm-num:cm_marta001.continuity.2'])
+    // Only Continuity: the comment of Marta keeps its number 2.
+    expect(numbers('continuity')).toEqual(['cm-num:cm_marta001.continuity.2'])
+    expect(marksOf(st.doc, shown('reader'), ranges).find()).toEqual([])
   })
 })

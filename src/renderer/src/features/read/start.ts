@@ -9,6 +9,7 @@ import { ensureRoute, newThread, sendInThread } from '@/features/chat/send'
 import { getT } from '@/lib/i18n'
 import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
+import { makeRoomForComments } from './ui'
 
 /** The name of a chapter in the words of a read. */
 export function chapterName(title: string): string {
@@ -34,9 +35,10 @@ export function readThreadFor(chapterId: string): Thread {
 }
 
 /**
- * Start a read: show the thread of the chapter, with the chat open, and send the message that asks for
- * it. The reply streams in the chat; its comments go to the comment store (useReadSync). While the thread
- * has a reply in progress, this does nothing: one read runs at a time in a thread.
+ * Start a read: show the thread of the chapter, with the chat open, make room for the margin of the
+ * comments, and send the message that asks for it. The reply streams in the chat; its comments go to the
+ * comment store (useReadSync). While the thread has a reply in progress, this does nothing: one read runs
+ * at a time in a thread.
  */
 export async function startRead(req: ReadRequest): Promise<void> {
   const book = useBook.getState()
@@ -51,8 +53,8 @@ export async function startRead(req: ReadRequest): Promise<void> {
   const request: ReadRequest = { chapterId: chapter.id, lens: req.lens, inProgress: req.inProgress, ...(selection ? { selection: { text: selection } } : {}) }
   const text = getT().read.ask(chapterName(chapter.title), req.lens, { selection: Boolean(selection), inProgress: req.inProgress })
 
-  const app = useApp.getState()
-  if (!app.settings?.ui.chatOpen) app.setUi({ chatOpen: true })
+  // The chat opens, and the desk makes room for the comments beside the page: one change of the panels.
+  makeRoomForComments(useApp.getState().settings?.ui.chatOpen ? {} : { chatOpen: true })
   if (book.threads.some((t) => t.id === thread.id)) useChat.getState().setActiveThread(thread.id)
   else useChat.getState().openBlank(thread)
   await sendInThread(thread.id, text, { read: request })

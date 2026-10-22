@@ -48,5 +48,23 @@ export const read: typeof en = {
     comments: (n) => (n === 1 ? '1 comentário' : `${n} comentários`)
   },
   resolved: (n) => (n === 1 ? 'A leitura acha que 1 comentário foi resolvido.' : `A leitura acha que ${n} comentários foram resolvidos.`),
-  markDone: (n) => (n === 1 ? 'Marcar como feito' : 'Marcar como feitos')
+  markDone: (n) => (n === 1 ? 'Marcar como feito' : 'Marcar como feitos'),
+  margin: {
+    title: (n) => `Comentários do editor · ${n}`,
+    filter: 'Mostrar os comentários de um olhar',
+    hide: 'Ocultar',
+    lost: 'O trecho mudou',
+    discuss: 'Discutir no chat',
+    polish: 'Polir trecho',
+    updateNote: 'Atualizar a nota',
+    intentional: 'É intencional',
+    ignore: 'Ignorar',
+    done: 'Feito',
+    readOnly: 'Uma versão mais nova do Wordelia guarda estes comentários. Esta versão não pode mudá-los.',
+    chapter: (n) => `Cap. ${n}`,
+    storyLine: 'Linha',
+    note: 'Nota',
+    quote: (text) => `«${text}»`,
+    card: (n, lens) => (n === null ? `Comentário · ${lens}` : `Comentário ${n} · ${lens}`)
+  }
 }

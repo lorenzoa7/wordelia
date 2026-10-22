@@ -8,8 +8,13 @@
 // The page always fits: when the desk is narrower than the pages at 100 % (a narrow window with
 // the two side panels), the pages scale down to the width of the desk. The zoom of the author
 // multiplies this fit.
+//
+// The column of the comments of an editor's read (features/read) takes room on the desk to the right
+// of the page: then the page and the column together are in the middle of the desk, and the page fits
+// in the room that the column leaves.
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { MARGIN_W, columnFits, pagesOffset } from '@/features/read/layout'
 import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
 
@@ -64,15 +69,19 @@ const ease = (t: number): number => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 *
 
 /**
  * The zoom of the desk. `inner` has the pages, laid out at 100 %; `sizer` holds it and has its scaled
- * size. Returns the zoom to show in a short badge after a change, or null.
+ * size. `room`: the desk keeps room for the column of the comments. Returns the zoom to show in a short
+ * badge after a change, or null, and `column`: the column of the comments shows to the right of the page
+ * (it has room on the desk).
  */
 export function useDeskZoom(
   deskRef: React.RefObject<HTMLDivElement | null>,
   sizerRef: React.RefObject<HTMLDivElement | null>,
-  innerRef: React.RefObject<HTMLDivElement | null>
-): number | null {
+  innerRef: React.RefObject<HTMLDivElement | null>,
+  room = false
+): { badge: number | null; column: boolean } {
   const target = useApp((s) => s.settings?.ui.zoom ?? 1)
   const [badge, setBadge] = useState<number | null>(null)
+  const [column, setColumn] = useState(false)
   /** The zoom of the author on screen now (it moves to `target` during an animation) */
   const shown = useRef(target)
   /** The scale on screen now: the zoom of the author times the fit to the desk width */
@@ -80,6 +89,8 @@ export function useDeskZoom(
   /** The horizontal offset of the scaled pages (they are centered when narrower than the desk) */
   const offset = useRef(0)
   const frame = useRef(0)
+  const roomRef = useRef(room)
+  roomRef.current = room
 
   /** Put the scale on the pages and give the sizer the scaled size. */
   const apply = (s: number): void => {
@@ -88,15 +99,31 @@ export function useDeskZoom(
     const inner = innerRef.current
     if (!desk || !sizer || !inner) return
     const room = desk.clientWidth
-    const e = s * fitScale(room, inner.offsetWidth)
+    // The column shows when the desk keeps room for it and has the room for a page at 100 % beside it.
+    const page = parseFloat(inner.style.getPropertyValue('--page-w')) || 0
+    const withColumn = roomRef.current && page > 0 && columnFits(room, page)
+    const e = s * fitScale(withColumn ? room - MARGIN_W : room, inner.offsetWidth)
     effective.current = e
     const w = inner.offsetWidth * e
     const h = inner.offsetHeight * e
-    offset.current = w < room ? (room - w) / 2 : 0
-    sizer.style.width = `${Math.max(room, w)}px`
+    offset.current = pagesOffset(room, w, withColumn)
+    sizer.style.width = `${Math.max(room, offset.current + w + (withColumn ? MARGIN_W : 0))}px`
     sizer.style.height = `${h}px`
     inner.style.transform = `translate(${offset.current}px, 0) scale(${e})`
     sizer.style.setProperty('--desk-scale', String(e))
+    setColumn(withColumn)
+  }
+
+  /** The desk or the room for the column changed: the same zoom, maybe a new fit. The text at the reading line stays in place. */
+  const refit = (): void => {
+    const desk = deskRef.current
+    if (!desk) return
+    const before = effective.current
+    apply(shown.current)
+    if (Math.abs(effective.current - before) > 0.0005) {
+      const ay = desk.clientHeight * 0.3
+      desk.scrollTop = ((desk.scrollTop + ay) / before) * effective.current - ay
+    }
   }
 
   // The size of the pages or of the desk changes (typing, a window resize): the same scale, new sizes.
@@ -105,20 +132,18 @@ export function useDeskZoom(
     const inner = innerRef.current
     if (!desk || !inner) return
     apply(shown.current)
-    const ro = new ResizeObserver(() => {
-      // A new width of the desk can give a new fit: the text at the reading line stays in place.
-      const before = effective.current
-      apply(shown.current)
-      if (Math.abs(effective.current - before) > 0.0005) {
-        const ay = desk.clientHeight * 0.3
-        desk.scrollTop = ((desk.scrollTop + ay) / before) * effective.current - ay
-      }
-    })
+    const ro = new ResizeObserver(refit)
     ro.observe(inner)
     ro.observe(desk)
     return () => ro.disconnect()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deskRef, innerRef, sizerRef])
+
+  // The desk keeps room for the column of the comments, or gives it back.
+  useLayoutEffect(() => {
+    refit()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room])
 
   // A new zoom: scale from the zoom on screen to the new one, around the anchor point.
   useLayoutEffect(() => {
@@ -211,7 +236,7 @@ export function useDeskZoom(
     }
   }, [deskRef])
 
-  return badge
+  return { badge, column }
 }
 
 /** The scale of the desk now, from an element inside the scaled pages (1 when not scaled). */

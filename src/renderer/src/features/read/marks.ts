@@ -17,9 +17,9 @@ import { Extension } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey, type EditorState, type Transaction } from '@tiptap/pm/state'
 import type { Mappable, StepMap } from '@tiptap/pm/transform'
-import { Decoration, DecorationSet } from '@tiptap/pm/view'
+import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view'
 import { create } from 'zustand'
-import type { EditorComment, Lens } from '@shared/comments'
+import type { EditorComment, Lens, LensChoice } from '@shared/comments'
 import { findText } from '@shared/proposals/apply'
 import { isReload } from '@/features/editor/keep'
 import { getChapterEditor } from '@/features/editor/registry'
@@ -34,11 +34,12 @@ export interface Range {
   to: number
 }
 
-/** A comment with a mark */
+/** An open comment of the chapter. It has a number; it has a mark when it is `visible` (the lens filter). */
 interface Shown {
   id: string
   lens: Lens
   rank: number
+  visible: boolean
 }
 
 interface MarksState {
@@ -63,8 +64,20 @@ export const commentMarksKey = new PluginKey<MarksState>('commentMarks')
 /** The pause after the last edit, before the comments get the new words of their passages. */
 const PASSAGE_PAUSE_MS = 300
 
-/** The marks of the passages are off (the "Hide" switch of the margin sets it). The comments still follow the text. */
-export const useCommentMarks = create<{ hidden: boolean }>(() => ({ hidden: false }))
+/**
+ * What the marks show (the margin sets it, ui.ts). `hidden`: no marks ("Hide"); the comments still follow
+ * the text. `lens`: only the marks of this lens; the numbers stay the same.
+ */
+export const useCommentMarks = create<{ hidden: boolean; lens: LensChoice }>(() => ({ hidden: false, lens: 'all' }))
+
+/** The count of the draws of the marks that changed something: the margin draws its cards again after each. */
+export const useMarksDrawn = create<{ n: number }>(() => ({ n: 0 }))
+
+/** The editors that found the passages of their comments at least once */
+const drawnViews = new WeakSet<EditorView>()
+
+/** The space between two numbers in the margin of the page, one under the other */
+const NUMBER_GAP = 3
 
 function inDoc(doc: PMNode, r: Range): boolean {
   return r.from >= 0 && r.from <= r.to && r.to <= doc.content.size
@@ -218,6 +231,31 @@ export function commentRanges(chapterId: string): Map<string, Range> {
   return new Map([...(st?.ranges ?? [])].filter(([, r]) => r.from < r.to))
 }
 
+/**
+ * The chapter is on screen and its editor looked for the passages of its comments. Then a comment without a
+ * live range has no passage in the text now.
+ */
+export function rangesKnown(chapterId: string): boolean {
+  const ed = getChapterEditor(chapterId)
+  return Boolean(ed && !ed.editor.isDestroyed && drawnViews.has(ed.editor.view))
+}
+
+/**
+ * The numbers of passages that start on one line of text go one under the other, not on top of each other.
+ * `root` is the text of a chapter (the box of the position of the numbers).
+ */
+export function stackNumbers(root: HTMLElement): void {
+  let free = -Infinity
+  for (const el of root.querySelectorAll<HTMLElement>('.cm-nums')) {
+    // The place of the number in the layout of the text; the shift (a translate) does not change it.
+    const top = el.offsetTop
+    const shift = Math.max(0, free - top)
+    const value = `${shift}px`
+    if (el.style.getPropertyValue('--cm-shift') !== value) el.style.setProperty('--cm-shift', value)
+    free = top + shift + el.offsetHeight + NUMBER_GAP
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* The read of a comment                                                */
 /* ------------------------------------------------------------------ */
@@ -265,14 +303,18 @@ function numbersWidget(items: Numbered[]): HTMLElement {
   return box
 }
 
-/** The marks of the shown comments at their ranges. */
-function marksOf(doc: PMNode, shown: Shown[], ranges: Map<string, Range>): DecorationSet {
+/**
+ * The marks of the visible comments at their ranges. The numbers count all the shown comments, so a filter
+ * by lens does not change them.
+ */
+export function marksOf(doc: PMNode, shown: Shown[], ranges: Map<string, Range>): DecorationSet {
   const ordered = inChapterOrder(shown, ranges)
-  if (!ordered.length) return DecorationSet.empty
+  if (!ordered.some((c) => c.visible)) return DecorationSet.empty
   const decos: Decoration[] = []
   const washes = new Set<string>()
   const starts = new Map<number, Numbered[]>()
   ordered.forEach((c, i) => {
+    if (!c.visible) return
     const r = ranges.get(c.id)!
     // Two comments of one lens on the same words get one mark, not a darker one.
     const wash = `${r.from}:${r.to}:${c.lens}`
@@ -297,7 +339,7 @@ function marksOf(doc: PMNode, shown: Shown[], ranges: Map<string, Range>): Decor
   return DecorationSet.create(doc, decos)
 }
 
-const shownKey = (shown: Shown[]): string => shown.map((c) => `${c.id}:${c.lens}:${c.rank}`).join(',')
+const shownKey = (shown: Shown[]): string => shown.map((c) => `${c.id}:${c.lens}:${c.rank}:${c.visible ? 1 : 0}`).join(',')
 
 function sameMap<V>(a: Map<string, V>, b: Map<string, V>, same: (x: V, y: V) => boolean): boolean {
   if (a.size !== b.size) return false
@@ -393,8 +435,10 @@ export function commentMarksPlugin(chapterId: () => string): Plugin<MarksState> 
           lost.delete(id)
           back.push(id)
         }
+        const wasFirst = first
         first = false
-        const shown: Shown[] = useCommentMarks.getState().hidden ? [] : mine.map((c) => ({ id: c.id, lens: c.lens, rank: c.rank }))
+        const { hidden, lens } = useCommentMarks.getState()
+        const shown: Shown[] = hidden ? [] : mine.map((c) => ({ id: c.id, lens: c.lens, rank: c.rank, visible: lens === 'all' || c.lens === lens }))
         const touched = settled ? new Set<string>() : st.touched
         const same =
           !st.refind &&
@@ -406,8 +450,23 @@ export function commentMarksPlugin(chapterId: () => string): Plugin<MarksState> 
           const next: MarksState = { ranges, lost, shown, decorations: marksOf(doc, shown, ranges), touched, refind: false }
           view.dispatch(view.state.tr.setMeta(commentMarksKey, next).setMeta('addToHistory', false).setMeta('allowDuringReview', true))
         }
+        drawnViews.add(view)
+        if (!same || wasFirst) useMarksDrawn.setState((s) => ({ n: s.n + 1 }))
         if (!readOnly) for (const id of back) setLost(id, false)
       }
+
+      // The numbers of passages on one line of text go one under the other: after each change of the
+      // text or of the marks, and when the lines of the text move.
+      let stackFrame = 0
+      const restack = (): void => {
+        if (stackFrame) return
+        stackFrame = requestAnimationFrame(() => {
+          stackFrame = 0
+          if (!view.isDestroyed) stackNumbers(view.dom)
+        })
+      }
+      const lines = new ResizeObserver(restack)
+      lines.observe(view.dom)
 
       /**
        * Give the comments that the edits of this editor touched the new words of their passages, and mark
@@ -441,6 +500,7 @@ export function commentMarksPlugin(chapterId: () => string): Plugin<MarksState> 
       soon = setTimeout(refresh, 0)
       return {
         update(v, prev) {
+          restack()
           if (v.state.doc === prev.doc) return
           clearTimeout(pause)
           pause = setTimeout(() => {
@@ -456,6 +516,8 @@ export function commentMarksPlugin(chapterId: () => string): Plugin<MarksState> 
           offComments()
           offHidden()
           clearTimeout(soon)
+          lines.disconnect()
+          cancelAnimationFrame(stackFrame)
           // The chapter leaves the screen in the pause: the comments get the last words now.
           if (pause) {
             clearTimeout(pause)

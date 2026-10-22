@@ -117,12 +117,91 @@ export default async function ({ app, page, shot, openBook }) {
     if (!(await page.locator(`.page[data-chapter="ch_sample01"] .cm-mark.cm-${lens}`).count())) fail(`the passage of the ${lens} comment has no mark`)
   }
   if ((await page.locator('.cm-mark.cm-continuity').first().evaluate((e) => getComputedStyle(e).textDecorationStyle)) !== 'wavy') fail('the continuity mark is not a wavy line')
-  // "Hide" takes the marks out of the text, and puts them back.
-  const hide = (hidden) => page.evaluate((h) => window.__commentMarks.useCommentMarks.setState({ hidden: h }), hidden)
-  await hide(true)
-  await until('"Hide" did not take the marks away', async () => !(await page.locator('.cm-mark, .cm-num').count()), 3000)
-  await hide(false)
-  await until('the marks did not come back', async () => (await numbers()).length === 3, 3000)
+
+  // The margin. The read made room once: the chapter list closed, the page went to the left, and the cards
+  // are in a column to the right of the page, inside the desk, next to their passages.
+  const desk = () =>
+    page.evaluate(() => {
+      const d = document.querySelector('.desk')
+      const box = d.getBoundingClientRect()
+      const sheet = document.querySelector('.page[data-chapter="ch_sample01"]').getBoundingClientRect()
+      const cards = [...document.querySelectorAll('.cm-column .cm-card')].map((c) => {
+        const r = c.getBoundingClientRect()
+        return { id: c.dataset.comment, left: r.left, right: r.right, top: r.top, bottom: r.bottom, visible: getComputedStyle(c).visibility === 'visible' }
+      })
+      return { left: box.left, right: box.left + d.clientWidth, pageLeft: sheet.left, pageRight: sheet.right, cards, sidebar: window.__wordelia.app.getState().settings.ui.sidebarOpen }
+    })
+  await until('the read did not close the chapter list', async () => (await desk()).sidebar === false, 5000)
+  await until('the chapter list did not close', () => page.evaluate(() => document.querySelector('.book-sidebar').getBoundingClientRect().width < 1), 3000)
+  await until('the cards of the comments are not in the margin', async () => {
+    const d = await desk()
+    return d.cards.length === 3 && d.cards.every((c) => c.visible && c.left >= d.pageRight && c.right <= d.right)
+  })
+  let room = await desk()
+  console.log('margin:', JSON.stringify(room))
+  if (room.cards.map((c) => c.id).join() !== first.map((c) => c.id).join()) fail('the cards do not follow the order of the passages')
+  for (let i = 1; i < room.cards.length; i++) if (room.cards[i].top < room.cards[i - 1].bottom) fail('two cards overlap')
+  const header = await page.locator('.cm-head').innerText()
+  console.log('margin header:', JSON.stringify(header))
+  if (!/(Editor's comments|Comentários do editor|Comentarios del editor) · 3/i.test(header)) fail(`the margin header says "${header}"`)
+  // The continuity card shows the two quotes: the passage, and the note with its label.
+  const continuity = page.locator(`.cm-card[data-comment="${first[2].id}"]`)
+  const quotes = await continuity.locator('.cm-quote').allInnerTexts()
+  console.log('continuity quotes:', JSON.stringify(quotes))
+  if (quotes.length !== 2 || !/Ch\. 1|Cap\. 1/i.test(quotes[0]) || !/Note|Nota/i.test(quotes[1])) fail('the continuity card does not show the passage and the note')
+  // The numbers are easy to read: 4.5:1 or more on their background, for each lens.
+  const contrast = await page.evaluate(() => {
+    const rgb = (s) => s.match(/[\d.]+/g).slice(0, 3).map(Number)
+    const lum = (c) => {
+      const [r, g, b] = c.map((v) => {
+        const x = v / 255
+        return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4
+      })
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b
+    }
+    return [...document.querySelectorAll('.cm-num')].map((n) => {
+      const cs = getComputedStyle(n)
+      const bg = cs.backgroundColor === 'rgba(0, 0, 0, 0)' ? getComputedStyle(document.documentElement).getPropertyValue('--paper') : cs.backgroundColor
+      const back = bg.startsWith('#') ? [1, 3, 5].map((i) => parseInt(bg.trim().slice(i, i + 2), 16)) : rgb(bg)
+      const [a, b] = [lum(rgb(cs.color)), lum(back)]
+      return { lens: n.className, ratio: Math.round(((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)) * 100) / 100 }
+    })
+  })
+  console.log('number contrast:', JSON.stringify(contrast))
+  if (contrast.some((c) => c.ratio < 4.5)) fail('a number in the margin of the page is hard to read')
+  // A click on a card selects it, and a line joins it to its passage. A click on a number selects its card.
+  await page.locator(`.cm-card[data-comment="${first[1].id}"]`).click({ position: { x: 120, y: 8 } })
+  await until('the click did not select the card', async () => (await page.locator(`.cm-card.is-selected[data-comment="${first[1].id}"]`).count()) === 1, 3000)
+  await until('no line joins the card to its passage', async () => (await page.locator('.cm-link path').count()) === 1, 3000)
+  await page.locator(`.cm-num[data-comment="${first[2].id}"]`).click()
+  await until('a click on a number did not select its card', async () => (await page.locator(`.cm-card.is-selected[data-comment="${first[2].id}"]`).count()) === 1, 3000)
+  // Two passages that start on one line of text: their numbers do not overlap.
+  const listBefore = await comments()
+  await page.evaluate(
+    ([list, extra]) => window.__wordelia.comments.setState({ list: [...list, extra] }),
+    [listBefore, { ...first[1], id: 'cm_sameline1', key: '9', rank: 9, lens: 'reader', passage: 'pelas frestas da janela' }]
+  )
+  await until('the comment on the same line has no number', async () => (await page.locator('.cm-num[data-comment="cm_sameline1"]').count()) === 1, 3000)
+  const overlap = () =>
+    page.evaluate(() => {
+      const boxes = [...document.querySelectorAll('.page[data-chapter="ch_sample01"] .cm-num')].map((n) => n.getBoundingClientRect())
+      return boxes.some((a, i) => boxes.some((b, j) => i < j && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom))
+    })
+  await until('two numbers on one line overlap', async () => !(await overlap()), 3000)
+  await shot('margin')
+  await page.evaluate((list) => window.__wordelia.comments.setState({ list }), listBefore)
+  await until('the comment on the same line did not go', async () => (await page.locator('.cm-card').count()) === 3, 3000)
+  // "Hide" takes the cards and the marks away, and puts the page and the chapter list back.
+  await page.locator('.cm-head .cm-hide').click()
+  await until('"Hide" did not take the cards and the marks away', async () => !(await page.locator('.cm-card, .cm-mark, .cm-num').count()), 3000)
+  await until('"Hide" did not open the chapter list again', async () => (await desk()).sidebar === true, 3000)
+  // The chapter list opens with a short animation: the page is in the middle of the desk at its end.
+  await until('the chapter list did not open to its width', () => page.evaluate(() => document.querySelector('.book-sidebar').getBoundingClientRect().width >= 255), 3000)
+  await until('the page is not in the middle of the desk after "Hide"', async () => {
+    const d = await desk()
+    return Math.abs(d.pageLeft - d.left - (d.right - d.pageRight)) <= 2
+  })
+  await shot('margin-hidden')
   const head = await page.locator('.msg-ai .read-head').innerText()
   console.log('header:', JSON.stringify(head))
   if (!/3/.test(head) || !/Cap\. 1|Ch\. 1/.test(head)) fail(`the header card says "${head}"`)
@@ -236,4 +315,41 @@ export default async function ({ app, page, shot, openBook }) {
   await until('the mark stayed after a text from outside without the passage', async () => !(await page.locator(`.cm-num[data-comment="${style.id}"]`).count()), 3000)
   await page.waitForTimeout(800)
   if ((await passageOf(style.id)).lost) fail('a text from outside made the comment lost')
+  // On screen, the card of that comment says that the passage changed, and has only "Done" and "Ignore".
+  const lostCard = page.locator(`.cm-column .cm-card[data-comment="${style.id}"]`)
+  await until('the card of a comment without its passage does not say that the passage changed', async () => (await lostCard.locator('.cm-lost').count()) === 1, 3000)
+  const lostButtons = await lostCard.locator('button').allInnerTexts()
+  console.log('buttons of a lost card:', JSON.stringify(lostButtons))
+  if (lostButtons.map((b) => b.trim()).join() !== 'Ignore,Done' && lostButtons.map((b) => b.trim()).join() !== 'Ignorar,Feito' && lostButtons.map((b) => b.trim()).join() !== 'Ignorar,Hecho') fail('a lost card has other buttons than "Ignore" and "Done"')
+  await shot('margin-lost')
+  // A comments file of a newer Wordelia: the cards show, but their state buttons are off.
+  await page.evaluate(() => window.__wordelia.comments.setState({ readOnly: true }))
+  await until('the state buttons are on for a comments file of a newer Wordelia', async () => (await page.locator('.cm-column .cm-card .cm-act-done[aria-disabled="true"]').count()) === (await page.locator('.cm-column .cm-card').count()), 3000)
+  const before7 = (await comments()).filter((c) => c.state === 'open').length
+  // A forced click: the button is off, and the click must change nothing.
+  await page.locator('.cm-column .cm-card .cm-act-done').first().click({ force: true })
+  await page.waitForTimeout(300)
+  if ((await comments()).filter((c) => c.state === 'open').length !== before7) fail('"Done" changed a comment of a read-only file')
+  await page.evaluate(() => window.__wordelia.comments.setState({ readOnly: false }))
+  // "Done" on a card closes its comment, and the card leaves the margin.
+  const doneId = await page.locator('.cm-column .cm-card').first().getAttribute('data-comment')
+  await page.locator(`.cm-card[data-comment="${doneId}"] .cm-act-done`).click()
+  await until('"Done" did not close the comment', async () => (await comments()).find((c) => c.id === doneId).state === 'done', 3000)
+  await until('the card of a closed comment stayed', async () => !(await page.locator(`.cm-card[data-comment="${doneId}"]`).count()), 3000)
+
+  // 6. A narrow window: no column. A click on a number opens its card in a popover beside it.
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1000, 800))
+  await page.waitForFunction(() => Math.abs(innerWidth - 1000) < 40)
+  await until('the column stayed in a narrow window', async () => !(await page.locator('.cm-column').count()), 5000)
+  await page.locator('.page[data-chapter="ch_sample01"] .cm-num').first().click()
+  await page.waitForSelector('.cm-pop .cm-card', { timeout: 5000 })
+  const popped = await page.evaluate(() => {
+    const pop = document.querySelector('.cm-pop').getBoundingClientRect()
+    return { left: pop.left, right: pop.right, width: innerWidth }
+  })
+  console.log('popover:', JSON.stringify(popped))
+  if (popped.left < 0 || popped.right > popped.width) fail('the popover card is not on screen')
+  await shot('narrow-popover')
+  await page.keyboard.press('Escape')
+  await page.waitForFunction(() => !document.querySelector('.cm-pop'), null, { timeout: 5000 })
 }

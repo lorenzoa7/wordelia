@@ -19,14 +19,8 @@ import { HistoryDialog } from '@/features/history/HistoryDialog'
 import { startAutoSnapshots } from '@/features/history/snapshots'
 import { SidePanel } from './SidePanel'
 import { ShowSidebarButton } from './SidebarToggle'
+import { CHAT, SIDEBAR, panelLayout } from './panels'
 import './book.css'
-
-const SIDEBAR = { min: 200, max: 420, default: 256 }
-const CHAT = { min: 320, max: 680, default: 400 }
-/** The page keeps at least this width. In a narrow window the chat gives up width first, then the sidebar. */
-const MAIN_MIN = 560
-
-const clampTo = (r: { min: number; max: number }, v: number): number => Math.min(r.max, Math.max(r.min, v))
 
 function useWindowWidth(): number {
   const [w, setW] = useState(window.innerWidth)
@@ -47,10 +41,7 @@ export function BookView(): React.JSX.Element {
   const chatWidth = useApp((s) => s.settings?.ui.chatWidth ?? CHAT.default)
   const setUi = useApp((s) => s.setUi)
   const vw = useWindowWidth()
-  const sideNow = sidebarOpen ? clampTo(SIDEBAR, sidebarWidth) : 0
-  const chatFit = vw - MAIN_MIN - sideNow
-  const chatNow = chatOpen ? Math.max(CHAT.min, Math.min(clampTo(CHAT, chatWidth), chatFit)) : 0
-  const sidebarFit = vw - MAIN_MIN - chatNow
+  const { chatFit, sidebarFit } = panelLayout(vw, { sidebarOpen, sidebarWidth, chatOpen, chatWidth })
   const exportOpen = useUi((s) => s.exportOpen)
   const setExportOpen = useUi((s) => s.setExportOpen)
   const historyChapterId = useUi((s) => s.historyChapterId)

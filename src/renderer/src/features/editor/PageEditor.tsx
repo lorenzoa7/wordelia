@@ -30,6 +30,8 @@ import { typewriterSound } from './typewriter-sound'
 import { cleanPastedHtml, cleanPastedSlice, pasteStyleFor } from './paste'
 import { forgetEditorStates, isReload, keepEditorState, loadDoc, takeEditorState } from './keep'
 import { restorePlace, savePlace } from './deskPlace'
+import { Margin } from '@/features/read/Margin'
+import { useReadUi } from '@/features/read/ui'
 import './editor.css'
 
 const MM = 96 / 25.4
@@ -254,7 +256,9 @@ export function PageEditor(): React.JSX.Element | null {
   }, [chapterIds, ids, markActive])
 
   useEditorStats(active?.editor ?? null, active?.chapterId ?? null)
-  const zoomBadge = useDeskZoom(deskRef, sizerRef, innerRef)
+  // The desk keeps room for the column of the comments of an editor's read (features/read).
+  const commentRoom = useReadUi((s) => s.room)
+  const { badge: zoomBadge, column } = useDeskZoom(deskRef, sizerRef, innerRef, commentRoom)
   // The first page number of each chapter: the pages of the chapters before it, plus one.
   const { pages } = usePagesOf()
   const starts = useMemo(() => {
@@ -301,6 +305,8 @@ export function PageEditor(): React.JSX.Element | null {
             {ids.length ? <PageEnd /> : <EmptyManuscript />}
             <PageCounter />
           </div>
+          {/* Outside the scaled pages, so the cards keep their size at every zoom: the comments beside the page. */}
+          <Margin column={column} typing={typing} sizerRef={sizerRef} />
           {/* Outside the scaled pages: the bar keeps its size at every zoom. It stays with its review, in any chapter. */}
           <ReviewBar />
         </div>

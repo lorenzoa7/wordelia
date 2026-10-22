@@ -62,5 +62,32 @@ export const read = {
   },
   /** The toast when the AI says that some comments look fixed. The writer decides. */
   resolved: (n: number): string => (n === 1 ? 'The read thinks 1 comment is fixed.' : `The read thinks ${n} comments are fixed.`),
-  markDone: (n: number): string => (n === 1 ? 'Mark as done' : 'Mark all as done')
+  markDone: (n: number): string => (n === 1 ? 'Mark as done' : 'Mark all as done'),
+  /** The margin beside the page: the cards of the open comments of the chapter on screen */
+  margin: {
+    /** The header of the column, with the number of cards that show */
+    title: (n: number): string => `Editor's comments · ${n}`,
+    /** The name of the lens filter of the margin */
+    filter: 'Show the comments of one lens',
+    /** Hide the cards and the marks of this book */
+    hide: 'Hide',
+    /** A comment whose passage is not in the text now */
+    lost: 'The passage changed',
+    discuss: 'Discuss in chat',
+    polish: 'Polish passage',
+    updateNote: 'Update the note',
+    intentional: "It's intentional",
+    ignore: 'Ignore',
+    done: 'Done',
+    /** The tooltip of the state buttons when the comments file comes from a newer Wordelia */
+    readOnly: 'A newer version of Wordelia keeps these comments. This version cannot change them.',
+    /** The labels of the quotes of a Continuity comment: a chapter, the story line, a planning note */
+    chapter: (n: number): string => `Ch. ${n}`,
+    storyLine: 'Story line',
+    note: 'Note',
+    /** A quote in a card */
+    quote: (text: string): string => `“${text}”`,
+    /** The name of a card for screen readers */
+    card: (n: number | null, lens: string): string => (n === null ? `Comment · ${lens}` : `Comment ${n} · ${lens}`)
+  }
 }

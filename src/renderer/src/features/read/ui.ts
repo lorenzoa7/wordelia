@@ -151,6 +151,14 @@ function giveRoomBack(): void {
   if (taken?.sidebarWasOpen && app.settings && !app.settings.ui.sidebarOpen) app.setUi({ sidebarOpen: true })
 }
 
+/**
+ * A read ended: its reply is saved (also a reply that stopped or failed). When the book has no open comment,
+ * the margin would be empty: give the room back. "Hide" stays as the author chose it.
+ */
+export function readEnded(): void {
+  if (useReadUi.getState().room && !hasOpenComments()) giveRoomBack()
+}
+
 /** "Hide": no cards and no marks, for this book. The page and the chapter list go back to their places. */
 export function hideComments(): void {
   writeHidden(useReadUi.getState().root, true)

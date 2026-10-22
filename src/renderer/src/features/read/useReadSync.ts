@@ -12,7 +12,7 @@ import { getT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
 import { toast } from '@/stores/ui'
 import { addFromReply, useComments } from './store'
-import { decideComments } from './ui'
+import { decideComments, readEnded } from './ui'
 
 /** The least time between two parses of a reply that streams, for each thread. */
 export const STREAM_PARSE_MS = 300
@@ -132,7 +132,10 @@ function ingestSaved(): void {
       if (!req || handled.get(message.id) === message.content) return
       handled.set(message.id, message.content)
       ingest(thread, message, req)
-      if (streamed.delete(message.id)) askAboutFixed(message, req)
+      if (streamed.delete(message.id)) {
+        askAboutFixed(message, req)
+        readEnded()
+      }
     })
   }
 }

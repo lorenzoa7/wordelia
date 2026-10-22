@@ -9,7 +9,7 @@ vi.mock('@/lib/api', () => ({
 
 const { makeThrottle, readBefore, startReadSync, STREAM_PARSE_MS } = await import('./useReadSync')
 const { commentsChangedOutside, loadComments, useComments } = await import('./store')
-const { decideComments } = await import('./ui')
+const { decideComments, useReadUi } = await import('./ui')
 const { useBook } = await import('@/stores/book')
 const { useChat } = await import('@/features/chat/chatStore')
 const { useUi } = await import('@/stores/ui')
@@ -369,5 +369,31 @@ describe('a read reply that leaves its thread', () => {
       ['m_reply2', 'intentional'],
       ['m_reply3', 'open']
     ])
+  })
+})
+
+describe('the room for the margin after a read', () => {
+  /** A reply that streams, ends and is saved, as in the app. */
+  function finish(message: ChatMessage): void {
+    stream(message.content)
+    useChat.setState({ streaming: {} })
+    useBook.setState({ threads: [thread([asked(), message])] })
+  }
+
+  it('a read that ends with an error and no open comment gives the room back: the margin would be empty', () => {
+    useBook.setState({ threads: [thread([asked()])] })
+    stop = startReadSync()
+    useReadUi.setState({ room: true, roomTaken: { sidebarWasOpen: false } })
+    finish({ ...reply('', 'm_stream'), error: 'Failed to authenticate' })
+    expect(useReadUi.getState().room).toBe(false)
+  })
+
+  it('a read that ends with comments keeps the room', () => {
+    useBook.setState({ threads: [thread([asked()])] })
+    stop = startReadSync()
+    useReadUi.setState({ room: true, roomTaken: { sidebarWasOpen: false } })
+    finish(reply(`A letter.\n${note(1, 'Marta olhou o mar')}`, 'm_stream'))
+    expect(list()).toHaveLength(1)
+    expect(useReadUi.getState().room).toBe(true)
   })
 })

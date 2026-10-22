@@ -1,6 +1,4 @@
 import { memo, useMemo, useState } from 'react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import {
   ArrowClockwise,
   ArrowCounterClockwise,
@@ -35,6 +33,7 @@ import { typesetForBook } from '@/lib/typeset'
 import { getT, useT } from '@/lib/i18n'
 import { resendEdited, retryLast } from './send'
 import { ChatInput } from './ChatInput'
+import { Markdown } from './ChatMarkdown'
 import { MentionPill } from './MentionPill'
 import { MessageImages } from './ChatImages'
 import { docFromParts, readDraft, splitMentions } from './draft'
@@ -44,22 +43,6 @@ import { latestThought, streamPhase, type StreamPhase } from './thinking'
 import { closeMarkdown } from './markdown'
 import { acceptedToast, rejectWithUndo } from './undo'
 import { formatCost } from './usage'
-
-const mdComponents = {
-  a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
-    <a href={href} target="_blank" rel="noreferrer">
-      {children}
-    </a>
-  )
-}
-
-function Markdown({ text }: { text: string }): React.JSX.Element {
-  return (
-    <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
-      {text}
-    </ReactMarkdown>
-  )
-}
 
 function copyText(text: string): void {
   const t = getT()

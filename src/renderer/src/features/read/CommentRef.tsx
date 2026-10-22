@@ -4,11 +4,11 @@
 // comment. A rank without a comment (the app dropped its note) stays text.
 
 import { useMemo } from 'react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
+import type { Components } from 'react-markdown'
 import clsx from 'clsx'
 import { Check, Warning, X } from '@phosphor-icons/react'
 import type { EditorComment } from '@shared/comments'
+import { ChatLink, Markdown } from '@/features/chat/ChatMarkdown'
 import { useT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
 import { Tooltip } from '@/ui'
@@ -72,29 +72,19 @@ export function CommentRef({ threadId, messageId, rank, children }: RefProps): R
 
 /** The text of the letter of a read: Markdown, with its "(→ N)" as links to the comments of the reply. */
 export function LetterText({ text, threadId, messageId }: { text: string; threadId: string; messageId: string }): React.JSX.Element {
-  const components = useMemo(
+  const components = useMemo<Components>(
     () => ({
-      a: ({ href, children }: { href?: string; children?: React.ReactNode }) => {
+      a: ({ href, children }) => {
         const rank = commentRefRank(href)
-        if (rank !== null) {
-          return (
-            <CommentRef threadId={threadId} messageId={messageId} rank={rank}>
-              {children}
-            </CommentRef>
-          )
-        }
+        if (rank === null) return <ChatLink href={href}>{children}</ChatLink>
         return (
-          <a href={href} target="_blank" rel="noreferrer">
+          <CommentRef threadId={threadId} messageId={messageId} rank={rank}>
             {children}
-          </a>
+          </CommentRef>
         )
       }
     }),
     [threadId, messageId]
   )
-  return (
-    <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
-      {linkCommentRefs(text)}
-    </ReactMarkdown>
-  )
+  return <Markdown text={linkCommentRefs(text)} components={components} />
 }

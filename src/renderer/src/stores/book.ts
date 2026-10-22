@@ -204,6 +204,11 @@ export const useBook = create<BookState>((set, get) => {
     if (!root) return
     // Typing that is still in an editor wins over the change from outside: save it first.
     runFlushers()
+    // The comments file merges with a change of the app that waits (features/read/store.ts): it never waits here.
+    if (rel === COMMENTS_FILE) {
+      commentsChangedOutside(root, content)
+      return
+    }
     if (saver.isPending(root, rel)) return
     if (rel === MANIFEST_FILE && content) {
       try {
@@ -224,10 +229,6 @@ export const useBook = create<BookState>((set, get) => {
       } catch {
         /* a partial write from a sync client: ignore */
       }
-      return
-    }
-    if (rel === COMMENTS_FILE) {
-      commentsChangedOutside(root, content)
       return
     }
     if (rel.startsWith(`${MANUSCRIPT_DIR}/`) && rel.endsWith('.md')) {

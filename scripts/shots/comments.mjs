@@ -1,9 +1,10 @@
 // The comments of a book (ai/comments.json): a chapter that goes to the trash takes its comments along,
-// they wait in the trash folder of the book, and the Undo of the delete brings them back.
+// they wait in the trash folder of the book, and the Undo of the delete brings them back. A damaged file
+// stays as it is.
 import { readFile, readdir, writeFile, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
-export default async function ({ page, openBook, book }) {
+export default async function ({ page, shot, openBook, book }) {
   const fail = (msg) => {
     throw new Error(`Comments scenario: ${msg}`)
   }
@@ -47,4 +48,22 @@ export default async function ({ page, openBook, book }) {
   if (states.join() !== 'cm_aaaaaaaa|open,cm_bbbbbbbb|open,cm_cccccccc|done') fail(`the comments after the Undo are ${states}`)
   await until('the file does not hold the comments after the Undo', async () => (await onDisk()).length === 3)
   console.log('after the Undo:', JSON.stringify(await onDisk()))
+
+  // The book opens with a damaged file (the conflict marks of git): the app shows no comments, never writes
+  // over the decisions in the file, and a toast tells the author.
+  const damaged = ['<<<<<<< HEAD', JSON.stringify({ version: 1, comments: all }), '=======', JSON.stringify({ version: 1, comments: [] }), '>>>>>>> other', ''].join('\n')
+  await page.evaluate(() => window.__wordelia.book.getState().close())
+  await writeFile(file, damaged)
+  await openBook()
+  await page.locator('.toast', { hasText: 'ai/comments.json' }).waitFor({ timeout: 5000 })
+  const store = await page.evaluate(() => {
+    const s = window.__wordelia.comments.getState()
+    return { comments: s.list.length, readOnly: s.readOnly, damaged: s.damaged }
+  })
+  console.log('a damaged file:', JSON.stringify(store))
+  if (store.comments || !store.readOnly || !store.damaged) fail(`the store of a damaged file is ${JSON.stringify(store)}`)
+  await shot('damaged-file')
+  // The close writes everything that waits: the file is still the damaged one.
+  await page.evaluate(() => window.__wordelia.book.getState().close())
+  if ((await readFile(file, 'utf8')) !== damaged) fail('the app wrote over the damaged comments file')
 }

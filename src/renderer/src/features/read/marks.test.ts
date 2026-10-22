@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { getSchema } from '@tiptap/core'
-import { EditorState } from '@tiptap/pm/state'
+import { EditorState, type Plugin } from '@tiptap/pm/state'
+import { history, redo, undo } from '@tiptap/pm/history'
 import { parseMarkdown } from '@shared/markdown/parse'
 import type { EditorComment } from '@shared/comments'
 import { schemaExtensions } from '@/features/editor/extensions'
 import { RELOAD_META } from '@/features/editor/keep'
 import { textWithMap } from '@/features/editor/review'
-import { anchorComments, commentMarksKey, commentMarksPlugin, inChapterOrder, passageChanges, type Range } from './marks'
+import { anchorComments, commentMarksKey, commentMarksPlugin, inChapterOrder, passageAt, passageChanges, type Range } from './marks'
 
 const schema = getSchema(schemaExtensions())
 const NOW = '2026-10-21T10:00:00.000Z'
@@ -32,13 +33,13 @@ function comment(over: Partial<EditorComment> = {}): EditorComment {
   }
 }
 
-function stateOf(md: string): EditorState {
-  return EditorState.create({ schema, doc: schema.nodeFromJSON(parseMarkdown(md)), plugins: [commentMarksPlugin(() => 'ch_one')] })
+function stateOf(md: string, plugins: Plugin[] = []): EditorState {
+  return EditorState.create({ schema, doc: schema.nodeFromJSON(parseMarkdown(md)), plugins: [...plugins, commentMarksPlugin(() => 'ch_one')] })
 }
 
 /** A state whose marks know the passages of the comments, as the view gives them after a build */
-function anchored(md: string, comments: EditorComment[]): EditorState {
-  const st = stateOf(md)
+function anchored(md: string, comments: EditorComment[], plugins: Plugin[] = []): EditorState {
+  const st = stateOf(md, plugins)
   const ranges = anchorComments(st.doc, comments, new Map())
   const meta = { ...commentMarksKey.getState(st)!, ranges }
   return st.apply(st.tr.setMeta(commentMarksKey, meta))
@@ -122,6 +123,52 @@ describe('the passages of comments in the text', () => {
     expect(commentMarksKey.getState(next)!.refind).toBe(true)
     const again = anchorComments(next.doc, [c], new Map())
     expect(textAt(next, again.get(c.id)!)).toBe('Marta subiu a escada')
+  })
+
+  it('a replace of a larger part that keeps the words of the passage keeps the passage', () => {
+    // A Polish of the whole paragraph, accepted as one replace: the passage is in the new text.
+    const c = comment()
+    const st = anchored(CHAPTER, [c])
+    const para = posOf(st, 'Marta subiu')
+    const end = para + 'Marta subiu a escada com o café.'.length
+    const next = st.apply(st.tr.replaceWith(para, end, schema.text('Devagar, Marta subiu a escada com a xícara quente.')))
+    const r = rangesOf(next).get(c.id)!
+    expect(textAt(next, r)).toBe('Marta subiu a escada')
+    expect(passageChanges(next.doc, [c], rangesOf(next)).size).toBe(0)
+    // A Polish that rewrites the words of the passage: it is gone.
+    const rewritten = st.apply(st.tr.replaceWith(para, end, schema.text('Marta foi para cima com o café.')))
+    expect(passageChanges(rewritten.doc, [c], rangesOf(rewritten))).toEqual(new Map([[c.id, null]]))
+  })
+
+  it('a deleted passage whose words come back at its place is found there again', () => {
+    const c = comment({ passage: 'Elias acendeu o farol' })
+    let st = anchored(`${CHAPTER}\n\nNo fim, Elias acendeu o farol.`, [c], [history()])
+    const r = rangesOf(st).get(c.id)!
+    st = st.apply(st.tr.delete(r.from, r.to))
+    const gone = rangesOf(st).get(c.id)!
+    expect(gone.from).toBe(gone.to)
+    // The same words later in the chapter are not the passage.
+    expect(passageAt(st.doc, gone.from, c.passage)).toBeNull()
+    // Ctrl+Z: the words are back at the place where they went.
+    undo(st, (tr) => (st = st.apply(tr)))
+    const point = rangesOf(st).get(c.id)!
+    const back = passageAt(st.doc, point.from, c.passage)!
+    expect(back.from).toBe(r.from)
+    expect(textAt(st, back)).toBe('Elias acendeu o farol')
+    // Redo deletes them again.
+    redo(st, (tr) => (st = st.apply(tr)))
+    expect(passageAt(st.doc, rangesOf(st).get(c.id)!.from, c.passage)).toBeNull()
+  })
+
+  it('a read of a selection anchors to the first match after the start of the selection', () => {
+    const md = ['Elias disse que sim.', 'Marta olhou o mar.', 'Elias disse que sim.'].join('\n\n')
+    const c = comment({ passage: 'Elias disse que sim' })
+    const st = stateOf(md)
+    const scope = (): string => 'Marta olhou o mar.\n\nElias disse que sim.'
+    const r = anchorComments(st.doc, [c], new Map(), scope).get(c.id)!
+    expect(r.from).toBe(posOf(st, 'Elias disse', 1))
+    // A selection that is not in the text any more: the first match of the chapter.
+    expect(anchorComments(st.doc, [c], new Map(), () => 'O farol apagou.').get(c.id)!.from).toBe(posOf(st, 'Elias disse', 0))
   })
 
   it('numbers the comments in the order of their passages, not of their ranks', () => {

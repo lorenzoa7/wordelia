@@ -187,8 +187,8 @@ export default async function ({ app, page, shot, openBook }) {
 
   // 5. The comments follow the text. A word typed in the passage of the open style comment goes into its
   // passage after a short pause, and the mark stays. Ctrl+Z takes the word out again. A passage that the
-  // author deletes makes its comment "lost", and its mark goes away. A text from outside the editor that
-  // has the passage again gives the comment its passage back.
+  // author deletes makes its comment "lost", and its mark goes away; Ctrl+Z brings it back. A text from
+  // outside the editor that has the passage again gives the comment its passage back.
   const style = (await comments()).find((c) => c.lens === 'style' && c.state === 'open')
   if (!style) fail('no open style comment')
   const original = await page.evaluate(() => window.__wordelia.book.getState().chapters.find((c) => c.id === 'ch_sample01').body)
@@ -218,6 +218,13 @@ export default async function ({ app, page, shot, openBook }) {
   if (await page.locator(`.cm-num[data-comment="${style.id}"], .cm-mark[data-mark="${style.id}"]`).count()) fail('the lost comment still has a mark')
   if ((await passageOf(style.id)).state !== 'open') fail('the lost comment is not open')
   await shot('passage-lost')
+  // Ctrl+Z puts the words back at their place: the comment is not lost, and its mark comes back. Ctrl+Y
+  // deletes them again.
+  await page.keyboard.press('Control+z')
+  await until('Ctrl+Z did not give the comment its passage back', async () => !(await passageOf(style.id)).lost, 3000)
+  await until('the mark did not come back after Ctrl+Z', async () => (await mark.allInnerTexts()).join('') === 'Elias acendeu a lâmpada do farol', 3000)
+  await page.keyboard.press('Control+y')
+  await until('Ctrl+Y did not make the comment lost again', async () => (await passageOf(style.id)).lost === true, 3000)
   // An older version of the chapter comes back (History → Restore): the editor loads it as a text from outside.
   await page.evaluate((body) => window.__wordelia.book.getState().restoreChapter('ch_sample01', body), original)
   await until('the restored text did not give the comment its passage back', async () => !(await passageOf(style.id)).lost, 3000)

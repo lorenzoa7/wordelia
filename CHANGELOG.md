@@ -21,7 +21,7 @@ This version adds the editor's read: the AI reads a chapter as an editor and lea
 - The first item of the chapter list opens all the comments of the book, by chapter. Filter them by lens and by state.
 - A second read of a chapter knows the first one. It does not repeat comments that you closed. When it thinks that a comment is fixed, it asks you.
 - The comments are in the book folder (`ai/comments.json`), so they go with the book. When two computers change them at the same time, the app keeps the changes of both. A damaged file is never overwritten: the app tells you, and does not change it.
-- Retry, Rewind and Edit of a read remove only the open comments. Your decisions and reasons stay.
+- Retry, Rewind and Edit of a read, and a thread delete, remove only the open comments. Your decisions and reasons stay.
 - Ctrl+Z outside the text no longer undoes typing that you cannot see (for example in the Plan view, or after a click on Done).
 
 ## 0.14.0 (2026-10-21)

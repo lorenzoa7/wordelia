@@ -84,7 +84,7 @@ An action shows its result as an **inline diff** on the page: removed words in r
 - Each comment is on a passage. Its card is in the **comment margin**, to the right of the page, and a number marks the passage. The first read makes room for the cards one time; **Hide** gives the room back.
 - **Actions of a comment:** Discuss in chat, Polish passage (the main action with the comment, in the normal review), Update the note (Continuity: a chat message, then normal proposals), It's intentional (with an optional reason), Ignore, Done. Each change of state has Undo.
 - A comment follows its passage when the text changes. When the passage is gone, the comment says "The passage changed".
-- Retry, Rewind and Edit of a read remove only the open comments of the replies that go. Comments that the writer decided stay, with their reasons.
+- Retry, Rewind and Edit of a read, and a thread delete, remove only the open comments of the replies that go. Comments that the writer decided stay, with their reasons.
 - The **revision list** shows all the comments of the book, by chapter, with filters by lens and by state. The first item of the chapter list opens it.
 - A second read of a chapter gets the earlier comments, with their states and reasons. When it says that a comment is fixed, the app asks the writer. It never closes a comment by itself.
 

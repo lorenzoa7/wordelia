@@ -373,7 +373,7 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] The margin: cards beside the page, room at the author's click, Hide, popovers in a narrow window, status bar count
 - [x] Actions: Go to passage, Discuss in chat, Polish passage (with the comment), Update the note, It's intentional, Ignore, Done; links "(→ N)" in the letter
 - [x] The revision list, and a second read that knows the first
-- [x] Scenarios `comments` and `editorread`; {SCEN} scenarios, {UNIT} unit tests
+- [x] Scenarios `comments` and `editorread`; 56 scenarios, 708 unit tests
 
 ## Tests and CI
 

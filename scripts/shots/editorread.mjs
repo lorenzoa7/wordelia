@@ -338,8 +338,12 @@ export default async function ({ app, page, shot, openBook }) {
   // normal review. Enter accepts; a toast asks to mark the comment as done, and its Undo puts the card back
   // on the same passage.
   // The toasts of the earlier parts go first: the question after the Polish shows alone.
-  for (const close of await page.locator('.toast .toast-close').all()) await close.click()
-  await until('the earlier toasts stayed', async () => !(await page.locator('.toast').count()), 3000)
+  // One at a time: a toast can end by itself while the others close.
+  await until('the earlier toasts stayed', async () => {
+    const close = page.locator('.toast .toast-close').first()
+    if (await close.count()) await close.click({ timeout: 1000 }).catch(() => {})
+    return !(await page.locator('.toast').count())
+  }, 5000)
   const passage = await rangeOf(styleCm.id)
   await card(styleCm.id).getByRole('button', { name: /^(Polish passage|Polir trecho|Pulir fragmento)$/ }).click()
   await until('the review of the passage did not open', () => page.evaluate(() => window.__review.state()?.phase === 'ready'), 15000)
@@ -505,13 +509,13 @@ export default async function ({ app, page, shot, openBook }) {
   const before7 = (await comments()).filter((c) => c.state === 'open').length
   // A forced click: the button is off, and the click must change nothing.
   await page.locator('.cm-column .cm-card .cm-act-done').first().click({ force: true })
-  await page.waitForTimeout(300)
+  await frames()
   if ((await comments()).filter((c) => c.state === 'open').length !== before7) fail('"Done" changed a comment of a read-only file')
   // "It's intentional" is off too. "Discuss in chat" still works.
   const intentionalActs = page.locator('.cm-column .cm-card .cm-act-intentional')
   if (!(await intentionalActs.count()) || (await page.locator('.cm-column .cm-card .cm-act-intentional:not([aria-disabled="true"])').count())) fail('"It is intentional" is on for a comments file of a newer Wordelia')
   await intentionalActs.first().click({ force: true })
-  await page.waitForTimeout(300)
+  await frames()
   if (await page.getByRole('dialog').count()) fail('"It is intentional" asks for a reason in a read-only file')
   await page.locator('.cm-column .cm-card').getByRole('button', { name: /^(Discuss in chat|Discutir no chat|Discutir en el chat)$/ }).first().click()
   await until('"Discuss in chat" does not work in a read-only file', () => page.evaluate(() => window.__wordelia.chat.getState().quotes.length === 1), 3000)

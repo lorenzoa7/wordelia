@@ -6,7 +6,7 @@
 
 import { create } from 'zustand'
 import { COMMENTS_FILE, markdownToPlainBlocks } from '@shared/book'
-import { READ_LIMIT_ALL, READ_LIMIT_ONE, readCommentsFile, serializeComments, uniqueById, type CommentState, type EditorComment } from '@shared/comments'
+import { READ_LIMIT_ALL, READ_LIMIT_ONE, mergeComments, readCommentsFile, serializeComments, uniqueById, type CommentState, type EditorComment } from '@shared/comments'
 import { parseProposals } from '@shared/proposals/parse'
 import type { ChatMessage, ReadRequest, Thread } from '@shared/types'
 import { invoke } from '@/lib/api'
@@ -58,15 +58,21 @@ export function loadComments(root: string | null, list: EditorComment[], version
 }
 
 /**
- * The file `ai/comments.json` changed outside the app (a sync client, git). Show the new list, unless
- * the app has a change of its own that waits to be written: that change wins and the next write puts
- * it in the file. Text that is not a comments file (a sync client has not finished the write) changes
- * nothing, except a newer Wordelia that changed the shape of the file: the list stays, and the app does
- * not write the file any more.
+ * The file `ai/comments.json` changed outside the app (a sync client, git). Show the new list. When the app
+ * has a change of its own that waits to be written, the two lists merge: each comment of the two stays, the
+ * later version of a comment wins, and the app writes the merge. A file of a newer Wordelia always wins: the
+ * change of the app is dropped, and the app does not write the file any more (also when the newer Wordelia
+ * changed the shape of the file: then the list stays). Other text that is not a comments file (a sync client
+ * has not finished the write) changes nothing.
  */
 export function commentsChangedOutside(root: string, content: string | null): void {
-  if (useComments.getState().root !== root || saver.isPending(root, COMMENTS_FILE)) return
+  if (useComments.getState().root !== root) return
   const file = readCommentsFile(content)
+  if (file.version > 1) saver.cancel(root, COMMENTS_FILE)
+  if (file.valid && file.version === 1 && saver.isPending(root, COMMENTS_FILE)) {
+    change(mergeComments(useComments.getState().list, file.comments))
+    return
+  }
   if (file.valid) {
     loadComments(root, file.comments, file.version)
     return

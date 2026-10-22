@@ -446,6 +446,37 @@ describe('changes from outside', () => {
     expect(onDisk().map((c) => c.state)).toEqual(['done'])
   })
 
+  it('a pending local write and a file from outside with a new comment: both are kept', async () => {
+    store.loadComments(ROOT, [comment()])
+    store.setCommentState(['cm_aaaaaaaa'], 'done') // waits in the saver
+    store.commentsChangedOutside(ROOT, text([comment(), comment({ id: 'cm_bbbbbbbb', lens: 'reader' })]))
+    const both = (list: EditorComment[]): string[] => list.map((c) => `${c.id}|${c.state}`)
+    expect(both(store.useComments.getState().list)).toEqual(['cm_aaaaaaaa|done', 'cm_bbbbbbbb|open'])
+    await saver.flush()
+    expect(both(onDisk())).toEqual(['cm_aaaaaaaa|done', 'cm_bbbbbbbb|open'])
+  })
+
+  it('a pending local write and a newer version of the same comment from outside: the newer one wins', async () => {
+    store.loadComments(ROOT, [comment(), comment({ id: 'cm_bbbbbbbb' })])
+    store.setCommentState(['cm_aaaaaaaa'], 'done')
+    const later = comment({ state: 'ignored', updatedAt: '2099-01-01T00:00:00.000Z' })
+    store.commentsChangedOutside(ROOT, text([later]))
+    expect(store.useComments.getState().list.map((c) => `${c.id}|${c.state}`)).toEqual(['cm_aaaaaaaa|ignored', 'cm_bbbbbbbb|open'])
+    await saver.flush()
+    expect(onDisk().map((c) => c.state)).toEqual(['ignored', 'open'])
+  })
+
+  it('a file of a newer Wordelia while a local write waits: it wins, the list is read-only, nothing is written', async () => {
+    store.loadComments(ROOT, [comment()])
+    store.setCommentState(['cm_aaaaaaaa'], 'done')
+    store.commentsChangedOutside(ROOT, JSON.stringify({ version: 2, comments: [comment({ id: 'cm_bbbbbbbb' })] }))
+    expect(store.useComments.getState()).toMatchObject({ readOnly: true })
+    expect(store.useComments.getState().list.map((c) => c.id)).toEqual(['cm_bbbbbbbb'])
+    expect(saver.isPending(ROOT, COMMENTS_FILE)).toBe(false)
+    await saver.flush()
+    expect(calls.filter((c) => c.rel === COMMENTS_FILE)).toEqual([])
+  })
+
   it('a change for another book is ignored', () => {
     store.loadComments(ROOT, [comment()])
     store.commentsChangedOutside('/books/other', text([]))

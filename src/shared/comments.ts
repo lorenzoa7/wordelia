@@ -106,6 +106,22 @@ export function uniqueById(list: EditorComment[]): EditorComment[] {
   })
 }
 
+/**
+ * Two lists of the same comments, for example the list of the app and a file from another computer. Each
+ * comment of the two lists stays; when both lists have a comment, the version with the later `updatedAt`
+ * wins (the version of `ours` when the times are the same). The order is the order of `ours`, then the new
+ * comments of `theirs`.
+ */
+export function mergeComments(ours: EditorComment[], theirs: EditorComment[]): EditorComment[] {
+  const other = new Map(uniqueById(theirs).map((c) => [c.id, c]))
+  const merged = uniqueById(ours).map((c) => {
+    const o = other.get(c.id)
+    other.delete(c.id)
+    return o && o.updatedAt > c.updatedAt ? o : c
+  })
+  return [...merged, ...other.values()]
+}
+
 /** What the text of `ai/comments.json` holds. */
 export interface CommentsFile {
   comments: EditorComment[]

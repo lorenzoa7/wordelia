@@ -4,6 +4,7 @@ import {
   READ_LIMIT_ALL,
   READ_LIMIT_ONE,
   isLens,
+  mergeComments,
   openCount,
   parseCommentsFile,
   readCommentsFile,
@@ -177,5 +178,19 @@ describe('openCount', () => {
 
   it('counts nothing for an empty list', () => {
     expect(openCount([])).toBe(0)
+  })
+})
+
+describe('mergeComments', () => {
+  const later = '2026-10-22T09:00:00.000Z'
+
+  it('keeps the comments of both lists, and the later version of a comment', () => {
+    const ours = [comment({ state: 'done', updatedAt: later }), comment({ id: 'cm_bbbbbbbb' })]
+    const theirs = [comment({ state: 'ignored' }), comment({ id: 'cm_bbbbbbbb', state: 'intentional', updatedAt: later }), comment({ id: 'cm_cccccccc' })]
+    expect(mergeComments(ours, theirs).map((c) => `${c.id}|${c.state}`)).toEqual(['cm_aaaaaaaa|done', 'cm_bbbbbbbb|intentional', 'cm_cccccccc|open'])
+  })
+
+  it('keeps our version when the two have the same time', () => {
+    expect(mergeComments([comment({ state: 'done' })], [comment({ state: 'ignored' })]).map((c) => c.state)).toEqual(['done'])
   })
 })

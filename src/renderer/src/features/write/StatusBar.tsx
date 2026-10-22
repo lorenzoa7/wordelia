@@ -8,6 +8,7 @@ import { saver, type SaveState } from '@/stores/saver'
 import { useStats } from '@/features/editor/stats'
 import { getT, useT } from '@/lib/i18n'
 import { Tooltip } from '@/ui'
+import { CommentsStatus } from '@/features/read/CommentsStatus'
 
 export function StatusBar(): React.JSX.Element {
   const t = useT()
@@ -72,6 +73,7 @@ export function StatusBar(): React.JSX.Element {
         {counted && chapterWords > 0 && <span className="status-part status-read">{s.minRead(minutes)}</span>}
       </span>
       <span className="status-right">
+        <CommentsStatus />
         {goal > 0 && (
           <Tooltip label={s.dailyGoal(goal)} side="top">
             <span className={`today${progress >= 1 ? ' is-done' : ''}`}>

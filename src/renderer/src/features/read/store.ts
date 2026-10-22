@@ -120,9 +120,9 @@ function inState(c: EditorComment, state: CommentState, reason: string | undefin
 
 /**
  * Put comments in a state. A toast says it and has Undo: the old states come back, except for a comment
- * that the writer changed again in the meantime.
+ * that the writer changed again in the meantime. `onUndo` runs after an Undo (the margin takes its room again).
  */
-export function setCommentState(ids: string[], state: CommentState, reason?: string): void {
+export function setCommentState(ids: string[], state: CommentState, reason?: string, opts: { onUndo?: () => void } = {}): void {
   const { list, root } = useComments.getState()
   const wanted = new Set(ids)
   const why = state === 'intentional' ? reason?.trim() || undefined : undefined
@@ -150,6 +150,7 @@ export function setCommentState(ids: string[], state: CommentState, reason?: str
             return before && c.state === state && c.reason === why ? inState(c, before.state, before.reason, now()) : c
           })
         )
+        opts.onUndo?.()
       }
     }
   })

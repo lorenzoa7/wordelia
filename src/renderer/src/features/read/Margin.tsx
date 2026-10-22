@@ -17,10 +17,10 @@ import { getChapterEditor } from '@/features/editor/registry'
 import { useT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
 import { Menu, MenuItem, Tooltip } from '@/ui'
-import { CARD_INSET, CARD_W, layoutCards, type CardBox } from './layout'
+import { CARD_INSET, layoutCards, type CardBox } from './layout'
 import { commentRanges, inChapterOrder, rangesKnown, useMarksDrawn } from './marks'
-import { setCommentState, useComments } from './store'
-import { giveRoomBackWhenDone, hideComments, selectComment, setCommentLens, useReadUi } from './ui'
+import { useComments } from './store'
+import { decideComments, hideComments, selectComment, setCommentLens, useReadUi } from './ui'
 import './read.css'
 
 /** The space between two cards, and between the header and the first card */
@@ -108,7 +108,8 @@ export function Margin({ column, typing, sizerRef }: MarginProps): React.JSX.Ele
   columnRef.current = column
   /** The cards changed while the author typed: they move at the pause. */
   const pending = useRef(false)
-  const showColumn = column && !hidden && all.length > 0
+  // The header shows while the desk keeps room for the column, also for a chapter without comments ("· 0").
+  const showColumn = column && !hidden
 
   /** The thin line from the number of the selected comment in the margin of the page to its card. */
   const drawLink = (sizer: HTMLElement, origin: DOMRect): void => {
@@ -249,7 +250,7 @@ export function Margin({ column, typing, sizerRef }: MarginProps): React.JSX.Ele
   return (
     <div className="cm-margin">
       {showColumn && (
-        <div ref={colRef} className="cm-column" style={{ width: CARD_W }}>
+        <div ref={colRef} className="cm-column">
           <MarginHead headRef={headRef} shown={cards.length} lens={lens} counts={counts} />
           {cards.map((card) => (
             <CommentCard
@@ -336,24 +337,24 @@ function CommentCard({ card, chapterNumber, readOnly, selected, onSelect, cardRe
   const sources = continuity ? c.sources.map((s) => ({ ...sourceOf(s.file, chapters, entries, t), quote: s.quote })) : []
   const subject = sources.find((s) => s.note)?.note
 
-  // The state buttons: "Done", "Ignore". The other actions open the chat or the editor (the actions of a comment).
+  // The decisions go through decideComments. The other actions open the chat or the editor (the actions of a comment).
   const decide = (state: CommentState): void => {
-    if (readOnly) return
-    setCommentState([c.id], state)
-    giveRoomBackWhenDone()
+    if (!readOnly) decideComments([c.id], state)
   }
-  const done = <Act key="done" className="cm-act-done" icon={<Check size={13} weight="bold" />} label={m.done} off={readOnly} offTip={m.readOnly} onClick={() => decide('done')} />
-  const ignore = <Act key="ignore" className="cm-act-ignore" icon={<X size={13} />} label={m.ignore} off={readOnly} offTip={m.readOnly} onClick={() => decide('ignored')} />
-  // Two rows: the work on the comment with the chat or the editor, then the decisions ("Done" on the right).
+  // One row: the work on the comment with the chat or the editor, a smaller decision, and "Done" on the right.
   const work = lost
     ? []
     : continuity
-      ? [<Act key="note" icon={<NotePencil size={13} />} label={m.updateNote} />]
-      : [<Act key="discuss" icon={<ChatCircleText size={13} />} label={m.discuss} />, <Act key="polish" icon={<Sparkle size={13} />} label={m.polish} />]
-  const decisions =
-    continuity && !lost
-      ? [<Act key="intentional" className="cm-act-intentional" icon={<Check size={13} />} label={m.intentional} off={readOnly} offTip={m.readOnly} />, done]
-      : [ignore, done]
+      ? [<Act key="note" kind="work" icon={<NotePencil size={13} />} label={m.updateNote} />]
+      : [<Act key="discuss" kind="work" icon={<ChatCircleText size={13} />} label={m.discuss} />, <Act key="polish" kind="work" icon={<Sparkle size={13} />} label={m.polish} />]
+  const minor =
+    continuity && !lost ? (
+      <Act key="intentional" kind="minor" className="cm-act-intentional" icon={<Check size={13} />} label={m.intentional} off={readOnly} offTip={m.readOnly} />
+    ) : (
+      <Act key="ignore" kind="minor" className="cm-act-ignore" icon={<X size={13} />} label={m.ignore} off={readOnly} offTip={m.readOnly} onClick={() => decide('ignored')} />
+    )
+  const done = <Act key="done" kind="done" className="cm-act-done" icon={<Check size={13} weight="bold" />} label={m.done} off={readOnly} offTip={m.readOnly} onClick={() => decide('done')} />
+  const rowRef = useFitRow()
 
   return (
     <article
@@ -396,30 +397,85 @@ function CommentCard({ card, chapterNumber, readOnly, selected, onSelect, cardRe
           ))}
         </div>
       )}
-      <div className="cm-actions">
-        {work.length > 0 && <div className="cm-actions-work">{work}</div>}
-        <div className="cm-actions-decide">{decisions}</div>
+      <div ref={rowRef} className="cm-actions">
+        {work}
+        {minor}
+        {done}
       </div>
     </article>
   )
 }
 
-/** A button of a card. `off`: it does nothing, and its tooltip says why. */
-function Act({ icon, label, className, onClick, off, offTip }: { icon: React.ReactNode; label: string; className?: string; onClick?: () => void; off?: boolean; offTip?: string }): React.JSX.Element {
+/**
+ * The buttons of a card are on one line. When they do not fit (a narrow card, a long language), the smaller
+ * decision shows only its icon (`data-compact="1"`), then the work buttons too (`"2"`). "Done" keeps its
+ * label. The name of each button stays in its tooltip and its aria-label.
+ */
+function useFitRow(): React.RefObject<HTMLDivElement | null> {
+  const ref = useRef<HTMLDivElement>(null)
+  const fit = (): void => {
+    const row = ref.current
+    if (!row) return
+    delete row.dataset.compact
+    const gap = parseFloat(getComputedStyle(row).columnGap) || 0
+    const kids = [...row.children] as HTMLElement[]
+    const needed = (): number => kids.reduce((n, k) => n + k.getBoundingClientRect().width, 0) + gap * Math.max(0, kids.length - 1)
+    for (const level of ['1', '2']) {
+      if (needed() <= row.clientWidth + 0.5) return
+      row.dataset.compact = level
+    }
+  }
+  // After each render (new labels, a new language), and when the card gets a new width.
+  useLayoutEffect(fit)
+  useEffect(() => {
+    const row = ref.current
+    if (!row) return
+    const ro = new ResizeObserver(() => fit())
+    ro.observe(row)
+    return () => ro.disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  return ref
+}
+
+/**
+ * A button of a card. `kind`: a work with the chat or the editor (a light button), a smaller decision, or
+ * "Done". `off`: it does nothing, and its tooltip says why.
+ */
+function Act({
+  kind,
+  icon,
+  label,
+  className,
+  onClick,
+  off,
+  offTip
+}: {
+  kind: 'work' | 'minor' | 'done'
+  icon: React.ReactNode
+  label: string
+  className?: string
+  onClick?: () => void
+  off?: boolean
+  offTip?: string
+}): React.JSX.Element {
   const button = (
     <button
       type="button"
-      className={clsx('cm-act', className)}
+      className={clsx('cm-act', `cm-act-${kind}`, className)}
+      aria-label={label}
       aria-disabled={off || undefined}
       onClick={() => {
         if (!off) onClick?.()
       }}
     >
       {icon}
-      <span>{label}</span>
+      <span className="cm-act-label">{label}</span>
     </button>
   )
-  return off && offTip ? <Tooltip label={offTip}>{button}</Tooltip> : button
+  // The tooltip names a button that shows only its icon, or says why a button is off.
+  const tip = off && offTip ? offTip : kind === 'done' ? null : label
+  return tip ? <Tooltip label={tip}>{button}</Tooltip> : button
 }
 
 /** The card of a number in a narrow window, beside the number. */
@@ -446,6 +502,12 @@ function NumberPopover({ id, onClose, children }: { id: string | null; onClose: 
           align="start"
           sideOffset={10}
           collisionPadding={12}
+          tabIndex={-1}
+          // The focus goes to the card, not to its first button: a button with the focus shows its tooltip.
+          onOpenAutoFocus={(e) => {
+            e.preventDefault()
+            ;(e.currentTarget as HTMLElement).focus()
+          }}
           onEscapeKeyDown={() => (escaped.current = true)}
           // Esc gives the focus back to the text; a click somewhere else keeps it there.
           onCloseAutoFocus={(e) => {

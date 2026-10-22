@@ -141,6 +141,11 @@ export default async function ({ app, page, shot, openBook }) {
   console.log('margin:', JSON.stringify(room))
   if (room.cards.map((c) => c.id).join() !== first.map((c) => c.id).join()) fail('the cards do not follow the order of the passages')
   for (let i = 1; i < room.cards.length; i++) if (room.cards[i].top < room.cards[i - 1].bottom) fail('two cards overlap')
+  // The desk of 1440 px has room for the widest column: wide cards, with their buttons on one line.
+  const rows = await page.evaluate(() => [...document.querySelectorAll('.cm-column .cm-card')].map((c) => ({ width: c.getBoundingClientRect().width, row: c.querySelector('.cm-actions').getBoundingClientRect().height })))
+  console.log('cards:', JSON.stringify(rows))
+  if (rows.some((r) => r.width < 360)) fail('the cards are narrow on a wide desk')
+  if (rows.some((r) => r.row > 30)) fail('the buttons of a card are not on one line')
   const header = await page.locator('.cm-head').innerText()
   console.log('margin header:', JSON.stringify(header))
   if (!/(Editor's comments|Comentários do editor|Comentarios del editor) · 3/i.test(header)) fail(`the margin header says "${header}"`)
@@ -191,6 +196,12 @@ export default async function ({ app, page, shot, openBook }) {
   await shot('margin')
   await page.evaluate((list) => window.__wordelia.comments.setState({ list }), listBefore)
   await until('the comment on the same line did not go', async () => (await page.locator('.cm-card').count()) === 3, 3000)
+  await page.evaluate(() => window.__wordelia.book.getState().selectChapter('ch_sample02'))
+  await until('the chapter without comments has no header in the margin', async () => /· 0/.test((await page.locator('.cm-head').allInnerTexts()).join('')), 5000)
+  if (await page.locator('.cm-card').count()) fail('a chapter without comments shows cards')
+  await shot('margin-empty-chapter')
+  await page.evaluate(() => window.__wordelia.book.getState().selectChapter('ch_sample01'))
+  await until('the cards of the first chapter did not come back', async () => (await page.locator('.cm-column .cm-card').count()) === 3, 5000)
   // "Hide" takes the cards and the marks away, and puts the page and the chapter list back.
   await page.locator('.cm-head .cm-hide').click()
   await until('"Hide" did not take the cards and the marks away', async () => !(await page.locator('.cm-card, .cm-mark, .cm-num').count()), 3000)
@@ -202,6 +213,19 @@ export default async function ({ app, page, shot, openBook }) {
     return Math.abs(d.pageLeft - d.left - (d.right - d.pageRight)) <= 2
   })
   await shot('margin-hidden')
+  const status = page.locator('.status-bar .status-comments')
+  // Its name: in a tight status bar, the words can hide and the icon stays.
+  const said = (await status.getAttribute('aria-label')) ?? ''
+  console.log('status bar:', JSON.stringify(said))
+  if (!/3 (editor's comments|comentários do editor|comentarios del editor)/.test(said)) fail(`the status bar says "${said}"`)
+  await status.click()
+  await until('the status bar did not show the comments again', async () => {
+    const d = await desk()
+    return d.sidebar === false && d.cards.length === 3 && d.cards.every((c) => c.visible && c.left >= d.pageRight)
+  })
+  await until('the marks did not come back', async () => (await numbers()).length === 3, 3000)
+  await status.click()
+  await until('a click on the status bar did not go to the first comment', async () => (await page.locator(`.cm-card.is-selected[data-comment="${first[0].id}"]`).count()) === 1, 3000)
   const head = await page.locator('.msg-ai .read-head').innerText()
   console.log('header:', JSON.stringify(head))
   if (!/3/.test(head) || !/Cap\. 1|Ch\. 1/.test(head)) fail(`the header card says "${head}"`)
@@ -318,7 +342,18 @@ export default async function ({ app, page, shot, openBook }) {
   // On screen, the card of that comment says that the passage changed, and has only "Done" and "Ignore".
   const lostCard = page.locator(`.cm-column .cm-card[data-comment="${style.id}"]`)
   await until('the card of a comment without its passage does not say that the passage changed', async () => (await lostCard.locator('.cm-lost').count()) === 1, 3000)
-  const lostButtons = await lostCard.locator('button').allInnerTexts()
+  // The cards stay where they are while the author types; a move of the mouse ends the typing.
+  await page.mouse.move(700, 500)
+  await page.mouse.move(720, 520)
+  await until('the lost card is not after the cards with a number', () =>
+    page.evaluate((id) => {
+      const lost = document.querySelector(`.cm-column .cm-card[data-comment="${id}"]`).getBoundingClientRect()
+      const numbered = [...document.querySelectorAll('.cm-column .cm-card')].filter((c) => c.querySelector('.cm-badge'))
+      return numbered.length > 0 && numbered.every((c) => c.getBoundingClientRect().bottom <= lost.top)
+    }, style.id)
+  )
+  // The names of the buttons: a button can show only its icon in a narrow card.
+  const lostButtons = await lostCard.locator('button').evaluateAll((bs) => bs.map((b) => b.getAttribute('aria-label') ?? ''))
   console.log('buttons of a lost card:', JSON.stringify(lostButtons))
   if (lostButtons.map((b) => b.trim()).join() !== 'Ignore,Done' && lostButtons.map((b) => b.trim()).join() !== 'Ignorar,Feito' && lostButtons.map((b) => b.trim()).join() !== 'Ignorar,Hecho') fail('a lost card has other buttons than "Ignore" and "Done"')
   await shot('margin-lost')

@@ -288,6 +288,15 @@ describe('setCommentState', () => {
     expect(onDisk()).toEqual(back)
   })
 
+  it('with Undo runs `onUndo` after the old states are back', () => {
+    store.loadComments(ROOT, three())
+    const seen: string[][] = []
+    store.setCommentState(['cm_aaaaaaaa'], 'done', undefined, { onUndo: () => seen.push(states().map(([s]) => s)) })
+    expect(seen).toEqual([])
+    useUi.getState().toasts[0].action?.run()
+    expect(seen).toEqual([['open', 'ignored', 'intentional']])
+  })
+
   it('Undo leaves a comment alone when the writer changed it again', () => {
     store.loadComments(ROOT, three())
     store.setCommentState(['cm_aaaaaaaa', 'cm_bbbbbbbb'], 'done')

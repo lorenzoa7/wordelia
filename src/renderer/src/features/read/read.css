@@ -302,6 +302,7 @@
 .cm-column {
   position: absolute;
   top: 0;
+  width: calc(var(--cm-column, 300px) - 14px);
 }
 .cm-column .cm-head,
 .cm-column .cm-card {
@@ -318,8 +319,10 @@
 
 .cm-head {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px var(--s-2);
 }
 .cm-head-title {
   display: flex;
@@ -335,8 +338,8 @@
 .cm-head-tools {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--s-2);
+  gap: var(--s-1);
+  margin-left: auto;
 }
 .cm-filter,
 .cm-hide {
@@ -477,9 +480,10 @@
   background: var(--lens-wash);
 }
 .cm-quote {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  align-items: baseline;
+  gap: var(--s-2);
   padding: 6px 10px;
 }
 .cm-quote + .cm-quote {
@@ -514,35 +518,32 @@
   text-underline-offset: 0.24em;
 }
 
-/* The buttons of a card: the work with the chat or the editor (light buttons), then the decisions with
-   "Done" on the right */
+/* The buttons of a card, on one line: the work with the chat or the editor (light buttons), a smaller
+   decision, and "Done" on the right. When they do not fit (Margin.tsx sets `data-compact`), the smaller
+   decision shows only its icon, then the work buttons too. */
 .cm-actions {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.cm-actions-work,
-.cm-actions-decide {
-  display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 6px;
+  gap: var(--s-1);
 }
-.cm-actions-work {
-  gap: 2px;
-  margin-left: -6px;
+.cm-actions[data-compact] .cm-act-minor .cm-act-label,
+.cm-actions[data-compact='2'] .cm-act-work .cm-act-label {
+  display: none;
 }
-.cm-actions-work .cm-act {
-  padding: 0 6px;
-  border-color: transparent;
-  background: transparent;
+.cm-actions[data-compact] .cm-act-minor,
+.cm-actions[data-compact='2'] .cm-act-work {
+  justify-content: center;
+  width: 26px;
+  padding: 0;
 }
 .cm-act {
   display: inline-flex;
+  flex: none;
   align-items: center;
   gap: 5px;
   height: 26px;
-  padding: 0 8px;
+  padding: 0 7px;
   border: 1px solid var(--rule);
   border-radius: var(--radius-sm);
   background: var(--paper);
@@ -567,6 +568,15 @@
 .cm-act[aria-disabled] {
   opacity: 0.45;
   cursor: not-allowed;
+}
+/* The work buttons are light: no border and no background until the pointer is on them */
+.cm-act.cm-act-work {
+  padding: 0 6px;
+  border-color: transparent;
+  background: transparent;
+}
+.cm-act-work:first-child {
+  margin-left: -6px;
 }
 .cm-act-done {
   margin-left: auto;
@@ -596,10 +606,22 @@
 /* ---------- The card of a number in a narrow window (Margin.tsx) ---------- */
 .cm-pop {
   z-index: 60;
-  width: 290px;
+  /* As wide as a card in the widest column */
+  width: 386px;
   max-width: calc(100vw - var(--s-6));
+  outline: none;
   animation: pop-in var(--dur-med) var(--ease-out);
 }
 .cm-pop .cm-card {
   box-shadow: var(--shadow-pop);
+}
+
+/* ---------- The comments in the status bar (CommentsStatus.tsx) ---------- */
+.status-comments svg {
+  color: var(--ribbon);
+}
+/* In a tight status bar (StatusBar.tsx, book.css) the words go with the words of the daily count: after the
+   reading time and the words of "History". The icon stays, with the name in its tooltip. */
+.status-bar:is([data-tight='3'], [data-tight='4']) .status-comments-text {
+  display: none;
 }

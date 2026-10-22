@@ -66,5 +66,10 @@ export const read: typeof en = {
     note: 'Nota',
     quote: (text) => `«${text}»`,
     card: (n, lens) => (n === null ? `Comentario · ${lens}` : `Comentario ${n} · ${lens}`)
+  },
+  status: {
+    count: (n) => (n === 1 ? '1 comentario del editor' : `${n} comentarios del editor`),
+    show: 'Mostrar los comentarios en el margen',
+    goTo: 'Ir a los comentarios'
   }
 }

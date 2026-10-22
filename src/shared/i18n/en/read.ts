@@ -89,5 +89,13 @@ export const read = {
     quote: (text: string): string => `“${text}”`,
     /** The name of a card for screen readers */
     card: (n: number | null, lens: string): string => (n === null ? `Comment · ${lens}` : `Comment ${n} · ${lens}`)
+  },
+  /** The item of the status bar: the open comments of the book */
+  status: {
+    count: (n: number): string => (n === 1 ? "1 editor's comment" : `${n} editor's comments`),
+    /** The tooltip when the comments do not show in the margin now */
+    show: 'Show the comments in the margin',
+    /** The tooltip when they show */
+    goTo: 'Go to the comments'
   }
 }

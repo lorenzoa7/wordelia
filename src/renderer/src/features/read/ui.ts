@@ -5,13 +5,13 @@
 // page or the chapter list.
 
 import { create } from 'zustand'
-import type { LensChoice } from '@shared/comments'
+import type { CommentState, LensChoice } from '@shared/comments'
 import type { AppSettings } from '@shared/types'
 import { panelLayout } from '@/features/book/panels'
 import { useApp } from '@/stores/app'
 import { columnFits } from './layout'
 import { useCommentMarks } from './marks'
-import { useComments } from './store'
+import { setCommentState, useComments } from './store'
 
 interface ReadUiState {
   /** The book of these choices */
@@ -26,9 +26,11 @@ interface ReadUiState {
   lens: LensChoice
   /** The selected card: a line joins it to its passage */
   selected: string | null
+  /** The column of the cards shows on the desk now (the desk keeps room for it, and the room is there: zoom.ts) */
+  column: boolean
 }
 
-export const useReadUi = create<ReadUiState>(() => ({ root: null, hidden: false, room: false, roomTaken: null, lens: 'all', selected: null }))
+export const useReadUi = create<ReadUiState>(() => ({ root: null, hidden: false, room: false, roomTaken: null, lens: 'all', selected: null, column: false }))
 
 /* ------------------------------------------------------------------ */
 /* "Hide", for each book                                                */
@@ -132,15 +134,33 @@ export function hideComments(): void {
   giveRoomBack()
 }
 
-/** The author closed the last open comment of the book: the room goes back, as with "Hide", but the margin stays on. */
-export function giveRoomBackWhenDone(): void {
-  if (useReadUi.getState().room && !useComments.getState().list.some((c) => c.state === 'open')) giveRoomBack()
+/**
+ * The author decides about comments ("Done", "Ignore", "It's intentional", "Mark as done"). Every decision
+ * of the author goes through here. When it closes the last open comment of the book, the room goes back, as
+ * with "Hide", but the margin stays on; the Undo of the toast takes the room again.
+ */
+export function decideComments(ids: string[], state: CommentState, reason?: string): void {
+  let gaveBack = false
+  setCommentState(ids, state, reason, {
+    onUndo: () => {
+      if (gaveBack && useComments.getState().list.some((c) => c.state === 'open')) makeRoomForComments()
+    }
+  })
+  if (useReadUi.getState().room && !useComments.getState().list.some((c) => c.state === 'open')) {
+    giveRoomBack()
+    gaveBack = true
+  }
 }
 
 /** Show the comments of one lens in the margin and in the text, or of all lenses. */
 export function setCommentLens(lens: LensChoice): void {
   useReadUi.setState({ lens })
   useCommentMarks.setState({ lens })
+}
+
+/** The desk shows the column of the cards, or not (PageEditor, from the zoom of the desk). */
+export function setColumnShown(column: boolean): void {
+  if (useReadUi.getState().column !== column) useReadUi.setState({ column })
 }
 
 /** Select a card: a line joins it to its passage. */

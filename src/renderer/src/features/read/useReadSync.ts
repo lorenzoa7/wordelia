@@ -11,7 +11,8 @@ import { useChat } from '@/features/chat/chatStore'
 import { getT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
 import { toast } from '@/stores/ui'
-import { addFromReply, setCommentState, useComments } from './store'
+import { addFromReply, useComments } from './store'
+import { decideComments } from './ui'
 
 /** The least time between two parses of a reply that streams, for each thread. */
 export const STREAM_PARSE_MS = 300
@@ -99,7 +100,7 @@ function askAboutFixed(message: ChatMessage, req: ReadRequest): void {
     .map((c) => c.id)
   if (!open.length) return
   const t = getT()
-  toast(t.read.resolved(open.length), { ms: 14000, action: { label: t.read.markDone(open.length), run: () => setCommentState(open, 'done') } })
+  toast(t.read.resolved(open.length), { ms: 14000, action: { label: t.read.markDone(open.length), run: () => decideComments(open, 'done') } })
 }
 
 /** The saved replies of the read threads of the open book. A reply that has not changed since the last time is skipped. */

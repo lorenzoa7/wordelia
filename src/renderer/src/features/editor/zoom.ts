@@ -10,11 +10,11 @@
 // multiplies this fit.
 //
 // The column of the comments of an editor's read (features/read) takes room on the desk to the right
-// of the page: then the page and the column together are in the middle of the desk, and the page fits
-// in the room that the column leaves.
+// of the page (from 300 to 400 px, `--cm-column` on the sizer): then the page and the column together
+// are in the middle of the desk, and the page fits in the room that the column leaves.
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { MARGIN_W, columnFits, pagesOffset } from '@/features/read/layout'
+import { MARGIN_W, columnFits, marginWidth, pagesOffset } from '@/features/read/layout'
 import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
 
@@ -106,11 +106,14 @@ export function useDeskZoom(
     effective.current = e
     const w = inner.offsetWidth * e
     const h = inner.offsetHeight * e
-    offset.current = pagesOffset(room, w, withColumn)
-    sizer.style.width = `${Math.max(room, offset.current + w + (withColumn ? MARGIN_W : 0))}px`
+    // The column takes the room beside the pages, from its narrowest to its widest width.
+    const column = withColumn ? marginWidth(room, w) : 0
+    offset.current = pagesOffset(room, w, column)
+    sizer.style.width = `${Math.max(room, offset.current + w + column)}px`
     sizer.style.height = `${h}px`
     inner.style.transform = `translate(${offset.current}px, 0) scale(${e})`
     sizer.style.setProperty('--desk-scale', String(e))
+    sizer.style.setProperty('--cm-column', `${column}px`)
     setColumn(withColumn)
   }
 

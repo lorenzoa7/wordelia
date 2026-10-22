@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MARGIN_W, columnFits, layoutCards, pagesOffset } from './layout'
+import { MARGIN_MAX, MARGIN_W, columnFits, layoutCards, marginWidth, pagesOffset } from './layout'
 
 describe('the cards in the margin', () => {
   it('keeps the order of the list', () => {
@@ -60,15 +60,26 @@ describe('room for the column on the desk', () => {
   })
 
   it('puts the page in the middle of the desk without the column', () => {
-    expect(pagesOffset(1000, 600, false)).toBe(200)
+    expect(pagesOffset(1000, 600, 0)).toBe(200)
     // Pages wider than the desk start at its left edge.
-    expect(pagesOffset(500, 600, false)).toBe(0)
+    expect(pagesOffset(500, 600, 0)).toBe(0)
   })
 
   it('puts the page and the column together in the middle of the desk', () => {
-    // The page (600 with its side room) and the column (300) in 1100: 100 px on each side.
-    expect(pagesOffset(1100, 600, true)).toBe(100)
+    // The page (600 with its side room) and a column of 300 in 1100: 100 px on each side.
+    expect(pagesOffset(1100, 600, 300)).toBe(100)
     // No room on the sides: the page goes to the left edge of the desk.
-    expect(pagesOffset(850, 600, true)).toBe(0)
+    expect(pagesOffset(850, 600, 300)).toBe(0)
+    // No column: the page alone in the middle.
+    expect(pagesOffset(1000, 600, 0)).toBe(200)
+  })
+
+  it('gives the column the room beside the page, from MARGIN_W to MARGIN_MAX', () => {
+    // The pages with their side room: 623 px. 1440 px with the chat, the chapter list closed: 1030 px.
+    expect(marginWidth(1030, 623)).toBe(MARGIN_MAX)
+    // Less room than the narrowest column: the narrowest column (the page fits in the rest).
+    expect(marginWidth(900, 623)).toBe(MARGIN_W)
+    expect(marginWidth(990, 623)).toBe(367)
+    expect(marginWidth(2000, 623)).toBe(MARGIN_MAX)
   })
 })

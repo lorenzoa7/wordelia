@@ -1,12 +1,12 @@
 // The column of the comment cards beside the page: its width, the places of the cards, and the room on the
 // desk. Pure code: the margin (Margin.tsx) and the zoom of the desk (editor/zoom.ts) use it.
 
-/** The width of the column of the cards on the desk, in pixels on screen: the cards (272) and the room around them. */
+/** The narrowest column of the cards on the desk, in pixels on screen. With less room, no column: a popover. */
 export const MARGIN_W = 300
-/** The width of a card */
-export const CARD_W = 272
-/** The room between the page and the cards */
-export const CARD_INSET = (MARGIN_W - CARD_W) / 2
+/** The widest column of the cards, when the desk has the room */
+export const MARGIN_MAX = 400
+/** The room between the page and the cards. The card has the rest of the column. */
+export const CARD_INSET = 14
 
 export interface CardBox {
   id: string
@@ -28,18 +28,26 @@ export function layoutCards(items: CardBox[], gap: number): { id: string; top: n
   })
 }
 
-/** The desk has room for a page at 100 % (`pageWidth`) and the column of the cards to its right. */
+/** The desk has room for a page at 100 % (`pageWidth`) and the narrowest column of the cards to its right. */
 export function columnFits(deskWidth: number, pageWidth: number): boolean {
   return deskWidth - pageWidth >= MARGIN_W
 }
 
 /**
- * The left offset of the scaled pages on the desk. `width` is the width of the pages with their room on the
- * sides, at the scale on screen. Without the column, the pages are in the middle of the desk. With the
- * column, the pages and the column together are in the middle, or the pages start at the left edge when there
- * is no more room.
+ * The width of the column: the room on the desk beside the pages (`width`: the pages with their room on the
+ * sides, at the scale on screen), from MARGIN_W to MARGIN_MAX.
  */
-export function pagesOffset(room: number, width: number, column: boolean): number {
-  if (column) return Math.max(0, (room - width - MARGIN_W) / 2)
+export function marginWidth(room: number, width: number): number {
+  return Math.min(MARGIN_MAX, Math.max(MARGIN_W, room - width))
+}
+
+/**
+ * The left offset of the scaled pages on the desk. `width` is the width of the pages with their room on the
+ * sides, at the scale on screen; `column` the width of the column of the cards (0 for none). Without the
+ * column, the pages are in the middle of the desk. With the column, the pages and the column together are in
+ * the middle, or the pages start at the left edge when there is no more room.
+ */
+export function pagesOffset(room: number, width: number, column: number): number {
+  if (column > 0) return Math.max(0, (room - width - column) / 2)
   return width < room ? (room - width) / 2 : 0
 }

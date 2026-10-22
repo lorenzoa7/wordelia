@@ -31,7 +31,7 @@ import { cleanPastedHtml, cleanPastedSlice, pasteStyleFor } from './paste'
 import { forgetEditorStates, isReload, keepEditorState, loadDoc, takeEditorState } from './keep'
 import { restorePlace, savePlace } from './deskPlace'
 import { Margin } from '@/features/read/Margin'
-import { useReadUi } from '@/features/read/ui'
+import { setColumnShown, useReadUi } from '@/features/read/ui'
 import './editor.css'
 
 const MM = 96 / 25.4
@@ -259,6 +259,7 @@ export function PageEditor(): React.JSX.Element | null {
   // The desk keeps room for the column of the comments of an editor's read (features/read).
   const commentRoom = useReadUi((s) => s.room)
   const { badge: zoomBadge, column } = useDeskZoom(deskRef, sizerRef, innerRef, commentRoom)
+  useEffect(() => setColumnShown(column), [column])
   // The first page number of each chapter: the pages of the chapters before it, plus one.
   const { pages } = usePagesOf()
   const starts = useMemo(() => {

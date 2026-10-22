@@ -25,6 +25,7 @@ import { useBook } from '@/stores/book'
 import { showText, toast, useUi } from '@/stores/ui'
 import { getT } from '@/lib/i18n'
 import { typesetForBook } from '@/lib/typeset'
+import { isTextField, stoppedByGuard, undoKey } from '@/lib/undoKeys'
 import { useChat } from '@/features/chat/chatStore'
 import { applyEditHunk, applyPortrait, markAfter, resolveTarget, restoreSnapshot, setHunkStates, snapshotOf } from '@/features/chat/applyProposal'
 import { authorIsBusy } from '@/features/chat/typing'
@@ -362,13 +363,11 @@ function checkUndo(docId: string, doc: EditorState['doc']): void {
 export function useProposalUndoKeys(): void {
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (e.defaultPrevented || !(e.ctrlKey || e.metaKey) || e.altKey) return
-      const key = e.key.toLowerCase()
-      const isUndo = key === 'z' && !e.shiftKey
-      const isRedo = key === 'y' || (key === 'z' && e.shiftKey)
-      if (!isUndo && !isRedo) return
-      const target = e.target as HTMLElement | null
-      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return
+      // The guard of the book view stopped the Undo of the browser (lib/undoKeys.ts): then no handler took the key.
+      if (e.defaultPrevented && !stoppedByGuard(e)) return
+      const kind = undoKey(e)
+      if (!kind || isTextField(e.target)) return
+      const isUndo = kind === 'undo'
       const p = isUndo ? accepted[accepted.length - 1] : undone[undone.length - 1]
       const ed = p && p.kind === 'chapter' ? getChapterEditor(p.docId) : null
       if (!ed) return

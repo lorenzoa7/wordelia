@@ -1,7 +1,47 @@
 // Keyboard only: shortcuts open and close panels; Tab reaches the main controls. Closing the find
 // bar leaves the text where it is.
+
+/**
+ * Ctrl+Z with the focus outside a text changes no chapter. The browser has an Undo of its own: it would take the
+ * last typing out of a chapter that does not show (the Write view stays under the Plan view). In the text,
+ * Ctrl+Z stays the Undo of the text.
+ */
+async function undoOutsideText(page) {
+  const fail = (msg) => {
+    throw new Error(`Undo keys: ${msg}`)
+  }
+  const frames = (n = 2) => page.evaluate((k) => new Promise((resolve) => (function step(i) { if (i) requestAnimationFrame(() => step(i - 1)); else resolve() })(k)), n)
+  const chapterText = () => page.evaluate(() => document.querySelector('.page[data-chapter] .manuscript').textContent)
+  const paragraph = page.locator('.manuscript > p').first()
+  const untyped = await chapterText()
+  await paragraph.click()
+  await page.keyboard.press('End')
+  await page.keyboard.type(' O farol apagou.')
+  const typed = await chapterText()
+  if (typed === untyped) fail('the typing did not reach the chapter')
+  // The tab of the Plan view keeps the focus after the click. A link of the overview goes away after the click:
+  // then the focus is on the page.
+  await page.locator('.view-tab').nth(1).click()
+  await page.waitForSelector('.plan-desk')
+  for (const step of ['the tab of the view', 'a link that goes away']) {
+    if (step === 'a link that goes away') {
+      await page.locator('.plan-section-link').first().click()
+      await page.waitForSelector('.plan-back')
+    }
+    await page.keyboard.press('Control+z')
+    await frames()
+    if ((await chapterText()) !== typed) fail(`Ctrl+Z in the Plan view (the focus on ${step}) changed the text of a chapter`)
+  }
+  await page.keyboard.press('Control+1')
+  await page.waitForFunction(() => !document.querySelector('.book-pane-write.is-away'), null, { timeout: 5000 })
+  await paragraph.click()
+  await page.keyboard.press('Control+z')
+  await page.waitForFunction((t) => document.querySelector('.page[data-chapter] .manuscript').textContent === t, untyped, { timeout: 3000 }).catch(() => fail('Ctrl+Z in the text did not undo the typing'))
+}
+
 export default async function ({ app, page, shot, openBook }) {
   await openBook()
+  await undoOutsideText(page)
   await page.keyboard.press('Control+l')
   await page.waitForTimeout(500)
   const chatHidden = (await page.locator('.book-chat').evaluate((el) => el.getBoundingClientRect().width)) < 5

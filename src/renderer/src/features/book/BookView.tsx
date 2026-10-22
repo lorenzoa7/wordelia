@@ -5,6 +5,7 @@ import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
 import { useUi } from '@/stores/ui'
 import { useT } from '@/lib/i18n'
+import { useUndoGuard } from '@/lib/undoKeys'
 import { PageEditor } from '@/features/editor/PageEditor'
 import { ChapterSidebar } from '@/features/write/ChapterSidebar'
 import { StatusBar } from '@/features/write/StatusBar'
@@ -66,6 +67,8 @@ export function BookView(): React.JSX.Element {
   useInlineProposalSync()
   // The comments of the editor's reads, from the replies in the chat
   useReadSync()
+  // Outside a text, Ctrl+Z never runs the Undo of the browser: it would change a text that does not show.
+  useUndoGuard()
 
   return (
     <div className="book">

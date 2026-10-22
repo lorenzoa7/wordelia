@@ -539,11 +539,33 @@ export default async function ({ app, page, shot, openBook, book, work }) {
   await until('the composer did not take the focus after "Discuss in chat"', composerFocused, 5000)
   await page.evaluate(() => window.__wordelia.chat.getState().clearComposer())
   await page.evaluate(() => window.__wordelia.comments.setState({ readOnly: false }))
-  // "Done" on a card closes its comment, and the card leaves the margin.
+  // "Done" on a card closes its comment, and the card leaves the margin. The focus goes to the page then, and
+  // Ctrl+Z (the author wants the comment back) does not change the text: the browser's own Undo would take the
+  // last typing out of the chapter. In the text, Ctrl+Z stays the Undo of the text.
+  // The text of the chapter, without the numbers of the comments in the margin (the number of a closed comment goes).
+  const chapterText = () =>
+    page.evaluate(() => {
+      const text = document.querySelector('.page[data-chapter="ch_sample01"] .manuscript').cloneNode(true)
+      text.querySelectorAll('.cm-nums').forEach((n) => n.remove())
+      return text.textContent
+    })
+  const paragraph = page.locator('.page[data-chapter="ch_sample01"] .manuscript > p').nth(3)
+  const untyped = await chapterText()
+  await paragraph.click()
+  await page.keyboard.press('End')
+  await page.keyboard.type(' O mar calou.')
+  const typed = await chapterText()
+  if (typed === untyped) fail('the typing did not reach the chapter')
   const doneId = await page.locator('.cm-column .cm-card').first().getAttribute('data-comment')
   await page.locator(`.cm-card[data-comment="${doneId}"] .cm-act-done`).click()
   await until('"Done" did not close the comment', async () => (await comments()).find((c) => c.id === doneId).state === 'done', 3000)
   await until('the card of a closed comment stayed', async () => !(await page.locator(`.cm-card[data-comment="${doneId}"]`).count()), 3000)
+  await page.keyboard.press('Control+z')
+  await frames()
+  if ((await chapterText()) !== typed) fail('Ctrl+Z after "Done" on a card changed the text of the chapter')
+  await paragraph.click()
+  await page.keyboard.press('Control+z')
+  await until('Ctrl+Z in the text did not undo the typing', async () => (await chapterText()) === untyped, 3000)
 
   // 7. A narrow window: no column. A click on a number opens its card in a popover beside it.
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1000, 800))

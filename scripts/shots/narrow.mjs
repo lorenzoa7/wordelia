@@ -1,5 +1,11 @@
 // The smallest window (980 × 640) with a long book title: the title bar must not overlap.
 export default async function ({ app, page, shot, openBook }) {
+  // Some layouts settle one frame after a resize (a ResizeObserver): wait for the condition that the
+  // checks below look for, then measure. When it never comes, the checks fail with the details.
+  const settled = (check, arg) => page.waitForFunction(check, arg, { timeout: 3000 }).then(
+    () => {},
+    () => {}
+  )
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(980, 640))
   await page.waitForTimeout(400)
   await shot('library')
@@ -30,7 +36,12 @@ export default async function ({ app, page, shot, openBook }) {
   // The page always fits between the two panels: no sideways scroll, no cut text.
   for (const width of [980, 1100, 1280]) {
     await app.evaluate(({ BrowserWindow }, w) => BrowserWindow.getAllWindows()[0].setSize(w, 640), width)
-    await page.waitForTimeout(500)
+    await page.waitForFunction((w) => Math.abs(innerWidth - w) < 40, width)
+    await settled(() => {
+      const desk = document.querySelector('.desk')
+      const sheet = document.querySelector('.page[data-chapter]').getBoundingClientRect()
+      return desk.scrollWidth - desk.clientWidth <= 1 && sheet.right <= desk.getBoundingClientRect().left + desk.clientWidth
+    })
     const fit = await page.evaluate(() => {
       const desk = document.querySelector('.desk')
       const sheet = document.querySelector('.page[data-chapter]').getBoundingClientRect()
@@ -96,6 +107,12 @@ export default async function ({ app, page, shot, openBook }) {
         await app.evaluate(({ BrowserWindow }, width) => BrowserWindow.getAllWindows()[0].setSize(width, 700), w)
         await page.waitForFunction((width) => Math.abs(innerWidth - width) < 40, w)
         await page.waitForFunction((l) => document.documentElement.lang === l, lang)
+        await settled(() => {
+          const r = (sel) => document.querySelector(sel).getBoundingClientRect()
+          const tools = [...document.querySelectorAll('.titlebar-right > *')].map((el) => el.getBoundingClientRect())
+          const controls = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--window-controls-w'))
+          return r('.view-switch').right <= Math.min(...tools.map((b) => b.left)) && Math.max(...tools.map((b) => b.right)) <= innerWidth - controls
+        })
         const m = await page.evaluate(() => {
           const r = (sel) => document.querySelector(sel).getBoundingClientRect()
           const tools = [...document.querySelectorAll('.titlebar-right > *')].map((el) => el.getBoundingClientRect())

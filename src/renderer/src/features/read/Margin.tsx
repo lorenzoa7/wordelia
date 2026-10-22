@@ -71,8 +71,13 @@ export function Margin({ column, typing, sizerRef }: MarginProps): React.JSX.Ele
     for (const x of all) m.set(x.c.lens, (m.get(x.c.lens) ?? 0) + 1)
     return m
   }, [all])
-  // The card in a popover beside its number (a narrow desk): a click on a number, or goToComment.
+  // The card in a popover beside its number (a narrow desk): a click on a number, or goToComment. It belongs
+  // to its comment, not to the chapter on screen: a scroll that makes another chapter active keeps it.
   const pop = useReadUi((s) => s.popover)
+  // (A book that opens closes it: ui.ts.)
+  const popComment = useComments((s) => (pop ? s.list.find((c) => c.id === pop && c.state === 'open') : undefined))
+  const popCards = useChapterCards(popComment?.chapterId ?? null)
+  const popNumber = useBook((s) => (popComment ? s.chapters.findIndex((c) => c.id === popComment.chapterId) + 1 : 0))
 
   const headRef = useRef<HTMLElement>(null)
   const colRef = useRef<HTMLDivElement>(null)
@@ -207,11 +212,12 @@ export function Margin({ column, typing, sizerRef }: MarginProps): React.JSX.Ele
     }
   }, [sizerRef])
 
-  // The popover belongs to the narrow desk, and to an open comment.
-  const popCard = pop ? all.find((x) => x.c.id === pop) : undefined
+  // The popover belongs to the narrow desk, and to an open comment: it closes when the column comes back, the
+  // comments hide, or the comment closes.
+  const popCard: Card | undefined = popComment ? (popCards.find((x) => x.c.id === popComment.id) ?? { c: popComment, n: null, lost: Boolean(popComment.lost) }) : undefined
   useEffect(() => {
-    if (pop && (column || hidden || !popCard)) showCardPopover(null)
-  }, [pop, column, hidden, popCard])
+    if (pop && (column || hidden || !popComment)) showCardPopover(null)
+  }, [pop, column, hidden, popComment])
 
   if (hidden) return null
 
@@ -251,7 +257,7 @@ export function Margin({ column, typing, sizerRef }: MarginProps): React.JSX.Ele
         </>
       )}
       <NumberPopover id={popCard ? pop : null} onClose={() => showCardPopover(null)}>
-        {popCard && <CommentCard card={popCard} chapterNumber={chapterNumber} readOnly={readOnly} selected={false} />}
+        {popCard && <CommentCard card={popCard} chapterNumber={popNumber} readOnly={readOnly} selected={false} />}
       </NumberPopover>
     </div>
   )

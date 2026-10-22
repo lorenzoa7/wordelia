@@ -12,7 +12,7 @@ import type { Mention, Quote, Thread } from '@shared/types'
 import { allActions, findAction } from '@/features/actions/allActions'
 import { runAction } from '@/features/actions/runAction'
 import { resolveTarget } from '@/features/chat/applyProposal'
-import { addQuote, focusComposer, useChat } from '@/features/chat/chatStore'
+import { composerEditor, focusComposer, useChat } from '@/features/chat/chatStore'
 import { mentionToken } from '@/features/chat/draft'
 import { sendInThread } from '@/features/chat/send'
 import { getChapterEditor, scrollToPos, whenChapterEditor, type ChapterEditor } from '@/features/editor/registry'
@@ -123,10 +123,14 @@ export function discussComment(c: EditorComment): void {
   const quote = passageQuote(c)
   if (!quote) return
   showThread(c)
-  if (!useChat.getState().quotes.some((q) => q.text === quote.text)) addQuote(quote)
-  else focusComposer(200)
+  if (!useChat.getState().quotes.some((q) => q.text === quote.text)) useChat.setState((s) => ({ quotes: [...s.quotes, { ...quote, id: newId('q') }] }))
   const chat = useChat.getState()
   if (!chat.draft.trim()) chat.setDraft(getT().read.aboutComment(marginNumbers(c.chapterId).get(c.id) ?? null, c.text))
+  // The cursor goes to the end of the composer: at once when the composer shows (a focus that comes later
+  // could take the focus from what the author opens next), else when the chat that just opened shows it.
+  const composer = composerEditor()
+  if (composer) composer.commands.focus('end')
+  else focusComposer(200)
 }
 
 /** The comments whose Polish waits in a review, by chapter and comment text (the note of the review). */

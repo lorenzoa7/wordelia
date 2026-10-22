@@ -46,6 +46,11 @@ export default async function ({ app, page, shot, openBook }) {
     }, id)
   const select = (sel) => page.evaluate((s) => window.__wordelia.editor().chain().focus().setTextSelection(s).run(), sel)
   const card = (id) => page.locator(`.cm-column .cm-card[data-comment="${id}"]`)
+  // "Discuss in chat" puts the cursor in the composer a moment later (focusComposer). A test window is hidden,
+  // so that can come late: wait for it, or it takes the focus from what the next step opens.
+  const composerFocused = () => page.evaluate(() => Boolean(document.activeElement?.closest('.composer-input')))
+  // Some frames of the page: a change that would happen shows by then.
+  const frames = (n = 2) => page.evaluate((k) => new Promise((resolve) => (function step(i) { if (i) requestAnimationFrame(() => step(i - 1)); else resolve() })(k)), n)
 
   await openBook()
   // The last chapter of the book is a chapter in progress, by default.
@@ -378,6 +383,7 @@ export default async function ({ app, page, shot, openBook }) {
   if (!composer.quotes.includes(structureCm.passage)) fail('the composer does not quote the passage')
   if (!composer.draft.includes(structureCm.text)) fail('the draft does not name the comment')
   await page.waitForSelector('.composer .quote-chip', { timeout: 3000 })
+  await until('the composer did not take the focus after "Discuss in chat"', composerFocused, 5000)
   await shot('discuss')
   await page.evaluate(() => window.__wordelia.chat.getState().clearComposer())
 
@@ -489,6 +495,7 @@ export default async function ({ app, page, shot, openBook }) {
   if (await page.getByRole('dialog').count()) fail('"It is intentional" asks for a reason in a read-only file')
   await page.locator('.cm-column .cm-card').getByRole('button', { name: /^(Discuss in chat|Discutir no chat|Discutir en el chat)$/ }).first().click()
   await until('"Discuss in chat" does not work in a read-only file', () => page.evaluate(() => window.__wordelia.chat.getState().quotes.length === 1), 3000)
+  await until('the composer did not take the focus after "Discuss in chat"', composerFocused, 5000)
   await page.evaluate(() => window.__wordelia.chat.getState().clearComposer())
   await page.evaluate(() => window.__wordelia.comments.setState({ readOnly: false }))
   // "Done" on a card closes its comment, and the card leaves the margin.
@@ -501,6 +508,17 @@ export default async function ({ app, page, shot, openBook }) {
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1000, 800))
   await page.waitForFunction(() => Math.abs(innerWidth - 1000) < 40)
   await until('the column stayed in a narrow window', async () => !(await page.locator('.cm-column').count()), 5000)
+  // The desk settles after the resize (the zoom, the place of the page): the number stays still for two frames.
+  const settled = () =>
+    page.evaluate(
+      () =>
+        new Promise((resolve) => {
+          const rect = () => JSON.stringify(document.querySelector('.page[data-chapter="ch_sample01"] .cm-num')?.getBoundingClientRect() ?? null)
+          const before = rect()
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve(before !== 'null' && before === rect())))
+        })
+    )
+  await until('the numbers did not settle after the resize', settled, 5000)
   await page.locator('.page[data-chapter="ch_sample01"] .cm-num').first().click()
   await page.waitForSelector('.cm-pop .cm-card', { timeout: 5000 })
   const popped = await page.evaluate(() => {
@@ -509,6 +527,10 @@ export default async function ({ app, page, shot, openBook }) {
   })
   console.log('popover:', JSON.stringify(popped))
   if (popped.left < 0 || popped.right > popped.width) fail('the popover card is not on screen')
+  // The popover belongs to its comment: a scroll that makes another chapter active does not close it.
+  await page.evaluate(() => window.__wordelia.book.getState().setActiveChapter('ch_sample02'))
+  await frames()
+  if (!(await page.locator('.cm-pop .cm-card').count())) fail('the popover closed when another chapter became active')
   await shot('narrow-popover')
   await page.keyboard.press('Escape')
   await page.waitForFunction(() => !document.querySelector('.cm-pop'), null, { timeout: 5000 })

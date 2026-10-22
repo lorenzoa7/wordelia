@@ -357,6 +357,26 @@ export default async function ({ app, page, shot, openBook }) {
   await askDone.waitFor({ timeout: 5000 })
   if ((await passageOf(styleCm.id)).state !== 'open') fail('the comment closed before the author decided')
   await page.waitForFunction(() => !document.querySelector('.review-bar'), null, { timeout: 5000 })
+  // The number of the comment is on the first line of its passage, also when the passage starts in the middle
+  // of a line ("Ao anoitecer, Elias acendeu…").
+  const onItsLine = (id) =>
+    page.evaluate((i) => {
+      const num = document.querySelector(`.cm-num[data-comment="${i}"]`)?.getBoundingClientRect()
+      const line = document.querySelector(`.cm-mark[data-mark="${i}"]`)?.getClientRects()[0]
+      if (!num || !line) return null
+      return Math.abs(num.top + num.height / 2 - (line.top + line.height / 2))
+    }, id)
+  await until('the number of the polished comment is not on the line of its passage', async () => ((await onItsLine(styleCm.id)) ?? 99) < 6, 3000)
+  // The line of the selected card starts at its number (the cards wait for the pause after typing; the line does not).
+  const lineFromNumber = () =>
+    page.evaluate((i) => {
+      const num = document.querySelector(`.cm-num[data-comment="${i}"]`)?.getBoundingClientRect()
+      const svg = document.querySelector('.cm-link')?.getBoundingClientRect()
+      const m = /^M[ ]*([-\d.]+)[ ]+([-\d.]+)/.exec(document.querySelector('.cm-link path')?.getAttribute('d') ?? '')
+      return num && svg && m ? Math.abs(svg.top + Number(m[2]) - (num.top + num.height / 2)) : 99
+    }, styleCm.id)
+  await frames()
+  if ((await lineFromNumber()) >= 3) fail('the line of the selected card does not start at its number')
   await shot('polish-ask-done')
   await until('the passage of the polished comment changed', async () => (await passageOf(styleCm.id)).passage === 'Elias acendeu a lâmpada do farol', 3000)
   const polished = await rangeOf(styleCm.id)

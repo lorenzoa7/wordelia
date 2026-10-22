@@ -79,6 +79,9 @@ export const useMarksDrawn = create<{ n: number }>(() => ({ n: 0 }))
 /** The editors that found the passages of their comments at least once */
 const drawnViews = new WeakSet<EditorView>()
 
+/** The event of the text of a chapter after its numbers are laid out again (each change of the text or the marks) */
+export const NUMBERS_MOVED = 'cm-numbers'
+
 /** The space between two numbers in the margin of the page, one under the other */
 const NUMBER_GAP = 3
 
@@ -513,7 +516,10 @@ export function commentMarksPlugin(chapterId: () => string): Plugin<MarksState> 
         if (stackFrame) return
         stackFrame = requestAnimationFrame(() => {
           stackFrame = 0
-          if (!view.isDestroyed) stackNumbers(view.dom)
+          if (view.isDestroyed) return
+          stackNumbers(view.dom)
+          // The numbers can be at new places: the margin draws the line of the selected card again.
+          view.dom.dispatchEvent(new Event(NUMBERS_MOVED, { bubbles: true }))
         })
       }
       const lines = new ResizeObserver(restack)

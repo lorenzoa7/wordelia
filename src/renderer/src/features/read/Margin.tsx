@@ -15,7 +15,7 @@ import { useBook } from '@/stores/book'
 import { Menu, MenuItem } from '@/ui'
 import { CommentCard, type Card } from './Card'
 import { CARD_INSET, layoutCards, type CardBox } from './layout'
-import { commentRanges, inChapterOrder, rangesKnown, useMarksDrawn } from './marks'
+import { NUMBERS_MOVED, commentRanges, inChapterOrder, rangesKnown, useMarksDrawn } from './marks'
 import { useComments } from './store'
 import { hideComments, selectComment, setCommentLens, showCardPopover, useReadUi } from './ui'
 import './read.css'
@@ -181,6 +181,18 @@ export function Margin({ column, typing, sizerRef }: MarginProps): React.JSX.Ele
       ro.disconnect()
       cancelAnimationFrame(frame)
     }
+  }, [sizerRef, showColumn])
+
+  // The numbers moved (an edit, the end of a review): the line follows the number of the selected card at
+  // once, also while the cards wait for the pause after typing.
+  useEffect(() => {
+    const sizer = sizerRef.current
+    if (!sizer || !showColumn) return
+    const onMoved = (): void => drawLink(sizer, sizer.getBoundingClientRect())
+    sizer.addEventListener(NUMBERS_MOVED, onMoved)
+    return () => sizer.removeEventListener(NUMBERS_MOVED, onMoved)
+    // `drawLink` reads refs only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sizerRef, showColumn])
 
   // A click on a number in the margin of the page: select its card, or open it in a popover.

@@ -298,11 +298,13 @@
 
 /* The numbers of the comments in the right margin of the page, on the first line of each passage.
    The text of the chapter (.ProseMirror) is the box of the position. The numbers of two passages that
-   start on one line go one under the other (--cm-shift, marks.ts). A click selects the card. */
+   start on one line go one under the other (--cm-shift, marks.ts). A click selects the card.
+   The box is inline (inline-flex): its place is on the line where the passage starts, also when text comes
+   before the passage on that line. A block box would go under that line. */
 .cm-nums {
   position: absolute;
   right: calc(var(--page-mr) / -2);
-  display: flex;
+  display: inline-flex;
   flex-direction: column;
   gap: 3px;
   margin-top: calc((1lh - 18px) / 2);

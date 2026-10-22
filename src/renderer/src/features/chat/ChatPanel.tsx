@@ -10,6 +10,7 @@ import { useT } from '@/lib/i18n'
 import { toast } from '@/stores/ui'
 import { oldPending } from '@shared/proposals/state'
 import { SYNC_THREAD_ID } from '@/features/plan/sync'
+import { dropMessageComments, putBackComments } from '@/features/read/store'
 import { composerEditor, draftKey, ensureBlank, focusComposer, useChat, worthKeeping } from './chatStore'
 import { askConfirm } from '@/ui/prompt'
 import { newThread, stopReply, threadBrief, threadTitle } from './send'
@@ -151,22 +152,28 @@ export function ChatPanel(): React.JSX.Element {
     }).then(async (ok) => {
       if (!ok) return
       // A reply in progress stops: the thread goes away.
+      const replying = useChat.getState().streaming[th.id]?.messageId
       stopReply(th.id)
       const wasActive = th.id === useChat.getState().activeThreadId
       const latest = useBook.getState().threads.find((x) => x.id === th.id) ?? th
       const trash = await useBook.getState().deleteThread(th.id)
       dropDraft(th.id)
+      // The comments of its reads go with it; Undo brings them back with their states.
+      const comments = dropMessageComments([...latest.messages.map((m) => m.id), ...(replying ? [replying] : [])])
       toast(t.chat.threadDeleted(threadTitle(t, latest.title)), {
         ms: 9000,
         action: {
           label: t.common.undo,
-          run: () =>
+          run: () => {
+            // Before the thread: its replies then find their comments in the list and do not make them again.
+            putBackComments(comments)
             void useBook
               .getState()
               .restoreThread(latest, trash)
               .then(() => {
                 if (wasActive) useChat.getState().setActiveThread(latest.id)
               })
+          }
         }
       })
       if (!wasActive) return

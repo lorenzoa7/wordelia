@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildActionSystem, extractRewrite, replyWithoutRewrite, tidyRewrite } from './action'
+import { buildActionSystem, buildActionUser, extractRewrite, replyWithoutRewrite, tidyRewrite } from './action'
 
 describe('a reply without rewrite tags', () => {
   const comment = 'This passage already reads well. I would keep it as it is.'
@@ -34,6 +34,24 @@ describe('the action prompt', () => {
   it('does not send the example lines of the rules template', () => {
     expect(sys).not.toContain('third person, past tense')
     expect(sys).toContain('has not written rules yet')
+  })
+
+  it('a note goes to the AI before the instructions', () => {
+    const input = {
+      book: { manifest, writingRules: '', entries: [] },
+      action: { id: 'polish', name: 'Polish', icon: 'Sparkle', builtIn: true, route: null, contextChars: 100, instructions: 'Polish.' },
+      before: '',
+      selection: 'Elias acendeu a lâmpada do farol.',
+      after: '',
+      chapterTitle: 'Um'
+    }
+    const user = buildActionUser({ ...input, note: 'Three sentences in a row open the same way.' })
+    const at = user.indexOf('<editor_comment>\nThree sentences in a row open the same way.\n</editor_comment>')
+    expect(at).toBeGreaterThanOrEqual(0)
+    expect(at).toBeLessThan(user.indexOf('<instructions>'))
+    expect(user).toContain('Fix what this comment says; keep the rest')
+    // Without a note, the prompt has no comment.
+    expect(buildActionUser(input)).not.toContain('editor_comment')
   })
 })
 

@@ -19,7 +19,7 @@ vi.mock('@/lib/api', () => ({
   on: () => () => {}
 }))
 
-const { commentsFromSegments } = await import('./fromReply')
+const { commentRefRank, commentsFromSegments, linkCommentRefs } = await import('./fromReply')
 const store = await import('./store')
 const { saver } = await import('@/stores/saver')
 const { useUi } = await import('@/stores/ui')
@@ -185,6 +185,19 @@ beforeEach(() => {
 afterEach(async () => {
   await saver.flush()
   for (const t of useUi.getState().toasts) useUi.getState().dismissToast(t.id)
+})
+
+describe('the links of a letter to its comments', () => {
+  it('each "→ N" of the letter is a link to comment N of the reply', () => {
+    const letter = 'The rhythm of the opening (style, → 1), the conflict (→2) and Marta (continuity, →  3).'
+    const linked = linkCommentRefs(letter)
+    expect(linked).toBe('The rhythm of the opening (style, [→ 1](#comment-1)), the conflict ([→ 2](#comment-2)) and Marta (continuity, [→ 3](#comment-3)).')
+    expect(commentRefRank('#comment-12')).toBe(12)
+    expect(commentRefRank('https://example.com/#comment-1')).toBeNull()
+    expect(commentRefRank(undefined)).toBeNull()
+    // Text without arrows stays as it is.
+    expect(linkCommentRefs('What works: the lamp.')).toBe('What works: the lamp.')
+  })
 })
 
 describe('addFromReply', () => {
@@ -580,6 +593,35 @@ describe('the comments of a chapter that goes to the trash', () => {
     store.loadComments(ROOT, two())
     calls.length = 0
     expect(store.takeChapterComments('ch_none', trash)).toEqual([])
+    await saver.flush()
+    expect(calls).toEqual([])
+  })
+})
+
+describe('the comments of replies that leave their thread', () => {
+  const three = (): EditorComment[] => [
+    comment({ id: 'cm_aaaaaaaa', messageId: 'msg_old' }),
+    comment({ id: 'cm_bbbbbbbb', messageId: 'msg_new', key: '1', state: 'done' }),
+    comment({ id: 'cm_cccccccc', messageId: 'msg_new', key: '2', lens: 'continuity', state: 'intentional', reason: 'A choice' })
+  ]
+
+  it('dropMessageComments takes out the comments of those replies and writes the file', async () => {
+    store.loadComments(ROOT, three())
+    const gone = store.dropMessageComments(['msg_new', 'msg_user'])
+    expect(gone.map((c) => c.id)).toEqual(['cm_bbbbbbbb', 'cm_cccccccc'])
+    expect(store.useComments.getState().list.map((c) => c.id)).toEqual(['cm_aaaaaaaa'])
+    await saver.flush()
+    expect(onDisk().map((c) => c.id)).toEqual(['cm_aaaaaaaa'])
+    // The Undo of a thread delete puts them back, with their states and reasons.
+    store.putBackComments(gone)
+    expect(store.useComments.getState().list.find((c) => c.id === 'cm_cccccccc')).toMatchObject({ state: 'intentional', reason: 'A choice' })
+  })
+
+  it('replies without comments write nothing', async () => {
+    store.loadComments(ROOT, three())
+    calls.length = 0
+    expect(store.dropMessageComments(['msg_other'])).toEqual([])
+    expect(store.dropMessageComments([])).toEqual([])
     await saver.flush()
     expect(calls).toEqual([])
   })

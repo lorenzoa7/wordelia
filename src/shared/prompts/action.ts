@@ -10,6 +10,8 @@ export interface ActionPromptInput {
   selection: string
   after: string
   chapterTitle: string
+  /** A comment of an editor's read about the passage (Polish of a comment): the rewrite fixes what it says. */
+  note?: string
 }
 
 export function buildActionSystem(input: ActionPromptInput): string {
@@ -41,7 +43,9 @@ export function buildActionSystem(input: ActionPromptInput): string {
 }
 
 export function buildActionUser(input: ActionPromptInput): string {
+  const note = input.note?.trim()
   return [
+    ...(note ? [`<editor_comment>\n${note}\n</editor_comment>`, 'An editor left this comment on the passage. Fix what this comment says; keep the rest.', ''] : []),
     `<instructions>\n${input.action.instructions.trim()}\n</instructions>`,
     '',
     `Chapter: "${input.chapterTitle}"`,

@@ -9,6 +9,8 @@
 //   and a passage that is gone makes the comment "lost". When the words come back at the same place
 //   (Ctrl+Z, Redo), the comment is not lost any more. The marks are decorations: they never change the
 //   text, the selection or the undo history.
+// - A closed comment has no mark, but its passage maps and follows the edits too: the Undo of "Done" puts
+//   it back on the same words.
 // - A comment that this editor does not follow yet (a new comment, a chapter that comes on screen, a text
 //   from outside the editor) finds its passage by its text: the first match after the start of its read
 //   (the selection of a read of a selection, else the start of the chapter).
@@ -19,6 +21,7 @@ import { Plugin, PluginKey, type EditorState, type Transaction } from '@tiptap/p
 import type { Mappable, StepMap } from '@tiptap/pm/transform'
 import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view'
 import { create } from 'zustand'
+import { markdownToPlainBlocks } from '@shared/book'
 import type { EditorComment, Lens, LensChoice } from '@shared/comments'
 import { findText } from '@shared/proposals/apply'
 import { isReload } from '@/features/editor/keep'
@@ -215,6 +218,63 @@ export function changesToWrite(state: EditorState, comments: EditorComment[], to
   return passageChanges(state.doc, comments.filter((c) => touched.has(c.id)), st.ranges)
 }
 
+/**
+ * The passages that an editor follows after a draw, from the state of its marks (pure). `comments` are the
+ * comments of the chapter. An open comment keeps its range, or finds its passage by its text; a deleted
+ * passage whose words are back at its place keeps its comment. A lost comment gets its passage back when its
+ * words are at the place where they went, or (`first`: the first draw of a new editor, or a text from
+ * outside) anywhere in the text. A comment that another computer made lost is not taken back here.
+ * `back`: the lost comments that have their passages again.
+ */
+export function followPassages(
+  doc: PMNode,
+  st: Pick<MarksState, 'ranges' | 'lost' | 'refind'>,
+  comments: EditorComment[],
+  first: boolean,
+  scopeOf?: (c: EditorComment) => string | undefined
+): { ranges: Map<string, Range>; lost: Map<string, number>; back: string[] } {
+  const open = comments.filter((c) => c.state === 'open')
+  const mine = open.filter((c) => !c.lost)
+  const known = st.refind ? new Map<string, Range>() : new Map(st.ranges)
+  for (const c of mine) {
+    const r = known.get(c.id)
+    const again = r && r.from >= r.to ? passageAt(doc, r.from, c.passage) : null
+    if (again) known.set(c.id, again)
+  }
+  const ranges = anchorComments(doc, mine, known, scopeOf)
+  const lost = new Map<string, number>()
+  const search: EditorComment[] = []
+  const back: string[] = []
+  for (const c of open.filter((x) => x.lost)) {
+    const r = st.ranges.get(c.id)
+    const at = st.lost.get(c.id) ?? (r && r.from >= r.to ? r.from : undefined)
+    const again = at !== undefined && !st.refind ? passageAt(doc, at, c.passage) : null
+    if (again) {
+      ranges.set(c.id, again)
+      back.push(c.id)
+    } else {
+      if (at !== undefined && !st.refind) lost.set(c.id, at)
+      if (first || st.refind) search.push(c)
+    }
+  }
+  for (const [id, r] of anchorComments(doc, search, new Map(), scopeOf)) {
+    ranges.set(id, r)
+    lost.delete(id)
+    back.push(id)
+  }
+  // A closed comment has no mark, but the editor follows its passage too: the Undo of "Done" puts it back on
+  // the same words. The first draw (and a text from outside) finds the passages of closed comments by text.
+  const find: EditorComment[] = []
+  for (const c of comments) {
+    if (c.state === 'open') continue
+    const r = known.get(c.id)
+    if (r && inDoc(doc, r)) ranges.set(c.id, r)
+    else if ((first || st.refind) && !c.lost) find.push(c)
+  }
+  for (const [id, r] of anchorComments(doc, find, new Map(), scopeOf)) ranges.set(id, r)
+  return { ranges, lost, back }
+}
+
 /** The comments that have a passage, in the order of their passages in the chapter. The rank orders two comments at one place. */
 export function inChapterOrder<T extends { id: string; rank: number }>(comments: T[], ranges: Map<string, Range>): T[] {
   const has = (c: T): boolean => {
@@ -238,6 +298,26 @@ export function commentRanges(chapterId: string): Map<string, Range> {
 export function rangesKnown(chapterId: string): boolean {
   const ed = getChapterEditor(chapterId)
   return Boolean(ed && !ed.editor.isDestroyed && drawnViews.has(ed.editor.view))
+}
+
+/**
+ * The number of each open comment of a chapter, as the margin shows it: the order of the passages in the
+ * text. For a chapter that is not on screen, the passages are found in the text of the chapter (the first
+ * match). A comment without a passage in the text has no number.
+ */
+export function marginNumbers(chapterId: string): Map<string, number> {
+  const open = useComments.getState().list.filter((c) => c.chapterId === chapterId && c.state === 'open' && !c.lost)
+  if (!open.length) return new Map()
+  let ranges = commentRanges(chapterId)
+  if (!rangesKnown(chapterId)) {
+    const plain = markdownToPlainBlocks(useBook.getState().chapters.find((c) => c.id === chapterId)?.body ?? '')
+    ranges = new Map()
+    for (const c of open) {
+      const m = c.passage.trim() ? findText(plain, c.passage) : null
+      if (m) ranges.set(c.id, { from: m.start, to: m.end })
+    }
+  }
+  return new Map(inChapterOrder(open, ranges).map((c, i) => [c.id, i + 1]))
 }
 
 /**
@@ -403,38 +483,9 @@ export function commentMarksPlugin(chapterId: () => string): Plugin<MarksState> 
         if (!st) return
         const doc = view.state.doc
         const { list, readOnly } = comments()
-        const open = list.filter((c) => c.chapterId === chapterId() && c.state === 'open')
-        const mine = open.filter((c) => !c.lost)
-        // A deleted passage whose words are back at its place keeps its comment.
-        const known = st.refind ? new Map<string, Range>() : new Map(st.ranges)
-        for (const c of mine) {
-          const r = known.get(c.id)
-          const again = r && r.from >= r.to ? passageAt(doc, r.from, c.passage) : null
-          if (again) known.set(c.id, again)
-        }
-        const ranges = anchorComments(doc, mine, known, readScope)
-        // The lost comments: their words at the place where they went, or (a new editor, a text from
-        // outside) anywhere in the text. A comment that another computer made lost is not taken back here.
-        const lost = new Map<string, number>()
-        const search: EditorComment[] = []
-        const back: string[] = []
-        for (const c of open.filter((x) => x.lost)) {
-          const r = st.ranges.get(c.id)
-          const at = st.lost.get(c.id) ?? (r && r.from >= r.to ? r.from : undefined)
-          const again = at !== undefined && !st.refind ? passageAt(doc, at, c.passage) : null
-          if (again) {
-            ranges.set(c.id, again)
-            back.push(c.id)
-          } else {
-            if (at !== undefined && !st.refind) lost.set(c.id, at)
-            if (first || st.refind) search.push(c)
-          }
-        }
-        for (const [id, r] of anchorComments(doc, search, new Map(), readScope)) {
-          ranges.set(id, r)
-          lost.delete(id)
-          back.push(id)
-        }
+        const all = list.filter((c) => c.chapterId === chapterId())
+        const mine = all.filter((c) => c.state === 'open' && !c.lost)
+        const { ranges, lost, back } = followPassages(doc, st, all, first, readScope)
         const wasFirst = first
         first = false
         const { hidden, lens } = useCommentMarks.getState()
@@ -470,13 +521,13 @@ export function commentMarksPlugin(chapterId: () => string): Plugin<MarksState> 
 
       /**
        * Give the comments that the edits of this editor touched the new words of their passages, and mark
-       * the passages that are gone.
+       * the passages that are gone. The closed comments too: the Undo of a decision brings them back.
        */
       const settle = (state: EditorState, touched: ReadonlySet<string>): void => {
         const { list, readOnly } = comments()
         // A comments file of a newer Wordelia is never written, and the comments of another book never change here.
         if (readOnly) return
-        const mine = list.filter((c) => c.chapterId === chapterId() && c.state === 'open' && !c.lost)
+        const mine = list.filter((c) => c.chapterId === chapterId() && !c.lost)
         for (const [id, text] of changesToWrite(state, mine, touched)) {
           if (text === null) setLost(id, true)
           else updatePassage(id, text)

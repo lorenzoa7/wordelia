@@ -146,6 +146,8 @@ interface RunOptions {
   editor?: ChapterEditor
   /** The selection of the author to give back when the review ends without a change */
   selection?: { anchor: number; head: number }
+  /** A comment of an editor's read about the passage: the AI fixes what it says (Polish of a comment) */
+  note?: string
 }
 
 /** Run an action on [from, to], or on the selection, or on the paragraph of the cursor. */
@@ -166,10 +168,12 @@ export async function runAction(action: AiAction, range?: { from: number; to: nu
   let from: number
   let to: number
   let selection = opts.selection ?? { anchor: editor.state.selection.anchor, head: editor.state.selection.head }
+  let note = opts.note
   if (retry) {
     // The same passage, not the paragraph of the cursor: the cursor is at the end of the passage now.
     ;({ from, to } = retry.review)
     selection = retry.review.selection
+    note = retry.review.note
   } else {
     ;({ from, to } = range ?? editor.state.selection)
     if (from === to) {
@@ -204,7 +208,8 @@ export async function runAction(action: AiAction, range?: { from: number; to: nu
     before: ctx.before,
     selection: selectionMd,
     after: ctx.after,
-    chapterTitle: chapter?.title ?? ''
+    chapterTitle: chapter?.title ?? '',
+    note
   }
 
   // One review in the book at a time: the review that is open ends, and its request stops.
@@ -216,7 +221,7 @@ export async function runAction(action: AiAction, range?: { from: number; to: nu
   // Collapse the selection: the review marks show the range, and the selection menu closes.
   // The label is the name as the settings show it, also for a built-in action that moved to the book.
   const label = actionLabel(t, action)
-  editor.chain().setTextSelection(to).startReview({ id, from, to, label, actionId: action.id, docId: chapterId, selection }).run()
+  editor.chain().setTextSelection(to).startReview({ id, from, to, label, actionId: action.id, docId: chapterId, selection, note }).run()
 
   const handle = runCompletion(
     {
@@ -298,7 +303,7 @@ function runAgain(action: AiAction, chapterId: string, r: ReviewData): void {
     const doc = e.editor.state.doc
     const same = r.to <= doc.content.size && reviewText(doc, r.from, r.to).text === r.original
     e.editor.commands.focus()
-    void runAction(action, same ? { from: r.from, to: r.to } : undefined, { editor: e, ...(same ? { selection: r.selection } : {}) })
+    void runAction(action, same ? { from: r.from, to: r.to } : undefined, { editor: e, ...(same ? { selection: r.selection, note: r.note } : {}) })
   }
   const e = getChapterEditor(chapterId)
   if (e) return go(e)
@@ -318,7 +323,7 @@ export async function retryAction(): Promise<void> {
   const editor = host ? chapterEditors().find((e) => e.editor === host) : undefined
   const action = findAction(review?.actionId ?? useActionRun.getState().actionId)
   if (!review || !action || !editor) return
-  await runAction(action, { from: review.from, to: review.to }, { editor, selection: review.selection })
+  await runAction(action, { from: review.from, to: review.to }, { editor, selection: review.selection, note: review.note })
 }
 
 // Test runs (WORDELIA_E2E) read the state of the run.

@@ -5,10 +5,11 @@
 // page or the chapter list.
 
 import { create } from 'zustand'
-import type { CommentState, LensChoice } from '@shared/comments'
-import type { AppSettings } from '@shared/types'
+import type { CommentState, EditorComment, LensChoice } from '@shared/comments'
+import type { AppSettings, Chapter } from '@shared/types'
 import { panelLayout } from '@/features/book/panels'
 import { useApp } from '@/stores/app'
+import { useBook } from '@/stores/book'
 import { columnFits } from './layout'
 import { useCommentMarks } from './marks'
 import { setCommentState, useComments } from './store'
@@ -28,9 +29,27 @@ interface ReadUiState {
   selected: string | null
   /** The column of the cards shows on the desk now (the desk keeps room for it, and the room is there: zoom.ts) */
   column: boolean
+  /** A narrow desk has no column: the card of this comment shows in a popover beside its number. */
+  popover: string | null
 }
 
-export const useReadUi = create<ReadUiState>(() => ({ root: null, hidden: false, room: false, roomTaken: null, lens: 'all', selected: null, column: false }))
+export const useReadUi = create<ReadUiState>(() => ({ root: null, hidden: false, room: false, roomTaken: null, lens: 'all', selected: null, column: false, popover: null }))
+
+/**
+ * The open comments of the chapters of the book. A comment of a chapter that is not in the book (a sync can
+ * bring one back after the chapter was deleted) never shows and never counts; it stays in the file.
+ */
+export function openInBook(list: EditorComment[], chapters: Chapter[]): EditorComment[] {
+  const ids = new Set(chapters.map((c) => c.id))
+  return list.filter((c) => c.state === 'open' && ids.has(c.chapterId))
+}
+
+/** The book has open comments that show. Before the book store has the book of the comments, all open comments count. */
+function hasOpenComments(): boolean {
+  const { list, root } = useComments.getState()
+  const book = useBook.getState()
+  return book.root === root ? openInBook(list, book.chapters).length > 0 : list.some((c) => c.state === 'open')
+}
 
 /* ------------------------------------------------------------------ */
 /* "Hide", for each book                                                */
@@ -87,8 +106,7 @@ function deskWidth(ui: Ui): number {
 /** The book opens: its "Hide" choice, and room for the cards when it has open comments. */
 function bookOpened(root: string | null): void {
   const hidden = root ? readHidden(root) : false
-  const open = useComments.getState().list.some((c) => c.state === 'open')
-  useReadUi.setState({ root, hidden, room: Boolean(root) && !hidden && open, roomTaken: null, lens: 'all', selected: null })
+  useReadUi.setState({ root, hidden, room: Boolean(root) && !hidden && hasOpenComments(), roomTaken: null, lens: 'all', selected: null, popover: null })
   useCommentMarks.setState({ hidden, lens: 'all' })
 }
 
@@ -121,7 +139,7 @@ export function makeRoomForComments(ui: Partial<Ui> = {}): void {
 /** Give the room back: the page goes back to the middle, and the chapter list opens when a read closed it. */
 function giveRoomBack(): void {
   const taken = useReadUi.getState().roomTaken
-  useReadUi.setState({ room: false, roomTaken: null, selected: null })
+  useReadUi.setState({ room: false, roomTaken: null, selected: null, popover: null })
   const app = useApp.getState()
   if (taken?.sidebarWasOpen && app.settings && !app.settings.ui.sidebarOpen) app.setUi({ sidebarOpen: true })
 }
@@ -137,16 +155,18 @@ export function hideComments(): void {
 /**
  * The author decides about comments ("Done", "Ignore", "It's intentional", "Mark as done"). Every decision
  * of the author goes through here. When it closes the last open comment of the book, the room goes back, as
- * with "Hide", but the margin stays on; the Undo of the toast takes the room again.
+ * with "Hide", but the margin stays on; the Undo of the toast takes the room again. A comments file of a newer
+ * Wordelia cannot change: then a decision does nothing.
  */
 export function decideComments(ids: string[], state: CommentState, reason?: string): void {
+  if (useComments.getState().readOnly) return
   let gaveBack = false
   setCommentState(ids, state, reason, {
     onUndo: () => {
-      if (gaveBack && useComments.getState().list.some((c) => c.state === 'open')) makeRoomForComments()
+      if (gaveBack && hasOpenComments()) makeRoomForComments()
     }
   })
-  if (useReadUi.getState().room && !useComments.getState().list.some((c) => c.state === 'open')) {
+  if (useReadUi.getState().room && !hasOpenComments()) {
     giveRoomBack()
     gaveBack = true
   }
@@ -166,6 +186,11 @@ export function setColumnShown(column: boolean): void {
 /** Select a card: a line joins it to its passage. */
 export function selectComment(id: string | null): void {
   if (useReadUi.getState().selected !== id) useReadUi.setState({ selected: id })
+}
+
+/** Show the card of a comment in a popover beside its number (a narrow desk), or close the popover. */
+export function showCardPopover(id: string | null): void {
+  if (useReadUi.getState().popover !== id) useReadUi.setState({ popover: id })
 }
 
 // A book opens (the comments of another book load), or none.

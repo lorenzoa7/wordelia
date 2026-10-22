@@ -90,8 +90,12 @@ function ingestStreaming(threadId: string): void {
   ingest(thread, { id: now.messageId, role: 'assistant', content: now.text, createdAt: '' }, req)
 }
 
-/** The AI says that some comments look fixed: ask the author. Nothing closes before the author says yes. */
+/**
+ * The AI says that some comments look fixed: ask the author. Nothing closes before the author says yes. The
+ * comments of a file of a newer Wordelia cannot change: no question then.
+ */
 function askAboutFixed(message: ChatMessage, req: ReadRequest): void {
+  if (useComments.getState().readOnly) return
   const said = new Set<string>()
   for (const s of parseProposals(message.content)) if (s.kind === 'resolved') s.ids.forEach((id) => said.add(id))
   const open = useComments

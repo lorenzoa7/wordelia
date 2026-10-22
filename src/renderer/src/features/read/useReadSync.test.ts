@@ -257,6 +257,14 @@ describe('comments that look fixed', () => {
     expect(useUi.getState().toasts).toHaveLength(1)
   })
 
+  it('a comments file of a newer Wordelia does not ask: its comments cannot change', () => {
+    loadComments(ROOT, [comment()], 2)
+    useBook.setState({ threads: [thread([asked()])] })
+    stop = startReadSync()
+    finish(`Fixed.\n${resolved('cm_open0001')}`)
+    expect(useUi.getState().toasts.filter((t) => t.message === getT().read.resolved(1))).toEqual([])
+  })
+
   it('no open comment named: no toast', () => {
     loadComments(ROOT, [comment({ state: 'done' })])
     useBook.setState({ threads: [thread([asked()])] })
@@ -286,5 +294,21 @@ ${note(1, 'Marta olhou o mar')}
     off()
     vi.advanceTimersByTime(1000)
     expect(list().map((c) => c.passage)).toEqual(['Marta olhou o mar'])
+  })
+})
+
+describe('a read reply that leaves its thread', () => {
+  it('Retry, Rewind and Edit take the comments of the removed replies away', async () => {
+    const { truncateThread } = await import('@/features/chat/rewind')
+    const first = reply(note(1, 'Marta olhou o mar'))
+    const second = reply(note(1, 'dois dias'), 'm_reply2')
+    useBook.setState({ threads: [thread([asked(), first, asked('m_ask2'), second])] })
+    loadComments(ROOT, [comment({ id: 'cm_first01', messageId: first.id }), comment({ id: 'cm_second1', messageId: second.id, state: 'done' })])
+    // Retry of the last reply: the thread keeps the first three messages.
+    truncateThread('th_read', 3)
+    expect(list().map((c) => c.id)).toEqual(['cm_first01'])
+    // Rewind to the start.
+    truncateThread('th_read', 0)
+    expect(list()).toEqual([])
   })
 })

@@ -82,3 +82,18 @@ export function commentsFromSegments(segments: Segment[], ctx: CommentsContext):
   }
   return found.sort((a, b) => a.rank - b.rank).slice(0, ctx.limit)
 }
+
+/**
+ * The links of the letter of a read to its comments. In the letter, each problem has "(→ N)", where N is
+ * the rank of its comment in the reply. Each "→ N" becomes a Markdown link to "#comment-N"; the chat shows it
+ * as a link to that comment.
+ */
+export function linkCommentRefs(text: string): string {
+  return text.replace(/→[ \t]*(\d+)/g, (_m, n: string) => `[→ ${n}](#comment-${n})`)
+}
+
+/** The rank of the comment of a link that `linkCommentRefs` made, or null for another link. */
+export function commentRefRank(href: string | undefined): number | null {
+  const m = href ? /^#comment-(\d+)$/.exec(href) : null
+  return m ? Number(m[1]) : null
+}

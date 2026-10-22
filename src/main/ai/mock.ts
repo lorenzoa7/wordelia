@@ -37,12 +37,15 @@ function polish(text: string): string {
  * - "one paragraph": the passage becomes one paragraph, without its scene breaks;
  * - "without italics": the italics go, the words stay;
  * - "only a comment": a reply without <rewrite> tags.
- * Other instructions polish the passage (`polish`).
+ * With a comment of an editor's read (`note`, the Polish of a comment), the passage gets a new start ("Ao
+ * anoitecer, …"), so a scenario sees that the comment went to the AI. Other instructions polish the passage
+ * (`polish`).
  */
-function actionReply(instructions: string, sel: string): string {
+function actionReply(instructions: string, sel: string, note: string | null, english: boolean): string {
   if (/only a comment/i.test(instructions)) return 'This passage already reads well. I would keep it as it is.'
   if (/one paragraph/i.test(instructions)) return `<rewrite>\n${sel.replace(/\s*\n\s*\n\s*(?:\* \* \*\s*\n\s*\n\s*)?/g, ' ')}\n</rewrite>`
   if (/without italics/i.test(instructions)) return `<rewrite>\n${sel.replace(/\*([^*\n]+)\*/g, '$1')}\n</rewrite>`
+  if (note?.trim()) return `<rewrite>\n${english ? 'At dusk, ' : 'Ao anoitecer, '}${sel}\n</rewrite>`
   return `<rewrite>\n${polish(sel)}\n</rewrite>`
 }
 
@@ -238,7 +241,7 @@ function reply(req: AiRequest): string {
   }
   if (req.purpose === 'action') {
     const sel = between(last, '<selection>\n', '\n</selection>') ?? between(last, '<selection>', '</selection>') ?? last
-    return actionReply(between(last, '<instructions>', '</instructions>') ?? '', sel.trim())
+    return actionReply(between(last, '<instructions>', '</instructions>') ?? '', sel.trim(), between(last, '<editor_comment>', '</editor_comment>'), english)
   }
   if (req.purpose === 'background' && /short title/i.test(req.system)) return 'The opening paragraph'
   if (req.purpose === 'background') {

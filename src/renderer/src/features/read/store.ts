@@ -196,7 +196,20 @@ export function takeChapterComments(chapterId: string, trash?: string): EditorCo
   return taken
 }
 
-/** Bring comments back (the Undo of a chapter delete). A comment that is already in the list stays as it is. */
+/**
+ * Replies of reads leave their thread (Retry, Rewind, the Edit of an earlier message, a deleted thread): their
+ * comments go too, because a comment comes from a reply. Returns them, for the Undo of a thread delete
+ * (`putBackComments`).
+ */
+export function dropMessageComments(messageIds: string[]): EditorComment[] {
+  const { list } = useComments.getState()
+  const gone = new Set(messageIds)
+  const taken = list.filter((c) => gone.has(c.messageId))
+  if (taken.length) change(list.filter((c) => !gone.has(c.messageId)))
+  return taken
+}
+
+/** Bring comments back (the Undo of a chapter or thread delete). A comment that is already in the list stays as it is. */
 export function putBackComments(back: EditorComment[]): void {
   const { list } = useComments.getState()
   const have = new Set(list.map((c) => c.id))

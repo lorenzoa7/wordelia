@@ -5,7 +5,7 @@
 //
 // The cards never move while the author types: they go to their new places at the pause.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { Popover } from 'radix-ui'
 import { CaretDown, EyeSlash, Eyeglasses } from '@phosphor-icons/react'
 import { LENSES, type LensChoice } from '@shared/comments'
@@ -17,7 +17,7 @@ import { CommentCard, type Card } from './Card'
 import { CARD_INSET, layoutCards, type CardBox } from './layout'
 import { commentRanges, inChapterOrder, rangesKnown, useMarksDrawn } from './marks'
 import { useComments } from './store'
-import { hideComments, selectComment, setCommentLens, useReadUi } from './ui'
+import { hideComments, selectComment, setCommentLens, showCardPopover, useReadUi } from './ui'
 import './read.css'
 
 /** The space between two cards, and between the header and the first card */
@@ -71,7 +71,8 @@ export function Margin({ column, typing, sizerRef }: MarginProps): React.JSX.Ele
     for (const x of all) m.set(x.c.lens, (m.get(x.c.lens) ?? 0) + 1)
     return m
   }, [all])
-  const [pop, setPop] = useState<string | null>(null)
+  // The card in a popover beside its number (a narrow desk): a click on a number, or goToComment.
+  const pop = useReadUi((s) => s.popover)
 
   const headRef = useRef<HTMLElement>(null)
   const colRef = useRef<HTMLDivElement>(null)
@@ -196,7 +197,7 @@ export function Margin({ column, typing, sizerRef }: MarginProps): React.JSX.Ele
       if (columnRef.current) {
         selectComment(id)
         requestAnimationFrame(() => cardEls.current.get(id)?.scrollIntoView({ block: 'nearest' }))
-      } else setPop(id)
+      } else showCardPopover(id)
     }
     sizer.addEventListener('mousedown', onDown, true)
     sizer.addEventListener('click', onClick)
@@ -209,7 +210,7 @@ export function Margin({ column, typing, sizerRef }: MarginProps): React.JSX.Ele
   // The popover belongs to the narrow desk, and to an open comment.
   const popCard = pop ? all.find((x) => x.c.id === pop) : undefined
   useEffect(() => {
-    if (pop && (column || hidden || !popCard)) setPop(null)
+    if (pop && (column || hidden || !popCard)) showCardPopover(null)
   }, [pop, column, hidden, popCard])
 
   if (hidden) return null
@@ -249,7 +250,7 @@ export function Margin({ column, typing, sizerRef }: MarginProps): React.JSX.Ele
           <style>{`.cm-num[data-comment="${CSS.escape(selectedCard.c.id)}"]{background:var(--lens-ink);box-shadow:none;color:var(--paper)}`}</style>
         </>
       )}
-      <NumberPopover id={popCard ? pop : null} onClose={() => setPop(null)}>
+      <NumberPopover id={popCard ? pop : null} onClose={() => showCardPopover(null)}>
         {popCard && <CommentCard card={popCard} chapterNumber={chapterNumber} readOnly={readOnly} selected={false} />}
       </NumberPopover>
     </div>

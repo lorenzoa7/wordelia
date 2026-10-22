@@ -11,6 +11,7 @@ import type { Chapter, Entry } from '@shared/types'
 import { useT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
 import { Tooltip } from '@/ui'
+import { discussComment, markIntentional, polishComment, updateNoteFor } from './actions'
 import { decideComments } from './ui'
 import './read.css'
 
@@ -56,7 +57,8 @@ export function CommentCard({ card, chapterNumber, readOnly, selected, onSelect,
   const sources = continuity ? c.sources.map((s) => ({ ...sourceOf(s.file, chapters, entries, t), quote: s.quote })) : []
   const subject = sources.find((s) => s.note)?.note
 
-  // The decisions go through decideComments. The other actions open the chat or the editor (the actions of a comment).
+  // The decisions go through decideComments, with Undo; a comments file of a newer Wordelia cannot change. The
+  // work opens the chat or the editor (actions.ts) and never changes the text without the author.
   const decide = (state: CommentState): void => {
     if (!readOnly) decideComments([c.id], state)
   }
@@ -64,11 +66,23 @@ export function CommentCard({ card, chapterNumber, readOnly, selected, onSelect,
   const work = lost
     ? []
     : continuity
-      ? [<Act key="note" kind="work" icon={<NotePencil size={13} />} label={m.updateNote} />]
-      : [<Act key="discuss" kind="work" icon={<ChatCircleText size={13} />} label={m.discuss} />, <Act key="polish" kind="work" icon={<Sparkle size={13} />} label={m.polish} />]
+      ? [<Act key="note" kind="work" icon={<NotePencil size={13} />} label={m.updateNote} onClick={() => void updateNoteFor(c)} />]
+      : [
+          <Act key="discuss" kind="work" icon={<ChatCircleText size={13} />} label={m.discuss} onClick={() => discussComment(c)} />,
+          <Act key="polish" kind="work" icon={<Sparkle size={13} />} label={m.polish} onClick={() => void polishComment(c)} />
+        ]
   const minor =
     continuity && !lost ? (
-      <Act key="intentional" kind="minor" className="cm-act-intentional" icon={<Check size={13} />} label={m.intentional} off={readOnly} offTip={m.readOnly} />
+      <Act
+        key="intentional"
+        kind="minor"
+        className="cm-act-intentional"
+        icon={<Check size={13} />}
+        label={m.intentional}
+        off={readOnly}
+        offTip={m.readOnly}
+        onClick={() => void markIntentional(c)}
+      />
     ) : (
       <Act key="ignore" kind="minor" className="cm-act-ignore" icon={<X size={13} />} label={m.ignore} off={readOnly} offTip={m.readOnly} onClick={() => decide('ignored')} />
     )

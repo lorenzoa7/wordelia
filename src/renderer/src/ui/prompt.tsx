@@ -6,12 +6,16 @@ import { useT } from '@/lib/i18n'
 import { Button, Dialog, Field, TextInput } from './index'
 
 type Request =
-  | { kind: 'text'; title: string; label: string; placeholder?: string; initial?: string; confirm?: string; resolve: (v: string | null) => void }
+  | { kind: 'text'; title: string; label: string; placeholder?: string; initial?: string; confirm?: string; optional?: boolean; resolve: (v: string | null) => void }
   | { kind: 'confirm'; title: string; message: string; confirm?: string; cancel?: string; danger?: boolean; resolve: (v: boolean) => void }
 
 const usePrompt = create<{ req: Request | null }>(() => ({ req: null }))
 
-export function askText(opts: { title: string; label: string; placeholder?: string; initial?: string; confirm?: string }): Promise<string | null> {
+/**
+ * Ask for a short text. Null: the user cancelled. `optional`: the user can confirm without a text (the
+ * answer is then '').
+ */
+export function askText(opts: { title: string; label: string; placeholder?: string; initial?: string; confirm?: string; optional?: boolean }): Promise<string | null> {
   return new Promise((resolve) => usePrompt.setState({ req: { kind: 'text', ...opts, resolve } }))
 }
 
@@ -49,8 +53,8 @@ export function PromptHost(): React.JSX.Element {
           </Button>
           <Button
             variant={req?.kind === 'confirm' && req.danger ? 'ribbon' : 'primary'}
-            onClick={() => close(req?.kind === 'text' ? value.trim() || null : true)}
-            disabled={req?.kind === 'text' && !value.trim()}
+            onClick={() => close(req?.kind === 'text' ? (value.trim() || (req.optional ? '' : null)) : true)}
+            disabled={req?.kind === 'text' && !req.optional && !value.trim()}
           >
             {req?.confirm ?? (req?.kind === 'confirm' ? t.common.confirm : t.common.ok)}
           </Button>
@@ -61,7 +65,7 @@ export function PromptHost(): React.JSX.Element {
         <form
           onSubmit={(e) => {
             e.preventDefault()
-            if (value.trim()) close(value.trim())
+            if (value.trim() || req.optional) close(value.trim())
           }}
         >
           <Field label={req.label}>

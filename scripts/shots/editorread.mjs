@@ -38,6 +38,15 @@ export default async function ({ app, page, shot, openBook }) {
       ed.chain().focus().setTextSelection(range).run()
     }, start)
 
+  const passageOf = async (id) => (await comments()).find((c) => c.id === id)
+  const rangeOf = (id) =>
+    page.evaluate((i) => {
+      const r = window.__commentMarks.commentRanges('ch_sample01').get(i)
+      return r ? { from: r.from, to: r.to } : null
+    }, id)
+  const select = (sel) => page.evaluate((s) => window.__wordelia.editor().chain().focus().setTextSelection(s).run(), sel)
+  const card = (id) => page.locator(`.cm-column .cm-card[data-comment="${id}"]`)
+
   await openBook()
   // The last chapter of the book is a chapter in progress, by default.
   await page.locator('.page[data-chapter="ch_sample02"] p').first().click()
@@ -288,20 +297,127 @@ export default async function ({ app, page, shot, openBook }) {
   await until('the comments of the offered read did not come', async () => (await comments()).length === 7)
   await shot('after-offer')
 
-  // 5. The comments follow the text. A word typed in the passage of the open style comment goes into its
+  // 5. What a comment can do. In the letter, each "(→ N)" is a link to its comment: it shows the number of
+  // the comment in the margin (one numbering for the author), and a click selects its card. A closed
+  // comment has a link without a number.
+  const third = (await readThreads())[0].messages[5]
+  const ofThird = (await comments()).filter((c) => c.messageId === third.id)
+  const styleCm = ofThird.find((c) => c.rank === 1)
+  const structureCm = ofThird.find((c) => c.rank === 2)
+  const continuityCm = ofThird.find((c) => c.rank === 3)
+  if (styleCm?.lens !== 'style' || structureCm?.lens !== 'structure' || continuityCm?.lens !== 'continuity') fail(`the comments of the third read are ${JSON.stringify(ofThird.map((c) => [c.rank, c.lens]))}`)
+  const letter = page.locator('.msg-ai').last()
+  const chip = letter.locator(`.read-ref[data-comment="${styleCm.id}"]`)
+  await chip.waitFor({ timeout: 5000 })
+  if ((await letter.locator('.read-ref').count()) !== 3) fail(`the letter has ${await letter.locator('.read-ref').count()} links to its comments`)
+  const badge = (await card(styleCm.id).locator('.cm-badge').innerText()).trim()
+  const chipSays = (await chip.innerText()).trim()
+  console.log('letter link:', JSON.stringify({ chip: chipSays, card: badge }))
+  if (chipSays !== badge) fail(`the link says "${chipSays}", its card says "${badge}"`)
+  if (!(await page.locator('.msg-ai').first().locator(`.read-ref.is-closed[data-comment="${first[0].id}"]`).count())) fail('the link of a done comment shows a number')
+  await chip.click()
+  await until('a click on a link of the letter did not select its card', async () => (await page.locator(`.cm-card.is-selected[data-comment="${styleCm.id}"]`).count()) === 1, 3000)
+  await shot('letter-links')
+  // A comment of a chapter that is not in the book (a sync can bring one back after a delete) has no link,
+  // and the status bar does not count it.
+  const listNow = await comments()
+  const openNow = listNow.filter((c) => c.state === 'open').length
+  await page.evaluate(([list, id]) => window.__wordelia.comments.setState({ list: list.map((c) => (c.id === id ? { ...c, chapterId: 'ch_deleted' } : c)) }), [listNow, continuityCm.id])
+  await until('a comment of a chapter that is not in the book has a link', async () => (await letter.locator('.read-ref').count()) === 2, 3000)
+  const counted = (await page.locator('.status-bar .status-comments').getAttribute('aria-label')) ?? ''
+  if (!counted.startsWith(`${openNow - 1} `)) fail(`the status bar counts a comment of a chapter that is not in the book: "${counted}"`)
+  await page.evaluate((list) => window.__wordelia.comments.setState({ list }), listNow)
+  await until('the link did not come back', async () => (await letter.locator('.read-ref').count()) === 3, 3000)
+
+  // "Polish passage": the main action runs on the passage, with the comment as an extra instruction, in the
+  // normal review. Enter accepts; a toast asks to mark the comment as done, and its Undo puts the card back
+  // on the same passage.
+  // The toasts of the earlier parts go first: the question after the Polish shows alone.
+  for (const close of await page.locator('.toast .toast-close').all()) await close.click()
+  await until('the earlier toasts stayed', async () => !(await page.locator('.toast').count()), 3000)
+  const passage = await rangeOf(styleCm.id)
+  await card(styleCm.id).getByRole('button', { name: /^(Polish passage|Polir trecho|Pulir fragmento)$/ }).click()
+  await until('the review of the passage did not open', () => page.evaluate(() => window.__review.state()?.phase === 'ready'), 15000)
+  const review = await page.evaluate(() => {
+    const r = window.__review.state()
+    return { from: r.from, to: r.to, proposed: r.proposed }
+  })
+  console.log('polish review:', JSON.stringify(review))
+  if (review.from !== passage.from || review.to !== passage.to) fail('the review is not on the passage of the comment')
+  // The scripted AI answers a polish with a comment this way only: the comment went to the AI.
+  if (!/^Ao anoitecer, Elias acendeu/.test(review.proposed)) fail('the comment did not go to the AI with the passage')
+  await shot('polish-review')
+  await page.keyboard.press('Enter')
+  const askDone = page.locator('.toast', { hasText: /Mark the comment as done\?|Marcar o comentário como feito\?|¿Marcar el comentario como hecho\?/ })
+  await askDone.waitFor({ timeout: 5000 })
+  if ((await passageOf(styleCm.id)).state !== 'open') fail('the comment closed before the author decided')
+  await page.waitForFunction(() => !document.querySelector('.review-bar'), null, { timeout: 5000 })
+  await shot('polish-ask-done')
+  await until('the passage of the polished comment changed', async () => (await passageOf(styleCm.id)).passage === 'Elias acendeu a lâmpada do farol', 3000)
+  const polished = await rangeOf(styleCm.id)
+  await askDone.locator('.toast-action').click()
+  await until('"Mark as done" did not close the polished comment', async () => (await passageOf(styleCm.id)).state === 'done', 3000)
+  await until('the card of the polished comment stayed', async () => !(await card(styleCm.id).count()), 3000)
+  // The newest toast of a decision (an older one can still be on screen).
+  await page.locator('.toast', { hasText: /Comment marked as done|Comentário marcado como feito|Comentario marcado como hecho/ }).last().locator('.toast-action').click()
+  await until('Undo did not put the card back', async () => (await passageOf(styleCm.id)).state === 'open' && (await card(styleCm.id).count()) === 1, 3000)
+  const back = await rangeOf(styleCm.id)
+  if (back?.from !== polished?.from || back?.to !== polished?.to) fail(`the comment came back on another passage: ${JSON.stringify({ polished, back })}`)
+
+  // "Discuss in chat": the read thread shows, with the passage as a quote and the comment in the draft.
+  const readId = (await readThreads())[0].id
+  const other = (await threads()).find((t) => !t.readChapterId)
+  await page.evaluate((id) => window.__wordelia.chat.getState().setActiveThread(id), other.id)
+  await card(structureCm.id).getByRole('button', { name: /^(Discuss in chat|Discutir no chat|Discutir en el chat)$/ }).click()
+  await until('"Discuss in chat" did not show the read thread', () => page.evaluate((id) => window.__wordelia.chat.getState().activeThreadId === id, readId), 3000)
+  const composer = await page.evaluate(() => {
+    const s = window.__wordelia.chat.getState()
+    return { quotes: s.quotes.map((q) => q.text), draft: s.draft }
+  })
+  console.log('discuss:', JSON.stringify(composer))
+  if (!composer.quotes.includes(structureCm.passage)) fail('the composer does not quote the passage')
+  if (!composer.draft.includes(structureCm.text)) fail('the draft does not name the comment')
+  await page.waitForSelector('.composer .quote-chip', { timeout: 3000 })
+  await shot('discuss')
+  await page.evaluate(() => window.__wordelia.chat.getState().clearComposer())
+
+  // "It's intentional" on a continuity comment, with a short reason: the next reads get it.
+  const continuityCards = await page.locator('.cm-column .cm-card.cm-continuity').evaluateAll((cs) => cs.map((c) => c.dataset.comment))
+  if (continuityCards.length !== 2) fail(`two continuity cards were expected, there are ${continuityCards.length}`)
+  const [intended, toUpdate] = continuityCards
+  await card(intended).getByRole('button', { name: /^(It's intentional|É intencional|Es intencional)$/ }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.waitFor({ timeout: 3000 })
+  await dialog.locator('input').fill('Elias mente para Marta')
+  await shot('intentional')
+  await page.keyboard.press('Enter')
+  await until('"It\'s intentional" did not set the state', async () => (await passageOf(intended)).state === 'intentional', 3000)
+  if ((await passageOf(intended)).reason !== 'Elias mente para Marta') fail(`the reason is "${(await passageOf(intended)).reason}"`)
+  await until('the card of the intentional comment stayed', async () => !(await card(intended).count()), 3000)
+
+  // "Update the note": a message in the read thread asks to change the planning so that it agrees with the
+  // text. The reply follows the normal flow: a proposal changes nothing before the author accepts it.
+  const count = (await readThreads())[0].messages.length
+  await card(toUpdate).getByRole('button', { name: /^(Update the note|Atualizar a nota|Actualizar la nota)$/ }).click()
+  await until('"Update the note" did not send a message', async () => (await readThreads())[0].messages.length === count + 1, 5000)
+  const sent = (await readThreads())[0].messages[count]
+  console.log('update the note:', JSON.stringify({ content: sent.content, mentions: sent.mentions, quotes: sent.quotes?.map((q) => q.text) }))
+  if (sent.role !== 'user' || sent.read) fail('"Update the note" did not send a message of the author')
+  if (!sent.mentions?.some((m) => m.kind === 'entry' && m.label === 'Marta')) fail('the message does not name the note of the comment')
+  const updatedPassage = (await passageOf(toUpdate)).passage
+  if (!sent.quotes?.some((q) => q.text === updatedPassage)) fail('the message does not quote the passage')
+  await until('the reply to "Update the note" did not come', async () => (await readThreads())[0].messages.length === count + 2 && !(await streaming()), 30000)
+  await idle()
+  if ((await passageOf(toUpdate)).state !== 'open') fail('"Update the note" changed the state of the comment')
+  await shot('update-note')
+
+  // 6. The comments follow the text. A word typed in the passage of the open style comment goes into its
   // passage after a short pause, and the mark stays. Ctrl+Z takes the word out again. A passage that the
   // author deletes makes its comment "lost", and its mark goes away; Ctrl+Z brings it back. A text from
   // outside the editor that has the passage again gives the comment its passage back.
   const style = (await comments()).find((c) => c.lens === 'style' && c.state === 'open')
   if (!style) fail('no open style comment')
   const original = await page.evaluate(() => window.__wordelia.book.getState().chapters.find((c) => c.id === 'ch_sample01').body)
-  const passageOf = async (id) => (await comments()).find((c) => c.id === id)
-  const rangeOf = (id) =>
-    page.evaluate((i) => {
-      const r = window.__commentMarks.commentRanges('ch_sample01').get(i)
-      return r ? { from: r.from, to: r.to } : null
-    }, id)
-  const select = (sel) => page.evaluate((s) => window.__wordelia.editor().chain().focus().setTextSelection(s).run(), sel)
   await page.locator('.page[data-chapter="ch_sample01"] p').first().click()
   const at = await rangeOf(style.id)
   if (!at) fail('the style comment has no range in the text')
@@ -365,6 +481,15 @@ export default async function ({ app, page, shot, openBook }) {
   await page.locator('.cm-column .cm-card .cm-act-done').first().click({ force: true })
   await page.waitForTimeout(300)
   if ((await comments()).filter((c) => c.state === 'open').length !== before7) fail('"Done" changed a comment of a read-only file')
+  // "It's intentional" is off too. "Discuss in chat" still works.
+  const intentionalActs = page.locator('.cm-column .cm-card .cm-act-intentional')
+  if (!(await intentionalActs.count()) || (await page.locator('.cm-column .cm-card .cm-act-intentional:not([aria-disabled="true"])').count())) fail('"It is intentional" is on for a comments file of a newer Wordelia')
+  await intentionalActs.first().click({ force: true })
+  await page.waitForTimeout(300)
+  if (await page.getByRole('dialog').count()) fail('"It is intentional" asks for a reason in a read-only file')
+  await page.locator('.cm-column .cm-card').getByRole('button', { name: /^(Discuss in chat|Discutir no chat|Discutir en el chat)$/ }).first().click()
+  await until('"Discuss in chat" does not work in a read-only file', () => page.evaluate(() => window.__wordelia.chat.getState().quotes.length === 1), 3000)
+  await page.evaluate(() => window.__wordelia.chat.getState().clearComposer())
   await page.evaluate(() => window.__wordelia.comments.setState({ readOnly: false }))
   // "Done" on a card closes its comment, and the card leaves the margin.
   const doneId = await page.locator('.cm-column .cm-card').first().getAttribute('data-comment')
@@ -372,7 +497,7 @@ export default async function ({ app, page, shot, openBook }) {
   await until('"Done" did not close the comment', async () => (await comments()).find((c) => c.id === doneId).state === 'done', 3000)
   await until('the card of a closed comment stayed', async () => !(await page.locator(`.cm-card[data-comment="${doneId}"]`).count()), 3000)
 
-  // 6. A narrow window: no column. A click on a number opens its card in a popover beside it.
+  // 7. A narrow window: no column. A click on a number opens its card in a popover beside it.
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1000, 800))
   await page.waitForFunction(() => Math.abs(innerWidth - 1000) < 40)
   await until('the column stayed in a narrow window', async () => !(await page.locator('.cm-column').count()), 5000)
@@ -385,6 +510,13 @@ export default async function ({ app, page, shot, openBook }) {
   console.log('popover:', JSON.stringify(popped))
   if (popped.left < 0 || popped.right > popped.width) fail('the popover card is not on screen')
   await shot('narrow-popover')
+  await page.keyboard.press('Escape')
+  await page.waitForFunction(() => !document.querySelector('.cm-pop'), null, { timeout: 5000 })
+  // A link of the letter opens the card of its comment in the popover too.
+  const numbered = page.locator('.msg-ai .read-ref[data-n]').last()
+  const target = await numbered.getAttribute('data-comment')
+  await numbered.click()
+  await page.waitForSelector(`.cm-pop .cm-card[data-comment="${target}"]`, { timeout: 5000 })
   await page.keyboard.press('Escape')
   await page.waitForFunction(() => !document.querySelector('.cm-pop'), null, { timeout: 5000 })
 }

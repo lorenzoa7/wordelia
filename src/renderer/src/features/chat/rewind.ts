@@ -9,6 +9,7 @@ import type { ChatMessage, Thread } from '@shared/types'
 import { useBook } from '@/stores/book'
 import { toast } from '@/stores/ui'
 import { flushEditor } from '@/features/editor/registry'
+import { dropMessageComments } from '@/features/read/store'
 import { snapshot, SNAPSHOT_EN } from '@/features/history/snapshots'
 import { typesetForBook } from '@/lib/typeset'
 import { getT } from '@/lib/i18n'
@@ -181,10 +182,14 @@ export async function undoBookChanges(changes: BookChanges): Promise<UndoResult>
   return { undone, failed }
 }
 
-/** Keep the first `keep` messages of a thread. The digest starts again when it covered removed messages. */
+/**
+ * Keep the first `keep` messages of a thread. The digest starts again when it covered removed messages. The
+ * comments of the removed replies of reads go too.
+ */
 export function truncateThread(threadId: string, keep: number): Thread | null {
   const th = useBook.getState().threads.find((t) => t.id === threadId)
   if (!th) return null
+  dropMessageComments(th.messages.slice(keep).map((m) => m.id))
   const next: Thread = {
     ...th,
     messages: th.messages.slice(0, keep),

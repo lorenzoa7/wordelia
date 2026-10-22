@@ -25,6 +25,7 @@ import { sliceFromMarkdown } from '@/features/editor/review'
 import type { ChatMessage, ReadRequest, Thread } from '@shared/types'
 import { ProposalCard } from './ProposalCard'
 import { ReadHead, ReadOfferCard } from '@/features/read/ReadOfferCard'
+import { LetterText } from '@/features/read/CommentRef'
 import { acceptPending, pendingKeys, resolveTarget, segmentKeys, setHunkStates } from './applyProposal'
 import { acceptLineProposal, isLineSegment, messageLineProposal } from '@/features/plan/line/proposal'
 import { findStoryLine } from '@shared/storyline'
@@ -270,7 +271,12 @@ function AssistantMessage({ message, thread, index, after, canAct }: Props): Rea
       {segments.map((s, i) =>
         s.kind === 'text' ? (
           <div key={i} className="msg-ai-text prose">
-            <Markdown text={cut && i === segments.length - 1 ? closeMarkdown(s.text) : s.text} />
+            {/* The letter of a read links to its comments. */}
+            {read ? (
+              <LetterText text={cut && i === segments.length - 1 ? closeMarkdown(s.text) : s.text} threadId={thread.id} messageId={message.id} />
+            ) : (
+              <Markdown text={cut && i === segments.length - 1 ? closeMarkdown(s.text) : s.text} />
+            )}
           </div>
         ) : isFileSegment(s) ? (
           <ProposalCard key={i} segment={s} message={message} thread={thread} />
@@ -525,7 +531,11 @@ export function StreamingMessage({ streaming, read, threadId }: { streaming: Str
       {segments.map((s, i) =>
         s.kind === 'text' ? (
           <div key={i} className="msg-ai-text prose">
-            <Markdown text={i === segments.length - 1 ? closeMarkdown(s.text) : s.text} />
+            {read && threadId ? (
+              <LetterText text={i === segments.length - 1 ? closeMarkdown(s.text) : s.text} threadId={threadId} messageId={streaming.messageId} />
+            ) : (
+              <Markdown text={i === segments.length - 1 ? closeMarkdown(s.text) : s.text} />
+            )}
           </div>
         ) : isFileSegment(s) ? (
           <ProposalCard key={i} segment={s} streaming />

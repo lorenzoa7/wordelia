@@ -15,6 +15,7 @@ const ui = await import('./ui')
 const { useCommentMarks } = await import('./marks')
 const { useApp } = await import('@/stores/app')
 const { useUi } = await import('@/stores/ui')
+const { useBook } = await import('@/stores/book')
 
 const ROOT = '/books/santa-ilha'
 const NOW = '2026-10-21T10:00:00.000Z'
@@ -52,6 +53,7 @@ beforeEach(() => {
   useUi.setState({ toasts: [] })
   // The chapter list is closed: no page to measure in these tests.
   useApp.setState({ settings: { ui: { sidebarOpen: false, chatOpen: true } } as never, setUi })
+  useBook.setState({ root: null, chapters: [] })
   store.loadComments(null, [])
 })
 
@@ -106,5 +108,28 @@ describe('the room for the margin', () => {
     ui.makeRoomForComments({ chatOpen: true })
     expect(setUi).toHaveBeenCalledTimes(1)
     expect(setUi).toHaveBeenCalledWith({ chatOpen: true })
+  })
+})
+
+describe('the decisions of the author', () => {
+  it('a comments file of a newer Wordelia: a decision changes nothing', () => {
+    store.loadComments(ROOT, [comment()], 2)
+    useUi.setState({ toasts: [] })
+    ui.decideComments(['cm_aaaaaaaa'], 'done')
+    expect(store.useComments.getState().list[0].state).toBe('open')
+    expect(useUi.getState().toasts).toEqual([])
+  })
+
+  it('a comment of a chapter that is not in the book does not count: it never shows', () => {
+    const chapter = { id: 'ch_one', file: 'A Tempestade.md', title: 'A Tempestade', body: '', meta: {} }
+    useBook.setState({ root: ROOT, chapters: [chapter] })
+    // A sync brought back a comment of a deleted chapter.
+    const list = [comment({ id: 'cm_a' }), comment({ id: 'cm_gone', key: '1', chapterId: 'ch_deleted' })]
+    store.loadComments(ROOT, list)
+    expect(ui.openInBook(store.useComments.getState().list, [chapter]).map((c) => c.id)).toEqual(['cm_a'])
+    ui.decideComments(['cm_a'], 'done')
+    // The last comment that shows is closed: the room goes back. The other comment stays in the file.
+    expect(ui.useReadUi.getState().room).toBe(false)
+    expect(store.useComments.getState().list.map((c) => c.id)).toEqual(['cm_a', 'cm_gone'])
   })
 })

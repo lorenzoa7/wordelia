@@ -71,5 +71,24 @@ export const read: typeof en = {
     count: (n) => (n === 1 ? '1 comentario del editor' : `${n} comentarios del editor`),
     show: 'Mostrar los comentarios en el margen',
     goTo: 'Ir a los comentarios'
+  },
+  aboutComment: (n, text) => (n === null ? `Sobre el comentario «${text}»: ` : `Sobre el comentario ${n} («${text}»): `),
+  updateNoteAsk: (text, targets) => {
+    const what = targets.length ? (targets.length === 1 ? targets[0] : `${targets.slice(0, -1).join(', ')} y ${targets[targets.length - 1]}`) : 'la nota de la planificación o la línea de la historia'
+    return `El texto de este capítulo está bien así. Actualiza ${what} para que concuerde con el fragmento. No cambies este capítulo. El comentario: «${text}»`
+  },
+  polished: '¿Marcar el comentario como hecho?',
+  noPassage: 'El fragmento de este comentario ya no está en el texto.',
+  intentionalAsk: {
+    title: 'Es intencional',
+    label: 'Motivo para las próximas lecturas (opcional)',
+    placeholder: 'Por ejemplo: el personaje miente a propósito',
+    confirm: 'Marcar como intencional'
+  },
+  letterRef: {
+    open: (n, lens) => (n === null ? `Ir al comentario · ${lens}` : `Ir al comentario ${n} · ${lens}`),
+    done: (lens) => `Hecho · ${lens}`,
+    ignored: (lens) => `Ignorado · ${lens}`,
+    intentional: (lens) => `Intencional · ${lens}`
   }
 }

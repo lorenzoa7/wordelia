@@ -1,12 +1,16 @@
 // The comments of the editor's read in the status bar of the Write view: "N editor's comments". A click shows
 // the comments again (after "Hide", or when the desk gave back their room), or goes to them.
 
+import { useMemo } from 'react'
 import { Eyeglasses } from '@phosphor-icons/react'
+import type { EditorComment } from '@shared/comments'
 import { useBook } from '@/stores/book'
 import { useT } from '@/lib/i18n'
 import { Tooltip } from '@/ui'
 import { useComments } from './store'
-import { makeRoomForComments, selectComment, useReadUi } from './ui'
+import { makeRoomForComments, openInBook, selectComment, useReadUi } from './ui'
+
+const NONE: EditorComment[] = []
 
 /**
  * Go to the comments: the first number in the chapter on screen, else the first chapter of the book that has
@@ -22,7 +26,7 @@ function goToComments(): void {
     selectComment(num.dataset.comment)
     return
   }
-  const open = useComments.getState().list.filter((c) => c.state === 'open')
+  const open = openInBook(useComments.getState().list, book.chapters)
   const chapter = book.chapters.find((ch) => open.some((c) => c.chapterId === ch.id))
   if (chapter) book.selectChapter(chapter.id)
 }
@@ -31,7 +35,10 @@ export function CommentsStatus(): React.JSX.Element | null {
   const t = useT()
   const s = t.read.status
   const root = useBook((st) => st.root)
-  const count = useComments((st) => (st.root === root ? st.list.filter((c) => c.state === 'open').length : 0))
+  const chapters = useBook((st) => st.chapters)
+  const list = useComments((st) => (st.root === root ? st.list : NONE))
+  // A comment of a chapter that is not in the book does not count.
+  const count = useMemo(() => openInBook(list, chapters).length, [list, chapters])
   // The cards are on the desk now: a click goes to them. Else a click shows them, with room for the column.
   const shown = useReadUi((st) => !st.hidden && st.room && st.column)
   if (!count) return null

@@ -7,7 +7,7 @@ import type { EditorComment } from '@shared/comments'
 import { schemaExtensions } from '@/features/editor/extensions'
 import { RELOAD_META } from '@/features/editor/keep'
 import { textWithMap } from '@/features/editor/review'
-import { anchorComments, changesToWrite, commentMarksKey, commentMarksPlugin, inChapterOrder, marksOf, passageAt, passageChanges, type Range } from './marks'
+import { anchorComments, changesToWrite, commentMarksKey, commentMarksPlugin, followPassages, inChapterOrder, marksOf, passageAt, passageChanges, type Range } from './marks'
 
 const schema = getSchema(schemaExtensions())
 const NOW = '2026-10-21T10:00:00.000Z'
@@ -225,5 +225,30 @@ describe('the passages of comments in the text', () => {
     // Only Continuity: the comment of Marta keeps its number 2.
     expect(numbers('continuity')).toEqual(['cm-num:cm_marta001.continuity.2'])
     expect(marksOf(st.doc, shown('reader'), ranges).find()).toEqual([])
+  })
+
+  it('a closed comment keeps its passage, and has it again when it opens (the Undo of "Done")', () => {
+    const md = ['Elias disse que sim.', 'Marta olhou o mar.', 'Elias disse que sim.'].join('\n\n')
+    const c = comment({ passage: 'Elias disse que sim' })
+    const st = stateOf(md)
+    // The editor follows the second copy of the words.
+    const second = { from: posOf(st, 'Elias disse', 1), to: posOf(st, 'Elias disse', 1) + 'Elias disse que sim'.length }
+    const now = { ranges: new Map([[c.id, second]]), lost: new Map<string, number>(), refind: false }
+    const done = followPassages(st.doc, now, [{ ...c, state: 'done' }], false)
+    expect(done.ranges.get(c.id)).toEqual(second)
+    // Undo: the comment is open again, on the same passage, not on the first copy of its words.
+    const open = followPassages(st.doc, { ...now, ranges: done.ranges }, [c], false)
+    expect(open.ranges.get(c.id)).toEqual(second)
+  })
+
+  it('the first draw of an editor finds the passages of closed comments by their text, the later draws do not', () => {
+    const c = comment({ state: 'ignored' })
+    const st = stateOf(CHAPTER)
+    const none = { ranges: new Map<string, Range>(), lost: new Map<string, number>(), refind: false }
+    const first = followPassages(st.doc, none, [c], true).ranges.get(c.id)
+    expect(first && textAt(st, first)).toBe('Marta subiu a escada')
+    expect(followPassages(st.doc, none, [c], false).ranges.has(c.id)).toBe(false)
+    // A text from outside finds them again too.
+    expect(followPassages(st.doc, { ...none, refind: true }, [c], false).ranges.has(c.id)).toBe(true)
   })
 })

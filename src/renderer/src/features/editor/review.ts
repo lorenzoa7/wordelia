@@ -29,6 +29,8 @@ export interface ReviewData {
   docId?: string
   /** The selection of the author when the action started. It comes back when the review ends without a change. */
   selection: { anchor: number; head: number }
+  /** A comment of an editor's read that the action fixes (Polish of a comment). Retry asks with it again. */
+  note?: string
   /** Text of the range, blocks joined with a blank line, scene breaks as "* * *" (`reviewText`) */
   original: string
   /** The rewrite, as Markdown */
@@ -78,7 +80,7 @@ function cue(): void {
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     review: {
-      startReview: (opts: { id: string; from: number; to: number; label: string; actionId?: string; docId?: string; selection?: { anchor: number; head: number } }) => ReturnType
+      startReview: (opts: { id: string; from: number; to: number; label: string; actionId?: string; docId?: string; selection?: { anchor: number; head: number }; note?: string }) => ReturnType
       /** Show a review again, as it was (a review that waited while its editor was closed) */
       resumeReview: (data: ReviewData) => ReturnType
       updateReview: (id: string, proposed: string, phase: ReviewData['phase'], error?: string) => ReturnType
@@ -614,12 +616,12 @@ export const Review = Extension.create({
   addCommands() {
     return {
       startReview:
-        ({ id, from, to, label, actionId, docId, selection }) =>
+        ({ id, from, to, label, actionId, docId, selection, note }) =>
         ({ state, tr, dispatch }) => {
           if (dispatch) {
             const original = reviewText(state.doc, from, to).text
             const sel = selection ?? { anchor: state.selection.anchor, head: state.selection.head }
-            const data: ReviewData = { id, from, to, label, actionId, docId, selection: sel, phase: 'loading', original, proposed: '', ops: [] }
+            const data: ReviewData = { id, from, to, label, actionId, docId, selection: sel, phase: 'loading', original, proposed: '', ops: [], ...(note ? { note } : {}) }
             tr.setMeta(reviewKey, { type: 'start', data } satisfies ReviewMeta)
           }
           return true

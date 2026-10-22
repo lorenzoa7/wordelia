@@ -97,5 +97,38 @@ export const read = {
     show: 'Show the comments in the margin',
     /** The tooltip when they show */
     goTo: 'Go to the comments'
+  },
+  /**
+   * The draft of "Discuss in chat", after the quote of the passage: the number of the comment in the margin
+   * (null when it has none) and its text. The author writes the question after it.
+   */
+  aboutComment: (n: number | null, text: string): string => (n === null ? `About the comment “${text}”: ` : `About comment ${n} (“${text}”): `),
+  /**
+   * The message of "Update the note" in the thread of the read: the planning notes and the story line that
+   * must agree with the chapter (as mentions, for example "@Marta"; none when the comment names none) and the
+   * comment. The passage is a quote of the message.
+   */
+  updateNoteAsk: (text: string, targets: string[]): string => {
+    const what = targets.length ? (targets.length === 1 ? targets[0] : `${targets.slice(0, -1).join(', ')} and ${targets[targets.length - 1]}`) : 'the planning note or the story line'
+    return `The text of this chapter is right as it is. Update ${what} so that it agrees with the passage. Do not change this chapter. The comment: “${text}”`
+  },
+  /** The toast after the author accepts the Polish of a comment. Its button is `markDone(1)`. */
+  polished: 'Mark the comment as done?',
+  /** The passage of a comment is not in the text now: "Polish passage" has nothing to polish */
+  noPassage: 'The passage of this comment is not in the text now.',
+  /** "It's intentional": the dialog that asks for a short reason. The next reads of the chapter get it. */
+  intentionalAsk: {
+    title: "It's intentional",
+    label: 'Why? The next reads get the reason (optional)',
+    placeholder: 'For example: the character lies on purpose',
+    confirm: 'Mark as intentional'
+  },
+  /** A link of the letter of a read to one of its comments: its name for screen readers and its tooltip */
+  letterRef: {
+    /** An open comment, with its number in the margin (null when its passage is not in the text) */
+    open: (n: number | null, lens: string): string => (n === null ? `Go to the comment · ${lens}` : `Go to comment ${n} · ${lens}`),
+    done: (lens: string): string => `Done · ${lens}`,
+    ignored: (lens: string): string => `Ignored · ${lens}`,
+    intentional: (lens: string): string => `Intentional · ${lens}`
   }
 }

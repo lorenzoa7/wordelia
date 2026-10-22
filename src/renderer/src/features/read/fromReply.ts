@@ -83,13 +83,20 @@ export function commentsFromSegments(segments: Segment[], ctx: CommentsContext):
   return found.sort((a, b) => a.rank - b.rank).slice(0, ctx.limit)
 }
 
+/** Inline code and Markdown links of a letter: their text stays as it is. */
+const KEEP = /(`[^`\n]*`|\[[^\]\n]*\]\([^)\n]*\))/
+
 /**
  * The links of the letter of a read to its comments. In the letter, each problem has "(→ N)", where N is
- * the rank of its comment in the reply. Each "→ N" becomes a Markdown link to "#comment-N"; the chat shows it
- * as a link to that comment.
+ * the rank of its comment in the reply. Each "→ N" at the end of parentheses becomes a Markdown link to
+ * "#comment-N"; the chat shows it as a link to that comment. A bare arrow ("scene 2 → 3"), inline code and
+ * other links stay as they are.
  */
 export function linkCommentRefs(text: string): string {
-  return text.replace(/→[ \t]*(\d+)/g, (_m, n: string) => `[→ ${n}](#comment-${n})`)
+  return text
+    .split(KEEP)
+    .map((part, i) => (i % 2 ? part : part.replace(/→[ \t]*(\d+)(?=[ \t]*\))/g, (_m, n: string) => `[→ ${n}](#comment-${n})`)))
+    .join('')
 }
 
 /** The rank of the comment of a link that `linkCommentRefs` made, or null for another link. */

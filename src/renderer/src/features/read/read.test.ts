@@ -198,6 +198,12 @@ describe('the links of a letter to its comments', () => {
     // Text without arrows stays as it is.
     expect(linkCommentRefs('What works: the lamp.')).toBe('What works: the lamp.')
   })
+
+  it('only "(→ N)" is a link: a bare arrow, code and other links stay as they are', () => {
+    expect(linkCommentRefs('Scene 2 → 3 of the plan, and the boat (→ 2).')).toBe('Scene 2 → 3 of the plan, and the boat ([→ 2](#comment-2)).')
+    expect(linkCommentRefs('Write `(→ 1)` in the letter.')).toBe('Write `(→ 1)` in the letter.')
+    expect(linkCommentRefs('See [the note (→ 1)](https://example.com) and (→ 1).')).toBe('See [the note (→ 1)](https://example.com) and ([→ 1](#comment-1)).')
+  })
 })
 
 describe('addFromReply', () => {

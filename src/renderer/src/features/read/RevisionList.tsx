@@ -13,7 +13,7 @@ import { findText } from '@shared/proposals/apply'
 import type { Chapter } from '@shared/types'
 import { useT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
-import { useUi } from '@/stores/ui'
+import { showText, useUi } from '@/stores/ui'
 import { discussComment, goToComment, markIntentional, polishComment, updateNoteFor } from './actions'
 import { Act, sourceOf } from './Card'
 import { commentRanges, rangesKnown, useMarksDrawn } from './marks'
@@ -21,7 +21,7 @@ import { NewReadButton } from './ReadPopover'
 import { revisionCounts, revisionGroups, type RevisionFilter, type RevisionGroup, type StateChoice } from './revision'
 import { chapterName } from './start'
 import { useComments } from './store'
-import { closeRevisionList, decideComments, inBook } from './ui'
+import { decideComments, inBook } from './ui'
 import './read.css'
 
 const NONE: EditorComment[] = []
@@ -111,14 +111,6 @@ export function RevisionList(): React.JSX.Element {
     [comments, chapters, filter, drawn]
   )
 
-  // A jump to a chapter (the chapter list, a link in the chat) shows the text: the list closes.
-  useEffect(
-    () =>
-      useBook.subscribe((s, prev) => {
-        if (s.chapterJump && s.chapterJump !== prev.chapterJump) useUi.getState().setRevisionOpen(false)
-      }),
-    []
-  )
   // The text under the list must not change where the author cannot see it. Outside a field, Ctrl+Z and
   // Ctrl+Y do nothing while the list shows: else the browser undoes the last edit of the page, also in the
   // text of a chapter that does not show. (The Ctrl+Z of chat changes is off too: PageEditor.)
@@ -260,7 +252,7 @@ function Row({ c, chapterNumber, lost, readOnly }: { c: EditorComment; chapterNu
 
   // "Go to passage": the list closes first, so the passage and its card are on screen.
   const goTo = (): void => {
-    closeRevisionList()
+    showText()
     goToComment(c)
   }
   const acts: React.ReactNode[] = [<Act key="go" kind="minor" named icon={null} label={l.goTo} onClick={goTo} />]

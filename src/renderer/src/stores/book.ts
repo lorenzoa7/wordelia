@@ -347,6 +347,8 @@ export const useBook = create<BookState>((set, get) => {
       set({ view })
     },
     selectChapter(id) {
+      // The chapter shows in the Write view: the revision list does not stay over it (also from the Plan view).
+      useUi.getState().setRevisionOpen(false)
       set({ activeChapterId: id, view: 'write', chapterJump: { id, n: (get().chapterJump?.n ?? 0) + 1 } })
     },
     setActiveChapter(id) {

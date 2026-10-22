@@ -8,10 +8,10 @@ import { LENSES, type LensChoice } from '@shared/comments'
 import type { ReadRequest } from '@shared/types'
 import { getActiveEditor, selectedText, whenChapterEditor } from '@/features/editor/registry'
 import { useBook } from '@/stores/book'
+import { showText } from '@/stores/ui'
 import { useT } from '@/lib/i18n'
 import { Button, IconButton, Switch } from '@/ui'
 import { bookTarget, isLastChapter, readTarget, startRead, useReadRunning, type ReadTarget } from './start'
-import { closeRevisionList } from './ui'
 import './read.css'
 
 const CHOICES: LensChoice[] = ['all', ...LENSES]
@@ -198,7 +198,7 @@ export function NewReadButton(): React.JSX.Element {
       }
       takeTarget={bookTarget}
       onRun={(req) => {
-        closeRevisionList()
+        showText()
         const book = useBook.getState()
         if (book.activeChapterId !== req.chapterId) book.selectChapter(req.chapterId)
         void startRead(req)

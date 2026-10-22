@@ -20,12 +20,12 @@ import { onReviewEnd } from '@/features/editor/review'
 import { getT } from '@/lib/i18n'
 import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
-import { toast } from '@/stores/ui'
+import { showText, toast } from '@/stores/ui'
 import { askText } from '@/ui/prompt'
 import { commentRanges, marginNumbers, rangesKnown, useMarksDrawn } from './marks'
 import { chapterName, readThreadFor } from './start'
 import { useComments } from './store'
-import { closeRevisionList, decideComments, makeRoomForComments, selectComment, showCardPopover, useReadUi } from './ui'
+import { decideComments, makeRoomForComments, selectComment, showCardPopover, useReadUi } from './ui'
 
 /** The longest wait for the editor of a chapter to find the passages of its comments */
 const PASSAGES_WAIT_MS = 2000
@@ -52,7 +52,7 @@ function whenPassages(chapterId: string, fn: () => void): void {
  * on screen becomes the active chapter; another chapter opens first. The revision list closes: the text shows.
  */
 function inChapter(chapterId: string, go: (e: ChapterEditor) => void): void {
-  closeRevisionList()
+  showText()
   const ready = (e: ChapterEditor): void => whenPassages(chapterId, () => !e.editor.isDestroyed && go(e))
   const book = useBook.getState()
   const here = book.view === 'write' ? getChapterEditor(chapterId) : null

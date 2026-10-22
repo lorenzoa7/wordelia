@@ -6,7 +6,7 @@ import clsx from 'clsx'
 import { markdownToPlain } from '@shared/book'
 import { Button, Dialog } from '@/ui'
 import { useBook } from '@/stores/book'
-import { toast, useUi } from '@/stores/ui'
+import { showText, toast, useUi } from '@/stores/ui'
 import { getT, useT } from '@/lib/i18n'
 import { findKey } from './find'
 import { scrollToPos, setActiveEditor, whenChapterEditor } from './registry'
@@ -59,6 +59,8 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
       // The Write view stays mounted under the Plan view: Ctrl+F works only while it shows.
       if (mod && (e.key === 'f' || e.key === 'h') && useBook.getState().view === 'write') {
         e.preventDefault()
+        // The find bar looks in the text: the text shows (the revision list closes).
+        showText()
         setOpen(true)
         if (e.key === 'h') setShowReplace(true)
         const { from, to } = editor.state.selection

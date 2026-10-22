@@ -1,18 +1,16 @@
 // What the margin of the comments shows, and the room that it takes on the desk. Also which comments the
-// revision list shows, and its place over the desk.
+// revision list shows.
 //
 // The desk changes its layout only at a click of the author (a read starts, "Hide", the last comment is
 // closed) and when a book opens. A comment that streams in, or text that the author types, never moves the
 // page or the chapter list.
 
-import { flushSync } from 'react-dom'
 import { create } from 'zustand'
 import type { CommentState, EditorComment, LensChoice } from '@shared/comments'
 import type { AppSettings, Chapter } from '@shared/types'
 import { panelLayout } from '@/features/book/panels'
 import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
-import { useUi } from '@/stores/ui'
 import { columnFits } from './layout'
 import { useCommentMarks } from './marks'
 import { setCommentState, useComments } from './store'
@@ -51,14 +49,6 @@ export function inBook(list: EditorComment[], chapters: Chapter[]): EditorCommen
 /** The open comments of the chapters of the book: the counts of the status bar and of the chapter list. */
 export function openInBook(list: EditorComment[], chapters: Chapter[]): EditorComment[] {
   return inBook(list, chapters).filter((c) => c.state === 'open')
-}
-
-/**
- * The text shows again: the revision list closes at once, so the text can take the focus or scroll right
- * after this call ("Go to passage", "Polish passage", "Read" of the list, a link of a letter).
- */
-export function closeRevisionList(): void {
-  if (useUi.getState().revisionOpen) flushSync(() => useUi.getState().setRevisionOpen(false))
 }
 
 /** The book has open comments that show. Before the book store has the book of the comments, all open comments count. */

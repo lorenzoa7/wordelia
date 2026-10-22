@@ -22,7 +22,7 @@ import { currentFrom } from '@shared/proposals/state'
 import { wordDiff } from '@shared/text/diff'
 import type { ChatMessage, Thread } from '@shared/types'
 import { useBook } from '@/stores/book'
-import { toast, useUi } from '@/stores/ui'
+import { showText, toast, useUi } from '@/stores/ui'
 import { getT } from '@/lib/i18n'
 import { typesetForBook } from '@/lib/typeset'
 import { useChat } from '@/features/chat/chatStore'
@@ -498,8 +498,9 @@ function markFocus(id: string | undefined): void {
   focusTimer = setTimeout(() => useInlineProposals.setState({ focus: null }), 1600)
 }
 
-/** Open the chapter when it has no editor (another page, or far from the screen), then run `go`. */
+/** Open the chapter when it has no editor (another page, or far from the screen), then run `go`. The text shows: the revision list closes. */
 function inChapter(chapterId: string, go: () => void): void {
+  showText()
   const book = useBook.getState()
   if (book.view === 'write' && getChapterEditor(chapterId)) go()
   else {

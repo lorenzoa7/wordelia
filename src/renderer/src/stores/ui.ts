@@ -1,5 +1,6 @@
 // Transient UI state: dialogs and toasts.
 
+import { flushSync } from 'react-dom'
 import { create } from 'zustand'
 
 /** 'book' and 'rules' belong to the open book: without a book, the dialog shows 'general'. */
@@ -111,3 +112,12 @@ export const useUi = create<UiState>((set, get) => ({
 }))
 
 export const toast = (message: string, opts?: Parameters<UiState['toast']>[1]): void => useUi.getState().toast(message, opts)
+
+/**
+ * The text of the Write view shows: the revision list over the desk closes, at once, so the text can take the
+ * focus or scroll right after this call ("Go to passage", "Show in text", Ctrl+F). Call it from an event, not
+ * while React renders. (A jump to a chapter closes the list too: stores/book.ts, `selectChapter`.)
+ */
+export function showText(): void {
+  if (useUi.getState().revisionOpen) flushSync(() => useUi.getState().setRevisionOpen(false))
+}

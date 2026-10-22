@@ -162,14 +162,21 @@ export function polishComment(c: EditorComment): Promise<void> {
 }
 
 // The author accepted the Polish of a comment (also a Retry of it): ask whether the comment is done.
-// Nothing closes by itself.
 onReviewEnd((e) => {
   if (!e.accepted || !e.data.note || !e.data.docId) return
   const key = polishKey(e.data.docId, e.data.note)
   const id = polishing.get(key)
   polishing.delete(key)
+  if (id) askDoneAfterPolish(id)
+})
+
+/**
+ * The author accepted the Polish of a comment: a toast asks whether the comment is done. Nothing closes by
+ * itself, and no question comes for a comment that is closed, or in a comments file of a newer Wordelia.
+ */
+export function askDoneAfterPolish(id: string): void {
   const { list, readOnly } = useComments.getState()
-  if (!id || readOnly || !list.some((c) => c.id === id && c.state === 'open')) return
+  if (readOnly || !list.some((c) => c.id === id && c.state === 'open')) return
   const t = getT()
   toast(t.read.polished, {
     ms: 12000,
@@ -185,7 +192,7 @@ onReviewEnd((e) => {
       }
     }
   })
-})
+}
 
 /**
  * "Update the note" (Continuity): a message in the thread of the read asks for a change of the planning note
@@ -196,6 +203,11 @@ export async function updateNoteFor(c: EditorComment): Promise<void> {
   const quote = passageQuote(c)
   if (!quote) return
   const thread = showThread(c)
+  // One reply at a time in a thread: say it, and send nothing.
+  if (useChat.getState().streaming[thread.id]) {
+    toast(getT().read.threadBusy)
+    return
+  }
   const mentions: Mention[] = []
   const targets: string[] = []
   for (const s of c.sources) {

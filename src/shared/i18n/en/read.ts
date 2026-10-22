@@ -130,5 +130,7 @@ export const read = {
     done: (lens: string): string => `Done · ${lens}`,
     ignored: (lens: string): string => `Ignored · ${lens}`,
     intentional: (lens: string): string => `Intentional · ${lens}`
-  }
+  },
+  /** "Update the note" while the thread of the read still writes a reply: nothing is sent */
+  threadBusy: 'The chat still writes a reply in the thread of this read. Try again when the reply ends.'
 }

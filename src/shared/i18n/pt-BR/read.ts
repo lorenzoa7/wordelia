@@ -90,5 +90,6 @@ export const read: typeof en = {
     done: (lens) => `Feito · ${lens}`,
     ignored: (lens) => `Ignorado · ${lens}`,
     intentional: (lens) => `Intencional · ${lens}`
-  }
+  },
+  threadBusy: 'O chat ainda escreve uma resposta na conversa desta leitura. Tente de novo quando a resposta terminar.'
 }

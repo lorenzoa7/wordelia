@@ -104,7 +104,17 @@ function askAboutFixed(message: ChatMessage, req: ReadRequest): void {
     .map((c) => c.id)
   if (!open.length) return
   const t = getT()
-  toast(t.read.resolved(open.length), { ms: 14000, action: { label: t.read.markDone(open.length), run: () => decideComments(open, 'done') } })
+  const named = new Set(open)
+  // The author can decide about some of them before the click (the margin, the revision list): close only the
+  // ones that are still open.
+  const run = (): void => {
+    const still = useComments
+      .getState()
+      .list.filter((c) => named.has(c.id) && c.state === 'open')
+      .map((c) => c.id)
+    if (still.length) decideComments(still, 'done')
+  }
+  toast(t.read.resolved(open.length), { ms: 14000, action: { label: t.read.markDone(open.length), run } })
 }
 
 /** The saved replies of the read threads of the open book. A reply that has not changed since the last time is skipped. */

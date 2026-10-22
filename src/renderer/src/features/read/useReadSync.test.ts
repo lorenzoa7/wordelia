@@ -9,6 +9,7 @@ vi.mock('@/lib/api', () => ({
 
 const { makeThrottle, readBefore, startReadSync, STREAM_PARSE_MS } = await import('./useReadSync')
 const { loadComments, useComments } = await import('./store')
+const { decideComments } = await import('./ui')
 const { useBook } = await import('@/stores/book')
 const { useChat } = await import('@/features/chat/chatStore')
 const { useUi } = await import('@/stores/ui')
@@ -239,6 +240,22 @@ describe('comments that look fixed', () => {
     toasts[0].action?.run()
     expect(list().filter((c) => c.state === 'done').map((c) => c.id)).toEqual(['cm_open0001', 'cm_open0002', 'cm_done0001'])
     expect(list().find((c) => c.id === 'cm_other001')?.state).toBe('open')
+  })
+
+  it('"Mark as done" closes only the comments that are still open when the author clicks', () => {
+    loadComments(ROOT, [comment(), comment({ id: 'cm_open0002', passage: 'dois dias' })])
+    useBook.setState({ threads: [thread([asked()])] })
+    stop = startReadSync()
+    finish(`Fixed.\n${resolved('cm_open0001 cm_open0002')}`)
+    const [asking] = useUi.getState().toasts
+    expect(asking.message).toBe(getT().read.resolved(2))
+    // The author ignores one of them in the revision list before the click.
+    decideComments(['cm_open0002'], 'ignored')
+    asking.action?.run()
+    expect(list().map((c) => [c.id, c.state])).toEqual([
+      ['cm_open0001', 'done'],
+      ['cm_open0002', 'ignored']
+    ])
   })
 
   it('a reply that was not seen while it streamed does not ask (the book opens with an old reply)', () => {

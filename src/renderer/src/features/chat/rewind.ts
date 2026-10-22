@@ -184,7 +184,7 @@ export async function undoBookChanges(changes: BookChanges): Promise<UndoResult>
 
 /**
  * Keep the first `keep` messages of a thread. The digest starts again when it covered removed messages. The
- * comments of the removed replies of reads go too.
+ * open comments of the removed replies of reads go too; the decided ones stay (dropMessageComments).
  */
 export function truncateThread(threadId: string, keep: number): Thread | null {
   const th = useBook.getState().threads.find((t) => t.id === threadId)

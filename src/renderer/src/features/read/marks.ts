@@ -24,6 +24,7 @@ import { create } from 'zustand'
 import { markdownToPlainBlocks } from '@shared/book'
 import type { EditorComment, Lens, LensChoice } from '@shared/comments'
 import { findText } from '@shared/proposals/apply'
+import { useChat } from '@/features/chat/chatStore'
 import { isReload } from '@/features/editor/keep'
 import { getChapterEditor } from '@/features/editor/registry'
 import { textWithMap } from '@/features/editor/review'
@@ -347,14 +348,16 @@ export function stackNumbers(root: HTMLElement): void {
 const scopes = new Map<string, string | null>()
 
 /** The selected text of the read that gave a comment, or undefined for a read of the whole chapter. */
-function readScope(c: EditorComment): string | undefined {
+export function readScope(c: EditorComment): string | undefined {
   const known = scopes.get(c.messageId)
   if (known !== undefined) return known ?? undefined
   const thread = useBook.getState().threads.find((t) => t.id === c.threadId)
   if (!thread) return undefined
   const i = thread.messages.findIndex((m) => m.id === c.messageId)
-  // A reply that still streams is not in the thread yet: it answers the last message.
-  const asked = i < 0 ? thread.messages.at(-1) : thread.messages[i - 1]
+  // A reply that still streams is not in the thread yet: it answers the last message. A reply that left its
+  // thread (Retry, Rewind, Edit; its decided comments stay) has no read now: its passage is found in the chapter.
+  const streams = i < 0 && useChat.getState().streaming[c.threadId]?.messageId === c.messageId
+  const asked = i >= 0 ? thread.messages[i - 1] : streams ? thread.messages.at(-1) : undefined
   const scope = asked?.role === 'user' && asked.read?.selection?.text.trim() ? asked.read.selection.text : null
   if (i >= 0) scopes.set(c.messageId, scope)
   return scope ?? undefined

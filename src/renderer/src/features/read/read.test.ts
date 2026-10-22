@@ -662,23 +662,27 @@ describe('the comments of replies that leave their thread', () => {
     comment({ id: 'cm_cccccccc', messageId: 'msg_new', key: '2', lens: 'continuity', state: 'intentional', reason: 'A choice' })
   ]
 
-  it('dropMessageComments takes out the comments of those replies and writes the file', async () => {
-    store.loadComments(ROOT, three())
+  it('dropMessageComments takes out the open comments of those replies and writes the file; the decided ones stay', async () => {
+    store.loadComments(ROOT, [...three(), comment({ id: 'cm_dddddddd', messageId: 'msg_new', key: '3' })])
     const gone = store.dropMessageComments(['msg_new', 'msg_user'])
-    expect(gone.map((c) => c.id)).toEqual(['cm_bbbbbbbb', 'cm_cccccccc'])
-    expect(store.useComments.getState().list.map((c) => c.id)).toEqual(['cm_aaaaaaaa'])
-    await saver.flush()
-    expect(onDisk().map((c) => c.id)).toEqual(['cm_aaaaaaaa'])
-    // The Undo of a thread delete puts them back, with their states and reasons.
-    store.putBackComments(gone)
+    expect(gone.map((c) => c.id)).toEqual(['cm_dddddddd'])
+    // A decision of the author is the memory of the chapter: the next read must not write the comment again.
+    expect(store.useComments.getState().list.map((c) => c.id)).toEqual(['cm_aaaaaaaa', 'cm_bbbbbbbb', 'cm_cccccccc'])
     expect(store.useComments.getState().list.find((c) => c.id === 'cm_cccccccc')).toMatchObject({ state: 'intentional', reason: 'A choice' })
+    await saver.flush()
+    expect(onDisk().map((c) => c.id)).toEqual(['cm_aaaaaaaa', 'cm_bbbbbbbb', 'cm_cccccccc'])
+    // The Undo of a thread delete puts the open ones back.
+    store.putBackComments(gone)
+    expect(store.useComments.getState().list.map((c) => c.id)).toEqual(['cm_aaaaaaaa', 'cm_bbbbbbbb', 'cm_cccccccc', 'cm_dddddddd'])
   })
 
-  it('replies without comments write nothing', async () => {
+  it('replies without comments, or with decided comments only, write nothing', async () => {
     store.loadComments(ROOT, three())
     calls.length = 0
     expect(store.dropMessageComments(['msg_other'])).toEqual([])
     expect(store.dropMessageComments([])).toEqual([])
+    expect(store.dropMessageComments(['msg_new'])).toEqual([])
+    expect(store.useComments.getState().list).toHaveLength(3)
     await saver.flush()
     expect(calls).toEqual([])
   })

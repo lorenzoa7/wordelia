@@ -4,10 +4,13 @@ import { EditorState, type Plugin } from '@tiptap/pm/state'
 import { history, redo, undo } from '@tiptap/pm/history'
 import { parseMarkdown } from '@shared/markdown/parse'
 import type { EditorComment } from '@shared/comments'
+import type { ChatMessage, Thread } from '@shared/types'
 import { schemaExtensions } from '@/features/editor/extensions'
 import { RELOAD_META } from '@/features/editor/keep'
 import { textWithMap } from '@/features/editor/review'
-import { anchorComments, changesToWrite, commentMarksKey, commentMarksPlugin, followPassages, inChapterOrder, marksOf, passageAt, passageChanges, type Range } from './marks'
+import { useChat } from '@/features/chat/chatStore'
+import { useBook } from '@/stores/book'
+import { anchorComments, changesToWrite, commentMarksKey, commentMarksPlugin, followPassages, inChapterOrder, marksOf, passageAt, passageChanges, readScope, type Range } from './marks'
 
 const schema = getSchema(schemaExtensions())
 const NOW = '2026-10-21T10:00:00.000Z'
@@ -250,5 +253,49 @@ describe('the passages of comments in the text', () => {
     expect(followPassages(st.doc, none, [c], false).ranges.has(c.id)).toBe(false)
     // A text from outside finds them again too.
     expect(followPassages(st.doc, { ...none, refind: true }, [c], false).ranges.has(c.id)).toBe(true)
+  })
+})
+
+describe('the read of a comment', () => {
+  const asked = (id: string, selection?: string): ChatMessage => ({
+    id,
+    role: 'user',
+    content: 'Read the chapter.',
+    createdAt: NOW,
+    read: { chapterId: 'ch_one', lens: 'all', inProgress: false, ...(selection ? { selection: { text: selection } } : {}) }
+  })
+  const answer = (id: string): ChatMessage => ({ id, role: 'assistant', content: 'A letter.', createdAt: NOW })
+  const thread = (messages: ChatMessage[]): Thread => ({
+    id: 'th_scope',
+    title: 'Leitura · A Tempestade',
+    brief: '',
+    digest: '',
+    digestedCount: 0,
+    createdAt: NOW,
+    updatedAt: NOW,
+    pinned: false,
+    route: null,
+    readChapterId: 'ch_one',
+    messages
+  })
+
+  it('a reply in its thread has the selection of its read', () => {
+    useBook.setState({ threads: [thread([asked('m_sel_ask', 'Marta subiu a escada com o café.'), answer('m_sel_reply')])] })
+    expect(readScope(comment({ threadId: 'th_scope', messageId: 'm_sel_reply' }))).toBe('Marta subiu a escada com o café.')
+  })
+
+  it('a reply that streams answers the last message of its thread', () => {
+    useBook.setState({ threads: [thread([asked('m_live_ask', 'O vento entrava pelas frestas da janela.')])] })
+    useChat.setState({ streaming: { th_scope: { messageId: 'm_live_reply', text: '', requestId: 'r1', cancel: () => {} } } })
+    expect(readScope(comment({ threadId: 'th_scope', messageId: 'm_live_reply' }))).toBe('O vento entrava pelas frestas da janela.')
+    useChat.setState({ streaming: {} })
+  })
+
+  it('a reply that left its thread (Retry, Rewind, Edit) or a thread that is gone: the whole chapter', () => {
+    // After a Rewind, the last message is the read of another selection: it is not the read of the removed reply.
+    useBook.setState({ threads: [thread([asked('m_other_ask', 'O vento entrava pelas frestas da janela.')])] })
+    expect(readScope(comment({ threadId: 'th_scope', messageId: 'm_removed', state: 'done' }))).toBeUndefined()
+    useBook.setState({ threads: [] })
+    expect(readScope(comment({ threadId: 'th_scope', messageId: 'm_removed2', state: 'done' }))).toBeUndefined()
   })
 })

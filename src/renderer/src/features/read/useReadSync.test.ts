@@ -343,17 +343,31 @@ ${note(1, 'Marta olhou o mar')}
 })
 
 describe('a read reply that leaves its thread', () => {
-  it('Retry, Rewind and Edit take the comments of the removed replies away', async () => {
+  it('Retry, Rewind and Edit take the open comments of the removed replies away; the decided ones stay', async () => {
     const { truncateThread } = await import('@/features/chat/rewind')
     const first = reply(note(1, 'Marta olhou o mar'))
     const second = reply(note(1, 'dois dias'), 'm_reply2')
     useBook.setState({ threads: [thread([asked(), first, asked('m_ask2'), second])] })
-    loadComments(ROOT, [comment({ id: 'cm_first01', messageId: first.id }), comment({ id: 'cm_second1', messageId: second.id, state: 'done' })])
+    loadComments(ROOT, [
+      comment({ id: 'cm_first01', messageId: first.id }),
+      comment({ id: 'cm_first02', messageId: first.id, key: '1', state: 'ignored' }),
+      comment({ id: 'cm_second1', messageId: second.id, state: 'done' }),
+      comment({ id: 'cm_second2', messageId: second.id, key: '1', state: 'intentional', reason: 'Elias lies on purpose' })
+    ])
     // Retry of the last reply: the thread keeps the first three messages.
     truncateThread('th_read', 3)
-    expect(list().map((c) => c.id)).toEqual(['cm_first01'])
+    expect(list().map((c) => c.id)).toEqual(['cm_first01', 'cm_first02', 'cm_second1', 'cm_second2'])
     // Rewind to the start.
     truncateThread('th_read', 0)
-    expect(list()).toEqual([])
+    expect(list().map((c) => c.id)).toEqual(['cm_first02', 'cm_second1', 'cm_second2'])
+    // The new reply of the read gives its own comments; the decisions stay the memory of the chapter.
+    stop = startReadSync()
+    useBook.setState({ threads: [thread([asked('m_ask3'), reply(note(1, 'Marta olhou o mar'), 'm_reply3')])] })
+    expect(list().map((c) => [c.messageId, c.state])).toEqual([
+      ['m_reply', 'ignored'],
+      ['m_reply2', 'done'],
+      ['m_reply2', 'intentional'],
+      ['m_reply3', 'open']
+    ])
   })
 })

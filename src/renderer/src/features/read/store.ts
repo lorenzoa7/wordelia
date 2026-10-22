@@ -216,14 +216,17 @@ export function takeChapterComments(chapterId: string, trash?: string): EditorCo
 
 /**
  * Replies of reads leave their thread (Retry, Rewind, the Edit of an earlier message, a deleted thread): their
- * comments go too, because a comment comes from a reply. Returns them, for the Undo of a thread delete
+ * open comments go too, because a comment comes from a reply. A decided comment (done, ignored, intentional)
+ * stays, also when its reply or thread is gone: it is the memory of the chapter, and the next read gets it so
+ * that it does not write the comment again. Returns the comments that went, for the Undo of a thread delete
  * (`putBackComments`).
  */
 export function dropMessageComments(messageIds: string[]): EditorComment[] {
   const { list } = useComments.getState()
   const gone = new Set(messageIds)
-  const taken = list.filter((c) => gone.has(c.messageId))
-  if (taken.length) change(list.filter((c) => !gone.has(c.messageId)))
+  const goes = (c: EditorComment): boolean => c.state === 'open' && gone.has(c.messageId)
+  const taken = list.filter(goes)
+  if (taken.length) change(list.filter((c) => !goes(c)))
   return taken
 }
 

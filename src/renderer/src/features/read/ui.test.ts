@@ -133,3 +133,19 @@ describe('the decisions of the author', () => {
     expect(store.useComments.getState().list.map((c) => c.id)).toEqual(['cm_a', 'cm_gone'])
   })
 })
+
+describe('the revision list', () => {
+  it('shows the comments of the chapters of the book in all their states, and no comment of a chapter that is not in the book', () => {
+    const chapter = { id: 'ch_one', file: 'A Tempestade.md', title: 'A Tempestade', body: '', meta: {} }
+    const list = [comment({ id: 'cm_a' }), comment({ id: 'cm_done', key: '1', state: 'done' }), comment({ id: 'cm_gone', key: '2', chapterId: 'ch_deleted' })]
+    expect(ui.inBook(list, [chapter]).map((c) => c.id)).toEqual(['cm_a', 'cm_done'])
+    expect(ui.openInBook(list, [chapter]).map((c) => c.id)).toEqual(['cm_a'])
+  })
+
+  it('closes when another book opens', () => {
+    useUi.getState().setRevisionOpen(true)
+    expect(useUi.getState().revisionOpen).toBe(true)
+    useUi.getState().resetForBook()
+    expect(useUi.getState().revisionOpen).toBe(false)
+  })
+})

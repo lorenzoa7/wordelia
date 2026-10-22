@@ -162,8 +162,65 @@
 .book-main.is-sidebar-closed .toolbar-wrap {
   padding-inline: 56px;
 }
-.book-main.is-sidebar-closed .plan-scroll {
+.book-main.is-sidebar-closed .plan-scroll,
+.book-main.is-sidebar-closed .revision-scroll {
   padding-left: max(var(--s-8), 64px);
+}
+/* The item of the revision list (features/read/RevisionList.tsx), above the chapters: the open comments of
+   the book. It looks like a chapter item; it is on paper while the list shows. */
+.revision-item {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  height: 38px;
+  margin-bottom: var(--s-3);
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-align: left;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.revision-item:hover {
+  background: var(--desk-2);
+  color: var(--ink);
+}
+.revision-item.is-active {
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 7%, transparent);
+}
+.revision-item svg {
+  flex: none;
+  color: var(--ink-3);
+  translate: 0 var(--icon-lift);
+}
+.revision-item.is-active svg {
+  color: var(--ribbon);
+}
+.revision-item-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.revision-item-count {
+  flex: none;
+  min-width: 22px;
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--ribbon-wash);
+  color: var(--ribbon);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 .chapter-list {
   flex: 1;
@@ -247,6 +304,13 @@
   background: var(--paper);
   font-size: var(--text-sm);
   user-select: text;
+}
+/* The open comments of the editor's reads in a chapter */
+.chapter-item-open {
+  color: var(--ribbon);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 .chapter-item-words {
   font-size: var(--text-2xs);

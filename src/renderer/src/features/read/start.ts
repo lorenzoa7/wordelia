@@ -16,6 +16,34 @@ export function chapterName(title: string): string {
   return title.trim() || getT().common.untitled
 }
 
+/** What the form of a read reads: a chapter, and the text that is selected in it. */
+export interface ReadTarget {
+  chapterId: string
+  /** The number of the chapter in the book */
+  number: number
+  title: string
+  /** The selected text, or '' */
+  selection: string
+}
+
+/** The target of a read of a chapter of the book, with a selection in it. Null for a chapter that is not in the book. */
+export function readTarget(chapterId: string, selection: string): ReadTarget | null {
+  const chapters = useBook.getState().chapters
+  const index = chapters.findIndex((c) => c.id === chapterId)
+  if (index < 0) return null
+  return { chapterId, number: index + 1, title: chapterName(chapters[index].title), selection: selection.trim() }
+}
+
+/**
+ * The target of a read without an editor (the revision list covers the text): the open chapter, or the first
+ * chapter when none is open. Never a selection: the author does not see the text.
+ */
+export function bookTarget(): ReadTarget | null {
+  const { chapters, activeChapterId } = useBook.getState()
+  const open = chapters.find((c) => c.id === activeChapterId) ?? chapters[0]
+  return open ? readTarget(open.id, '') : null
+}
+
 /** A read of the last chapter of the book is a read of a chapter in progress, by default. */
 export function isLastChapter(chapterId: string): boolean {
   const chapters = useBook.getState().chapters

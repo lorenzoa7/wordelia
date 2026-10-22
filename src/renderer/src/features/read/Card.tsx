@@ -172,17 +172,19 @@ function useFitRow(): React.RefObject<HTMLDivElement | null> {
 }
 
 /**
- * A button of a card. `kind`: a work with the chat or the editor (a light button), a smaller decision, or
- * "Done". `off`: it does nothing, and its tooltip says why.
+ * A button of a card (and of a row of the revision list). `kind`: a work with the chat or the editor (a light
+ * button), a smaller decision, or "Done". `off`: it does nothing, and its tooltip says why. `named`: its label
+ * always shows, so it has no tooltip with its name.
  */
-function Act({
+export function Act({
   kind,
   icon,
   label,
   className,
   onClick,
   off,
-  offTip
+  offTip,
+  named
 }: {
   kind: 'work' | 'minor' | 'done'
   icon: React.ReactNode
@@ -191,6 +193,7 @@ function Act({
   onClick?: () => void
   off?: boolean
   offTip?: string
+  named?: boolean
 }): React.JSX.Element {
   const button = (
     <button
@@ -207,6 +210,6 @@ function Act({
     </button>
   )
   // The tooltip names a button that shows only its icon, or says why a button is off.
-  const tip = off && offTip ? offTip : kind === 'done' ? null : label
+  const tip = off && offTip ? offTip : kind === 'done' || named ? null : label
   return tip ? <Tooltip label={tip}>{button}</Tooltip> : button
 }

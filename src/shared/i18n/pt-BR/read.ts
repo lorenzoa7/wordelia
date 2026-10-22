@@ -91,5 +91,27 @@ export const read: typeof en = {
     ignored: (lens) => `Ignorado · ${lens}`,
     intentional: (lens) => `Intencional · ${lens}`
   },
-  threadBusy: 'O chat ainda escreve uma resposta na conversa desta leitura. Tente de novo quando a resposta terminar.'
+  threadBusy: 'O chat ainda escreve uma resposta na conversa desta leitura. Tente de novo quando a resposta terminar.',
+  list: {
+    title: 'Lista de revisão',
+    intro: 'Todos os comentários das leituras de editor, de todos os olhares. Nenhum comentário muda o texto.',
+    newRead: 'Nova leitura',
+    lensFilter: 'Olhar',
+    stateFilter: 'Estado',
+    all: 'Todos',
+    states: { open: 'Abertos', done: 'Feitos', ignored: 'Ignorados', intentional: 'Intencionais' },
+    state: { open: 'Aberto', done: 'Feito', ignored: 'Ignorado', intentional: 'Intencional' },
+    count: {
+      open: (n) => `${n} ${n === 1 ? 'aberto' : 'abertos'}`,
+      done: (n) => `${n} ${n === 1 ? 'feito' : 'feitos'}`,
+      ignored: (n) => `${n} ${n === 1 ? 'ignorado' : 'ignorados'}`,
+      intentional: (n) => `${n} ${n === 1 ? 'intencional' : 'intencionais'}`
+    },
+    openCount: (n) => (n === 1 ? '1 comentário aberto' : `${n} comentários abertos`),
+    goTo: 'Ir ao trecho',
+    reason: 'Sua razão:',
+    empty: 'Nenhum comentário ainda. Os comentários das leituras de editor ficam aqui.',
+    noMatch: 'Nenhum comentário com estes filtros.',
+    conflict: (chapter, source) => `${chapter} está em conflito com ${source}`
+  }
 }

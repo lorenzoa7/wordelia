@@ -19,6 +19,8 @@ interface UiState {
   newBookOpen: boolean
   findOpen: boolean
   historyChapterId: string | null
+  /** The revision list covers the desk of the Write view (features/read/RevisionList.tsx) */
+  revisionOpen: boolean
   toasts: Toast[]
   openSettings(tab?: SettingsTab): void
   closeSettings(): void
@@ -26,7 +28,8 @@ interface UiState {
   setNewBookOpen(v: boolean): void
   setFindOpen(v: boolean): void
   openHistory(chapterId: string | null): void
-  /** Close what belongs to the open book (the find bar, the history, the export): another book opens, or none. */
+  setRevisionOpen(v: boolean): void
+  /** Close what belongs to the open book (the find bar, the history, the export, the revision list): another book opens, or none. */
   resetForBook(): void
   toast(message: string, opts?: { kind?: Toast['kind']; action?: Toast['action']; ms?: number }): void
   dismissToast(id: number): void
@@ -48,6 +51,7 @@ export const useUi = create<UiState>((set, get) => ({
   newBookOpen: false,
   findOpen: false,
   historyChapterId: null,
+  revisionOpen: false,
   toasts: [],
   openSettings(tab) {
     // No tab (the gear, Ctrl+,): always the first tab, not the last one.
@@ -68,9 +72,12 @@ export const useUi = create<UiState>((set, get) => ({
   openHistory(chapterId) {
     set({ historyChapterId: chapterId })
   },
+  setRevisionOpen(v) {
+    if (get().revisionOpen !== v) set({ revisionOpen: v })
+  },
   resetForBook() {
     const tab = get().settingsTab
-    set({ findOpen: false, historyChapterId: null, exportOpen: false, ...(tab === 'book' || tab === 'rules' ? { settingsOpen: false } : {}) })
+    set({ findOpen: false, historyChapterId: null, exportOpen: false, revisionOpen: false, ...(tab === 'book' || tab === 'rules' ? { settingsOpen: false } : {}) })
   },
   toast(message, opts = {}) {
     const id = nextToast++

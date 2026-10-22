@@ -26,7 +26,7 @@ vi.mock('@/features/chat/digest', () => ({ afterReply: async () => {} }))
 vi.mock('@/features/chat/rewind', () => ({ confirmAndRewind: async () => true }))
 vi.mock('@/features/editor/registry', () => ({ flushEditor: () => {} }))
 
-const { chapterName, isLastChapter, readThreadFor, startRead } = await import('./start')
+const { bookTarget, chapterName, isLastChapter, readTarget, readThreadFor, startRead } = await import('./start')
 const { sendInThread } = await import('@/features/chat/send')
 const { loadComments } = await import('./store')
 const { useApp } = await import('@/stores/app')
@@ -217,6 +217,24 @@ describe('startRead', () => {
     // Back in the first thread, the draft is back.
     useChat.getState().setActiveThread('th_plain')
     expect(useChat.getState().draft).toBe('A question about Marta')
+  })
+})
+
+describe('what the form of a read reads without an editor (the revision list)', () => {
+  it('the open chapter, or the first chapter when none is open; never a selection', () => {
+    expect(bookTarget()).toEqual({ chapterId: 'ch_two', number: 2, title: 'O Visitante', selection: '' })
+    useBook.setState({ activeChapterId: null })
+    expect(bookTarget()).toEqual({ chapterId: 'ch_one', number: 1, title: 'A Tempestade', selection: '' })
+    // A chapter that left the book is not open any more.
+    useBook.setState({ activeChapterId: 'ch_gone' })
+    expect(bookTarget()?.chapterId).toBe('ch_one')
+    useBook.setState({ chapters: [] })
+    expect(bookTarget()).toBeNull()
+  })
+
+  it('a chapter with a selection, for the toolbar', () => {
+    expect(readTarget('ch_one', '  Marta olhou o mar.  ')).toEqual({ chapterId: 'ch_one', number: 1, title: 'A Tempestade', selection: 'Marta olhou o mar.' })
+    expect(readTarget('ch_gone', '')).toBeNull()
   })
 })
 

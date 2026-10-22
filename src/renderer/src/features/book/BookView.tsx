@@ -15,6 +15,7 @@ import { ExportDialog } from '@/features/export/ExportDialog'
 import { useActionShortcuts } from '@/features/actions/useActionShortcuts'
 import { useInlineProposalSync } from '@/features/editor/inlineProposals'
 import { useReadSync } from '@/features/read/useReadSync'
+import { RevisionList } from '@/features/read/RevisionList'
 import { HistoryDialog } from '@/features/history/HistoryDialog'
 import { startAutoSnapshots } from '@/features/history/snapshots'
 import { SidePanel } from './SidePanel'
@@ -45,6 +46,9 @@ export function BookView(): React.JSX.Element {
   const exportOpen = useUi((s) => s.exportOpen)
   const setExportOpen = useUi((s) => s.setExportOpen)
   const historyChapterId = useUi((s) => s.historyChapterId)
+  // The revision list of the editor's reads covers the desk of the Write view.
+  const revision = useUi((s) => s.revisionOpen) && view === 'write'
+  const writeAway = view !== 'write' || revision
 
   useEffect(() => startAutoSnapshots(), [])
 
@@ -83,12 +87,17 @@ export function BookView(): React.JSX.Element {
 
       <div className={clsx('book-main', !sidebarOpen && 'is-sidebar-closed')}>
         <ShowSidebarButton open={sidebarOpen} />
-        {/* The Write view stays mounted under the Plan view: back in Write, the scroll, the cursor
-            and the undo history are as they were. While Plan shows, it is hidden and inert. */}
-        <div className={clsx('book-pane book-pane-write', view !== 'write' && 'is-away')} inert={view !== 'write'}>
+        {/* The Write view stays mounted under the Plan view and under the revision list: back in Write,
+            the scroll, the cursor and the undo history are as they were. Meanwhile it is hidden and inert. */}
+        <div className={clsx('book-pane book-pane-write', writeAway && 'is-away')} inert={writeAway}>
           <PageEditor />
           <StatusBar />
         </div>
+        {revision && (
+          <div className="book-pane book-pane-revision">
+            <RevisionList />
+          </div>
+        )}
         <AnimatePresence initial={false}>
           {view === 'plan' && (
             <motion.div key="plan" className="book-pane book-pane-plan" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>

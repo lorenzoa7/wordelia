@@ -132,5 +132,42 @@ export const read = {
     intentional: (lens: string): string => `Intentional · ${lens}`
   },
   /** "Update the note" while the thread of the read still writes a reply: nothing is sent */
-  threadBusy: 'The chat still writes a reply in the thread of this read. Try again when the reply ends.'
+  threadBusy: 'The chat still writes a reply in the thread of this read. Try again when the reply ends.',
+  /** The revision list: all the comments of the book, in the Write view (the item at the top of the chapter list opens it) */
+  list: {
+    /** The title of the page, and the item of the chapter list */
+    title: 'Revision list',
+    /** The text under the title */
+    intro: "All the comments of the editor's reads, of all lenses. No comment changes the text.",
+    /** The button that opens the form of a read of the open chapter */
+    newRead: 'New read',
+    /** The names of the two filters */
+    lensFilter: 'Lens',
+    stateFilter: 'State',
+    /** The first choice of each filter: all the comments */
+    all: 'All',
+    /** The choices of the state filter */
+    states: { open: 'Open', done: 'Done', ignored: 'Ignored', intentional: 'Intentional' },
+    /** The state of one comment, in its row */
+    state: { open: 'Open', done: 'Done', ignored: 'Ignored', intentional: 'Intentional' },
+    /** The counts in the header of a chapter, for example "3 open · 1 done" */
+    count: {
+      open: (n: number): string => `${n} open`,
+      done: (n: number): string => `${n} done`,
+      ignored: (n: number): string => `${n} ignored`,
+      intentional: (n: number): string => `${n} intentional`
+    },
+    /** The tooltip of a count in the chapter list */
+    openCount: (n: number): string => (n === 1 ? '1 open comment' : `${n} open comments`),
+    /** Go to the passage of a comment: the list closes, and the chapter shows at the passage */
+    goTo: 'Go to passage',
+    /** Before the reason of an intentional comment */
+    reason: 'Your reason:',
+    /** The book has no comments yet */
+    empty: "No comments yet. The comments of an editor's read come here.",
+    /** No comment agrees with the filters */
+    noMatch: 'No comment agrees with these filters.',
+    /** The chip of a Continuity comment: the passage of this chapter is in conflict with its source */
+    conflict: (chapter: string, source: string): string => `${chapter} is in conflict with ${source}`
+  }
 }

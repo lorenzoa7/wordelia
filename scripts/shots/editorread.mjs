@@ -1,7 +1,13 @@
 // The editor's read: the author starts it from the toolbar or from an offer in the chat, it runs as a
 // chat message in the thread of its chapter, and the comments of the reply go into the comment store.
 // Usage: node scripts/shot.mjs editorread   (READ_LANG=pt-BR or es for another interface language)
-export default async function ({ app, page, shot, openBook }) {
+import { cp } from 'node:fs/promises'
+import { join } from 'node:path'
+
+export default async function ({ app, page, shot, openBook, book, work }) {
+  // A second book without comments, for the book switch at the end.
+  const otherBook = join(work, 'other-book')
+  await cp(book, otherBook, { recursive: true })
   if (process.env.READ_LANG) {
     await page.evaluate((l) => window.__wordelia.app.getState().updateSettings({ language: l }), process.env.READ_LANG)
     await page.waitForTimeout(300)
@@ -60,6 +66,15 @@ export default async function ({ app, page, shot, openBook }) {
   if ((await page.locator('.read-pop [role="switch"]').getAttribute('aria-checked')) !== 'true') fail('"in progress" is off for the last chapter')
   await page.keyboard.press('Escape')
   await closed()
+  // Esc gives the focus back to the text. A click somewhere else closes the popover, and the focus does not
+  // jump back to the text.
+  const inText = () => page.evaluate(() => Boolean(document.activeElement?.closest('.ProseMirror')))
+  await until('Esc did not give the focus back to the text', inText, 3000)
+  await openPopover()
+  await page.locator('.status-bar .status-left').click()
+  await closed()
+  await frames()
+  if (await inText()) fail('a click outside the popover put the focus back in the text')
   // The cursor is in the first chapter, and the chat is closed: a read opens it.
   await page.locator('.page[data-chapter="ch_sample01"] p').first().click()
   await page.keyboard.press('Control+l')
@@ -256,6 +271,8 @@ export default async function ({ app, page, shot, openBook }) {
   await shot('popover-selection')
   await slow(12)
   await page.locator('.read-pop .read-pop-run').click()
+  // "Read" gives the focus back to the text, with its selection.
+  await until('"Read" did not give the focus back to the text', inText, 3000)
   await until('the second reply did not finish', async () => (await readThreads())[0]?.messages.length === 4 && !(await streaming()), 30000)
   await idle()
   list = await readThreads()
@@ -565,4 +582,158 @@ export default async function ({ app, page, shot, openBook }) {
   await page.waitForSelector(`.cm-pop .cm-card[data-comment="${target}"]`, { timeout: 5000 })
   await page.keyboard.press('Escape')
   await page.waitForFunction(() => !document.querySelector('.cm-pop'), null, { timeout: 5000 })
+
+  // 8. The revision list: all the comments of the book, in the Write view. Its counts are the counts of the
+  // status bar and of the margin.
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1440, 900))
+  await page.waitForFunction(() => Math.abs(innerWidth - 1440) < 40)
+  await page.evaluate(() => window.__wordelia.book.getState().selectChapter('ch_sample01'))
+  const openOf = async (chapterId) => (await comments()).filter((c) => c.state === 'open' && (!chapterId || c.chapterId === chapterId))
+  const openAll = (await openOf()).length
+  const openFirst = (await openOf('ch_sample01')).length
+  await until('the margin does not count the open comments of the chapter', async () => (await page.locator('.cm-head').allInnerTexts()).join('').includes(`· ${openFirst}`), 5000)
+  // The chapter list has the item of the list, with the open comments of the book, and each chapter its own count.
+  const openSidebar = async () => {
+    await page.evaluate(() => window.__wordelia.app.getState().setUi({ sidebarOpen: true }))
+    await until('the chapter list did not open to its width', () => page.evaluate(() => document.querySelector('.book-sidebar').getBoundingClientRect().width >= 255), 3000)
+  }
+  // The toasts of the earlier steps go, one at a time: the screenshots show the list.
+  const closeToasts = () =>
+    until('the earlier toasts stayed', async () => {
+      const close = page.locator('.toast .toast-close').first()
+      if (await close.count()) await close.click({ timeout: 1000 }).catch(() => {})
+      return !(await page.locator('.toast').count())
+    }, 5000)
+  await openSidebar()
+  await closeToasts()
+  const listItem = page.locator('.revision-item')
+  await listItem.waitFor({ timeout: 5000 })
+  const itemSays = (await listItem.locator('.revision-item-count').innerText()).trim()
+  const statusSays = (await page.locator('.status-bar .status-comments').getAttribute('aria-label')) ?? ''
+  console.log('counts:', JSON.stringify({ item: itemSays, status: statusSays, open: openAll, chapter: openFirst }))
+  if (itemSays !== String(openAll) || !statusSays.startsWith(`${openAll} `)) fail(`the item says ${itemSays}, the status bar "${statusSays}", the book has ${openAll} open comments`)
+  const chapterSays = (await page.locator('.chapter-item[data-chapter="ch_sample01"] .chapter-item-open').innerText()).trim()
+  if (chapterSays !== String(openFirst)) fail(`the first chapter says ${chapterSays} open comments, it has ${openFirst}`)
+  if (await page.locator('.chapter-item[data-chapter="ch_sample02"] .chapter-item-open').count()) fail('a chapter without open comments shows a count')
+  await listItem.click()
+  await page.waitForSelector('.revision', { timeout: 5000 })
+  if (!(await page.locator('.book-pane-write.is-away').count())) fail('the desk shows under the revision list')
+  const revRows = page.locator('.revision-row')
+  const total = (await comments()).length
+  await until('the list does not show all the comments of the book', async () => (await revRows.count()) === total, 5000)
+  const filterChip = (filter, value) => page.locator(`.revision-filter[data-filter="${filter}"] [data-value="${value}"]`)
+  const openChip = (await filterChip('state', 'open').locator('.revision-chip-count').innerText()).trim()
+  if (openChip !== String(openAll)) fail(`the filter "Open" says ${openChip}, the book has ${openAll} open comments`)
+  const groupHead = await page.locator('.revision-group-head').first().innerText()
+  console.log('group:', JSON.stringify(groupHead))
+  if (!/A Tempestade/i.test(groupHead) || !groupHead.includes(String(openFirst))) fail(`the header of the first chapter says "${groupHead}"`)
+  await shot('revision-list')
+  // The lens filter "Continuity" shows only the continuity comments.
+  await filterChip('lens', 'continuity').click()
+  const continuityCount = (await comments()).filter((c) => c.lens === 'continuity').length
+  await until('the lens filter does not show only the continuity comments', async () => {
+    const classes = await revRows.evaluateAll((rs) => rs.map((r) => r.className))
+    return classes.length === continuityCount && classes.every((c) => /\bcm-continuity\b/.test(c))
+  }, 3000)
+  // The state filter "Intentional": the intentional comment, with its reason.
+  await filterChip('state', 'intentional').click()
+  await until('the state filter does not show only the intentional comment', async () => (await revRows.count()) === 1, 3000)
+  if ((await revRows.first().getAttribute('data-comment')) !== intended) fail('the intentional row is not the intentional comment')
+  if (!(await revRows.first().innerText()).includes('Elias mente para Marta')) fail('the intentional row does not show its reason')
+  await shot('revision-intentional')
+  await filterChip('lens', 'all').click()
+  await filterChip('state', 'all').click()
+  await until('the filters did not go back to all', async () => (await revRows.count()) === total, 3000)
+  // The actions of a row show on hover: the actions of a card, and "Go to passage".
+  const liveOpen = async () => {
+    const list = await openOf('ch_sample01')
+    for (const c of list) if (await rangeOf(c.id)) return c
+    return null
+  }
+  const goal = await liveOpen()
+  if (!goal) fail('no open comment of the first chapter has a passage on screen')
+  const goalRow = page.locator(`.revision-row[data-comment="${goal.id}"]`)
+  await goalRow.hover()
+  await until('the actions of a row do not show on hover', () => goalRow.locator('.revision-acts').evaluate((e) => getComputedStyle(e).opacity === '1'), 3000)
+  await shot('revision-hover')
+  // A comments file of a newer Wordelia: the rows show, but their state buttons are off.
+  await page.evaluate(() => window.__wordelia.comments.setState({ readOnly: true }))
+  await until('the state buttons of the list are on for a comments file of a newer Wordelia', async () => (await page.locator('.revision-row .cm-act-done:not([aria-disabled="true"])').count()) === 0 && (await page.locator('.revision-row .cm-act-done').count()) === openAll, 3000)
+  await goalRow.locator('.cm-act-done').click({ force: true })
+  await frames()
+  if ((await openOf()).length !== openAll) fail('"Done" in the list changed a comment of a read-only file')
+  await page.evaluate(() => window.__wordelia.comments.setState({ readOnly: false }))
+  // "Done" in the list closes the comment, with Undo in a toast.
+  await goalRow.hover()
+  await goalRow.locator('.cm-act-done').click()
+  await until('"Done" in the list did not close the comment', async () => (await passageOf(goal.id)).state === 'done', 3000)
+  if ((await goalRow.getAttribute('data-state')) !== 'done') fail('the row of the closed comment does not say "done"')
+  await page.locator('.toast', { hasText: /Comment marked as done|Comentário marcado como feito|Comentario marcado como hecho/ }).last().locator('.toast-action').click()
+  await until('Undo did not open the comment again', async () => (await passageOf(goal.id)).state === 'open', 3000)
+  // "Go to passage" closes the list: the passage is on screen, and its card is selected.
+  await goalRow.hover()
+  await goalRow.getByRole('button', { name: /^(Go to passage|Ir ao trecho|Ir al fragmento)$/ }).click()
+  await page.waitForFunction(() => !document.querySelector('.revision'), null, { timeout: 5000 })
+  if (await page.locator('.book-pane-write.is-away').count()) fail('the desk is still away after "Go to passage"')
+  await until('"Go to passage" did not select the card of the comment', () => page.evaluate((id) => window.__readUi.getState().selected === id, goal.id), 5000)
+  await until('the passage is not on screen after "Go to passage"', () =>
+    page.evaluate((id) => {
+      const mark = document.querySelector(`.cm-mark[data-mark="${id}"]`)?.getBoundingClientRect()
+      const desk = document.querySelector('.desk').getBoundingClientRect()
+      return Boolean(mark && mark.top >= desk.top && mark.bottom <= desk.bottom)
+    }, goal.id)
+  )
+  await shot('revision-go-to')
+
+  // "New read" in the list: the form of a read of the open chapter, without the choice of a selection (the text
+  // is under the list). "Read" closes the list. The read block lists the open comments of the earlier reads;
+  // the AI says that one is fixed, and "Mark as done" closes it.
+  await selectParagraph('O vento entrava')
+  await listItem.click()
+  await page.waitForSelector('.revision', { timeout: 5000 })
+  await page.locator('.revision-new').click()
+  await page.waitForSelector('.read-pop[data-state="open"]', { timeout: 5000 })
+  if (!/A Tempestade/.test(await page.locator('.read-pop').innerText())) fail('the form of the list does not name the open chapter')
+  if (await page.locator('.read-pop-scope').count()) fail('the form of the list offers the selection')
+  await shot('revision-new-read')
+  const earlier = (await openOf('ch_sample01')).map((c) => c.id)
+  const beforeRead = (await readThreads())[0].messages.length
+  await page.locator('.read-pop .read-pop-run').click()
+  await page.waitForFunction(() => !document.querySelector('.revision'), null, { timeout: 5000 })
+  await until('the read from the list did not finish', async () => (await readThreads())[0].messages.length === beforeRead + 2 && !(await streaming()), 30000)
+  await idle()
+  const again = (await readThreads())[0].messages.at(-1)
+  const named = /<resolved ids="([^"]+)"/.exec(again.content)?.[1]
+  console.log('second read:', JSON.stringify({ earlier, named }))
+  // The scripted AI names the first open comment that the read block lists: the block had the earlier comments.
+  if (!named || !earlier.includes(named)) fail('the read block did not list the open comments of the earlier reads')
+  const fixed = page.locator('.toast', { hasText: /thinks 1 comment is fixed|acha que 1 comentário foi resolvido|cree que 1 comentario se resolvió/ }).last()
+  await fixed.waitFor({ timeout: 10000 })
+  if ((await passageOf(named)).state !== 'open') fail('a comment closed before the author decided')
+  await fixed.locator('.toast-action').click()
+  await until('"Mark as done" did not close the comment of the second read', async () => (await passageOf(named)).state === 'done', 3000)
+
+  // A book switch: the list closes, and the list of the other book has none of these comments. (The read made
+  // room for the margin: the chapter list is closed.)
+  await openSidebar()
+  await listItem.click()
+  await page.waitForSelector('.revision', { timeout: 5000 })
+  const firstRoot = await page.evaluate(() => window.__wordelia.book.getState().root)
+  await page.evaluate((p) => window.__wordelia.openBook(p), otherBook)
+  await page.waitForFunction((r) => window.__wordelia.book.getState().root !== r && document.querySelector('.manuscript'), firstRoot, { timeout: 20000 })
+  await page.waitForSelector('.revision-item', { timeout: 5000 })
+  if (await page.locator('.revision').count()) fail('the revision list stayed open in another book')
+  if ((await comments()).length) fail('the comments of the first book are in the other book')
+  if (await page.locator('.revision-item-count, .chapter-item-open').count()) fail('the chapter list counts comments of the first book')
+  await page.locator('.revision-item').click()
+  await page.waitForSelector('.revision', { timeout: 5000 })
+  if (await revRows.count()) fail('the list of the other book shows comments of the first book')
+  if (!(await page.locator('.revision-empty').count())) fail('the list of a book without comments does not say so')
+  await closeToasts()
+  await shot('revision-other-book')
+  // A click on a chapter in the chapter list closes the list: the chapter shows.
+  await page.locator('.chapter-item[data-chapter="ch_sample02"]').click()
+  await page.waitForFunction(() => !document.querySelector('.revision'), null, { timeout: 5000 })
+  if (await page.locator('.book-pane-write.is-away').count()) fail('the desk is still away after a click on a chapter')
+  if ((await page.evaluate(() => window.__wordelia.book.getState().activeChapterId)) !== 'ch_sample02') fail('the chapter of the click is not open')
 }

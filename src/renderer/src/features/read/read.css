@@ -670,3 +670,365 @@
 .status-bar:is([data-tight='3'], [data-tight='4']) .status-comments-text {
   display: none;
 }
+
+/* ---------- The revision list (RevisionList.tsx): a page over the desk of the Write view ---------- */
+.book-pane-revision {
+  background: var(--desk);
+  animation: fade-in var(--dur-med) var(--ease-out);
+}
+.revision {
+  height: 100%;
+}
+/* As the Plan pages: the gutter of the scrollbar is always there. */
+.revision-scroll {
+  height: 100%;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding: var(--s-6) var(--s-8) 96px;
+}
+.revision-inner {
+  max-width: var(--plan-w);
+  margin: 0 auto;
+}
+.revision-hero {
+  padding: var(--s-6) 0;
+}
+.revision-hero-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s-2) var(--s-4);
+}
+.revision-hero h1 {
+  flex: 1 1 8em;
+  margin: 0 0 var(--s-2);
+  font-family: var(--font-prose);
+  font-size: var(--text-3xl);
+  font-weight: 600;
+  font-style: italic;
+  letter-spacing: var(--tracking-tight);
+  text-wrap: balance;
+}
+.revision-new .btn-icon {
+  color: var(--ribbon);
+}
+.revision-new .btn-icon svg,
+.revision-new-caret {
+  translate: 0 var(--icon-lift);
+}
+.revision-new-caret {
+  margin-left: var(--s-1);
+  color: var(--ink-3);
+}
+.revision-intro {
+  max-width: 46em;
+  margin: 0;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+}
+
+/* The two filters, in a box: the names of the filters in one column, then one chip for each choice, with its
+   count. In a narrow page the chips go on more lines. */
+.revision-filters {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: var(--s-3) var(--s-4);
+  margin-bottom: var(--s-8);
+  padding: var(--s-4) var(--s-5);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius-lg);
+  background: var(--paper-2);
+}
+.revision-filter {
+  display: contents;
+}
+.revision-seg {
+  display: flex;
+  flex-wrap: wrap;
+  justify-self: start;
+  gap: 2px;
+  min-width: 0;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--desk-2);
+  box-shadow: var(--shadow-inset);
+}
+.revision-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 var(--s-2);
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--ink-3);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.revision-chip:hover {
+  background: var(--desk-3);
+  color: var(--ink);
+}
+.revision-chip[data-state='checked'],
+.revision-chip[data-state='checked']:hover {
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 14%, transparent);
+}
+.revision-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--lens);
+  translate: 0 var(--icon-lift);
+}
+.revision-chip-count {
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+}
+.revision-chip[data-state='checked'] .revision-chip-count {
+  color: var(--ribbon);
+}
+
+.revision-empty {
+  margin: var(--s-8) 0;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+/* One chapter: its header, and its comments in one card */
+.revision-group + .revision-group {
+  margin-top: var(--s-10);
+}
+.revision-group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-1) var(--s-4);
+  margin-bottom: var(--s-3);
+  padding-bottom: var(--s-2);
+  border-bottom: 1px solid var(--rule);
+}
+.revision-group-title {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.revision-group-title svg {
+  flex: none;
+  color: var(--ribbon);
+  translate: 0 var(--icon-lift-book);
+}
+.revision-group-title span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.revision-group-counts {
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+.revision-rows {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  box-shadow: var(--shadow-page);
+  list-style: none;
+}
+
+/* One comment: its state, its text and its quote, its lens and its state. The actions show on hover and on focus. */
+.revision-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-5);
+  transition: background-color var(--dur-fast) var(--ease-out);
+}
+.revision-row + .revision-row {
+  border-top: 1px solid var(--rule-soft);
+}
+.revision-row:hover,
+.revision-row:focus-within {
+  background: var(--paper-2);
+}
+.revision-state-icon {
+  display: inline-grid;
+  place-items: start center;
+  padding-top: 3px;
+  color: var(--ink-4);
+}
+.revision-row.is-done .revision-state-icon {
+  color: var(--pen);
+}
+.revision-row.is-intentional .revision-state-icon {
+  color: var(--lens-ink);
+}
+.revision-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.revision-text {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-prose);
+  font-size: var(--text-lg);
+  line-height: 1.45;
+}
+.revision-row.is-ignored .revision-text {
+  color: var(--ink-3);
+}
+.revision-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s-1) var(--s-3);
+  min-width: 0;
+}
+/* Continuity: the chapter and the source in conflict */
+.revision-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 2px 7px;
+  border-radius: var(--radius-xs);
+  background: var(--lens-wash);
+  color: var(--lens-ink);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.revision-source span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.revision-source svg {
+  flex: none;
+  translate: 0 var(--icon-lift);
+}
+.revision-source .icon-book {
+  translate: 0 var(--icon-lift-book);
+}
+.revision-quote {
+  min-width: 0;
+  color: var(--ink-3);
+  font-family: var(--font-prose);
+  font-size: var(--text-md);
+  font-style: italic;
+  line-height: 1.45;
+}
+.revision-reason {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  margin: 2px 0 0;
+}
+.revision-reason svg {
+  flex: none;
+  color: var(--lens-ink);
+  translate: 0 2px;
+}
+.revision-reason-label {
+  color: var(--ink-3);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+}
+.revision-reason-text {
+  color: var(--ink);
+  font-family: var(--font-prose);
+  font-size: var(--text-md);
+  font-style: italic;
+}
+.revision-row .cm-lost {
+  margin-top: 2px;
+}
+
+/* The lens and the state, at the right of the first line */
+.revision-side {
+  display: grid;
+  grid-template-columns: 132px 104px;
+  align-items: center;
+  justify-items: end;
+  align-self: start;
+  gap: var(--s-3);
+  min-height: 24px;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.revision-side .cm-tag {
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+}
+.revision-state {
+  color: var(--ink);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.revision-row.is-done .revision-state {
+  color: var(--pen);
+}
+.revision-row.is-intentional .revision-state {
+  color: var(--lens-ink);
+}
+.revision-row.is-ignored .revision-state {
+  color: var(--ink-4);
+}
+
+/* The actions take the place of the lens and the state, over the end of the first line. They stay in the
+   order of the keyboard: the focus shows them too. */
+.revision-acts {
+  position: absolute;
+  top: calc(var(--s-4) - 1px);
+  right: var(--s-5);
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  padding-left: var(--s-6);
+  background: linear-gradient(to right, transparent, var(--paper-2) var(--s-5));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.revision-row:hover .revision-acts,
+.revision-row:focus-within .revision-acts {
+  opacity: 1;
+  pointer-events: auto;
+}
+.revision-row:hover .revision-side,
+.revision-row:focus-within .revision-side {
+  opacity: 0;
+}
+.revision-acts .cm-act-done {
+  margin-left: 0;
+}

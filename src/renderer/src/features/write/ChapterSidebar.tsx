@@ -13,6 +13,7 @@ import { getT, useT } from '@/lib/i18n'
 import { HideSidebarButton } from '@/features/book/SidebarToggle'
 import { usePagesOf } from '@/features/editor/pageCounts'
 import { chapterWordCount } from '@/features/editor/stats'
+import { RevisionListItem, useOpenCounts } from '@/features/read/RevisionList'
 import { StoryLineCard } from './StoryLineCard'
 
 export function ChapterSidebar(): React.JSX.Element {
@@ -20,6 +21,10 @@ export function ChapterSidebar(): React.JSX.Element {
   const chapters = useBook((s) => s.chapters)
   const activeId = useBook((s) => s.activeChapterId)
   const active = chapters.find((c) => c.id === activeId)
+  // The revision list covers the text: no chapter shows as the open one meanwhile.
+  const revisionOpen = useUi((s) => s.revisionOpen)
+  // The open comments of the editor's reads: of the book (the item of the revision list), and of each chapter.
+  const openComments = useOpenCounts()
   const [renaming, setRenaming] = useState<string | null>(null)
   const { pages } = usePagesOf()
   // A drag changes only this list. The book (and the pages) get the new order when the drag ends:
@@ -47,6 +52,7 @@ export function ChapterSidebar(): React.JSX.Element {
           <HideSidebarButton />
         </span>
       </div>
+      <RevisionListItem open={openComments.total} />
       <Reorder.Group
         axis="y"
         values={list}
@@ -62,8 +68,9 @@ export function ChapterSidebar(): React.JSX.Element {
               chapter={c}
               index={i}
               pages={pages[c.id] ?? 1}
+              openComments={openComments.byChapter.get(c.id) ?? 0}
               last={i === list.length - 1}
-              active={c.id === activeId}
+              active={!revisionOpen && c.id === activeId}
               renaming={renaming === c.id}
               onRename={() => setRenaming(c.id)}
               onRenamed={() => setRenaming(null)}
@@ -83,6 +90,7 @@ function ChapterItem({
   chapter,
   index,
   pages,
+  openComments,
   last,
   active,
   renaming,
@@ -93,6 +101,8 @@ function ChapterItem({
   index: number
   /** Pages of the chapter on screen */
   pages: number
+  /** The open comments of the editor's reads in the chapter */
+  openComments: number
   last: boolean
   active: boolean
   renaming: boolean
@@ -141,7 +151,7 @@ function ChapterItem({
       tabIndex={renaming ? -1 : 0}
       data-chapter={chapter.id}
       aria-current={active ? 'page' : undefined}
-      aria-label={t.write.chapterLabel(index + 1, chapter.title, words)}
+      aria-label={`${t.write.chapterLabel(index + 1, chapter.title, words)}${openComments > 0 ? ` · ${t.read.list.openCount(openComments)}` : ''}`}
       onClick={() => !renaming && useBook.getState().selectChapter(chapter.id)}
       onDoubleClick={onRename}
       onKeyDown={(e) => {
@@ -193,6 +203,11 @@ function ChapterItem({
         />
       ) : (
         <span className="chapter-item-title">{chapter.title}</span>
+      )}
+      {openComments > 0 && (
+        <span className="chapter-item-open" title={t.read.list.openCount(openComments)}>
+          {openComments}
+        </span>
       )}
       <span className="chapter-item-words" title={t.write.chapterWords(words)}>
         {t.write.chapterPages(pages)}

@@ -146,7 +146,8 @@ export function setCommentState(ids: string[], state: CommentState, reason?: str
         change(
           current.list.map((c) => {
             const before = old.get(c.id)
-            return before && c.state === state && c.reason === why ? inState(c, before.state, before.reason, before.updatedAt) : c
+            // The Undo is a decision of the writer too: it gets a new time.
+            return before && c.state === state && c.reason === why ? inState(c, before.state, before.reason, now()) : c
           })
         )
       }
@@ -154,23 +155,25 @@ export function setCommentState(ids: string[], state: CommentState, reason?: str
   })
 }
 
-/** The passage of a comment changed because the writer edited it. */
+/**
+ * The passage of a comment changed because the writer edited it. `updatedAt` is the time of the last decision
+ * of the writer (the state), so it stays: a decision from another computer always wins a merge, and the
+ * editor of the chapter writes the passage again from its own text.
+ */
 export function updatePassage(id: string, passage: string): void {
   const { list } = useComments.getState()
   if (!list.some((c) => c.id === id && c.passage !== passage)) return
-  const stamp = now()
-  change(list.map((c) => (c.id === id ? { ...c, passage, updatedAt: stamp } : c)))
+  change(list.map((c) => (c.id === id ? { ...c, passage } : c)))
 }
 
-/** The passage of a comment is gone from the text ("lost"), or is there again. */
+/** The passage of a comment is gone from the text ("lost"), or is there again. `updatedAt` stays, as for `updatePassage`. */
 export function setLost(id: string, lost: boolean): void {
   const { list } = useComments.getState()
   if (!list.some((c) => c.id === id && Boolean(c.lost) !== lost)) return
-  const stamp = now()
   change(
     list.map((c) => {
       if (c.id !== id) return c
-      const next: EditorComment = { ...c, updatedAt: stamp }
+      const next: EditorComment = { ...c }
       if (lost) next.lost = true
       else delete next.lost
       return next

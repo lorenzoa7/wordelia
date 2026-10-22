@@ -39,6 +39,7 @@ export interface EditorComment {
   /** The place of the comment in its reply: `${segment index}`. */
   key: string
   createdAt: string
+  /** The time of the last decision of the writer (the state, its reason). A new passage or the lost mark does not change it. */
   updatedAt: string
 }
 

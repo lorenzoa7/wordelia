@@ -7,7 +7,7 @@ import type { EditorComment } from '@shared/comments'
 import { schemaExtensions } from '@/features/editor/extensions'
 import { RELOAD_META } from '@/features/editor/keep'
 import { textWithMap } from '@/features/editor/review'
-import { anchorComments, commentMarksKey, commentMarksPlugin, inChapterOrder, passageAt, passageChanges, type Range } from './marks'
+import { anchorComments, changesToWrite, commentMarksKey, commentMarksPlugin, inChapterOrder, passageAt, passageChanges, type Range } from './marks'
 
 const schema = getSchema(schemaExtensions())
 const NOW = '2026-10-21T10:00:00.000Z'
@@ -169,6 +169,33 @@ describe('the passages of comments in the text', () => {
     expect(r.from).toBe(posOf(st, 'Elias disse', 1))
     // A selection that is not in the text any more: the first match of the chapter.
     expect(anchorComments(st.doc, [c], new Map(), () => 'O farol apagou.').get(c.id)!.from).toBe(posOf(st, 'Elias disse', 0))
+  })
+
+  it('a text from outside that removes a passage writes nothing; a deletion of the author makes it lost', () => {
+    const c = comment()
+    const st = anchored(CHAPTER, [c])
+    const touchedOf = (s: EditorState): ReadonlySet<string> => commentMarksKey.getState(s)!.touched
+    const without = schema.nodeFromJSON(parseMarkdown(CHAPTER.replace('Marta subiu a escada com o café.', 'O café esfriou na mesa.')))
+    const outside = st.apply(st.tr.replaceWith(0, st.doc.content.size, without.content).setMeta(RELOAD_META, true))
+    expect(changesToWrite(outside, [c], touchedOf(outside)).size).toBe(0)
+    // The editor shows it as lost: its passage has no place in the new text.
+    expect(anchorComments(outside.doc, [c], new Map()).has(c.id)).toBe(false)
+    // Typing somewhere else after it writes nothing either.
+    const typed = outside.apply(outside.tr.insertText('Ontem, ', posOf(outside, 'Elias')))
+    expect(changesToWrite(typed, [c], touchedOf(typed)).size).toBe(0)
+    // The author deletes the passage in this editor: the comment is lost.
+    const r = rangesOf(st).get(c.id)!
+    const deleted = st.apply(st.tr.delete(r.from, r.to))
+    expect(changesToWrite(deleted, [c], touchedOf(deleted))).toEqual(new Map([[c.id, null]]))
+  })
+
+  it('only an edit that touches a passage writes it', () => {
+    const c = comment()
+    const st = anchored(CHAPTER, [c])
+    const before = st.apply(st.tr.insertText('Ontem, ', posOf(st, 'Elias')))
+    expect(commentMarksKey.getState(before)!.touched.size).toBe(0)
+    const inside = before.apply(before.tr.insertText(' devagar', posOf(before, 'subiu') + 'subiu'.length))
+    expect(changesToWrite(inside, [c], commentMarksKey.getState(inside)!.touched)).toEqual(new Map([[c.id, 'Marta subiu devagar a escada']]))
   })
 
   it('numbers the comments in the order of their passages, not of their ranks', () => {

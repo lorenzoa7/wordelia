@@ -230,4 +230,10 @@ export default async function ({ app, page, shot, openBook }) {
   await until('the restored text did not give the comment its passage back', async () => !(await passageOf(style.id)).lost, 3000)
   await until('the mark of the comment did not come back', async () => (await page.locator(`.page[data-chapter="ch_sample01"] .cm-num[data-comment="${style.id}"]`).count()) === 1, 3000)
   if ((await passageOf(style.id)).passage !== 'Elias acendeu a lâmpada do farol') fail(`the passage after the restore is "${(await passageOf(style.id)).passage}"`)
+  // A text from outside without the passage: the mark goes away, but this computer writes nothing (the
+  // computer that made the edit writes it).
+  await page.evaluate((body) => window.__wordelia.book.getState().restoreChapter('ch_sample01', body), original.replace('Elias acendeu a lâmpada do farol', 'Elias ligou a luz'))
+  await until('the mark stayed after a text from outside without the passage', async () => !(await page.locator(`.cm-num[data-comment="${style.id}"]`).count()), 3000)
+  await page.waitForTimeout(800)
+  if ((await passageOf(style.id)).lost) fail('a text from outside made the comment lost')
 }

@@ -49,6 +49,11 @@ interface MarksState {
   /** The comments with marks, in the order of the list */
   shown: Shown[]
   decorations: DecorationSet
+  /**
+   * The comments whose passages the edits of this editor changed since the last pause. Only these get a new
+   * passage or the lost mark: the computer that made an edit writes it.
+   */
+  touched: ReadonlySet<string>
   /** The text came from outside the editor: the view finds all the passages again by their text. */
   refind: boolean
 }
@@ -104,42 +109,53 @@ export function anchorComments(
 }
 
 /**
- * A range after one step. Text typed at the start or at the end of a passage stays out of it. A step that
- * replaces text of the passage (a Polish of the paragraph, a paste over it, a chat change) keeps the passage
- * when the new text still has its words; else the range keeps what is left of it, or becomes empty.
+ * A range after one step, and whether the step changed text of the passage. Text typed at the start or at
+ * the end of a passage stays out of it. A step that replaces text of the passage (a Polish of the
+ * paragraph, a paste over it, a chat change) keeps the passage when the new text still has its words; else
+ * the range keeps what is left of it, or becomes empty.
  */
-function mapRange(map: StepMap, r: Range, before: PMNode, after: PMNode): Range {
+function mapRange(map: StepMap, r: Range, before: PMNode, after: PMNode): { range: Range; touched: boolean } {
   const from = map.map(r.from, 1)
   const to = map.map(r.to, -1)
   const mapped = from < to ? { from, to } : { from: to, to }
-  if (r.from >= r.to) return mapped
+  if (r.from >= r.to) return { range: mapped, touched: false }
   let start = r.from
   let end = r.to
   let replaced = false
+  let inside = false
   map.forEach((oldStart, oldEnd) => {
-    if (oldEnd <= oldStart || oldStart >= r.to || oldEnd <= r.from) return
+    if (oldEnd === oldStart) {
+      inside ||= r.from < oldStart && oldStart < r.to
+      return
+    }
+    if (oldStart >= r.to || oldEnd <= r.from) return
     replaced = true
     start = Math.min(start, oldStart)
     end = Math.max(end, oldEnd)
   })
-  if (!replaced) return mapped
+  if (!replaced) return { range: mapped, touched: inside }
   const words = textWithMap(before, r.from, r.to).text
   const { text, map: at } = textWithMap(after, map.map(start, -1), map.map(end, 1))
   const m = words.trim() ? findText(text, words.trim()) : null
-  return m ? { from: at[m.start], to: at[m.end - 1] + 1 } : mapped
+  return { range: m ? { from: at[m.start], to: at[m.end - 1] + 1 } : mapped, touched: true }
 }
 
-/** The ranges after the steps of a transaction. */
-export function mapRanges(ranges: Map<string, Range>, tr: Pick<Transaction, 'mapping' | 'docs' | 'doc'>): Map<string, Range> {
+/** The ranges after the steps of a transaction, and the comments whose passages the steps changed. */
+export function mapRanges(ranges: Map<string, Range>, tr: Pick<Transaction, 'mapping' | 'docs' | 'doc'>): { ranges: Map<string, Range>; touched: Set<string> } {
   let out = ranges
+  const touched = new Set<string>()
   tr.mapping.maps.forEach((map, i) => {
     const before = tr.docs[i]
     const after = tr.docs[i + 1] ?? tr.doc
     const next = new Map<string, Range>()
-    for (const [id, r] of out) next.set(id, mapRange(map, r, before, after))
+    for (const [id, r] of out) {
+      const m = mapRange(map, r, before, after)
+      next.set(id, m.range)
+      if (m.touched) touched.add(id)
+    }
     out = next
   })
-  return out
+  return { ranges: out, touched }
 }
 
 /** Places after an edit: text typed at a place goes after it. */
@@ -173,6 +189,17 @@ export function passageChanges(doc: PMNode, comments: EditorComment[], ranges: M
     else if (text !== c.passage) out.set(c.id, text)
   }
   return out
+}
+
+/**
+ * What an editor writes to the comments at the end of a pause: the changes of the passages that its own edits
+ * touched. A text from outside (another program, a restored version) changes no passage and makes no comment
+ * lost here: the computer that made the edit writes it.
+ */
+export function changesToWrite(state: EditorState, comments: EditorComment[], touched: ReadonlySet<string>): Map<string, string | null> {
+  const st = commentMarksKey.getState(state)
+  if (!st || !touched.size) return new Map()
+  return passageChanges(state.doc, comments.filter((c) => touched.has(c.id)), st.ranges)
 }
 
 /** The comments that have a passage, in the order of their passages in the chapter. The rank orders two comments at one place. */
@@ -288,19 +315,22 @@ export function commentMarksPlugin(chapterId: () => string): Plugin<MarksState> 
   return new Plugin<MarksState>({
     key: commentMarksKey,
     state: {
-      init: () => ({ ranges: new Map(), lost: new Map(), shown: [], decorations: DecorationSet.empty, refind: false }),
+      init: () => ({ ranges: new Map(), lost: new Map(), shown: [], decorations: DecorationSet.empty, touched: new Set(), refind: false }),
       apply(tr, value) {
         const meta = tr.getMeta(commentMarksKey) as MarksState | undefined
         if (meta) return meta
         if (!tr.docChanged) return value
-        const ranges = mapRanges(value.ranges, tr)
+        const { ranges, touched } = mapRanges(value.ranges, tr)
+        // A text from another program or a restored version: the view finds the passages again by their
+        // text, and writes none of the changes that this text made.
+        const reload = isReload(tr)
         return {
           ranges,
           lost: mapPoints(value.lost, tr.mapping),
           shown: value.shown,
           decorations: marksOf(tr.doc, value.shown, ranges),
-          // A text from another program or a restored version: the view finds the passages again by their text.
-          refind: value.refind || isReload(tr)
+          touched: reload ? new Set() : touched.size ? new Set([...value.touched, ...touched]) : value.touched,
+          refind: value.refind || reload
         }
       }
     },
@@ -323,9 +353,10 @@ export function commentMarksPlugin(chapterId: () => string): Plugin<MarksState> 
 
       /**
        * Find the passages of the comments that the editor does not follow yet, find again the deleted
-       * passages whose words came back, and draw the marks again when something changed.
+       * passages whose words came back, and draw the marks again when something changed. `settled`: the
+       * pause ended, and the comments that the edits touched start again from none.
        */
-      const draw = (): void => {
+      const draw = (settled: boolean): void => {
         const st = commentMarksKey.getState(view.state)
         if (!st) return
         const doc = view.state.doc
@@ -364,22 +395,30 @@ export function commentMarksPlugin(chapterId: () => string): Plugin<MarksState> 
         }
         first = false
         const shown: Shown[] = useCommentMarks.getState().hidden ? [] : mine.map((c) => ({ id: c.id, lens: c.lens, rank: c.rank }))
-        const same = !st.refind && shownKey(shown) === shownKey(st.shown) && sameMap(ranges, st.ranges, sameRange) && sameMap(lost, st.lost, (a, b) => a === b)
+        const touched = settled ? new Set<string>() : st.touched
+        const same =
+          !st.refind &&
+          touched.size === st.touched.size &&
+          shownKey(shown) === shownKey(st.shown) &&
+          sameMap(ranges, st.ranges, sameRange) &&
+          sameMap(lost, st.lost, (a, b) => a === b)
         if (!same) {
-          const next: MarksState = { ranges, lost, shown, decorations: marksOf(doc, shown, ranges), refind: false }
+          const next: MarksState = { ranges, lost, shown, decorations: marksOf(doc, shown, ranges), touched, refind: false }
           view.dispatch(view.state.tr.setMeta(commentMarksKey, next).setMeta('addToHistory', false).setMeta('allowDuringReview', true))
         }
         if (!readOnly) for (const id of back) setLost(id, false)
       }
 
-      /** Give the comments the new words of their passages, and mark the passages that are gone. */
-      const settle = (state: EditorState): void => {
+      /**
+       * Give the comments that the edits of this editor touched the new words of their passages, and mark
+       * the passages that are gone.
+       */
+      const settle = (state: EditorState, touched: ReadonlySet<string>): void => {
         const { list, readOnly } = comments()
-        const st = commentMarksKey.getState(state)
         // A comments file of a newer Wordelia is never written, and the comments of another book never change here.
-        if (readOnly || !st) return
+        if (readOnly) return
         const mine = list.filter((c) => c.chapterId === chapterId() && c.state === 'open' && !c.lost)
-        for (const [id, text] of passageChanges(state.doc, mine, st.ranges)) {
+        for (const [id, text] of changesToWrite(state, mine, touched)) {
           if (text === null) setLost(id, true)
           else updatePassage(id, text)
         }
@@ -387,9 +426,11 @@ export function commentMarksPlugin(chapterId: () => string): Plugin<MarksState> 
 
       const refresh = (): void => {
         if (view.isDestroyed) return
-        draw()
         // Edits that are still in the pause settle at its end.
-        if (!pause) settle(view.state)
+        const settled = !pause
+        const touched = commentMarksKey.getState(view.state)?.touched ?? new Set<string>()
+        draw(settled)
+        if (settled) settle(view.state, touched)
       }
 
       const offComments = useComments.subscribe((s, prev) => {
@@ -419,7 +460,7 @@ export function commentMarksPlugin(chapterId: () => string): Plugin<MarksState> 
           if (pause) {
             clearTimeout(pause)
             pause = undefined
-            settle(view.state)
+            settle(view.state, commentMarksKey.getState(view.state)?.touched ?? new Set())
           }
         }
       }

@@ -280,9 +280,12 @@ describe('setCommentState', () => {
     expect(toast.message).toBe('3 comments marked as done.')
     expect(toast.action?.label).toBe('Undo')
     toast.action?.run()
-    expect(store.useComments.getState().list).toEqual(before)
+    const back = store.useComments.getState().list
+    // The Undo is a decision of the writer too: it gets a new time.
+    expect(back.map(({ updatedAt: _, ...c }) => c)).toEqual(before.map(({ updatedAt: _, ...c }) => c))
+    expect(back.every((c) => c.updatedAt > NOW)).toBe(true)
     await saver.flush()
-    expect(onDisk()).toEqual(before)
+    expect(onDisk()).toEqual(back)
   })
 
   it('Undo leaves a comment alone when the writer changed it again', () => {
@@ -336,6 +339,13 @@ describe('the passage of a comment', () => {
     expect(store.useComments.getState().list[0].lost).toBeUndefined()
     await saver.flush()
     expect(onDisk()[0].lost).toBeUndefined()
+  })
+
+  it('keeps the time of the last decision of the writer: the editor writes the passage and "lost" by itself', () => {
+    store.loadComments(ROOT, [comment()])
+    store.updatePassage('cm_aaaaaaaa', 'Elias acendeu o farol velho.')
+    store.setLost('cm_aaaaaaaa', true)
+    expect(store.useComments.getState().list[0]).toMatchObject({ passage: 'Elias acendeu o farol velho.', lost: true, updatedAt: NOW })
   })
 
   it('a change that changes nothing writes nothing', async () => {
@@ -464,6 +474,16 @@ describe('changes from outside', () => {
     expect(store.useComments.getState().list.map((c) => `${c.id}|${c.state}`)).toEqual(['cm_aaaaaaaa|ignored', 'cm_bbbbbbbb|open'])
     await saver.flush()
     expect(onDisk().map((c) => c.state)).toEqual(['ignored', 'open'])
+  })
+
+  it('a lost mark of the editor that waits loses to a decision of the writer from another computer', async () => {
+    store.loadComments(ROOT, [comment()])
+    store.setLost('cm_aaaaaaaa', true) // the editor did not find the passage; the write waits
+    const decided = comment({ state: 'done', passage: 'Elias acendeu o farol velho.', updatedAt: '2026-10-21T11:00:00.000Z' })
+    store.commentsChangedOutside(ROOT, text([decided]))
+    expect(store.useComments.getState().list).toEqual([decided])
+    await saver.flush()
+    expect(onDisk()).toEqual([decided])
   })
 
   it('a file of a newer Wordelia while a local write waits: it wins, the list is read-only, nothing is written', async () => {

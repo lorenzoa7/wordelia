@@ -3,25 +3,25 @@
 // with counts. The comments are grouped by chapter, in book order. The actions of a row are the actions of a
 // card of the margin (actions.ts), and "Go to passage". The item at the top of the chapter list opens it.
 
-import { useEffect, useId, useMemo, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef } from 'react'
 import clsx from 'clsx'
 import { RadioGroup } from 'radix-ui'
-import { ArrowsLeftRight, BookOpenText, ChatCircleText, Check, CheckCircle, Circle, ListChecks, SealCheck, Warning, XCircle } from '@phosphor-icons/react'
+import { ArrowsLeftRight, BookOpenText, ChatCircleText, CheckCircle, Circle, ListChecks, SealCheck, Warning, XCircle } from '@phosphor-icons/react'
 import { markdownToPlainBlocks } from '@shared/book'
 import { LENSES, type CommentState, type EditorComment, type Lens, type LensChoice } from '@shared/comments'
 import { findText } from '@shared/proposals/apply'
 import type { Chapter } from '@shared/types'
 import { useT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
-import { showText, useUi } from '@/stores/ui'
-import { discussComment, goToComment, markIntentional, polishComment, updateNoteFor } from './actions'
-import { Act, sourceOf } from './Card'
+import { showText, useUi, type RevisionFilter } from '@/stores/ui'
+import { goToComment } from './actions'
+import { Act, commentButtons, sourceOf } from './Card'
 import { commentRanges, rangesKnown, useMarksDrawn } from './marks'
 import { NewReadButton } from './ReadPopover'
-import { revisionCounts, revisionGroups, type RevisionFilter, type RevisionGroup, type StateChoice } from './revision'
+import { revisionCounts, revisionGroups, type RevisionGroup, type StateChoice } from './revision'
 import { chapterName } from './start'
 import { useComments } from './store'
-import { decideComments, inBook } from './ui'
+import { inBook } from './ui'
 import './read.css'
 
 const NONE: EditorComment[] = []
@@ -102,7 +102,13 @@ export function RevisionList(): React.JSX.Element {
   const readOnly = useComments((s) => s.readOnly)
   // A new draw of the marks: new places of the passages, and passages that are gone.
   const drawn = useMarksDrawn((s) => s.n)
-  const [filter, setFilter] = useState<RevisionFilter>({ lens: 'all', state: 'all' })
+  // The filters and the scroll stay while the book is open: "Go to passage", a fix, and back to the same place.
+  const filter = useUi((s) => s.revisionFilter)
+  const setFilter = (f: RevisionFilter): void => useUi.getState().setRevisionFilter(f)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = useUi.getState().revisionScroll
+  }, [])
   const counts = useMemo(() => revisionCounts(comments, filter), [comments, filter])
   const groups = useMemo(
     () => revisionGroups(comments, chapters, filter, placesIn(chapters)),
@@ -131,7 +137,7 @@ export function RevisionList(): React.JSX.Element {
 
   return (
     <div className="revision">
-      <div className="revision-scroll">
+      <div ref={scrollRef} className="revision-scroll" onScroll={(e) => useUi.getState().setRevisionScroll(e.currentTarget.scrollTop)}>
         <div className="revision-inner">
           <header className="revision-hero">
             <div className="revision-hero-top">
@@ -142,8 +148,8 @@ export function RevisionList(): React.JSX.Element {
           </header>
           {comments.length > 0 && (
             <div className="revision-filters">
-              <Filter name="lens" label={l.lensFilter} value={filter.lens} options={lensOptions} onChange={(lens) => setFilter((f) => ({ ...f, lens }))} />
-              <Filter name="state" label={l.stateFilter} value={filter.state} options={stateOptions} onChange={(state) => setFilter((f) => ({ ...f, state }))} />
+              <Filter name="lens" label={l.lensFilter} value={filter.lens} options={lensOptions} onChange={(lens) => setFilter({ ...filter, lens })} />
+              <Filter name="state" label={l.stateFilter} value={filter.state} options={stateOptions} onChange={(state) => setFilter({ ...filter, state })} />
             </div>
           )}
           {!comments.length ? (
@@ -221,7 +227,9 @@ function Group({ group, readOnly }: { group: RevisionGroup; readOnly: boolean })
       </header>
       <ul className="revision-rows">
         {group.rows.map((c) => (
-          <Row key={c.id} c={c} chapterNumber={group.number} lost={lost.has(c.id)} readOnly={readOnly} />
+          <li key={c.id}>
+            <Row c={c} chapterNumber={group.number} lost={lost.has(c.id)} readOnly={readOnly} />
+          </li>
         ))}
       </ul>
     </section>
@@ -237,7 +245,9 @@ const STATE_ICONS: Record<CommentState, React.ReactNode> = {
 
 /**
  * One comment: its state, its text, the quote of its passage (for Continuity, first the chip of the conflict),
- * the reason of an intentional comment, its lens and its state. The actions show on hover and on focus.
+ * the reason of an intentional comment, its lens and its state. The actions take the place of the lens and the
+ * state on hover and on focus: "Go to passage", then the buttons of its card (icons; their names in tooltips).
+ * The text of the comment is the name of the row, so its buttons have a context for a screen reader.
  */
 function Row({ c, chapterNumber, lost, readOnly }: { c: EditorComment; chapterNumber: number; lost: boolean; readOnly: boolean }): React.JSX.Element {
   const t = useT()
@@ -245,9 +255,8 @@ function Row({ c, chapterNumber, lost, readOnly }: { c: EditorComment; chapterNu
   const m = t.read.margin
   const chapters = useBook((s) => s.chapters)
   const entries = useBook((s) => s.entries)
-  const open = c.state === 'open'
-  const continuity = c.lens === 'continuity'
-  const sources = continuity ? c.sources.map((s) => sourceOf(s.file, chapters, entries, t)) : []
+  const textId = useId()
+  const sources = c.lens === 'continuity' ? c.sources.map((s) => sourceOf(s.file, chapters, entries, t)) : []
   const here = m.chapter(chapterNumber)
 
   // "Go to passage": the list closes first, so the passage and its card are on screen.
@@ -255,33 +264,16 @@ function Row({ c, chapterNumber, lost, readOnly }: { c: EditorComment; chapterNu
     showText()
     goToComment(c)
   }
-  const acts: React.ReactNode[] = [<Act key="go" kind="minor" named icon={null} label={l.goTo} onClick={goTo} />]
-  if (open && !lost) {
-    if (continuity) acts.push(<Act key="note" kind="minor" named icon={null} label={m.updateNote} onClick={() => void updateNoteFor(c)} />)
-    else {
-      acts.push(<Act key="discuss" kind="minor" named icon={null} label={m.discuss} onClick={() => discussComment(c)} />)
-      acts.push(<Act key="polish" kind="minor" named icon={null} label={m.polish} onClick={() => void polishComment(c)} />)
-    }
-  }
-  // The decisions go through decideComments, with Undo; a comments file of a newer Wordelia cannot change.
-  if (open) {
-    acts.push(
-      continuity && !lost ? (
-        <Act key="intentional" kind="minor" named className="cm-act-intentional" icon={null} label={m.intentional} off={readOnly} offTip={m.readOnly} onClick={() => void markIntentional(c)} />
-      ) : (
-        <Act key="ignore" kind="minor" named className="cm-act-ignore" icon={null} label={m.ignore} off={readOnly} offTip={m.readOnly} onClick={() => decideComments([c.id], 'ignored')} />
-      )
-    )
-    acts.push(<Act key="done" kind="done" className="cm-act-done" icon={<Check size={12} weight="bold" />} label={m.done} off={readOnly} offTip={m.readOnly} onClick={() => decideComments([c.id], 'done')} />)
-  }
 
   return (
-    <li className={clsx('revision-row', `cm-${c.lens}`, `is-${c.state}`)} data-comment={c.id} data-state={c.state}>
+    <article className={clsx('revision-row', `cm-${c.lens}`, `is-${c.state}`)} data-comment={c.id} data-state={c.state} aria-labelledby={textId}>
       <span className="revision-state-icon" aria-hidden>
         {STATE_ICONS[c.state]}
       </span>
       <div className="revision-body">
-        <p className="revision-text">{c.text}</p>
+        <p className="revision-text" id={textId}>
+          {c.text}
+        </p>
         <div className="revision-meta">
           {sources.map((s, i) => {
             const source = s.note ? `${s.label} · ${s.note}` : s.label
@@ -314,7 +306,10 @@ function Row({ c, chapterNumber, lost, readOnly }: { c: EditorComment; chapterNu
         <span className="cm-tag">{t.read.lens[c.lens]}</span>
         <span className="revision-state">{l.state[c.state]}</span>
       </div>
-      <div className="revision-acts">{acts}</div>
-    </li>
+      <div className="revision-acts">
+        <Act key="go" kind="go" named icon={null} label={l.goTo} onClick={goTo} />
+        {commentButtons(c, lost, readOnly, t)}
+      </div>
+    </article>
   )
 }

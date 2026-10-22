@@ -142,10 +142,15 @@ describe('the revision list', () => {
     expect(ui.openInBook(list, [chapter]).map((c) => c.id)).toEqual(['cm_a'])
   })
 
-  it('closes when another book opens', () => {
+  it('closes when another book opens, and forgets its filters and its scroll', () => {
     useUi.getState().setRevisionOpen(true)
-    expect(useUi.getState().revisionOpen).toBe(true)
+    useUi.getState().setRevisionFilter({ lens: 'continuity', state: 'open' })
+    useUi.getState().setRevisionScroll(240)
+    expect(useUi.getState()).toMatchObject({ revisionOpen: true, revisionFilter: { lens: 'continuity', state: 'open' }, revisionScroll: 240 })
+    // Closed and opened again in the same book: the filters and the scroll stay.
+    useUi.getState().setRevisionOpen(false)
+    expect(useUi.getState()).toMatchObject({ revisionFilter: { lens: 'continuity', state: 'open' }, revisionScroll: 240 })
     useUi.getState().resetForBook()
-    expect(useUi.getState().revisionOpen).toBe(false)
+    expect(useUi.getState()).toMatchObject({ revisionOpen: false, revisionFilter: { lens: 'all', state: 'all' }, revisionScroll: 0 })
   })
 })

@@ -2,9 +2,18 @@
 
 import { flushSync } from 'react-dom'
 import { create } from 'zustand'
+import type { CommentState, LensChoice } from '@shared/comments'
 
 /** 'book' and 'rules' belong to the open book: without a book, the dialog shows 'general'. */
 export type SettingsTab = 'general' | 'book' | 'ai' | 'actions' | 'rules'
+
+/** The filters of the revision list (features/read/RevisionList.tsx) */
+export interface RevisionFilter {
+  lens: LensChoice
+  state: 'all' | CommentState
+}
+
+const ALL_COMMENTS: RevisionFilter = { lens: 'all', state: 'all' }
 
 export interface Toast {
   id: number
@@ -22,6 +31,9 @@ interface UiState {
   historyChapterId: string | null
   /** The revision list covers the desk of the Write view (features/read/RevisionList.tsx) */
   revisionOpen: boolean
+  /** The filters and the scroll of the revision list: they stay while the book is open */
+  revisionFilter: RevisionFilter
+  revisionScroll: number
   toasts: Toast[]
   openSettings(tab?: SettingsTab): void
   closeSettings(): void
@@ -30,6 +42,8 @@ interface UiState {
   setFindOpen(v: boolean): void
   openHistory(chapterId: string | null): void
   setRevisionOpen(v: boolean): void
+  setRevisionFilter(f: RevisionFilter): void
+  setRevisionScroll(top: number): void
   /** Close what belongs to the open book (the find bar, the history, the export, the revision list): another book opens, or none. */
   resetForBook(): void
   toast(message: string, opts?: { kind?: Toast['kind']; action?: Toast['action']; ms?: number }): void
@@ -53,6 +67,8 @@ export const useUi = create<UiState>((set, get) => ({
   findOpen: false,
   historyChapterId: null,
   revisionOpen: false,
+  revisionFilter: ALL_COMMENTS,
+  revisionScroll: 0,
   toasts: [],
   openSettings(tab) {
     // No tab (the gear, Ctrl+,): always the first tab, not the last one.
@@ -76,9 +92,23 @@ export const useUi = create<UiState>((set, get) => ({
   setRevisionOpen(v) {
     if (get().revisionOpen !== v) set({ revisionOpen: v })
   },
+  setRevisionFilter(f) {
+    set({ revisionFilter: f })
+  },
+  setRevisionScroll(top) {
+    if (get().revisionScroll !== top) set({ revisionScroll: top })
+  },
   resetForBook() {
     const tab = get().settingsTab
-    set({ findOpen: false, historyChapterId: null, exportOpen: false, revisionOpen: false, ...(tab === 'book' || tab === 'rules' ? { settingsOpen: false } : {}) })
+    set({
+      findOpen: false,
+      historyChapterId: null,
+      exportOpen: false,
+      revisionOpen: false,
+      revisionFilter: ALL_COMMENTS,
+      revisionScroll: 0,
+      ...(tab === 'book' || tab === 'rules' ? { settingsOpen: false } : {})
+    })
   },
   toast(message, opts = {}) {
     const id = nextToast++

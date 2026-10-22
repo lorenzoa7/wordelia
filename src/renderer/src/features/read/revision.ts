@@ -3,14 +3,10 @@
 
 import { LENSES, type CommentState, type EditorComment, type LensChoice } from '@shared/comments'
 import type { Chapter } from '@shared/types'
+import type { RevisionFilter } from '@/stores/ui'
 
 /** The choices of the state filter: all states, or one */
-export type StateChoice = 'all' | CommentState
-
-export interface RevisionFilter {
-  lens: LensChoice
-  state: StateChoice
-}
+export type StateChoice = RevisionFilter['state']
 
 /** The states in the order of the list: the open comments first, then the decisions of the author. */
 export const STATES: CommentState[] = ['open', 'intentional', 'done', 'ignored']

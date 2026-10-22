@@ -686,9 +686,11 @@
   scrollbar-gutter: stable;
   padding: var(--s-6) var(--s-8) 96px;
 }
+/* A container: a narrow page puts the lens, the state and the actions of a row under its text. */
 .revision-inner {
   max-width: var(--plan-w);
   margin: 0 auto;
+  container: revision / inline-size;
 }
 .revision-hero {
   padding: var(--s-6) 0;
@@ -735,9 +737,9 @@
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
   align-items: center;
-  gap: var(--s-3) var(--s-4);
+  gap: var(--s-3);
   margin-bottom: var(--s-8);
-  padding: var(--s-4) var(--s-5);
+  padding: var(--s-4);
   border: 1px solid var(--rule-soft);
   border-radius: var(--radius-lg);
   background: var(--paper-2);
@@ -759,7 +761,7 @@
 .revision-chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--s-1);
   height: 28px;
   padding: 0 var(--s-2);
   border: 0;
@@ -863,14 +865,13 @@
 
 /* One comment: its state, its text and its quote, its lens and its state. The actions show on hover and on focus. */
 .revision-row {
-  position: relative;
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr) auto;
   gap: var(--s-3);
   padding: var(--s-4) var(--s-5);
   transition: background-color var(--dur-fast) var(--ease-out);
 }
-.revision-row + .revision-row {
+.revision-rows > li + li {
   border-top: 1px solid var(--rule-soft);
 }
 .revision-row:hover,
@@ -972,16 +973,26 @@
   margin-top: 2px;
 }
 
-/* The lens and the state, at the right of the first line */
+/* The lens and the state at the right of the first line; on hover and on focus the actions take their place.
+   The two are in one cell of the grid: the cell is as wide as the wider of the two, so the actions never
+   cover the text. The actions stay in the order of the keyboard: the focus shows them too. */
+.revision-side,
+.revision-acts {
+  grid-area: 1 / 3;
+  align-self: start;
+  justify-self: end;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+/* Nothing in it takes a click: the actions in the same cell get the clicks also when the lens and the state
+   are over them. */
 .revision-side {
   display: grid;
   grid-template-columns: 132px 104px;
   align-items: center;
   justify-items: end;
-  align-self: start;
   gap: var(--s-3);
-  min-height: 24px;
-  transition: opacity var(--dur-fast) var(--ease-out);
+  min-height: 26px;
+  pointer-events: none;
 }
 .revision-side .cm-tag {
   padding: 3px 9px;
@@ -1005,20 +1016,12 @@
   color: var(--ink-4);
 }
 
-/* The actions take the place of the lens and the state, over the end of the first line. They stay in the
-   order of the keyboard: the focus shows them too. */
 .revision-acts {
-  position: absolute;
-  top: calc(var(--s-4) - 1px);
-  right: var(--s-5);
   display: flex;
   align-items: center;
   gap: var(--s-1);
-  padding-left: var(--s-6);
-  background: linear-gradient(to right, transparent, var(--paper-2) var(--s-5));
   opacity: 0;
   pointer-events: none;
-  transition: opacity var(--dur-fast) var(--ease-out);
 }
 .revision-row:hover .revision-acts,
 .revision-row:focus-within .revision-acts {
@@ -1031,4 +1034,40 @@
 }
 .revision-acts .cm-act-done {
   margin-left: 0;
+}
+/* "Go to passage" and "Done" show their names. The buttons of the card show their icons; their names are in
+   their tooltips and their aria-labels. */
+.revision-acts .cm-act-work,
+.revision-acts .cm-act-minor {
+  justify-content: center;
+  width: 26px;
+  padding: 0;
+}
+.revision-acts .cm-act.cm-act-work {
+  border-color: var(--rule);
+  background: var(--paper);
+}
+.revision-acts .cm-act.cm-act-work:hover {
+  border-color: var(--ink-4);
+  background: var(--paper-2);
+}
+.revision-acts .cm-act-work .cm-act-label,
+.revision-acts .cm-act-minor .cm-act-label {
+  display: none;
+}
+
+/* A narrow page: the lens, the state and the actions go under the text. */
+@container revision (max-width: 600px) {
+  .revision-row {
+    grid-template-columns: 18px minmax(0, 1fr);
+  }
+  .revision-side,
+  .revision-acts {
+    grid-area: 2 / 2;
+    justify-self: start;
+  }
+  .revision-side {
+    grid-template-columns: auto auto;
+    justify-items: start;
+  }
 }

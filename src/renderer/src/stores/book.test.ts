@@ -69,6 +69,19 @@ const fromOutside = (content: string | null): void => external?.({ root: ROOT, r
 const commentWrites = (): Array<{ rel: string; content: string }> => writes.filter((w) => w.rel === COMMENTS_FILE)
 const states = (list: EditorComment[]): string[] => list.map((c) => `${c.id}|${c.state}`)
 
+describe('a book that opens with a damaged comments file', () => {
+  it('the comments are read-only and empty, nothing writes the file, and a toast says so', async () => {
+    await saver.flush()
+    writes.length = 0
+    useUi.setState({ toasts: [] })
+    useBook.getState().open({ ...snapshot([]), commentsDamaged: true })
+    expect(useComments.getState()).toMatchObject({ root: ROOT, list: [], readOnly: true, damaged: true })
+    expect(useUi.getState().toasts.map((t) => t.message)).toEqual([expect.stringContaining('ai/comments.json')])
+    await saver.flush()
+    expect(commentWrites()).toEqual([])
+  })
+})
+
 describe('the comments file changes outside while a local change of it waits', () => {
   beforeEach(async () => {
     await saver.flush()

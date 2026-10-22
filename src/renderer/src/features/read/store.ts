@@ -20,11 +20,17 @@ interface CommentsState {
   list: EditorComment[]
   /** The book of the list. The list is empty when no book is open. */
   root: string | null
-  /** The file comes from a newer Wordelia: the app shows the comments and never writes the file. */
+  /** The app shows the comments and never writes the file: the file comes from a newer Wordelia, or it is damaged. */
   readOnly: boolean
+  /**
+   * The book opened with a file that is not a comments file (conflict marks of git, a partial write of a sync
+   * client). Its decisions must not be lost: the list stays empty, and the replies of the reads make no comments
+   * over it, until a good file arrives or the file goes away.
+   */
+  damaged: boolean
 }
 
-export const useComments = create<CommentsState>(() => ({ list: [], root: null, readOnly: false }))
+export const useComments = create<CommentsState>(() => ({ list: [], root: null, readOnly: false, damaged: false }))
 
 const now = (): string => new Date().toISOString()
 
@@ -45,16 +51,24 @@ function sayNewer(): void {
   toast(getT().read.newerFile, { ms: 12000 })
 }
 
+/** The writer hears once that the file is damaged, and that the app does not change it. */
+function sayDamaged(): void {
+  toast(getT().read.damagedFile, { ms: 30000 })
+}
+
 /**
  * Show the comments of a book: the book opens, or its file changed. The list of another book goes away.
- * `version` is the version of the file: a newer one than 1 is shown and never written, and the writer
- * hears it once for the book.
+ * `version` is the version of the file: a newer one than 1 is shown and never written. `damaged`: the file is
+ * there, but it is not a comments file; it is never written. The writer hears each of the two once for the book.
  */
-export function loadComments(root: string | null, list: EditorComment[], version = 1): void {
+export function loadComments(root: string | null, list: EditorComment[], version = 1, damaged = false): void {
   const before = useComments.getState()
-  const readOnly = version > 1
-  useComments.setState({ root, list: uniqueById(list), readOnly })
-  if (root && readOnly && !(before.readOnly && before.root === root)) sayNewer()
+  const newer = version > 1 && !damaged
+  useComments.setState({ root, list: uniqueById(list), readOnly: newer || damaged, damaged })
+  if (!root) return
+  const same = before.root === root
+  if (damaged && !(same && before.damaged)) sayDamaged()
+  if (newer && !(same && before.readOnly && !before.damaged)) sayNewer()
 }
 
 /**
@@ -63,13 +77,16 @@ export function loadComments(root: string | null, list: EditorComment[], version
  * later version of a comment wins, and the app writes the merge. A file of a newer Wordelia always wins: the
  * change of the app is dropped, and the app does not write the file any more (also when the newer Wordelia
  * changed the shape of the file: then the list stays). Other text that is not a comments file (a sync client
- * has not finished the write) changes nothing.
+ * has not finished the write) changes nothing. A good file, or no file, after a damaged one makes the list
+ * normal again.
  */
 export function commentsChangedOutside(root: string, content: string | null): void {
-  if (useComments.getState().root !== root) return
+  const { root: open, readOnly, damaged } = useComments.getState()
+  if (open !== root) return
   const file = readCommentsFile(content)
   if (file.version > 1) saver.cancel(root, COMMENTS_FILE)
-  if (file.valid && file.version === 1 && saver.isPending(root, COMMENTS_FILE)) {
+  // A damaged file has no list of the app to merge with: the good file comes as it is.
+  if (file.valid && file.version === 1 && !damaged && saver.isPending(root, COMMENTS_FILE)) {
     change(mergeComments(useComments.getState().list, file.comments))
     return
   }
@@ -77,8 +94,8 @@ export function commentsChangedOutside(root: string, content: string | null): vo
     loadComments(root, file.comments, file.version)
     return
   }
-  if (file.version > 1 && !useComments.getState().readOnly) {
-    useComments.setState({ readOnly: true })
+  if (file.version > 1 && (!readOnly || damaged)) {
+    useComments.setState({ readOnly: true, damaged: false })
     sayNewer()
   }
 }
@@ -86,11 +103,12 @@ export function commentsChangedOutside(root: string, content: string | null): vo
 /**
  * Add the comments of the notes of a reply that came in. A reply that grows (a stream) adds only its new
  * notes: the same thread, message and key give the same comment, and a read never passes its limit.
- * Returns the comments that this call added.
+ * Returns the comments that this call added. A damaged file gets none: the comments of the reply are in it,
+ * with the decisions of the writer.
  */
 export function addFromReply(thread: Thread, message: ChatMessage, req: ReadRequest, chapterText: string): EditorComment[] {
-  const { list, root } = useComments.getState()
-  if (!root || !message.content.includes('<note')) return []
+  const { list, root, damaged } = useComments.getState()
+  if (!root || damaged || !message.content.includes('<note')) return []
   const limit = req.lens === 'all' ? READ_LIMIT_ALL : READ_LIMIT_ONE
   const mine = list.filter((c) => c.threadId === thread.id && c.messageId === message.id)
   if (mine.length >= limit) return []

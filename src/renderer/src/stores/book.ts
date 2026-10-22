@@ -307,7 +307,7 @@ export const useBook = create<BookState>((set, get) => {
         if (e.root === get().root) handleExternal(e.rel, e.content)
       })
       // The comments of the last book do not show in this one.
-      loadComments(snap.root, snap.comments ?? [], snap.commentsVersion)
+      loadComments(snap.root, snap.comments ?? [], snap.commentsVersion, snap.commentsDamaged)
       set({
         root: snap.root,
         manifest: snap.manifest,

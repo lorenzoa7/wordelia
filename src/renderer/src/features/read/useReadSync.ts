@@ -117,8 +117,13 @@ function askAboutFixed(message: ChatMessage, req: ReadRequest): void {
   toast(t.read.resolved(open.length), { ms: 14000, action: { label: t.read.markDone(open.length), run } })
 }
 
-/** The saved replies of the read threads of the open book. A reply that has not changed since the last time is skipped. */
+/**
+ * The saved replies of the read threads of the open book. A reply that has not changed since the last time is
+ * skipped. With a damaged comments file, no reply counts as handled: they give their comments when the file is
+ * good again or goes away.
+ */
 function ingestSaved(): void {
+  if (useComments.getState().damaged) return
   for (const { id } of useBook.getState().threads) {
     const thread = readThread(id)
     if (!thread) continue
@@ -148,10 +153,16 @@ export function startReadSync(): () => void {
       if (now && now !== prev.streaming[threadId]) throttle.call(threadId, () => ingestStreaming(threadId))
     }
   })
+  // A damaged comments file of the open book is good again, or gone. (Another book that opens changes the
+  // comment store before the book store: its threads are not here yet.)
+  const offComments = useComments.subscribe((s, prev) => {
+    if (prev.damaged && !s.damaged && s.root === prev.root && s.root === useBook.getState().root) ingestSaved()
+  })
   ingestSaved()
   return () => {
     offBook()
     offChat()
+    offComments()
     throttle.clear()
     forget()
   }

@@ -186,6 +186,28 @@ describe('the comments of a book', () => {
     expect((await openBook(book)).comments).toEqual([])
   })
 
+  it('a file that is there but is not a comments file is damaged; a missing file and bad items are not', async () => {
+    // Conflict marks of git, a partial write of a sync client, JSON of another shape.
+    const conflict = ['<<<<<<< HEAD', JSON.stringify({ version: 1, comments: [comment] }), '=======', JSON.stringify({ version: 1, comments: [] }), '>>>>>>> other', ''].join('\n')
+    for (const bad of [conflict, '{"version":1,"comments":[', '', JSON.stringify({ version: 1, items: [comment] })]) {
+      await writeComments(bad)
+      const snap = await openBook(book)
+      expect(snap.comments).toEqual([])
+      expect(snap.commentsDamaged).toBe(true)
+    }
+    // A file that is there but cannot be read (here a folder with its name) is damaged too.
+    await rm(join(book, 'ai', 'comments.json'))
+    await mkdir(join(book, 'ai', 'comments.json'))
+    expect((await openBook(book)).commentsDamaged).toBe(true)
+    await rm(join(book, 'ai', 'comments.json'), { recursive: true })
+    expect((await openBook(book)).commentsDamaged).toBeUndefined()
+    await writeComments(JSON.stringify({ version: 1, comments: [{ ...comment, lens: 'plot' }] }))
+    expect((await openBook(book)).commentsDamaged).toBeUndefined()
+    // A newer Wordelia can change the shape: that file is newer, not damaged.
+    await writeComments(JSON.stringify({ version: 2, items: [comment] }))
+    expect((await openBook(book)).commentsDamaged).toBeUndefined()
+  })
+
   it('a byte order mark is not damage, and the first of two comments with one id wins', async () => {
     await writeComments('\uFEFF' + JSON.stringify({ version: 1, comments: [comment, { ...comment, text: 'Outro.' }] }))
     expect((await openBook(book)).comments).toEqual([comment])

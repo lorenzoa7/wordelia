@@ -113,5 +113,6 @@ export const read: typeof en = {
     empty: 'Nenhum comentário ainda. Os comentários das leituras de editor ficam aqui.',
     noMatch: 'Nenhum comentário com estes filtros.',
     conflict: (chapter, source) => `${chapter} está em conflito com ${source}`
-  }
+  },
+  damagedFile: 'O arquivo de comentários deste livro está danificado. O Wordelia não muda esse arquivo. Corrija ou exclua ai/comments.json.'
 }

@@ -169,5 +169,10 @@ export const read = {
     noMatch: 'No comment agrees with these filters.',
     /** The chip of a Continuity comment: the passage of this chapter is in conflict with its source */
     conflict: (chapter: string, source: string): string => `${chapter} is in conflict with ${source}`
-  }
+  },
+  /**
+   * The toast when the book opens with an `ai/comments.json` that is not a comments file (conflict marks of git,
+   * a partial write of a sync client). The app shows no comments and does not write the file.
+   */
+  damagedFile: 'The comments file of this book is damaged. Wordelia does not change it. Fix or delete ai/comments.json.'
 }

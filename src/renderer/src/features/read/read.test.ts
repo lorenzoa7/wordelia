@@ -449,6 +449,57 @@ describe('a file from a newer Wordelia', () => {
   })
 })
 
+describe('a damaged comments file', () => {
+  const toasts = (): string[] => useUi.getState().toasts.map((t) => t.message)
+
+  it('is read-only, makes no comments from the replies, is never written, and the toast says so once', async () => {
+    store.loadComments(ROOT, [], 1, true)
+    expect(store.useComments.getState()).toMatchObject({ readOnly: true, damaged: true, list: [] })
+    expect(toasts()).toEqual([expect.stringContaining('ai/comments.json')])
+    // Another load of the same file says nothing more.
+    store.loadComments(ROOT, [], 1, true)
+    expect(toasts()).toHaveLength(1)
+    // The saved replies of the reads do not make the comments again over the file: their decisions are in it.
+    expect(store.addFromReply(thread(), reply(THREE), request(), CHAPTER)).toEqual([])
+    expect(store.useComments.getState().list).toEqual([])
+    store.putBackComments([comment()])
+    await saver.flush()
+    expect(calls.filter((c) => c.rel === COMMENTS_FILE)).toEqual([])
+  })
+
+  it('the file that a sync client or the author fixes makes the list normal again', async () => {
+    store.loadComments(ROOT, [], 1, true)
+    store.commentsChangedOutside(ROOT, '<<<<<<< HEAD')
+    expect(store.useComments.getState()).toMatchObject({ readOnly: true, damaged: true })
+    store.commentsChangedOutside(ROOT, serializeComments([comment()]))
+    expect(store.useComments.getState()).toMatchObject({ readOnly: false, damaged: false, list: [comment()] })
+    store.setCommentState(['cm_aaaaaaaa'], 'done')
+    await saver.flush()
+    expect(onDisk().map((c) => c.state)).toEqual(['done'])
+  })
+
+  it('a deleted file is a book with no comments, and the replies make them again', () => {
+    store.loadComments(ROOT, [], 1, true)
+    store.commentsChangedOutside(ROOT, null)
+    expect(store.useComments.getState()).toMatchObject({ readOnly: false, damaged: false })
+    expect(store.addFromReply(thread(), reply(THREE), request(), CHAPTER)).toHaveLength(3)
+  })
+
+  it('a file of a newer Wordelia that comes after it says that it is newer', () => {
+    store.loadComments(ROOT, [], 1, true)
+    store.commentsChangedOutside(ROOT, JSON.stringify({ version: 2, items: [] }))
+    expect(store.useComments.getState()).toMatchObject({ readOnly: true, damaged: false })
+    expect(toasts()).toEqual([expect.stringContaining('ai/comments.json'), expect.stringContaining('newer version of Wordelia')])
+  })
+
+  it('a missing file is no damage, and another book is not damaged', () => {
+    store.loadComments(ROOT, [], 1, true)
+    store.loadComments('/books/b', [])
+    expect(store.useComments.getState()).toMatchObject({ readOnly: false, damaged: false })
+    expect(toasts()).toHaveLength(1)
+  })
+})
+
 describe('changes from outside', () => {
   const text = (list: EditorComment[]): string => serializeComments(list)
 

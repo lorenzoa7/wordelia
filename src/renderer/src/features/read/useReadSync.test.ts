@@ -8,7 +8,7 @@ vi.mock('@/lib/api', () => ({
 }))
 
 const { makeThrottle, readBefore, startReadSync, STREAM_PARSE_MS } = await import('./useReadSync')
-const { loadComments, useComments } = await import('./store')
+const { commentsChangedOutside, loadComments, useComments } = await import('./store')
 const { decideComments } = await import('./ui')
 const { useBook } = await import('@/stores/book')
 const { useChat } = await import('@/features/chat/chatStore')
@@ -161,6 +161,34 @@ describe('comments from the saved replies of a read thread', () => {
     // The Undo of the delete brings the chapter back, and the thread is saved again.
     useBook.setState({ chapters: [chapter('ch_one', 'A Tempestade'), chapter('ch_two', 'O Visitante')], threads: [{ ...saved }] })
     expect(list().map((c) => c.passage)).toEqual(['Marta olhou o mar'])
+  })
+
+  it('a damaged comments file: the saved replies do not make the comments again over it', () => {
+    loadComments(ROOT, [], 1, true)
+    useBook.setState({ threads: [thread([asked(), reply(`A letter.\n${note(1, 'Marta olhou o mar')}`)])] })
+    stop = startReadSync()
+    expect(list()).toEqual([])
+    // A reply that streams makes none either.
+    stream(`A letter.\n${note(1, 'dois dias')}`)
+    vi.advanceTimersByTime(1000)
+    expect(list()).toEqual([])
+  })
+
+  it('a damaged comments file that the author deletes: the saved replies make the comments again', () => {
+    loadComments(ROOT, [], 1, true)
+    useBook.setState({ threads: [thread([asked(), reply(`A letter.\n${note(1, 'Marta olhou o mar')}`)])] })
+    stop = startReadSync()
+    commentsChangedOutside(ROOT, null)
+    expect(list().map((c) => c.passage)).toEqual(['Marta olhou o mar'])
+  })
+
+  it('another book that opens after a damaged file does not get the comments of the replies of the first book', () => {
+    loadComments(ROOT, [], 1, true)
+    useBook.setState({ threads: [thread([asked(), reply(`A letter.\n${note(1, 'Marta olhou o mar')}`)])] })
+    stop = startReadSync()
+    // The comment store changes before the book store (useBook.open).
+    loadComments('/books/other', [])
+    expect(list()).toEqual([])
   })
 
   it('a book that opens with its own thread: the thread of another book is not used', () => {

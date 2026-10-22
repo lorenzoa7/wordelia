@@ -146,6 +146,11 @@ export interface BookSnapshot {
    * knows: the app shows the comments and never writes the file.
    */
   commentsVersion?: number
+  /**
+   * `ai/comments.json` is there, but it is not a comments file (conflict marks of git, a partial write of a sync
+   * client). The app shows no comments, makes none from the replies of the reads and never writes the file.
+   */
+  commentsDamaged?: boolean
   /** What the writer must know about the files of the book when it opens */
   notices?: BookNotice[]
 }

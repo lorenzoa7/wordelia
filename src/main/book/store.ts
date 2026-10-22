@@ -286,8 +286,13 @@ export async function openBook(root: string, opts: OpenBookOptions = {}): Promis
   const syncState = await readJson<SyncState>(join(root, SYNC_STATE_FILE), { chapters: {}, syncedAt: null })
   // The actions of this book. A book without the file has none.
   const actions = parseBookActions(await readJson<unknown>(join(root, ACTIONS_FILE), null))
-  // The comments of the editor's reads. A book without the file, or with a bad one, has none.
-  const comments = readCommentsFile(await readTextOr(join(root, COMMENTS_FILE), null))
+  // The comments of the editor's reads. A book without the file, or with a bad one, has none. A bad file, or one
+  // that cannot be read, is damaged: the app must not write over the decisions in it. A newer Wordelia can change
+  // the shape of the file: that file is newer, not damaged.
+  const commentsPath = join(root, COMMENTS_FILE)
+  const commentsText = await readTextOr(commentsPath, null)
+  const comments = readCommentsFile(commentsText)
+  const commentsDamaged = commentsText == null ? await exists(commentsPath) : !comments.valid && comments.version <= 1
   if (!(await exists(join(root, AI_DIR)))) await mkdir(join(root, THREADS_DIR), { recursive: true })
 
   return {
@@ -301,6 +306,7 @@ export async function openBook(root: string, opts: OpenBookOptions = {}): Promis
     actions,
     comments: comments.comments,
     commentsVersion: comments.version,
+    ...(commentsDamaged ? { commentsDamaged } : {}),
     ...(notices.length ? { notices } : {})
   }
 }

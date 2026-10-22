@@ -153,4 +153,26 @@ describe('the revision list', () => {
     useUi.getState().resetForBook()
     expect(useUi.getState()).toMatchObject({ revisionOpen: false, revisionFilter: { lens: 'all', state: 'all' }, revisionScroll: 0 })
   })
+
+  it('closes at each jump to a chapter: open, add, and the Undo of a delete', async () => {
+    const one = { id: 'ch_one', file: 'A Tempestade.md', title: 'A Tempestade', body: '', meta: {} }
+    const two = { id: 'ch_two', file: 'O Visitante.md', title: 'O Visitante', body: '', meta: {} }
+    useBook.setState({ root: ROOT, chapters: [one, two], manifest: { chapters: [] } as never, activeChapterId: 'ch_one' })
+    store.loadComments(ROOT, [])
+
+    useUi.getState().setRevisionOpen(true)
+    useBook.getState().selectChapter('ch_two')
+    expect(useUi.getState().revisionOpen).toBe(false)
+
+    useUi.getState().setRevisionOpen(true)
+    const added = await useBook.getState().addChapter(null, 'Aurora')
+    expect(useBook.getState().activeChapterId).toBe(added.id)
+    expect(useUi.getState().revisionOpen).toBe(false)
+
+    const undo = await useBook.getState().deleteChapter('ch_two')
+    useUi.getState().setRevisionOpen(true)
+    await undo!()
+    expect(useBook.getState().activeChapterId).toBe('ch_two')
+    expect(useUi.getState().revisionOpen).toBe(false)
+  })
 })

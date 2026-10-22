@@ -803,6 +803,16 @@ export default async function ({ app, page, shot, openBook, book, work }) {
   if (await page.locator('.revision').count()) fail('a chapter that opens from the Plan view shows the revision list')
   if (await page.locator('.book-pane-write.is-away').count()) fail('a chapter that opens from the Plan view does not show')
 
+  // A new chapter with the list open: the list closes, and the new chapter shows.
+  await listItem.click()
+  await page.waitForSelector('.revision', { timeout: 5000 })
+  const chaptersBefore = await page.evaluate(() => window.__wordelia.book.getState().chapters.length)
+  await page.locator('.sidebar-add').click()
+  await until('"New chapter at the end" did not add a chapter', () => page.evaluate((n) => window.__wordelia.book.getState().chapters.length === n + 1, chaptersBefore), 5000)
+  await frames()
+  if (await page.locator('.revision').count()) fail('a new chapter stays under the revision list')
+  if (await page.locator('.book-pane-write.is-away').count()) fail('a new chapter does not show')
+
   // A book switch: the list closes, and the list of the other book has none of these comments.
   await listItem.click()
   await page.waitForSelector('.revision', { timeout: 5000 })

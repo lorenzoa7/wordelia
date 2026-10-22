@@ -191,6 +191,13 @@ export const useBook = create<BookState>((set, get) => {
     if (root) saver.write(root, MANIFEST_FILE, JSON.stringify(m, null, 2) + '\n', immediate)
   }
 
+  // A jump to a chapter shows it in the Write view: the revision list does not stay over it (also from the
+  // Plan view, a new chapter and the Undo of a delete). All the writers of `chapterJump` use this.
+  const jumpTo = (id: string, focus?: boolean): Pick<BookState, 'activeChapterId' | 'view' | 'chapterJump'> => {
+    useUi.getState().setRevisionOpen(false)
+    return { activeChapterId: id, view: 'write', chapterJump: { id, n: (get().chapterJump?.n ?? 0) + 1, ...(focus ? { focus } : {}) } }
+  }
+
   const handleExternal = (rel: string, content: string | null): void => {
     const st = get()
     const root = st.root
@@ -347,9 +354,7 @@ export const useBook = create<BookState>((set, get) => {
       set({ view })
     },
     selectChapter(id) {
-      // The chapter shows in the Write view: the revision list does not stay over it (also from the Plan view).
-      useUi.getState().setRevisionOpen(false)
-      set({ activeChapterId: id, view: 'write', chapterJump: { id, n: (get().chapterJump?.n ?? 0) + 1 } })
+      set(jumpTo(id))
     },
     setActiveChapter(id) {
       if (get().activeChapterId !== id) set({ activeChapterId: id })
@@ -448,7 +453,7 @@ export const useBook = create<BookState>((set, get) => {
       const file = uniqueName(fileNameFromTitle(t), takenChapterFiles(chapters))
       const ch: Chapter = { id: newId('ch'), file, title: t, body, meta: {} }
       const next = [...chapters.slice(0, idx), ch, ...chapters.slice(idx)]
-      set({ chapters: next, activeChapterId: ch.id, view: 'write', chapterJump: { id: ch.id, n: (get().chapterJump?.n ?? 0) + 1, focus: true } })
+      set({ chapters: next, ...jumpTo(ch.id, true) })
       saver.write(root, chapterRel(ch), chapterToFile(ch), true)
       get().updateManifest({ chapters: next.map((c) => ({ id: c.id, file: c.file })) })
       return ch
@@ -483,7 +488,7 @@ export const useBook = create<BookState>((set, get) => {
         const back = { ...ch, file }
         const at = Math.min(idx, st.chapters.length)
         const list = [...st.chapters.slice(0, at), back, ...st.chapters.slice(at)]
-        set({ chapters: list, activeChapterId: back.id, view: 'write', chapterJump: { id: back.id, n: (st.chapterJump?.n ?? 0) + 1 } })
+        set({ chapters: list, ...jumpTo(back.id) })
         putBackComments(comments)
         // The file of the trash comes back; the text in memory is the same.
         await invoke('book:renameFile', root, trash, chapterRel(back)).catch(() => saver.write(root, chapterRel(back), chapterToFile(back), true))

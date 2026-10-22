@@ -81,9 +81,10 @@ An action shows its result as an **inline diff** on the page: removed words in r
 - The glasses button of the toolbar opens a popover: what to read, the lens, "Chapter in progress", and **Read**. The chat can also offer a read as a card; one click starts it.
 - **Lenses:** Structure, Reader, Style, Continuity, Proofread, or all lenses. A read gives at most 7 comments with all lenses, 5 with one lens.
 - A read is a chat message in the thread "Read · <chapter>". The reply is a short letter ("What works", "What I would look at first") and comments.
-- Each comment is on a passage. Its card is in the **margin**, to the right of the page, and a number marks the passage. The first read makes room for the margin one time; **Hide** gives the room back.
+- Each comment is on a passage. Its card is in the **comment margin**, to the right of the page, and a number marks the passage. The first read makes room for the cards one time; **Hide** gives the room back.
 - **Actions of a comment:** Discuss in chat, Polish passage (the main action with the comment, in the normal review), Update the note (Continuity: a chat message, then normal proposals), It's intentional (with an optional reason), Ignore, Done. Each change of state has Undo.
 - A comment follows its passage when the text changes. When the passage is gone, the comment says "The passage changed".
+- Retry, Rewind and Edit of a read remove only the open comments of the replies that go. Comments that the writer decided stay, with their reasons.
 - The **revision list** shows all the comments of the book, by chapter, with filters by lens and by state. The first item of the chapter list opens it.
 - A second read of a chapter gets the earlier comments, with their states and reasons. When it says that a comment is fixed, the app asks the writer. It never closes a comment by itself.
 

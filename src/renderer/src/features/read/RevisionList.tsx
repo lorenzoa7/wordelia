@@ -119,6 +119,20 @@ export function RevisionList(): React.JSX.Element {
       }),
     []
   )
+  // The text under the list must not change where the author cannot see it. Outside a field, Ctrl+Z and
+  // Ctrl+Y do nothing while the list shows: else the browser undoes the last edit of the page, also in the
+  // text of a chapter that does not show. (The Ctrl+Z of chat changes is off too: PageEditor.)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return
+      const key = e.key.toLowerCase()
+      if (key !== 'z' && key !== 'y') return
+      if (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable="true"]')) return
+      e.preventDefault()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   const lensOptions = (['all', ...LENSES] as LensChoice[]).map((v) => ({ value: v, label: v === 'all' ? l.all : t.read.lens[v], count: counts.lens[v], lens: v === 'all' ? undefined : v }))
   const stateOptions = (['all', ...SHOWN_STATES] as StateChoice[]).map((v) => ({ value: v, label: v === 'all' ? l.all : l.states[v], count: counts.state[v] }))

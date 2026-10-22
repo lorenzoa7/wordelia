@@ -12,6 +12,7 @@ import type { BookManifest, DocNode } from '@shared/types'
 import { useApp } from '@/stores/app'
 import { useBook } from '@/stores/book'
 import { saver } from '@/stores/saver'
+import { useUi } from '@/stores/ui'
 import { useT } from '@/lib/i18n'
 import { fontStack } from '@/lib/fonts'
 import { registerFlusher } from '@/lib/flush'
@@ -80,7 +81,7 @@ function sheetAtReadingLine(desk: HTMLElement): { id: string; top: number } | nu
   return null
 }
 
-/** Ctrl+Z with the focus outside a text undoes an accepted chat change: only while the Write view shows. */
+/** Ctrl+Z with the focus outside a text undoes an accepted chat change: only while the text shows (the Write view, without the revision list over it). */
 function ProposalUndoKeys(): null {
   useProposalUndoKeys()
   return null
@@ -101,6 +102,8 @@ export function PageEditor(): React.JSX.Element | null {
   const ids = useMemo(() => (chapterIds ? chapterIds.split('|') : []), [chapterIds])
   const jump = useBook((s) => s.chapterJump)
   const view = useBook((s) => s.view)
+  // The revision list of the editor's reads covers the desk (BookView): the text does not show.
+  const revisionOpen = useUi((s) => s.revisionOpen)
   const ui = useApp((s) => s.settings?.ui)
   const active = useActiveEditor((s) => s.active)
   const typo = manifest?.typography
@@ -294,7 +297,7 @@ export function PageEditor(): React.JSX.Element | null {
     <div
       className={clsx('write-frame', ui?.focusMode && 'focus-mode', typing && 'is-typing', ui?.typewriterScroll && 'typewriter', typo.indentFirstParagraph && 'indent-first')}
     >
-      {view === 'write' && <ProposalUndoKeys />}
+      {view === 'write' && !revisionOpen && <ProposalUndoKeys />}
       {active && <Toolbar editor={active.editor} />}
       {active && <FindBar editor={active.editor} />}
       <div ref={deskRef} className={clsx('desk', placing && 'is-placing')}>

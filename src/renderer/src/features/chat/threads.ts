@@ -5,6 +5,7 @@
 
 import type { Thread } from '@shared/types'
 import { useBook } from '@/stores/book'
+import { dropMessageComments, putBackComments, useComments } from '@/features/read/store'
 import { draftKey, focusComposer, NEW_THREAD_TITLE, switchBook, useChat } from './chatStore'
 import { newThread } from './send'
 
@@ -55,6 +56,29 @@ export function dropDraft(threadId: string): void {
   const drafts = { ...s.drafts }
   delete drafts[key]
   useChat.setState({ drafts })
+}
+
+/**
+ * Delete a thread of the open book: it goes to the trash of the book, with the open comments of its reads
+ * (`replying`: the reply that streamed in it). Returns the thread as it was, and the Undo, which brings the
+ * thread and the comments back. The Undo returns true when the thread came back. In another book it does
+ * nothing: its toast can stay after a book switch, and the thread and comments of one book never go into another.
+ */
+export async function deleteThreadWithComments(th: Thread, replying?: string): Promise<{ thread: Thread; undo: () => Promise<boolean> }> {
+  const root = useBook.getState().root
+  const latest = useBook.getState().threads.find((x) => x.id === th.id) ?? th
+  // The thread leaves the list at once, and its comments go in the same step. Then its file moves to the trash.
+  const deleting = useBook.getState().deleteThread(th.id)
+  const comments = dropMessageComments([...latest.messages.map((m) => m.id), ...(replying ? [replying] : [])])
+  const trash = await deleting
+  const undo = async (): Promise<boolean> => {
+    if (!root || useBook.getState().root !== root || useComments.getState().root !== root) return false
+    // Before the thread: its replies then find their comments in the list and do not make them again.
+    putBackComments(comments)
+    await useBook.getState().restoreThread(latest, trash)
+    return true
+  }
+  return { thread: latest, undo }
 }
 
 /** An empty thread that older versions saved when the user clicked "New thread": no messages, no purpose, the default title. */

@@ -4,6 +4,7 @@
 import { useId, useRef, useState } from 'react'
 import { Popover, RadioGroup } from 'radix-ui'
 import { CaretDown, Eyeglasses } from '@phosphor-icons/react'
+import type { Editor } from '@tiptap/core'
 import { LENSES, type LensChoice } from '@shared/comments'
 import type { ReadRequest } from '@shared/types'
 import { getActiveEditor, selectedText, whenChapterEditor } from '@/features/editor/registry'
@@ -15,6 +16,14 @@ import { bookTarget, isLastChapter, readTarget, startRead, useReadRunning, type 
 import './read.css'
 
 const CHOICES: LensChoice[] = ['all', ...LENSES]
+
+/**
+ * Give the focus to a text now, with its selection, without a scroll. The focus command of the editor waits
+ * for the next frame, and a window that the system hides (or a slow one) can be late or skip it.
+ */
+function focusNow(editor: Editor | undefined): void {
+  if (editor && !editor.isDestroyed) editor.view.focus()
+}
 
 interface FormProps {
   target: ReadTarget
@@ -124,6 +133,8 @@ function ReadFormPopover({ trigger, takeTarget, onRun, focusText, escToText }: F
     toText.current = true
     setOpen(false)
     onRun(req)
+    // The text gets the focus now, not at the end of the exit animation of the popover.
+    if (target) focusText(target)
   }
 
   return (
@@ -135,21 +146,26 @@ function ReadFormPopover({ trigger, takeTarget, onRun, focusText, escToText }: F
           side="bottom"
           align="end"
           sideOffset={8}
-          onEscapeKeyDown={() => (toText.current = escToText)}
+          onEscapeKeyDown={() => {
+            toText.current = escToText
+            if (escToText && target) focusText(target)
+          }}
           onCloseAutoFocus={(e) => {
-            // The text gets the focus, with its selection: on the button, the focus would show its tooltip.
-            // After a click somewhere else, Radix keeps the focus where the click put it.
-            if (!toText.current || !target) return
+            // "Read" and Esc gave the focus to the text, with its selection, when the popover closed: Radix does
+            // not move it to the button (there, the focus would show its tooltip). After a click somewhere
+            // else, Radix keeps the focus where the click put it.
+            if (!toText.current) return
             toText.current = false
             e.preventDefault()
-            focusText(target)
           }}
         >
           <div className="read-pop-head">
             <Eyeglasses size={16} aria-hidden />
             <span className="caps">{t.read.title}</span>
           </div>
-          {target && <ReadForm target={target} lens={lens} onLens={setLens} onRun={run} />}
+          {/* A new target is a new form: "in progress" and the scope come from it, also when the popover opens
+              again before the last one left the screen. */}
+          {target && <ReadForm key={`${target.chapterId}\n${target.selection ?? ''}`} target={target} lens={lens} onLens={setLens} onRun={run} />}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
@@ -175,7 +191,7 @@ export function ReadPopover(): React.JSX.Element {
       }
       takeTarget={editorTarget}
       onRun={(req) => void startRead(req)}
-      focusText={() => getActiveEditor()?.editor.commands.focus(null, { scrollIntoView: false })}
+      focusText={() => focusNow(getActiveEditor()?.editor)}
       escToText
     />
   )
@@ -203,7 +219,7 @@ export function NewReadButton(): React.JSX.Element {
         if (book.activeChapterId !== req.chapterId) book.selectChapter(req.chapterId)
         void startRead(req)
       }}
-      focusText={(target) => whenChapterEditor(target.chapterId, (e) => !e.editor.isDestroyed && e.editor.commands.focus(null, { scrollIntoView: false }))}
+      focusText={(target) => whenChapterEditor(target.chapterId, (e) => focusNow(e.editor))}
       escToText={false}
     />
   )

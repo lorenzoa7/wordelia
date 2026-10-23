@@ -25,7 +25,12 @@ export default async function ({ app, page, shot, openBook, book, work }) {
       if (await check()) return
       await page.waitForTimeout(100)
     }
-    fail(what)
+    // The element with the focus, and the popover: they tell why a step about the focus failed.
+    const state = await page.evaluate(() => {
+      const a = document.activeElement
+      return `focus on ${a ? `${a.tagName.toLowerCase()}.${[...a.classList].join('.')}` : 'nothing'}, window focused ${document.hasFocus()}, popover ${document.querySelector('.read-pop')?.getAttribute('data-state') ?? 'gone'}`
+    })
+    fail(`${what} (${state})`)
   }
   const readThreads = async () => (await threads()).filter((t) => t.readChapterId === 'ch_sample01')
   const openPopover = async () => {
@@ -41,7 +46,9 @@ export default async function ({ app, page, shot, openBook, book, work }) {
       ed.state.doc.descendants((node, pos) => {
         if (!range && node.isTextblock && node.textContent.startsWith(text)) range = { from: pos + 1, to: pos + 1 + node.content.size }
       })
-      ed.chain().focus().setTextSelection(range).run()
+      // The focus now, not at the next frame: a late focus would close the popover that opens next.
+      ed.commands.setTextSelection(range)
+      ed.view.focus()
     }, start)
 
   const passageOf = async (id) => (await comments()).find((c) => c.id === id)

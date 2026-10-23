@@ -107,7 +107,8 @@ export function buildReadTurn(message: string, req: ReadRequest, chapter: Chapte
     all ? '- lens is the lens that found the problem: structure, reader, style, continuity or proofread.' : `- lens is always "${req.lens}".`,
     '- <find> is the passage that the comment is about. Copy it from the chapter word for word: a short phrase or one sentence, never a whole paragraph. Keep it inside one paragraph. Do not change, add or leave out a word. Leave out the Markdown marks (for example * and _). Make it long enough that it is in the chapter one time.',
     '- A comment needs a passage that is in the chapter. When something is missing (for example a scene), choose the passage where it must start. The app drops a comment whose passage it cannot find.',
-    '- <text> says in one or two sentences what the problem is and why it matters. Do not write the new text.'
+    '- <text> says in one or two sentences what the problem is and why it matters. Do not write the new text.',
+    '- The letter and each <text> are for the author: never write an id (of a story line card, as ^c12, or of a comment) or a file path there. Name a story line card by its words, a note by its name, a chapter by its number or its title.'
   )
   if (withSource) {
     lines.push(

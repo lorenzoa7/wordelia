@@ -70,6 +70,14 @@ describe('the read block', () => {
     expect(t).toMatch(/never a whole paragraph/)
   })
 
+  it('the letter and the comments are for the author: no ids of cards or comments, no file paths', () => {
+    // A real read named two cards of the story line by their ids ("cards ^c75 and ^c78").
+    const t = turn()
+    expect(t).toMatch(/never write an id/)
+    expect(t).toContain('^c12')
+    expect(t).toMatch(/Name a story line card by its words/)
+  })
+
   it('the example note is a note that the parser reads', () => {
     for (const [lens, exampleLens, sources] of [
       ['all', 'continuity', 1],

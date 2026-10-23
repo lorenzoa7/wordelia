@@ -14,6 +14,8 @@ const { useBook } = await import('@/stores/book')
 const { useChat } = await import('@/features/chat/chatStore')
 const { useUi } = await import('@/stores/ui')
 const { getT } = await import('@/lib/i18n')
+// A large module: it loads here, not in the time of a test.
+const { truncateThread } = await import('@/features/chat/rewind')
 
 const ROOT = '/books/santa-ilha'
 const NOW = '2026-10-21T10:00:00.000Z'
@@ -344,7 +346,6 @@ ${note(1, 'Marta olhou o mar')}
 
 describe('a read reply that leaves its thread', () => {
   it('Retry, Rewind and Edit take the open comments of the removed replies away; the decided ones stay', async () => {
-    const { truncateThread } = await import('@/features/chat/rewind')
     const first = reply(note(1, 'Marta olhou o mar'))
     const second = reply(note(1, 'dois dias'), 'm_reply2')
     useBook.setState({ threads: [thread([asked(), first, asked('m_ask2'), second])] })

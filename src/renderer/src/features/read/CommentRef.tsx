@@ -13,7 +13,7 @@ import { useT } from '@/lib/i18n'
 import { useBook } from '@/stores/book'
 import { Tooltip } from '@/ui'
 import { goToComment } from './actions'
-import { commentRefRank, linkCommentRefs } from './fromReply'
+import { commentRef, linkCommentRefs } from './fromReply'
 import { marginNumbers, useMarksDrawn } from './marks'
 import { useComments } from './store'
 import './read.css'
@@ -26,12 +26,14 @@ interface RefProps {
   messageId: string
   /** The rank of the comment in the reply */
   rank: number
-  /** The words of the letter ("→ N"), for a rank without a comment */
+  /** The link holds the opening parenthesis too ("(→ N)"), not only the closing one ("→ N)") */
+  opens: boolean
+  /** The words of the letter ("(→ N)" or "→ N)"), for a rank without a comment */
   children: React.ReactNode
 }
 
-/** One link of the letter to a comment of its reply. */
-export function CommentRef({ threadId, messageId, rank, children }: RefProps): React.JSX.Element {
+/** One link of the letter to a comment of its reply, with its parentheses on the same line. */
+export function CommentRef({ threadId, messageId, rank, opens, children }: RefProps): React.JSX.Element {
   const t = useT()
   const root = useBook((s) => s.root)
   const chapters = useBook((s) => s.chapters)
@@ -55,18 +57,22 @@ export function CommentRef({ threadId, messageId, rank, children }: RefProps): R
   const label = c.state === 'open' ? t.read.letterRef.open(n, lens) : t.read.letterRef[c.state](lens)
   const mark = open ? (n ?? <Warning size={11} weight="bold" />) : c.state === 'ignored' ? <X size={11} weight="bold" /> : <Check size={11} weight="bold" />
   return (
-    <Tooltip label={label}>
-      <button
-        type="button"
-        className={clsx('read-ref', `cm-${c.lens}`, !open && 'is-closed')}
-        data-comment={c.id}
-        data-n={n ?? undefined}
-        aria-label={label}
-        onClick={() => goToComment(c)}
-      >
-        {mark}
-      </button>
-    </Tooltip>
+    <span className="read-ref-wrap">
+      {opens && '('}
+      <Tooltip label={label}>
+        <button
+          type="button"
+          className={clsx('read-ref', `cm-${c.lens}`, !open && 'is-closed')}
+          data-comment={c.id}
+          data-n={n ?? undefined}
+          aria-label={label}
+          onClick={() => goToComment(c)}
+        >
+          {mark}
+        </button>
+      </Tooltip>
+      )
+    </span>
   )
 }
 
@@ -75,10 +81,10 @@ export function LetterText({ text, threadId, messageId }: { text: string; thread
   const components = useMemo<Components>(
     () => ({
       a: ({ href, children }) => {
-        const rank = commentRefRank(href)
-        if (rank === null) return <ChatLink href={href}>{children}</ChatLink>
+        const ref = commentRef(href)
+        if (!ref) return <ChatLink href={href}>{children}</ChatLink>
         return (
-          <CommentRef threadId={threadId} messageId={messageId} rank={rank}>
+          <CommentRef threadId={threadId} messageId={messageId} rank={ref.rank} opens={ref.opens}>
             {children}
           </CommentRef>
         )

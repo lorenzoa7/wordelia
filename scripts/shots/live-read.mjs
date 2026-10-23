@@ -43,8 +43,10 @@ export default async function ({ page, shot, work }) {
     await page.evaluate((id) => window.__wordelia.book.getState().selectChapter(id), ch.id)
     await page.waitForTimeout(1000)
     const before = (await comments()).map((c) => c.id)
-    await page.evaluate((r) => window.__wordelia.startRead(r), { chapterId: ch.id, lens, inProgress })
-    await until(`the read of "${name}" did not start`, streaming, 60000)
+    const asked = await page.evaluate((id) => window.__wordelia.book.getState().threads.find((t) => t.readChapterId === id)?.messages.length ?? 0, ch.id)
+    // startRead ends when the reply ends: do not wait for it here.
+    await page.evaluate((r) => void window.__wordelia.startRead(r), { chapterId: ch.id, lens, inProgress })
+    await until(`the read of "${name}" did not start`, async () => (await streaming()) || (await page.evaluate((id) => window.__wordelia.book.getState().threads.find((t) => t.readChapterId === id)?.messages.length ?? 0, ch.id)) > asked + 1, 60000)
     await page.waitForTimeout(5000)
     await shot(`${name}-streaming`)
     const seconds = await until(`the read of "${name}" did not finish`, async () => !(await streaming()), 15 * 60000)

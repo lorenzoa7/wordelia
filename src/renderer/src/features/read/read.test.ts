@@ -19,7 +19,7 @@ vi.mock('@/lib/api', () => ({
   on: () => () => {}
 }))
 
-const { commentRefRank, commentsFromSegments, linkCommentRefs } = await import('./fromReply')
+const { commentRef, commentsFromSegments, linkCommentRefs } = await import('./fromReply')
 const store = await import('./store')
 const { saver } = await import('@/stores/saver')
 const { useUi } = await import('@/stores/ui')
@@ -188,21 +188,23 @@ afterEach(async () => {
 })
 
 describe('the links of a letter to its comments', () => {
-  it('each "→ N" of the letter is a link to comment N of the reply', () => {
-    const letter = 'The rhythm of the opening (style, → 1), the conflict (→2) and Marta (continuity, →  3).'
+  it('each "→ N" of the letter is a link to comment N of the reply, with its closing parenthesis', () => {
+    // The link holds the parentheses that touch the arrow and the number: the chip never breaks from them.
+    const letter = 'The rhythm of the opening (style, → 1), the conflict (→2) and Marta (continuity, →  3 ).'
     const linked = linkCommentRefs(letter)
-    expect(linked).toBe('The rhythm of the opening (style, [→ 1](#comment-1)), the conflict ([→ 2](#comment-2)) and Marta (continuity, [→ 3](#comment-3)).')
-    expect(commentRefRank('#comment-12')).toBe(12)
-    expect(commentRefRank('https://example.com/#comment-1')).toBeNull()
-    expect(commentRefRank(undefined)).toBeNull()
+    expect(linked).toBe('The rhythm of the opening (style, [→ 1)](#comment-1-in), the conflict [(→ 2)](#comment-2) and Marta (continuity, [→ 3)](#comment-3-in).')
+    expect(commentRef('#comment-12')).toEqual({ rank: 12, opens: true })
+    expect(commentRef('#comment-3-in')).toEqual({ rank: 3, opens: false })
+    expect(commentRef('https://example.com/#comment-1')).toBeNull()
+    expect(commentRef(undefined)).toBeNull()
     // Text without arrows stays as it is.
     expect(linkCommentRefs('What works: the lamp.')).toBe('What works: the lamp.')
   })
 
   it('only "(→ N)" is a link: a bare arrow, code and other links stay as they are', () => {
-    expect(linkCommentRefs('Scene 2 → 3 of the plan, and the boat (→ 2).')).toBe('Scene 2 → 3 of the plan, and the boat ([→ 2](#comment-2)).')
+    expect(linkCommentRefs('Scene 2 → 3 of the plan, and the boat (→ 2).')).toBe('Scene 2 → 3 of the plan, and the boat [(→ 2)](#comment-2).')
     expect(linkCommentRefs('Write `(→ 1)` in the letter.')).toBe('Write `(→ 1)` in the letter.')
-    expect(linkCommentRefs('See [the note (→ 1)](https://example.com) and (→ 1).')).toBe('See [the note (→ 1)](https://example.com) and ([→ 1](#comment-1)).')
+    expect(linkCommentRefs('See [the note (→ 1)](https://example.com) and (→ 1).')).toBe('See [the note (→ 1)](https://example.com) and [(→ 1)](#comment-1).')
   })
 })
 

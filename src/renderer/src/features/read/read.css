@@ -210,6 +210,11 @@
 }
 
 /* ---------- The links of a letter to its comments (CommentRef.tsx) ---------- */
+/* The chip and its parentheses stay on one line. */
+.read-ref-wrap {
+  white-space: nowrap;
+}
+
 /* Like the number of the comment in the margin of the page: a ring in the color of its lens. */
 .read-ref {
   display: inline-grid;

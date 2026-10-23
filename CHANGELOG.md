@@ -2,6 +2,16 @@
 
 Each version has its Windows installer in GitHub Releases. The release workflow copies the section of the version from this file to the release notes.
 
+## 0.15.1 (2026-10-23)
+
+Fixes after a test of the editor's read with a real AI on a real book.
+
+- The letter and the comments of a read never name the internal ids of the story line cards. They name a card by its words.
+- In the letter, a link "(→ 2)" stays on one line with its parentheses.
+- A read that ends with an error, or that you stop, gives the room of the margin back when the book has no open comment.
+- After "Read" or Esc in the popover of a read, the cursor is back in the text at once.
+- The popover of a read always starts with "Chapter in progress" of its own chapter, also when you open it again quickly for another chapter.
+
 ## 0.15.0 (2026-10-22)
 
 This version adds the editor's read: the AI reads a chapter as an editor and leaves comments in the margin. It never changes your text.

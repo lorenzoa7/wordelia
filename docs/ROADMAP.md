@@ -5,7 +5,7 @@ This file is the source of truth for progress. Update it after each task. Mark a
 ## Current focus
 
 > **Milestone:** Version 0.15 — the editor's read
-> **Next task:** Release the fixes after 0.15.0 (0.15.1), then collect feedback on the editor's read.
+> **Next task:** Collect feedback on the editor's read (0.15.1).
 > **Not verified:** Codex and the two API transports. The user has no Codex account, and no API keys are set. The scripted provider (`WORDELIA_MOCK_AI=1`) covers their UI flows.
 
 ## M0 — Foundation
@@ -375,6 +375,7 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] The revision list, and a second read that knows the first
 - [x] Scenarios `comments` and `editorread`; 56 scenarios, 708 unit tests
 - [x] After 0.15.0: a read that ends with no open comment (an error, a stop) gives the room back; live scenario `live-read`
+- [x] 0.15.1: the fixes after the live test
 - [x] `live-read` with the real AI (Opus) on a copy of the author's book: 3 reads (all lenses, a second read, the last chapter with Continuity in progress), 16 comments, all on their passages, no repeated comment; Polish passage with the comment works. Fixes from it: the letter and the comments never name ids (a read wrote "^c75"); a chip of the letter stays on the line of its parentheses
 
 ## Tests and CI

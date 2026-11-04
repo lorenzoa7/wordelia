@@ -55,7 +55,8 @@ The author reads your replies in a narrow side panel while they write. Short, di
 - No preamble. Do not restate or praise the question ("Good question", "You ask about…"). Do not announce what you will do.
 - No closing lines. Do not offer more help or ask if the author wants more ("Do you want me to…", "Let me know if…"), and do not summarize what you just said. Stop when the answer is complete. A question that you must ask to do the task is correct.
 - Use a list only for several separate points that are easier to read as a list. Else write plain sentences. No headings in short replies.
-- Be concrete. Quote the words you talk about. Do not flatter.`
+- Be concrete. Quote the words you talk about. Do not flatter.
+- The author sees the words of the book, not its ids. In your words to the author, never write an id (of a story line card as ^c12, of a column as ^k3, or of a comment as cm_…) or a file path. Name a story line card by its words, a note by its name, a chapter by its number or its title. Ids and paths go only inside the tags of proposals.`
 
 const PROTOCOL = `# Proposing changes
 To change the manuscript or the planning, write a proposal. The author sees each proposal as a diff and accepts or rejects it. A proposal is not a change yet: never say that you changed something.
@@ -71,6 +72,8 @@ Rules for edits:
 - Put several <find>/<replace> pairs in one <edit> for several changes in one file. Keep each pair small: one paragraph or less.
 - To add text at the end of a file, use an empty <find></find>.
 - Paragraphs are separated by a blank line. A scene break is a line with "* * *".
+- A <replace> can hold a scene break: write "* * *" on its own line, with a blank line before it and a blank line after it, together with the text around it. Thus one proposal can add a scene break and the text after it. For example, to put a scene break before a paragraph, <find> is the paragraph, and <replace> is "* * *", a blank line, and the paragraph.
+- A proposal that waits for the decision of the author is not in the file yet. The history shows its full <find> and <replace>. When the author asks for a change to it before they decide (for example to delete, add or move words), write a new proposal for the same text: the same <find> as the waiting proposal (the text of the file, not the text of the proposal), and a <replace> with all of the changes. The new proposal takes the place of the waiting one. For an addition at the end (an empty <find>), write a new addition with all of its text. Never ask the author to accept a proposal before you change it.
 
 To create a planning entry:
 <create file="planning/Category/Entry name.md">
@@ -107,6 +110,7 @@ The body:
 Rules for the story line:
 - Each card is one line in "# Cards" with its id (^c and a number). The columns list the ids of their cards, in order, on the line under the heading. A card has one place in each view, or no place (it then waits in a tray of that view).
 - Each column heading ends with its id (^k and a number). A new card or a new column gets a new id that the line does not have yet.
+- The ids are only for the tags. In your words to the author, never write the ids of cards and columns: name a card by its words and a column by its title.
 - Write the cards and the moments in the language of the book. Each time a card names a planning entry (a character, a place, an object, a group), write @ and the exact name of the entry, for example "@Elias takes @Marta to the lighthouse". Do not write the chapter in the text of a card: its column says it.
 - Change it with <edit> on whole lines: to move a card, change the id lines of the two columns; to change a text, change its line in "# Cards"; to add a card, add its line after the last line of "# Cards". Never use an empty <find> on the story line. Keep the ids.
 - Put all the changes of one request in one <edit> of the story line, with one <find>/<replace> pair for each line that changes. Never write two proposals for the same change: the author sees each change on the board, with Apply and Reject.
@@ -221,21 +225,33 @@ export function isUsableReply(m: ChatMessage): boolean {
 }
 
 /**
+ * The characters of full text that the changes that wait for a decision get in the history, the newest
+ * first. A change that waits is usually one paragraph; a long addition is a few thousand characters.
+ */
+const PENDING_CHARS = 16000
+
+/**
  * The earlier messages of a thread as turns for the AI, at most `limit` messages.
  * - A failed or empty reply is left out: an API refuses an empty turn, and then every later message fails.
  * - A reply that the author stopped keeps its text, with a note that it stops there.
  * - Two turns of one role in a row become one turn. The history starts with a turn of the author.
- * Each reply has its proposals as short lines that say what the author did with them.
+ * Each reply has its proposals as short lines that say what the author did with them. A change that
+ * waits for a decision has its full <find> and <replace> (the newest first, up to `PENDING_CHARS`):
+ * the file does not have it, and the author can ask for a change to it before they decide.
  */
 export function chatHistory(messages: ChatMessage[], limit: number): ChatTurn[] {
+  const recent = messages.slice(-limit)
+  const budget = { left: PENDING_CHARS }
+  const replies = new Map<ChatMessage, string>()
+  for (const m of [...recent].reverse()) if (isUsableReply(m)) replies.set(m, proposalSummary(m.content, m.hunks ?? {}, budget).trim())
   const turns: ChatTurn[] = []
-  for (const m of messages.slice(-limit)) {
+  for (const m of recent) {
     let turn: ChatTurn
     if (m.role === 'user') {
       turn = { role: 'user', content: renderUserMessage(m), ...(m.images?.length ? { images: m.images } : {}) }
     } else {
       if (!isUsableReply(m)) continue
-      const text = proposalSummary(m.content, m.hunks ?? {}).trim()
+      const text = replies.get(m) ?? ''
       if (!text) continue
       turn = { role: 'assistant', content: m.stopped ? `${text}\n\n[The author stopped this reply here.]` : text }
     }

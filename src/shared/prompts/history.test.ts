@@ -41,4 +41,36 @@ describe('the history of a thread for the AI', () => {
     expect(turns[1].content).toContain('accepted by the author')
     expect(turns[1].content).not.toContain('<edit')
   })
+
+  // A paragraph of about 90 words: longer than the short lines of the history.
+  const FIND = 'Elias lit the lighthouse lamp at six o’clock sharp, as he had done for twenty-two years. ' + 'Outside, the sea was very rough. '.repeat(8)
+  const REPLACE = 'Elias lit the lamp at six sharp, as he had for twenty-two years. ' + 'Outside, the sea was rough. '.repeat(8) + 'He gazed at the horizon.'
+  const edit = (find: string, replace: string): string => `A tighter version.\n<edit file="manuscript/The Storm.md">\n<find>${find}</find>\n<replace>${replace}</replace>\n</edit>`
+
+  it('gives the full <find> and <replace> of a change that waits, so the AI can change it', () => {
+    const turns = chatHistory([user('u1', 'Improve it.'), reply('a1', edit(FIND, REPLACE)), user('u2', 'Change the proposal: keep the old verb.')], 24)
+    const text = turns[1].content
+    expect(text).toContain('not decided yet')
+    expect(text).toContain('not in the file yet')
+    expect(text).toContain('<edit file="manuscript/The Storm.md">')
+    expect(text).toContain(`<find>${FIND}</find>`)
+    expect(text).toContain(`<replace>${REPLACE}</replace>`)
+  })
+
+  it('an accepted or a rejected change stays one short line', () => {
+    for (const state of ['accepted', 'rejected'] as const) {
+      const text = chatHistory([user('u1', 'Improve it.'), reply('a1', edit(FIND, REPLACE), { hunks: { '0:0': state } })], 24)[1].content
+      expect(text).not.toContain(REPLACE)
+      expect(text).not.toContain('<find>')
+    }
+  })
+
+  it('keeps the history small: changes that wait beyond the budget are short lines, the newest in full', () => {
+    const long = 'A long passage. '.repeat(1500)
+    const turns = chatHistory([user('u1', 'Write a long scene.'), reply('a1', edit('', long)), user('u2', 'Improve it.'), reply('a2', edit(FIND, REPLACE))], 24)
+    const all = turns.map((t) => t.content).join('\n')
+    expect(all.length).toBeLessThan(long.length)
+    expect(all).toContain(`<replace>${REPLACE}</replace>`)
+    expect(turns[1].content).toContain('not decided yet')
+  })
 })

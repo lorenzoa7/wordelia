@@ -284,7 +284,7 @@ interface Unit {
 /** `scale`: the zoom of the desk; the rectangles are on screen, the line height is at 100 %. */
 export function lineBoxes(el: HTMLElement, scale: number): Array<{ top: number; bottom: number; left: number }> {
   const lh = (parseFloat(getComputedStyle(el).lineHeight) || 0) * scale
-  const rects: DOMRect[] = []
+  const rects: Array<{ top: number; bottom: number; left: number }> = []
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
   const range = document.createRange()
   for (let n = walker.nextNode(); n; n = walker.nextNode()) {
@@ -292,6 +292,15 @@ export function lineBoxes(el: HTMLElement, scale: number): Array<{ top: number; 
     if ((n.parentElement as HTMLElement | null)?.closest('.pm-page-gap')) continue
     range.selectNodeContents(n)
     for (const r of range.getClientRects()) if (r.width > 0 || r.height > 0) rects.push(r)
+  }
+  // Accept and Reject of a chat proposal (inlineProposals.ts) have room above and below them, so their
+  // line is taller than a line of text: their box with its margins is a part of the line.
+  for (const a of el.querySelectorAll<HTMLElement>('.pm-prop-actions')) {
+    if (a.closest('.pm-page-gap')) continue
+    const r = a.getBoundingClientRect()
+    if (!r.height) continue
+    const s = getComputedStyle(a)
+    rects.push({ top: r.top - (parseFloat(s.marginTop) || 0) * scale, bottom: r.bottom + (parseFloat(s.marginBottom) || 0) * scale, left: r.left })
   }
   // A line with only a line break (Shift+Enter) has no text, but it takes a line.
   for (const br of el.querySelectorAll('br')) {

@@ -20,6 +20,7 @@ import { toast } from '@/stores/ui'
 import { describeError } from '@/lib/ai'
 import { getActiveEditor } from '@/features/editor/registry'
 import { sliceFromMarkdown } from '@/features/editor/review'
+import { inlineProposalId, useInlineProposals } from '@/features/editor/inlineProposals'
 import type { ChatMessage, ReadRequest, Thread } from '@shared/types'
 import { ProposalCard } from './ProposalCard'
 import { ReadHead, ReadOfferCard } from '@/features/read/ReadOfferCard'
@@ -286,7 +287,13 @@ const BULK_NAMES = 3
 function ReplyReview({ segments, message, thread }: { segments: Segment[]; message: ChatMessage; thread: Thread }): React.JSX.Element | null {
   const t = useT()
   const [busy, setBusy] = useState(false)
-  const pending = pendingKeys(segments, message.hunks)
+  // A change whose newer proposal the author accepted cannot be accepted: it is not in this bar.
+  const superseded = useInlineProposals((s) => Object.keys(s.superseded).join('|'))
+  const skip = useMemo(() => {
+    const prefix = inlineProposalId(thread.id, message.id, '')
+    return superseded.split('|').filter((id) => id.startsWith(prefix)).map((id) => id.slice(prefix.length))
+  }, [superseded, thread.id, message.id])
+  const pending = pendingKeys(segments, message.hunks).filter((k) => !skip.includes(k))
   const files = useMemo(() => {
     const keys = new Set(pending)
     const labels: string[] = []
@@ -321,7 +328,7 @@ function ReplyReview({ segments, message, thread }: { segments: Segment[]; messa
       const line = messageLineProposal(thread, message, story ? story.body : null)
       if (line) await acceptLineProposal(line)
       const others = segments.filter((s) => s.kind === 'text' || !isLineSegment(s))
-      const { states: result, replaced } = await acceptPending(others, message.hunks)
+      const { states: result, replaced } = await acceptPending(others, message.hunks, skip)
       setHunkStates(thread, message.id, result, replaced)
       const states = Object.values(result)
       const ok = states.filter((s) => s === 'accepted').length

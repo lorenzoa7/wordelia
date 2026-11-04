@@ -224,13 +224,34 @@ function short(text: string, max = 200): string {
   return t.length > max ? `${t.slice(0, max)}…` : t
 }
 
+/** The characters of full text that the changes that wait can still get (see `proposalSummary`). */
+export interface PendingBudget {
+  left: number
+}
+
+/**
+ * A change that waits for the decision of the author, in full: the file does not have it yet, so the
+ * AI needs its exact <find> and <replace> to write a new proposal that takes its place.
+ */
+function pendingInFull(file: string, h: Hunk): string {
+  return [
+    `[Proposed change to ${file}, ${STATE_WORDS.pending}: it is not in the file yet. The full proposal:]`,
+    `<edit file="${file}">`,
+    `<find>${h.find}</find>`,
+    `<replace>${h.replace}</replace>`,
+    '</edit>'
+  ].join('\n')
+}
+
 /**
  * The text of a reply with each proposal as one short line: for digests and the thread history sent to the AI.
  * With `states`, each line says what the author did with the proposal, and edits show the new text,
  * so the history and the digests know what is now in the book.
+ * With `budget` (the history), a complete change that waits shows in full while the budget has room
+ * for its text, and the budget gets smaller. Accepted and rejected changes stay short.
  * The comments of a read have a line too, but they are not proposals: they never take a state.
  */
-export function proposalSummary(text: string, states?: Record<string, HunkState>): string {
+export function proposalSummary(text: string, states?: Record<string, HunkState>, budget?: PendingBudget): string {
   return parseProposals(text)
     .map((s) => {
       if (s.kind === 'text') return s.text
@@ -241,7 +262,15 @@ export function proposalSummary(text: string, states?: Record<string, HunkState>
       if (!states) return s.kind === 'edit' ? `[Proposed ${s.hunks.length} change(s) to ${s.file}]` : `[Proposed new file ${s.file}]`
       if (s.kind === 'create') return `[Proposed new file ${s.file}: ${STATE_WORDS[states[hunkKey(s.index, 0)] ?? 'pending']}]`
       return s.hunks
-        .map((h, i) => `[Proposed change to ${s.file}, ${STATE_WORDS[states[hunkKey(s.index, i)] ?? 'pending']}: "${short(h.find, 80)}" → "${short(h.replace)}"]`)
+        .map((h, i) => {
+          const state = states[hunkKey(s.index, i)] ?? 'pending'
+          const size = h.find.length + h.replace.length
+          if (budget && state === 'pending' && h.complete && size <= budget.left) {
+            budget.left -= size
+            return pendingInFull(s.file, h)
+          }
+          return `[Proposed change to ${s.file}, ${STATE_WORDS[state]}: "${short(h.find, 80)}" → "${short(h.replace)}"]`
+        })
         .join('\n')
     })
     .join('')

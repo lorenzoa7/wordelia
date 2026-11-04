@@ -171,6 +171,7 @@ export const chat: typeof en = {
   dismissOld: (v) => `Descartar as propostas antigas (${v})`,
   dismissOldHint: 'Rejeitar as propostas das respostas anteriores que você não decidiu.',
   replacedByNewer: 'Uma proposta mais nova muda o mesmo texto.',
+  newerAccepted: 'Você aceitou uma proposta mais nova para o mesmo texto.',
   notStarted: 'Nenhuma mensagem ainda',
   threadDeleted: (title) => `“${title}” foi para a lixeira do livro.`,
   newThreadRemoved: 'A conversa nova foi removida.',

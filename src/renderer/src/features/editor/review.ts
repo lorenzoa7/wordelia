@@ -13,7 +13,7 @@ import { Slice, type Mark, type Node as PMNode, type Schema } from '@tiptap/pm/m
 import { create } from 'zustand'
 import { parseMarkdown } from '@shared/markdown/parse'
 import { markdownToPlainBlocks } from '@shared/book'
-import { styledDiff, type DiffOp } from '@shared/text/diff'
+import { styledDiff, wordDiff, type DiffOp } from '@shared/text/diff'
 import { useApp } from '@/stores/app'
 import './review.css'
 
@@ -237,6 +237,19 @@ export function reviewOps(doc: PMNode, from: number, to: number, markdown: strin
   return styledDiff(reviewText(doc, from, to), reviewText(proposal, 0, proposal.content.size))
 }
 
+/**
+ * The diff of a chat proposal in the text: the range [from, to] against the new text (Markdown).
+ * - A chapter: as the review of an action (`reviewOps`). A new or a removed scene break, a paragraph
+ *   break and the formatting are part of the diff, and the new text is the text that Accept inserts.
+ * - A note: plain text, block by block, as before. Its Markdown has lists: the note editor shows each
+ *   item as a paragraph without its mark.
+ * `source`: the review text that the diff came from (for `diffDecorations`); none for a note.
+ */
+export function proposalDiff(doc: PMNode, from: number, to: number, markdown: string, kind: 'chapter' | 'entry'): { ops: DiffOp[]; source?: ReviewText } {
+  if (kind === 'chapter') return { ops: reviewOps(doc, from, to, markdown), source: reviewText(doc, from, to) }
+  return { ops: wordDiff(textWithMap(doc, from, to).text, proposedPlain(markdown)) }
+}
+
 /** True when the cursor (or all of the selection) is in the reviewed passage, its ends included. */
 export function cursorInPassage(state: EditorState, r: Pick<ReviewData, 'from' | 'to'>): boolean {
   const { from, to } = state.selection
@@ -301,7 +314,7 @@ export function currentDiffView(): DiffView {
   return useApp.getState().settings?.editor.diffView ?? 'words'
 }
 
-/** A review text from `textWithMap`, for diffs that were made on its plain text (the chat proposals). */
+/** A review text from `textWithMap`, for diffs that were made on its plain text (the chat proposals for notes). */
 function plainSource(doc: PMNode, from: number, to: number): ReviewText {
   const { text, map } = textWithMap(doc, from, to)
   const kinds = map.map((p, i) => (text[i] !== '\n' ? Kind.Text : doc.resolve(p).parent.isTextblock ? Kind.Line : Kind.Paragraph))

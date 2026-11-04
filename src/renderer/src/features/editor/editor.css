@@ -364,10 +364,22 @@
     box-shadow: 0 0 0 3px transparent;
   }
 }
+/* A scene break in an addition at the end: no indent on the paragraph after it, as in the text. */
+.manuscript .pm-prop-append > .pm-prop-scene,
+.manuscript .pm-prop-append > .pm-prop-scene + p,
+.manuscript .pm-prop-append > .pm-prop-scene + .pm-page-gap + p {
+  text-indent: 0;
+}
+.indent-first .manuscript .pm-prop-append > .pm-prop-scene + p,
+.indent-first .manuscript .pm-prop-append > .pm-prop-scene + .pm-page-gap + p {
+  text-indent: var(--book-indent);
+}
 .pm-prop-actions {
   display: inline-flex;
   gap: 4px;
   margin-left: 0.4em;
+  /* Room above and below: on a line of their own, the buttons do not touch the proposed words. */
+  margin-block: var(--s-1);
   vertical-align: 0.1em;
   text-indent: 0;
   user-select: none;

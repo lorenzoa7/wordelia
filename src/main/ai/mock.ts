@@ -3,7 +3,8 @@
 
 import { markdownToPlainBlocks } from '@shared/book'
 import { READ_MARK } from '@shared/prompts/read'
-import type { CompletionResult, ModelInfo, ProviderId, ProviderStatus, StreamEvent } from '@shared/types'
+import { parseProposals, type Hunk } from '@shared/proposals/parse'
+import type { ChatTurn, CompletionResult, ModelInfo, ProviderId, ProviderStatus, StreamEvent } from '@shared/types'
 import type { ProviderTransport } from './transport'
 import type { AiRequest } from './images'
 
@@ -138,6 +139,61 @@ export function readReply(system: string, last: string, english: boolean): strin
   return [letter.join('\n\n'), '', ...notes.flatMap((n) => [n, '']), ...(fixed ? [`<resolved ids="${fixed}"/>`] : [])].join('\n').trimEnd()
 }
 
+/** The words of an author who asks for a change to a proposal that waits, in the three languages of the app. */
+const CHANGE_WORDS = /change the proposal|mude a proposta|cambia la propuesta/i
+
+/** The words of an author who asks for a scene break, in the three languages of the app. */
+const SCENE_WORDS = /scene break|quebra de cena|salto de escena|cambio de escena/i
+
+/** A line with only a scene break */
+const SCENE_BLOCK = /^([-*_])(?:[ \t]*\1){2,}$/
+
+/**
+ * "Scene break": a scene break before the second paragraph of the open chapter. The proposal has the
+ * paragraph too: <find> is the paragraph, <replace> is "* * *", a blank line and the paragraph.
+ */
+function sceneBreakReply(system: string, english: boolean): string | null {
+  const chapter = OPEN_CHAPTER.exec(system)
+  const paragraphs = (chapter?.[2] ?? '')
+    .split(/\n[ \t]*\n/)
+    .map((p) => p.trim())
+    .filter((p) => p && !SCENE_BLOCK.test(p))
+  const second = paragraphs[1]
+  if (!chapter || !second) return null
+  return [
+    english ? 'A scene break before the second paragraph gives the jump in time a pause.' : 'Uma quebra de cena antes do segundo parágrafo dá uma pausa ao salto no tempo.',
+    '',
+    `<edit file="${chapter[1]}">`,
+    `<find>${second}</find>`,
+    `<replace>* * *\n\n${second}</replace>`,
+    '</edit>'
+  ].join('\n')
+}
+
+/**
+ * "Change the proposal": a new proposal for the newest change that waits for a decision, which the app
+ * sends in full in the history (`chatHistory`). The same <find>, and the <replace> with one more sentence.
+ */
+function changedProposal(messages: ChatTurn[], english: boolean): string {
+  let waiting: { file: string; hunk: Hunk } | null = null
+  for (const m of messages.slice(0, -1).reverse()) {
+    if (m.role !== 'assistant' || !m.content.includes('<edit')) continue
+    const edits = parseProposals(m.content).flatMap((s) => (s.kind === 'edit' ? s.hunks.filter((h) => h.complete).map((hunk) => ({ file: s.file, hunk })) : []))
+    waiting = edits.at(-1) ?? null
+    if (waiting) break
+  }
+  if (!waiting) return english ? 'No proposal of this conversation waits for a decision.' : 'Nenhuma proposta desta conversa espera uma decisão.'
+  const more = english ? ' The lamp turned above them, slow and patient.' : ' A lâmpada girava acima deles, lenta e paciente.'
+  return [
+    english ? 'Here is the proposal with the change. It takes the place of the one before.' : 'Aqui está a proposta com a mudança. Ela fica no lugar da anterior.',
+    '',
+    `<edit file="${waiting.file}">`,
+    `<find>${waiting.hunk.find}</find>`,
+    `<replace>${waiting.hunk.replace}${more}</replace>`,
+    '</edit>'
+  ].join('\n')
+}
+
 function reply(req: AiRequest): string {
   const last = req.messages[req.messages.length - 1]?.content ?? ''
   const english = /language="[^"]*English/.test(req.system)
@@ -168,6 +224,13 @@ function reply(req: AiRequest): string {
         : `**${name}** tem o rosto magro e os olhos escuros de quem passa a noite acordada. Cabelo grisalho, preso baixo.`,
       ...(entry ? ['', `<portrait file="${entry[1]}">${images[0].file}</portrait>`] : [])
     ].join('\n')
+  }
+  // A change to a proposal that waits, and a scene break: before the story line, because "mova" or
+  // "move" in such a message is not a request to move a card.
+  if (req.purpose === 'chat' && CHANGE_WORDS.test(last)) return changedProposal(req.messages, english)
+  if (req.purpose === 'chat' && SCENE_WORDS.test(last)) {
+    const scene = sceneBreakReply(req.system, english)
+    if (scene) return scene
   }
   // The story line: fill it (a new line), or move the last card of the last moment to the first moment.
   const story = /<story_line file="([^"]+)"[^>]*>\n([\s\S]*?)\n<\/story_line>/.exec(req.system)

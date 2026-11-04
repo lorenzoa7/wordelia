@@ -74,7 +74,7 @@ describe('chat system prompt', () => {
   })
 
   it('the words to the author have no ids and no file paths', () => {
-    // A real reply said: "o card ^c47 diz que Miguel sai". The author does not know the ids.
+    // A real reply said: "o card ^c47 diz que Elias sai". The author does not know the ids.
     const s = system('c1')
     const style = s.slice(s.indexOf('# How you reply'), s.indexOf('# Proposing changes'))
     expect(style).toMatch(/never write an id/)

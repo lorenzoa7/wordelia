@@ -138,6 +138,34 @@ export function readReply(system: string, last: string, english: boolean): strin
   return [letter.join('\n\n'), '', ...notes.flatMap((n) => [n, '']), ...(fixed ? [`<resolved ids="${fixed}"/>`] : [])].join('\n').trimEnd()
 }
 
+/** The words of an author who asks for a scene break, in the three languages of the app. */
+const SCENE_WORDS = /scene break|quebra de cena|salto de escena|cambio de escena/i
+
+/** A line with only a scene break */
+const SCENE_BLOCK = /^([-*_])(?:[ \t]*\1){2,}$/
+
+/**
+ * "Scene break": a scene break before the second paragraph of the open chapter. The proposal has the
+ * paragraph too: <find> is the paragraph, <replace> is "* * *", a blank line and the paragraph.
+ */
+function sceneBreakReply(system: string, english: boolean): string | null {
+  const chapter = OPEN_CHAPTER.exec(system)
+  const paragraphs = (chapter?.[2] ?? '')
+    .split(/\n[ \t]*\n/)
+    .map((p) => p.trim())
+    .filter((p) => p && !SCENE_BLOCK.test(p))
+  const second = paragraphs[1]
+  if (!chapter || !second) return null
+  return [
+    english ? 'A scene break before the second paragraph gives the jump in time a pause.' : 'Uma quebra de cena antes do segundo parágrafo dá uma pausa ao salto no tempo.',
+    '',
+    `<edit file="${chapter[1]}">`,
+    `<find>${second}</find>`,
+    `<replace>* * *\n\n${second}</replace>`,
+    '</edit>'
+  ].join('\n')
+}
+
 function reply(req: AiRequest): string {
   const last = req.messages[req.messages.length - 1]?.content ?? ''
   const english = /language="[^"]*English/.test(req.system)
@@ -168,6 +196,11 @@ function reply(req: AiRequest): string {
         : `**${name}** tem o rosto magro e os olhos escuros de quem passa a noite acordada. Cabelo grisalho, preso baixo.`,
       ...(entry ? ['', `<portrait file="${entry[1]}">${images[0].file}</portrait>`] : [])
     ].join('\n')
+  }
+  // A scene break: before the story line and the other chat replies.
+  if (req.purpose === 'chat' && SCENE_WORDS.test(last)) {
+    const scene = sceneBreakReply(req.system, english)
+    if (scene) return scene
   }
   // The story line: fill it (a new line), or move the last card of the last moment to the first moment.
   const story = /<story_line file="([^"]+)"[^>]*>\n([\s\S]*?)\n<\/story_line>/.exec(req.system)

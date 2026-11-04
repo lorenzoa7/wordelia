@@ -242,6 +242,24 @@ export function markdownToPlainBlocks(md: string): string {
     .join('\n\n')
 }
 
+/** A scene break in the text of `markdownToPlainScenes`: one character that the text of a book does not use. */
+export const SCENE_MARK = ''
+
+/** A line with only a scene break: "* * *", "***", "---" or "___" (a thematic break of Markdown). */
+const SCENE_LINE = /^[ \t]*([-*_])(?:[ \t]*\1){2,}[ \t]*$/gm
+
+/**
+ * Plain text like `markdownToPlain`, but each scene break stays: it is `SCENE_MARK`, as a paragraph of
+ * its own. A word diff then sees a new or a removed scene break as one word.
+ */
+export function markdownToPlainScenes(md: string): string {
+  return markdownToPlain(md.replace(SCENE_LINE, `\n${SCENE_MARK}\n`))
+    .split(/\n[ \t]*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .join('\n\n')
+}
+
 const WORD_RE = /[\p{L}\p{N}]+(?:['’\-][\p{L}\p{N}]+)*/gu
 
 export function countWords(text: string): number {

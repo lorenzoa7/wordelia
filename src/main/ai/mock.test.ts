@@ -3,7 +3,7 @@ import { markdownToPlainBlocks, newManifest } from '@shared/book'
 import type { EditorComment } from '@shared/comments'
 import { buildChatSystem } from '@shared/prompts/chat'
 import { buildReadTurn } from '@shared/prompts/read'
-import { parseProposals } from '@shared/proposals/parse'
+import { parseProposals, type Hunk } from '@shared/proposals/parse'
 import { findText } from '@shared/proposals/apply'
 import type { Chapter, Thread } from '@shared/types'
 import { mockProvider, readReply } from './mock'
@@ -146,5 +146,16 @@ describe('the scripted provider', () => {
   it('a message that asks for a read by an editor gets the offer, not an edit', async () => {
     const text = await chat(systemFor('Brazilian Portuguese'), 'Faça a leitura de editor deste capítulo.')
     expect(parseProposals(text).map((s) => s.kind)).toEqual(['text', 'read'])
+  })
+
+  const edits = (text: string): Hunk[] => parseProposals(text).flatMap((s) => (s.kind === 'edit' ? s.hunks : []))
+
+  it('"scene break": a scene break before the second paragraph of the open chapter, with the paragraph', async () => {
+    for (const ask of ['Coloque uma quebra de cena antes do segundo parágrafo.', 'Add a scene break before the second paragraph.']) {
+      const text = await chat(systemFor('Brazilian Portuguese'), ask)
+      const second = BODY.split('\n\n')[1]
+      expect(parseProposals(text).find((s) => s.kind === 'edit')).toMatchObject({ file: 'manuscript/A Tempestade.md' })
+      expect(edits(text)).toEqual([{ find: second, replace: `* * *\n\n${second}`, complete: true }])
+    }
   })
 })

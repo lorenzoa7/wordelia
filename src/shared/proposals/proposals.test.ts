@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { applyHunk, findText } from './apply'
 import { hasProposals, isFileSegment, parseProposals, proposalSummary, replyProse } from './parse'
 import { hasIncomplete, pendingKeys } from './state'
-import { wordDiff } from '../text/diff'
-import { markdownToPlainBlocks } from '../book'
+import { diffStats, wordDiff } from '../text/diff'
+import { SCENE_MARK, markdownToPlain, markdownToPlainBlocks, markdownToPlainScenes } from '../book'
 
 describe('parseProposals', () => {
   it('splits text and a complete edit', () => {
@@ -141,6 +141,25 @@ describe('the plain text of a passage, block by block', () => {
   it('drops a scene break and keeps a plain paragraph', () => {
     expect(markdownToPlainBlocks('First line\n\n* * *\n\n- item\nSecond')).toBe('First line\n\nitem\n\nSecond')
     expect(markdownToPlainBlocks('A - B is not an item.')).toBe('A - B is not an item.')
+  })
+})
+
+describe('the plain text of a change with its scene breaks', () => {
+  it('keeps each scene break as one mark, a paragraph of its own', () => {
+    expect(markdownToPlainScenes('He left.\n\n* * *\n\nAt *dawn* he came back.')).toBe(`He left.\n\n${SCENE_MARK}\n\nAt dawn he came back.`)
+    // The other forms of a scene break, and one with no blank lines around it.
+    expect(markdownToPlainScenes('A.\n\n***\n\nB.\n\n---\n\nC.')).toBe(`A.\n\n${SCENE_MARK}\n\nB.\n\n${SCENE_MARK}\n\nC.`)
+    expect(markdownToPlainScenes('A.\n* * *\nB.')).toBe(`A.\n\n${SCENE_MARK}\n\nB.`)
+  })
+
+  it('a new scene break is one new word of the diff', () => {
+    const ops = wordDiff(markdownToPlainScenes('At dawn he came back.'), markdownToPlainScenes('* * *\n\nAt dawn he came back.'))
+    expect(ops.filter((o) => o.type === 'insert').map((o) => o.text.trim())).toEqual([SCENE_MARK])
+    expect(diffStats(ops)).toEqual({ added: 1, removed: 0 })
+  })
+
+  it('plain text without the mark loses the scene break: the reason for the mark', () => {
+    expect(markdownToPlain('* * *\n\nAt dawn.').trim()).toBe('At dawn.')
   })
 })
 

@@ -3,7 +3,7 @@ import { motion } from 'motion/react'
 import { ArrowClockwise, BookOpenText, CaretDown, Check, Columns, Crosshair, FilePlus, Notebook, Path, Rows, UserCircle, WarningCircle, X } from '@phosphor-icons/react'
 import clsx from 'clsx'
 import ReactMarkdown from 'react-markdown'
-import { entryToFile, markdownToPlain } from '@shared/book'
+import { SCENE_MARK, entryToFile, markdownToPlainScenes } from '@shared/book'
 import { readFrontmatter } from '@shared/markdown/frontmatter'
 import { hunkKey, parseProposals, type Hunk, type Segment } from '@shared/proposals/parse'
 import { losesSomething, noteReplace, type NoteReplace } from '@shared/proposals/replace'
@@ -45,24 +45,46 @@ export function ProposalCard(props: Props): React.JSX.Element {
   return props.segment.kind === 'edit' ? <EditCard {...props} segment={props.segment} /> : <CreateCard {...props} segment={props.segment} />
 }
 
+/** Text of a card: a scene break (`SCENE_MARK`) shows as "* * *" on a line of its own. */
+function Words({ text }: { text: string }): React.JSX.Element {
+  if (!text.includes(SCENE_MARK)) return <>{text}</>
+  return (
+    <>
+      {text.split(SCENE_MARK).map((part, i) => (
+        <span key={i}>
+          {i > 0 && <span className="hunk-scene">* * *</span>}
+          {part}
+        </span>
+      ))}
+    </>
+  )
+}
+
 function DiffText({ ops }: { ops: DiffOp[] }): React.JSX.Element {
   return (
     <>
       {ops.map((op, i) =>
         op.type === 'equal' ? (
-          <span key={i}>{op.text}</span>
+          <span key={i}>
+            <Words text={op.text} />
+          </span>
         ) : op.type === 'delete' ? (
-          <del key={i}>{op.text}</del>
+          <del key={i}>
+            <Words text={op.text} />
+          </del>
         ) : (
-          <ins key={i}>{op.text}</ins>
+          <ins key={i}>
+            <Words text={op.text} />
+          </ins>
         )
       )}
     </>
   )
 }
 
+/** The plain text of a change, with each scene break as `SCENE_MARK`: the diff sees a new scene break. */
 function plain(md: string): string {
-  return markdownToPlain(md).replace(/\n{3,}/g, '\n\n').trim()
+  return markdownToPlainScenes(md)
 }
 
 function HunkView({ hunk, split }: { hunk: Hunk; split: boolean }): React.JSX.Element {
@@ -70,7 +92,11 @@ function HunkView({ hunk, split }: { hunk: Hunk; split: boolean }): React.JSX.El
   const after = plain(hunk.replace)
   const ops = useMemo(() => (hunk.complete ? wordDiff(before, after) : []), [before, after, hunk.complete])
   if (!hunk.complete) {
-    return <div className="hunk-text is-partial">{after || before}</div>
+    return (
+      <div className="hunk-text is-partial">
+        <Words text={after || before} />
+      </div>
+    )
   }
   if (split) {
     return (
@@ -94,7 +120,13 @@ function HunkView({ hunk, split }: { hunk: Hunk; split: boolean }): React.JSX.El
   }
   return (
     <div className="hunk-text">
-      {before ? <DiffText ops={ops} /> : <ins>{after}</ins>}
+      {before ? (
+        <DiffText ops={ops} />
+      ) : (
+        <ins>
+          <Words text={after} />
+        </ins>
+      )}
     </div>
   )
 }
@@ -307,7 +339,11 @@ function EditCard({ segment: raw, message, thread, streaming }: Props & { segmen
                   )}
                 </div>
               )}
-              {st === 'failed' && looking === i && <blockquote className="hunk-looked">{plain(h.find)}</blockquote>}
+              {st === 'failed' && looking === i && (
+                <blockquote className="hunk-looked">
+                  <Words text={plain(h.find)} />
+                </blockquote>
+              )}
             </div>
           )
         })}

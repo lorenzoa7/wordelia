@@ -15,11 +15,10 @@ import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey, type EditorState } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { create } from 'zustand'
-import { markdownToPlain, markdownToPlainBlocks } from '@shared/book'
+import { SCENE_MARK, markdownToPlainBlocks, markdownToPlainScenes } from '@shared/book'
 import { findText } from '@shared/proposals/apply'
 import { hunkKey, parseProposals } from '@shared/proposals/parse'
 import { currentFrom } from '@shared/proposals/state'
-import { wordDiff } from '@shared/text/diff'
 import type { ChatMessage, Thread } from '@shared/types'
 import { useBook } from '@/stores/book'
 import { showText, toast, useUi } from '@/stores/ui'
@@ -31,7 +30,7 @@ import { applyEditHunk, applyPortrait, markAfter, resolveTarget, restoreSnapshot
 import { authorIsBusy } from '@/features/chat/typing'
 import { rejectWithUndo } from '@/features/chat/undo'
 import { SYNC_THREAD_ID } from '@/features/plan/sync'
-import { currentDiffView, diffDecorations, proposedPlain, textWithMap } from './review'
+import { SCENE_TEXT, currentDiffView, diffDecorations, proposalDiff, textWithMap } from './review'
 import { useApp } from '@/stores/app'
 import { chapterHasText, getChapterEditor, locateInChapter, scrollToPos, whenChapterEditor } from './registry'
 
@@ -591,21 +590,27 @@ function actionsWidget(p: InlineProposal): HTMLElement {
   return el
 }
 
-/** A change that adds text at the end: the new paragraphs after the last one, with Accept and Reject. */
+/**
+ * A change that adds text at the end: the new paragraphs after the last one, with Accept and Reject.
+ * A scene break of the new text shows as a scene break.
+ */
 function appendWidget(p: InlineProposal, focus: boolean): HTMLElement {
   const box = document.createElement('div')
   box.className = `pm-prop pm-prop-append${focus ? ' is-focus' : ''}`
   box.setAttribute('contenteditable', 'false')
   box.dataset.prop = p.id
-  const paras = markdownToPlain(replaceText(p))
-    .split(/\n{2,}/)
-    .map((s) => s.trim())
-    .filter(Boolean)
+  const paras = markdownToPlainScenes(replaceText(p)).split('\n\n').filter(Boolean)
   paras.forEach((text, i) => {
     const para = document.createElement('p')
     const ins = document.createElement('span')
     ins.className = 'ai-ins'
-    ins.textContent = text
+    if (text === SCENE_MARK) {
+      para.className = 'pm-prop-scene'
+      const scene = document.createElement('span')
+      scene.className = 'ai-ins-scene'
+      scene.textContent = SCENE_TEXT
+      ins.appendChild(scene)
+    } else ins.textContent = text
     para.appendChild(ins)
     if (i === paras.length - 1) para.appendChild(actionsWidget(p))
     box.appendChild(para)
@@ -646,9 +651,9 @@ function build(state: EditorState, list: InlineProposal[], focus: string | null)
     const to = map[m.end - 1] + 1
     if (taken.some((r) => from < r.to && to > r.from)) continue
     taken.push({ from, to })
-    const original = textWithMap(doc, from, to).text
-    const ops = wordDiff(original, proposedPlain(replaceText(p)))
-    decos.push(...diffDecorations(doc, from, to, ops, p.id, currentDiffView()))
+    // A chapter compares as the review of an action: a new scene break and new italics show.
+    const { ops, source } = proposalDiff(doc, from, to, replaceText(p), p.kind)
+    decos.push(...diffDecorations(doc, from, to, ops, p.id, currentDiffView(), source))
     decos.push(Decoration.inline(from, to, { class: `pm-prop${focus === p.id ? ' is-focus' : ''}`, 'data-prop': p.id }))
     decos.push(
       Decoration.widget(to, () => actionsWidget(p), {

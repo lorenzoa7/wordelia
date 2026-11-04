@@ -364,6 +364,16 @@
     box-shadow: 0 0 0 3px transparent;
   }
 }
+/* A scene break in an addition at the end: no indent on the paragraph after it, as in the text. */
+.manuscript .pm-prop-append > .pm-prop-scene,
+.manuscript .pm-prop-append > .pm-prop-scene + p,
+.manuscript .pm-prop-append > .pm-prop-scene + .pm-page-gap + p {
+  text-indent: 0;
+}
+.indent-first .manuscript .pm-prop-append > .pm-prop-scene + p,
+.indent-first .manuscript .pm-prop-append > .pm-prop-scene + .pm-page-gap + p {
+  text-indent: var(--book-indent);
+}
 .pm-prop-actions {
   display: inline-flex;
   gap: 4px;

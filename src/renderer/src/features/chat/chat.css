@@ -892,6 +892,14 @@ button.proposal-file:hover span {
   text-decoration: none;
   border-radius: 2px;
 }
+/* A scene break in a change: "* * *" in the middle of a line of its own, as in the book */
+.hunk-scene {
+  display: inline-block;
+  width: 100%;
+  text-align: center;
+  letter-spacing: 0.5em;
+  text-indent: 0;
+}
 .hunk-split {
   display: flex;
   flex-direction: column;

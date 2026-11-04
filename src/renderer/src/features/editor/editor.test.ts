@@ -5,7 +5,7 @@ import { parseMarkdown } from '@shared/markdown/parse'
 import { serializeMarkdown } from '@shared/markdown/serialize'
 import type { DocNode } from '@shared/types'
 import { schemaExtensions } from './extensions'
-import { sliceFromMarkdown, textWithMap } from './review'
+import { proposalDiff, sliceFromMarkdown, textWithMap } from './review'
 import { normalizeRange } from '../actions/range'
 
 const schema = getSchema(schemaExtensions())
@@ -100,5 +100,53 @@ describe('sliceFromMarkdown', () => {
     const st = docOf('A B C D.')
     const tr = st.tr.replaceRange(posOf(st, 'B'), posOf(st, ' D'), sliceFromMarkdown(schema, 'B1.\n\nC1'))
     expect(serializeMarkdown(tr.doc.toJSON() as DocNode)).toBe('A B1.\n\nC1 D.\n')
+  })
+})
+
+describe('a chat proposal with a scene break', () => {
+  const SECOND = 'O vento entrava pela *janela*.'
+  const chapter = (): EditorState => docOf(`Primeiro parágrafo.\n\n${SECOND}`)
+  /** The range of the second paragraph, as the proposal finds it */
+  const second = (st: EditorState): { from: number; to: number } => {
+    const from = posOf(st, 'O vento')
+    return { from, to: from + 'O vento entrava pela janela.'.length }
+  }
+
+  it('the diff of a chapter shows a new scene break as new text, and nothing else', () => {
+    const st = chapter()
+    const { from, to } = second(st)
+    const { ops, source } = proposalDiff(st.doc, from, to, `* * *\n\n${SECOND}`, 'chapter')
+    expect(ops.filter((o) => o.type === 'insert').map((o) => o.text)).toEqual(['* * *\n\n'])
+    expect(ops.some((o) => o.type === 'delete')).toBe(false)
+    // The italics of the paragraph are the same: no change of formatting.
+    expect(source?.text).toBe('O vento entrava pela janela.')
+  })
+
+  it('the diff of a chapter keeps a scene break that the proposal removes', () => {
+    const st = docOf('Fim.\n\n* * *\n\nComeço.')
+    const { ops } = proposalDiff(st.doc, posOf(st, 'Fim'), posOf(st, 'Começo') + 'Começo.'.length, 'Fim.\n\nComeço.', 'chapter')
+    expect(ops.filter((o) => o.type === 'delete').map((o) => o.text).join('')).toContain('* * *')
+  })
+
+  it('a note compares plain text, as before (its lists are paragraphs in the editor)', () => {
+    const st = docOf('- Um item.\n- Outro item.')
+    const from = posOf(st, 'Outro')
+    const { ops, source } = proposalDiff(st.doc, from, from + 'Outro item.'.length, '- Outro item novo.', 'entry')
+    expect(source).toBeUndefined()
+    expect(ops.filter((o) => o.type === 'insert').map((o) => o.text.trim())).toEqual(['novo'])
+  })
+
+  it('Accept puts a scene break node there, and the file has "* * *" between blank lines', () => {
+    const st = chapter()
+    const { from, to } = second(st)
+    const tr = st.tr.replaceRange(from, to, sliceFromMarkdown(schema, `* * *\n\n${SECOND}`))
+    expect([...Array(tr.doc.childCount).keys()].map((i) => tr.doc.child(i).type.name)).toEqual(['paragraph', 'sceneBreak', 'paragraph'])
+    expect(serializeMarkdown(tr.doc.toJSON() as DocNode)).toBe(`Primeiro parágrafo.\n\n* * *\n\n${SECOND}\n`)
+  })
+
+  it('Accept of a scene break in the middle of a paragraph splits the paragraph', () => {
+    const st = docOf('Ele saiu. Na manhã seguinte, voltou.')
+    const tr = st.tr.replaceRange(1, st.doc.content.size - 1, sliceFromMarkdown(schema, 'Ele saiu.\n\n* * *\n\nNa manhã seguinte, voltou.'))
+    expect(serializeMarkdown(tr.doc.toJSON() as DocNode)).toBe('Ele saiu.\n\n* * *\n\nNa manhã seguinte, voltou.\n')
   })
 })

@@ -18,7 +18,8 @@ export const history: typeof en = {
     autosave: 'Guardado automático',
     beforeRestore: 'Antes de restaurar',
     beforeChat: 'Antes de un cambio de la IA en el chat',
-    snapshot: 'Versión'
+    snapshot: 'Versión',
+    beforeLoss: 'Antes de una gran pérdida de texto'
   },
   before: (action) => `Antes de ${action}`
 }

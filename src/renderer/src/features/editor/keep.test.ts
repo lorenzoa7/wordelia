@@ -65,4 +65,27 @@ describe('reloadTransaction', () => {
     const again = state.reconfigure({ plugins: [history()] })
     expect(undone(again).doc.textContent).toBe('The lamp was out.')
   })
+
+  it('loads a text of the schema of another editor without losing it', () => {
+    // A chapter far from the screen keeps the state of its first editor, with the schema of that editor.
+    // A change while it has no editor (an accepted chat change, a file from outside, a restore) is parsed
+    // in the schema of the next editor. The replace across two schemas emptied the whole chapter.
+    const state = typed('The lamp was out.\n\nElias waited.\n\nMarta came.\n', 'Elias', ' always')
+    const other = getSchema(schemaExtensions())
+    expect(other).not.toBe(schema)
+    const changed = other.nodeFromJSON(parseMarkdown('The lamp was out.\n\nElias always waited, with a gold cord.\n\nMarta came.\n'))
+    const next = state.apply(reloadTransaction(state, changed, false)!)
+    expect(next.doc.textContent).toBe('The lamp was out.Elias always waited, with a gold cord.Marta came.')
+    // The undo history of the typing stays.
+    expect(undone(next).doc.textContent).toBe('The lamp was out.Elias waited, with a gold cord.Marta came.')
+  })
+
+  it('never empties a text that the new text has', () => {
+    const state = typed('The lamp was out.\n\nElias waited.\n', 'Elias', ' always')
+    const other = getSchema(schemaExtensions())
+    const changed = other.nodeFromJSON(parseMarkdown('The lamp was out.\n\nElias always waited.\n\nA new line.\n'))
+    const tr = reloadTransaction(state, changed, true)
+    expect(tr).not.toBeNull()
+    expect(state.apply(tr!).doc.textContent).toBe('The lamp was out.Elias always waited.A new line.')
+  })
 })

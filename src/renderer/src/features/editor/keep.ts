@@ -70,15 +70,25 @@ export function docDiff(a: PMNode, b: PMNode): { from: number; to: number; toB: 
  * go into the undo history, but the history maps through it, so Ctrl+Z still undoes the typing
  * before it (a change from another program). Null when nothing changes.
  */
-export function reloadTransaction(state: EditorState, doc: PMNode, undoable: boolean): Transaction | null {
+export function reloadTransaction(state: EditorState, next: PMNode, undoable: boolean): Transaction | null {
+  // A text of the schema of another editor: build it again in the schema of the state. The editor of a
+  // chapter that comes back keeps the state of its first editor, with the schema of that editor, and
+  // the store text is parsed in the schema of the new editor. Across two schemas no node is the same:
+  // the replace did not fit, and the whole chapter became empty.
+  const doc = next.type.schema === state.schema ? next : state.schema.nodeFromJSON(next.toJSON())
   const d = docDiff(state.doc, doc)
   if (!d) return null
-  const tr = state.tr
+  let tr = state.tr
   try {
     tr.replace(d.from, d.to, doc.slice(d.from, d.toB))
   } catch {
     // A replace that does not fit the schema: replace all, and keep the cursor near its place.
-    tr.replaceWith(0, state.doc.content.size, doc.content)
+    tr = state.tr.replaceWith(0, state.doc.content.size, doc.content)
+  }
+  // Never load less text than the new text has: a load that lost the text is not done.
+  if (tr.doc.textContent !== doc.textContent) {
+    tr = state.tr.replaceWith(0, state.doc.content.size, doc.content)
+    if (tr.doc.textContent !== doc.textContent) return null
   }
   tr.setMeta(RELOAD_META, true).setMeta('allowDuringReview', true)
   // A restore is its own undo step, also right after typing.

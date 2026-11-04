@@ -25,7 +25,9 @@ export const history = {
     autosave: 'Autosave',
     beforeRestore: 'Before restore',
     beforeChat: 'Before AI chat change',
-    snapshot: 'Snapshot'
+    snapshot: 'Snapshot',
+    /** A save was going to take most of the text of the chapter away: the text before it */
+    beforeLoss: 'Before a big loss of text'
   },
   /** The label of the version saved before an action, for example "Before Polish" */
   before: (action: string): string => `Before ${action}`

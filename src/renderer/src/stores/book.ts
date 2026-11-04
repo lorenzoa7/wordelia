@@ -31,6 +31,7 @@ import { untitledChapter } from '@shared/export/model'
 import { entryPath, inFolder, topFolder } from '@shared/planning/notes'
 import { runFlushers } from '@/lib/flush'
 import { getT } from '@/lib/i18n'
+import { messagesFor } from '@shared/i18n'
 import { openingPlace } from '@/features/write/place'
 import { commentsChangedOutside, loadComments, putBackComments, takeChapterComments } from '@/features/read/store'
 import { toast, useUi } from './ui'
@@ -183,6 +184,13 @@ function showNotices(root: string, notices: BookNotice[], forgetMissing: () => v
       toast(t.chaptersMissing(n.files.map((f) => f.replace(/\.md$/i, ''))), { ms: 30000, action: { label: t.forgetMissing(n.files.length), run: forgetMissing } })
     }
   }
+}
+
+/** A chapter with fewer words than this has no version before a big loss: its loss is small. */
+const BIG_LOSS_WORDS = 50
+
+function wordsIn(text: string): number {
+  return text.match(/[\p{L}\p{N}]+/gu)?.length ?? 0
 }
 
 export const useBook = create<BookState>((set, get) => {
@@ -386,6 +394,12 @@ export const useBook = create<BookState>((set, get) => {
       const { chapters, root } = get()
       const ch = chapters.find((c) => c.id === id)
       if (!ch || !root || ch.body === body) return
+      // A save that takes most of the text of a chapter away keeps the text before it in the history
+      // first, whatever made it: a wrong save can never lose a chapter.
+      const was = wordsIn(ch.body)
+      if (was >= BIG_LOSS_WORDS && wordsIn(body) < was / 2) {
+        void invoke('history:save', root, id, messagesFor('en').history.labels.beforeLoss, ch.body).catch(() => {})
+      }
       const next = { ...ch, body }
       set({ chapters: chapters.map((c) => (c.id === id ? next : c)) })
       saver.write(root, chapterRel(next), chapterToFile(next))

@@ -6,12 +6,15 @@ import type { BookSnapshot } from '@shared/types'
 type Change = { root: string; rel: string; content: string | null }
 
 const writes: Array<{ rel: string; content: string }> = []
+/** The versions that the store saved in the history: chapter, label, text */
+const versions: Array<{ id: string; label: string; body: string }> = []
 /** The listener of `book:externalChange` that the open book gave: the watcher of the main process calls it. */
 let external: ((e: Change) => void) | null = null
 
 vi.mock('@/lib/api', () => ({
-  invoke: (channel: string, _root: string, rel: string, content: string) => {
+  invoke: (channel: string, _root: string, rel: string, content: string, body?: string) => {
     if (channel === 'book:writeFile') writes.push({ rel, content })
+    if (channel === 'history:save') versions.push({ id: rel, label: content, body: body ?? '' })
     return Promise.resolve()
   },
   on: (channel: string, fn: (e: Change) => void) => {
@@ -107,5 +110,32 @@ describe('the comments file changes outside while a local change of it waits', (
     expect(saver.isPending(ROOT, COMMENTS_FILE)).toBe(false)
     await saver.flush()
     expect(commentWrites()).toEqual([])
+  })
+})
+
+describe('a save that takes most of the text of a chapter away', () => {
+  const words = (n: number): string => Array.from({ length: n }, (_, i) => `palavra${i}`).join(' ')
+  const chapter = (body: string) => ({ id: 'ch_one', file: 'A Tempestade.md', title: 'A Tempestade', body, meta: {} })
+
+  it('keeps the text before it as a version of the history first', () => {
+    versions.length = 0
+    const before = `${words(300)}
+`
+    useBook.setState({ root: ROOT, chapters: [chapter(before)] })
+    // An editor that lost its text saves an empty chapter: the text before it stays in the history.
+    useBook.getState().setChapterBody('ch_one', '')
+    expect(versions).toEqual([{ id: 'ch_one', label: 'Before a big loss of text', body: before }])
+  })
+
+  it('keeps no version for a small change, or for a short chapter', () => {
+    versions.length = 0
+    useBook.setState({ root: ROOT, chapters: [chapter(`${words(300)}
+`)] })
+    useBook.getState().setChapterBody('ch_one', `${words(200)}
+`)
+    useBook.setState({ chapters: [chapter(`${words(20)}
+`)] })
+    useBook.getState().setChapterBody('ch_one', '')
+    expect(versions).toEqual([])
   })
 })

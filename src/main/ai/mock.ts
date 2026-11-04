@@ -383,6 +383,12 @@ function reply(req: AiRequest): string {
   if (chapter && /change the new scene|mude a cena nova/i.test(last) && chapter[2].includes(NEW_SCENE)) {
     return ['A smaller change in the new scene.', '', `<edit file="${chapter[1]}">`, `<find>${NEW_SCENE}</find>`, `<replace>${NEW_SCENE.replace('com a corda cortada', 'e a corda cortada')}</replace>`, '</edit>'].join('\n')
   }
+  // "A detail in the first chapter": a change of the first chapter of the book, which is not the open one.
+  const first = /<chapter file="([^"]+)"[^>]*>\n([\s\S]*?)\n<\/chapter>/.exec(req.system)
+  const firstOf = first?.[2].split(/\n\n/).find((p) => p.trim().length > 40)
+  if (first && firstOf && /detail in the first chapter|detalhe no primeiro capítulo/i.test(last)) {
+    return ['A small detail in the first chapter.', '', `<edit file="${first[1]}">`, `<find>${firstOf.trim()}</find>`, `<replace>${firstOf.trim()} No pescoço dele brilhava um cordão dourado.</replace>`, '</edit>'].join('\n')
+  }
   const wantsEdit = /edit|change|improve|rewrite|melhor|mude|reescrev/i.test(last)
   // "Improve the first two paragraphs": several proposals in one reply, for the bar that applies them all.
   if (chapter && wantsEdit && /\b(two|both|several|dois|duas|ambos)\b/i.test(last)) {

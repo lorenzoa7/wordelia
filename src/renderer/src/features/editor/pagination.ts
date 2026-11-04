@@ -8,6 +8,9 @@
 //   line before it stays justified, and the text after it starts a new line on the next page.
 // - Positions are measured in "flow" coordinates: the y of each line minus the height of the gaps
 //   above it. So the result does not depend on the gaps that are on screen now, and it is stable.
+// - Words that the AI proposes (inlineProposals.ts) are widgets, not text of the document: new words
+//   in a paragraph, or new paragraphs at the end. They take room on the pages like text. A gap in
+//   them goes into the DOM of the widget (ProseMirror leaves a widget alone), not into a decoration.
 
 import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey, type EditorState } from '@tiptap/pm/state'
@@ -33,6 +36,8 @@ interface Break {
   rest: number
   /** A page break (Ctrl+Enter) starts the page after the gap */
   forced: boolean
+  /** A gap in words that the AI proposes: in a text of a widget at this offset, or before a paragraph of it */
+  widget?: { node: Text; offset: number } | { before: HTMLElement }
 }
 
 /** A new page that comes in (arrive): a veil over it fades out. */
@@ -123,20 +128,139 @@ function pageNumber(top: number, m: PageMetrics): HTMLElement {
  * page comes in without a jump.
  */
 function build(state: EditorState, breaks: Break[], tail: number, m: PageMetrics, arrival: Arrival | null): DecorationSet {
-  const decos = breaks.map((b, i) => {
+  const decos: Decoration[] = []
+  breaks.forEach((b, i) => {
+    // A gap in words that the AI proposes goes into their widget (placeWidgetGaps).
+    if (b.widget) return
     const draw = (): HTMLElement => gapElement(b, m, i, arrival && i === arrival.index && arrival.p < 1 ? arrival.p : null)
-    return Decoration.widget(b.pos, draw, {
-      side: -1,
-      ignoreSelection: true,
-      key: `gap-${b.inline ? 'i' : 'b'}-${Math.round(b.rest)}-${m.contentHeight}`
-    })
+    decos.push(
+      Decoration.widget(b.pos, draw, {
+        side: -1,
+        ignoreSelection: true,
+        key: `gap-${b.inline ? 'i' : 'b'}-${Math.round(b.rest)}-${m.contentHeight}`
+      })
+    )
   })
   if (tail > 0) {
+    // After every other widget at the end, also new paragraphs that the AI proposes: the tail fills the last page.
     decos.push(
-      Decoration.widget(state.doc.content.size, () => tailElement(tail, m), { side: 1, ignoreSelection: true, key: `tail-${Math.round(tail)}-${m.zoom}` })
+      Decoration.widget(state.doc.content.size, () => tailElement(tail, m), { side: 100, ignoreSelection: true, key: `tail-${Math.round(tail)}-${m.zoom}` })
     )
   }
   return DecorationSet.create(state.doc, decos)
+}
+
+/** A gap in a widget, and the elements that it split: each one with its copy, the innermost first */
+interface WidgetGap {
+  gap: HTMLElement
+  split: Array<[HTMLElement, HTMLElement]>
+}
+
+/** The gaps that `placeWidgetGaps` put into the widgets of each editor, in the order of placing */
+const widgetGaps = new WeakMap<EditorView, WidgetGap[]>()
+
+/** Take the gaps out of the widgets again, and join what a gap split. */
+function clearWidgetGaps(view: EditorView): void {
+  // The last one placed first: each one joins the elements that it split.
+  for (const { gap, split } of [...(widgetGaps.get(view) ?? [])].reverse()) {
+    gap.remove()
+    for (const [original, copy] of [...split].reverse()) {
+      original.append(...copy.childNodes)
+      copy.remove()
+    }
+    split[0]?.[0].normalize()
+  }
+  widgetGaps.delete(view)
+}
+
+/**
+ * Split the tinted new words (`.ai-ins`) at a place of a text: the words after it go into copies of the
+ * elements around them. Returns the copy of the tinted span, or null when the text is not in new words.
+ */
+function splitWords(node: Text, offset: number, split: Array<[HTMLElement, HTMLElement]>): HTMLElement | null {
+  const top = node.parentElement?.closest<HTMLElement>('.ai-ins')
+  if (!top) return null
+  let child: Node = offset > 0 ? node.splitText(offset) : node
+  for (let parent = child.parentElement; parent; parent = parent.parentElement) {
+    const copy = parent.cloneNode(false) as HTMLElement
+    // A copy goes on the line of its original: no animation of new words, no indent of a new paragraph.
+    copy.classList.add('ai-cont')
+    for (let n: Node | null = child; n; ) {
+      const next: Node | null = n.nextSibling
+      copy.appendChild(n)
+      n = next
+    }
+    parent.after(copy)
+    split.push([parent, copy])
+    if (parent === top) return copy
+    child = copy
+  }
+  return null
+}
+
+/**
+ * Put the gaps of the breaks in words that the AI proposes into their widgets. ProseMirror ignores changes
+ * of the DOM in a widget, and every change here is inside one. A widget that ProseMirror draws again has no
+ * gaps: its new size starts a new measure.
+ */
+function placeWidgetGaps(view: EditorView, breaks: Break[], m: PageMetrics): void {
+  clearWidgetGaps(view)
+  const placed: WidgetGap[] = []
+  // From the last to the first: a gap splits a text, and the places of the gaps before it stay right.
+  breaks.map((b, i) => [b, i] as const).reverse().forEach(([b, i]) => {
+    const at = b.widget
+    if (!at) return
+    const gap = gapElement(b, m, i, null)
+    const split: Array<[HTMLElement, HTMLElement]> = []
+    if ('before' in at) {
+      if (!at.before.isConnected) return
+      at.before.before(gap)
+    } else {
+      if (!at.node.isConnected) return
+      // The words after the gap go to the next page. The gap is outside the tinted words: its line has no tint.
+      const after = splitWords(at.node, at.offset, split)
+      if (!after) return
+      after.before(gap)
+    }
+    placed.push({ gap, split })
+  })
+  if (placed.length) widgetGaps.set(view, placed)
+}
+
+/**
+ * The start of the word that starts the line at `y` (client coordinates) in a paragraph, when that word is
+ * one that the AI proposes (a widget); else null. A widget is not editable, so the caret functions of the
+ * browser do not go into it: this finds the first letter under the line from the boxes of the letters.
+ */
+function widgetLineStart(el: HTMLElement, y: number): { node: Text; offset: number } | null {
+  const range = document.createRange()
+  const bottomOf = (node: Text, k: number): number => {
+    range.setStart(node, k)
+    range.setEnd(node, k + 1)
+    const rects = range.getClientRects()
+    return rects.length ? rects[rects.length - 1].bottom : -Infinity
+  }
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    const node = n as Text
+    // Gaps, buttons and comment numbers are not words of the text.
+    if (!node.length || node.parentElement?.closest('.pm-page-gap, .pm-prop-actions, .cm-nums')) continue
+    // All the letters of this text are on the lines above.
+    if (bottomOf(node, node.length - 1) <= y) continue
+    // The first letter under the line: the letters before it end above `y`.
+    let lo = 0
+    let hi = node.length - 1
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (bottomOf(node, mid) > y) hi = mid
+      else lo = mid + 1
+    }
+    if (!node.parentElement?.closest('.ai-ins, .pm-prop-append')) return null
+    // A break never splits a word.
+    while (lo > 0 && !/\s/.test(node.data[lo - 1])) lo--
+    return { node, offset: lo }
+  }
+  return null
 }
 
 interface Unit {
@@ -152,6 +276,8 @@ interface Unit {
   /** Client coordinates of the start of the line, to find its document position */
   x: number
   y: number
+  /** A line of a new paragraph that the AI proposes at the end (a widget): that paragraph */
+  added?: HTMLElement
 }
 
 /** Line boxes of a paragraph, from the rectangles of its text, in client coordinates. */
@@ -207,6 +333,8 @@ function measure(view: EditorView, m: PageMetrics, firstOffset: number): { break
   const desk = root.closest('.desk') as HTMLElement | null
   const top = desk?.scrollTop ?? 0
   const left = desk?.scrollLeft ?? 0
+  // The gaps in the widgets go too: the measure then finds the words in whole texts (placeWidgetGaps).
+  clearWidgetGaps(view)
   root.classList.add('is-measuring')
   try {
     return measureFlow(view, root, m, firstOffset)
@@ -251,11 +379,27 @@ function measureFlow(view: EditorView, root: HTMLElement, m: PageMetrics, firstO
     const bottom = at100(r.bottom) + (parseFloat(style.marginBottom) || 0)
     units.push({ top, bottom, blockPos: offset, first: true, force, x: r.left + 1, y: r.top + 1 })
   })
+  // New paragraphs that the AI proposes at the end of the chapter: their lines come after the text.
+  const end = view.state.doc.content.size
+  for (const p of root.querySelectorAll<HTMLElement>(':scope > .pm-prop-append > p')) {
+    lineBoxes(p, z).forEach((l, i) => {
+      units.push({ top: at100(l.top), bottom: at100(l.bottom), blockPos: end, first: i === 0, force: false, x: l.left + 1, y: (l.top + l.bottom) / 2, added: p })
+    })
+  }
   const { cuts, tail } = cutPages(units, m.contentHeight, firstOffset)
   const breaks: Break[] = cuts.map(({ unit: u, rest, forced }) => {
+    if (u.added) {
+      // Before a new paragraph, or inside it at the start of its line.
+      const at = u.first ? null : widgetLineStart(u.added, u.y)
+      return { pos: end, inline: Boolean(at), rest, forced: false, widget: at ?? { before: u.added } }
+    }
     let pos = u.blockPos
     let inline = false
     if (!u.first && !forced) {
+      // A line that starts in new words of the AI: the gap goes into them.
+      const dom = view.nodeDOM(u.blockPos)
+      const at = dom instanceof HTMLElement && dom.querySelector('.ai-ins') ? widgetLineStart(dom, u.y) : null
+      if (at) return { pos: view.posAtCoords({ left: u.x, top: u.y })?.pos ?? pos, inline: true, rest, forced: false, widget: at }
       const hit = view.posAtCoords({ left: u.x, top: u.y })
       if (hit) {
         pos = wordStart(view.state, hit.pos)
@@ -322,7 +466,7 @@ function same(a: PageState, b: { breaks: Break[]; tail: number }): boolean {
   // A deleted page break left the list at once: the pages on screen are those of the last measure.
   if (a.measured !== b.breaks.length) return false
   if (a.breaks.length !== b.breaks.length || Math.abs(a.tail - b.tail) > 1) return false
-  return a.breaks.every((x, i) => x.pos === b.breaks[i].pos && x.inline === b.breaks[i].inline && Math.abs(x.rest - b.breaks[i].rest) <= 1)
+  return a.breaks.every((x, i) => x.pos === b.breaks[i].pos && x.inline === b.breaks[i].inline && !x.widget === !b.breaks[i].widget && Math.abs(x.rest - b.breaks[i].rest) <= 1)
 }
 
 export interface PaginationOptions {
@@ -389,13 +533,19 @@ export const Pagination = Extension.create<PaginationOptions>({
             opts.onCount?.(result.breaks.length + 1)
             const cur = paginationKey.getState(view.state)
             if (cur && same(cur, result)) {
+              placeWidgetGaps(view, result.breaks, m)
               rounds = 0
               height = (view.dom as HTMLElement).offsetHeight
               return
             }
             // Never loop: a layout that does not settle stops after a few rounds.
-            if (++rounds > 4) return
-            const arrive = fromEdit && cur && before && !reducedMotion() ? newPage(cur.breaks, result.breaks, view.state.selection.head) : -1
+            if (++rounds > 4) {
+              placeWidgetGaps(view, result.breaks, m)
+              return
+            }
+            const next = fromEdit && cur && before && !reducedMotion() ? newPage(cur.breaks, result.breaks, view.state.selection.head) : -1
+            // A new page in words that the AI proposes does not come in: it has no veil.
+            const arrive = next >= 0 && !result.breaks[next].widget ? next : -1
             // A page that still comes in is done now.
             if (arrive >= 0) settle(view)
             const tr = view.state.tr
@@ -405,6 +555,7 @@ export const Pagination = Extension.create<PaginationOptions>({
             // Typing moved the cursor onto another page: keep it on screen. A new page scrolls itself.
             if (fromEdit && view.hasFocus() && arrive < 0) tr.scrollIntoView()
             view.dispatch(tr)
+            placeWidgetGaps(view, result.breaks, m)
             height = (view.dom as HTMLElement).offsetHeight
             const arrival = paginationKey.getState(view.state)?.arrival
             if (arrive >= 0 && arrival && before) arriveAt(view, arrival, before.top)

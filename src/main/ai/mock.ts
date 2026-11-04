@@ -298,6 +298,19 @@ function reply(req: AiRequest): string {
   const paras = chapter?.[2].split(/\n\n/).filter((p) => p.trim().length > 40) ?? []
   const improvable = (p: string): boolean => SWAPS.slice(0, -1).some(([re]) => new RegExp(re.source, re.flags.replace('g', '')).test(p))
   const firstPara = paras.find(improvable) ?? paras[0]
+  // "A long passage": new text that fills more than a page, at the end of the chapter ("at the end") or in
+  // its first paragraph, for the pages of a proposal in the text.
+  if (chapter && firstPara && /long passage|trecho longo/i.test(last)) {
+    const atEnd = /at the end|no fim/i.test(last)
+    return [
+      atEnd ? 'Here is how the chapter can go on.' : 'Here is a longer version of the first paragraph.',
+      '',
+      `<edit file="${chapter[1]}">`,
+      `<find>${atEnd ? '' : firstPara.trim()}</find>`,
+      `<replace>${atEnd ? longPassage(8).join('\n\n') : `${firstPara.trim()} ${longPassage(4).join(' ')}`}</replace>`,
+      '</edit>'
+    ].join('\n')
+  }
   const wantsEdit = /edit|change|improve|rewrite|melhor|mude|reescrev/i.test(last)
   // "Improve the first two paragraphs": several proposals in one reply, for the bar that applies them all.
   if (chapter && wantsEdit && /\b(two|both|several|dois|duas|ambos)\b/i.test(last)) {
@@ -330,6 +343,22 @@ function reply(req: AiRequest): string {
     '',
     'The visitor also needs one concrete detail that the reader can remember: a smell, a scar, a way of speaking.'
   ].join('\n')
+}
+
+/** Paragraphs of new prose, about 70 words each, for a proposal longer than a page. */
+function longPassage(count: number): string[] {
+  const sentences = [
+    'Elias desceu a escada de ferro devagar, contando os degraus como fazia desde menino.',
+    'Lá embaixo, o mar batia nas pedras com a mesma raiva da noite anterior.',
+    'Marta esperava na porta da casa, com o xale preso nos ombros e os olhos no horizonte.',
+    'Nenhum dos dois falou do bote azul, mas os dois pensavam nele.',
+    'O vento trazia cheiro de sal e de chuva, e a lâmpada girava sobre as suas cabeças.',
+    'Na mesa da cozinha, o café esfriava ao lado do caderno onde Elias anotava os barcos.',
+    'Faltava a Andorinha, e ninguém no porto sabia dizer para onde ela tinha ido.'
+  ]
+  return Array.from({ length: count }, (_, i) =>
+    Array.from({ length: 6 }, (_, k) => sentences[(i * 3 + k) % sentences.length]).join(' ')
+  )
 }
 
 /** A short thinking summary for chat replies, so the chat can show what the AI thinks about. */

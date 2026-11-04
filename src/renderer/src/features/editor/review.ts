@@ -444,8 +444,17 @@ function paragraphs(text: string): Array<{ start: number; text: string }> {
 /**
  * The element of new text. Words view: one span in the line, a "¶" for each new paragraph break, a
  * new scene break on its own line. The other views: one paragraph for each paragraph.
+ * The tinted span is in a plain span (the widget): a page gap in the new words splits the tinted span
+ * inside the widget (pagination.ts), and the line of the gap has no tint.
  */
 function insertElement(op: Pick<DiffOp, 'text' | 'marks'>, view: DiffView): HTMLElement {
+  const host = document.createElement('span')
+  host.className = 'ai-ins-host'
+  host.appendChild(tintedInsert(op, view))
+  return host
+}
+
+function tintedInsert(op: Pick<DiffOp, 'text' | 'marks'>, view: DiffView): HTMLElement {
   const wrap = document.createElement('span')
   wrap.className = view === 'words' ? 'ai-ins' : view === 'stacked' ? 'ai-ins ai-ins-stacked' : 'ai-ins ai-ins-new'
   const parts = paragraphs(op.text)

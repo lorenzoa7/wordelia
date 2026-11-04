@@ -68,6 +68,17 @@
   vertical-align: top;
   text-indent: 0;
 }
+/* A gap in words that the AI proposes (pagination.ts) splits them: the part after the gap goes on without
+   the animation of new words or the indent of a new paragraph. A gap in new paragraphs at the end covers
+   the tint of their box when it has the focus. */
+:is(.ai-ins-host, .pm-prop-append) .ai-cont {
+  animation: none;
+  text-indent: 0;
+  margin-top: 0;
+}
+.pm-prop-append.is-focus .pm-page-gap {
+  background: var(--paper);
+}
 .pm-page-band {
   position: absolute;
   left: calc(-1 * var(--page-ml));

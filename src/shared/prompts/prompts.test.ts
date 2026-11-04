@@ -73,6 +73,41 @@ describe('chat system prompt', () => {
     expect(s).not.toContain('use a list when you have several points')
   })
 
+  it('the words to the author have no ids and no file paths', () => {
+    // A real reply said: "o card ^c47 diz que Miguel sai". The author does not know the ids.
+    const s = system('c1')
+    const style = s.slice(s.indexOf('# How you reply'), s.indexOf('# Proposing changes'))
+    expect(style).toMatch(/never write an id/)
+    expect(style).toContain('^c12')
+    expect(style).toContain('^k3')
+    expect(style).toContain('cm_')
+    expect(style).toMatch(/or a file path/)
+    expect(style).toMatch(/Name a story line card by its words, a note by its name, a chapter by its number or its title/)
+    expect(style).toMatch(/only inside the tags of proposals/)
+    const line = s.slice(s.indexOf('Rules for the story line'), s.indexOf('To use an image'))
+    expect(line).toMatch(/never write the ids/)
+  })
+
+  it('a <replace> can hold a scene break, with the text around it', () => {
+    const s = system('c1')
+    const rules = s.slice(s.indexOf('Rules for edits'), s.indexOf('To create a planning entry'))
+    expect(rules).toMatch(/A <replace> can hold a scene break/)
+    expect(rules).toContain('"* * *" on its own line, with a blank line before it and a blank line after it')
+    expect(rules).toMatch(/one proposal can add a scene break and the text after it/i)
+  })
+
+  it('a proposal that waits can change before the author decides', () => {
+    // A real reply told the author to accept a proposal first, and then to ask for the change.
+    const s = system('c1')
+    const rules = s.slice(s.indexOf('Rules for edits'), s.indexOf('To create a planning entry'))
+    expect(rules).toMatch(/not in the file yet/)
+    expect(rules).toMatch(/the same <find> as the waiting proposal/)
+    expect(rules).toMatch(/a <replace> with all of the changes/)
+    expect(rules).toMatch(/takes the place of the waiting one/)
+    expect(rules).toMatch(/empty <find>.*new addition/)
+    expect(rules).toContain('Never ask the author to accept a proposal before you change it.')
+  })
+
   it('uses summaries when the book does not fit', () => {
     const s = system('c1', 12, { c3: 'Resumo do capítulo três.' })
     expect(s).toContain('Resumo do capítulo três.')

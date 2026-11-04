@@ -47,6 +47,7 @@ const SCENARIOS = [
   { args: ['panels'], areas: ['shell'], s: 10 },
   { args: ['plannav'], areas: ['plan'], s: 8 },
   { args: ['plannotes'], areas: ['plan', 'store'], s: 12 },
+  { args: ['notefind'], areas: ['plan', 'editor'], s: 8 },
   { args: ['sync', '--en'], areas: ['plan', 'chat'], s: 20 },
   { args: ['chat', '--en'], areas: ['chat'], s: 40 },
   { args: ['proposals', '--en'], areas: ['chat', 'editor'], s: 35 },

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { EditorContent, useEditor } from '@tiptap/react'
+import { EditorContent, useEditor, type Editor } from '@tiptap/react'
 import { BubbleMenu } from '@tiptap/react/menus'
 import { ArrowBendUpLeft } from '@phosphor-icons/react'
 import { addQuote } from '@/features/chat/chatStore'
@@ -16,6 +16,7 @@ import { WikiLinks } from '@/features/editor/wiki-links'
 import { wikiLinkOptions } from './links'
 import { sliceFromMarkdown } from '@/features/editor/review'
 import { InlineProposals } from '@/features/editor/inlineProposals'
+import { FindReplace } from '@/features/editor/find'
 
 /** A rich-text editor for notes (planning entries, writing rules). Markdown in, Markdown out. */
 export function NoteEditor({
@@ -25,7 +26,8 @@ export function NoteEditor({
   placeholder,
   rev = 0,
   quoteLabel,
-  inlineProposals = false
+  inlineProposals = false,
+  onEditor
 }: {
   /** Changes when another note opens */
   docKey: string
@@ -38,6 +40,8 @@ export function NoteEditor({
   quoteLabel?: string
   /** A planning entry: chat proposals for it show in the text, with Accept and Reject (`docKey` is its id) */
   inlineProposals?: boolean
+  /** Gets the editor (null when it goes): the note page puts the find bar of the note on it */
+  onEditor?: (editor: Editor | null) => void
 }): React.JSX.Element {
   const t = useT()
   const hint = placeholder ?? t.plan.noteEditor.placeholder
@@ -52,6 +56,10 @@ export function NoteEditor({
     lastSent.current = md
     onChangeRef.current(md)
   }
+  const onEditorRef = useRef(onEditor)
+  onEditorRef.current = onEditor
+  /** A page that takes the editor can search it: the editor has the find extension. */
+  const findable = onEditor !== undefined
 
   const extensions = useMemo(
     () => [
@@ -60,9 +68,11 @@ export function NoteEditor({
       // A plain click puts the caret in a link (to fix a typo); Ctrl+click opens it.
       WikiLinks.configure(wikiLinkOptions()),
       Placeholder.configure({ placeholder: hint }),
-      ...(inlineProposals ? [InlineProposals.configure({ docId: () => docKey })] : [])
+      ...(inlineProposals ? [InlineProposals.configure({ docId: () => docKey })] : []),
+      // The search of the find bar (Ctrl+F) and its marks
+      ...(findable ? [FindReplace] : [])
     ],
-    [dash, language, hint, inlineProposals, docKey]
+    [dash, language, hint, inlineProposals, docKey, findable]
   )
 
   const editor = useEditor(
@@ -99,6 +109,13 @@ export function NoteEditor({
       unregister()
       flush()
     }
+  }, [editor])
+
+  // The page gets the editor, and loses it when it goes (another note, the page closes).
+  useEffect(() => {
+    if (!editor) return
+    onEditorRef.current?.(editor)
+    return () => onEditorRef.current?.(null)
   }, [editor])
 
   // A new note: its text is the starting point.

@@ -8,7 +8,7 @@ import { Button, Dialog } from '@/ui'
 import { useBook } from '@/stores/book'
 import { showText, toast, useUi } from '@/stores/ui'
 import { getT, useT } from '@/lib/i18n'
-import { findKey } from './find'
+import { findKey, goesToOtherChapter, selectionQuery, type FindScope } from './find'
 import { scrollToPos, setActiveEditor, whenChapterEditor } from './registry'
 import { matchesInBook, replaceInBook, type ChapterMatches } from './replaceBook'
 
@@ -29,9 +29,21 @@ function plainText(c: { id: string; body: string }): string {
   return plain
 }
 
-export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
-  const open = useUi((s) => s.findOpen)
-  const setOpen = useUi((s) => s.setFindOpen)
+/**
+ * The find bar of one editor. 'book' (the default) is the bar of the Write view: the active chapter,
+ * the other chapters with matches, going on into the next chapter, and "Replace in all chapters". 'note'
+ * is the bar of the open note of the Plan view: that note only. Ctrl+F (Ctrl+H: with replace) opens
+ * the bar of the view that shows.
+ */
+export function FindBar({ editor, scope = 'book' }: { editor: Editor; scope?: FindScope }): React.JSX.Element {
+  const book = scope === 'book'
+  // The bar of the chapters stays open from chapter to chapter (the toolbar opens it too). The bar of
+  // a note belongs to the note: another note opens with no bar.
+  const bookOpen = useUi((s) => s.findOpen)
+  const setBookOpen = useUi((s) => s.setFindOpen)
+  const [noteOpen, setNoteOpen] = useState(false)
+  const open = book ? bookOpen : noteOpen
+  const setOpen = book ? setBookOpen : setNoteOpen
   const [query, setQuery] = useState('')
   const [replace, setReplace] = useState('')
   const [showReplace, setShowReplace] = useState(false)
@@ -56,22 +68,21 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       const mod = e.ctrlKey || e.metaKey
-      // The Write view stays mounted under the Plan view: Ctrl+F works only while it shows.
-      if (mod && (e.key === 'f' || e.key === 'h') && useBook.getState().view === 'write') {
+      // The Write view stays mounted under the Plan view: each bar takes Ctrl+F only while its view shows.
+      if (mod && (e.key === 'f' || e.key === 'h') && useBook.getState().view === (book ? 'write' : 'plan')) {
         e.preventDefault()
-        // The find bar looks in the text: the text shows (the revision list closes).
-        showText()
+        // The find bar of the chapters looks in the text: the text shows (the revision list closes).
+        if (book) showText()
         setOpen(true)
         if (e.key === 'h') setShowReplace(true)
-        const { from, to } = editor.state.selection
-        const sel = editor.state.doc.textBetween(from, to, ' ')
-        if (sel && sel.length < 80) setQuery(sel)
+        const sel = selectionQuery(editor.state)
+        if (sel) setQuery(sel)
         setTimeout(() => input.current?.select(), 30)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [editor, setOpen])
+  }, [editor, setOpen, book])
 
   useEffect(() => {
     if (open) editor.commands.setFind(query, { caseSensitive: cs, wholeWord: ww })
@@ -84,12 +95,12 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
     return () => clearTimeout(t)
   }, [query])
   const others = useMemo(() => {
-    if (!open || !slowQuery) return []
+    if (!book || !open || !slowQuery) return []
     return chapters
       .filter((c) => c.id !== activeId)
       .map((c) => ({ id: c.id, title: c.title, n: countIn(plainText(c), slowQuery, cs, ww) }))
       .filter((c) => c.n > 0)
-  }, [open, slowQuery, cs, ww, chapters, activeId])
+  }, [book, open, slowQuery, cs, ww, chapters, activeId])
 
   /**
    * Close the bar and leave the text where it is. The cursor goes to the match that shows, so the
@@ -103,11 +114,14 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
     editor.commands.focus(null, { scrollIntoView: false })
   }
 
-  /** Bring the current match into view. */
+  /**
+   * Bring the current match into view. The desk always puts it in the upper part of the screen. A note
+   * moves only when the match is not in the middle part of the page: the page of a short note stays still.
+   */
   const showCurrent = (ed: Editor): void => {
     const f = findKey.getState(ed.state)
     const m = f && f.current >= 0 ? f.matches[f.current] : null
-    if (m) scrollToPos(ed, m.from)
+    if (m) scrollToPos(ed, m.from, 'smooth', { ifHidden: !book })
   }
 
   // A new search: show the first match.
@@ -121,7 +135,7 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
   // box, and the chapter shows its first match.
   const seed = useUi((s) => s.findSeed)
   useEffect(() => {
-    if (!seed) return
+    if (!seed || !book) return
     useUi.setState({ findSeed: null })
     setQuery(seed.query)
     setCs(false)
@@ -137,7 +151,10 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
     )
   }, [seed]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Next or previous match; after the last match of the chapter, go on in the next chapter that has one. */
+  /**
+   * Next or previous match. In the Write view, after the last match of the chapter, go on in the next
+   * chapter that has one. In a note, after the last match, go back to the first.
+   */
   const go = (dir: 1 | -1): void => {
     // Enter right after typing or a paste: the search of the text in the box is not there yet. Make
     // it, and go to its first match (the nearest after the cursor).
@@ -151,11 +168,10 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
       }
     }
     const f = findKey.getState(editor.state)
-    const count = f?.matches.length ?? 0
-    const atEdge = !count || (dir === 1 ? (f?.current ?? 0) >= count - 1 : (f?.current ?? 0) <= 0)
-    const book = useBook.getState()
-    const i = book.chapters.findIndex((c) => c.id === book.activeChapterId)
-    const order = dir === 1 ? book.chapters.slice(i + 1) : book.chapters.slice(0, Math.max(0, i)).reverse()
+    const atEdge = goesToOtherChapter(scope, f?.current ?? 0, f?.matches.length ?? 0, dir)
+    const store = useBook.getState()
+    const i = store.chapters.findIndex((c) => c.id === store.activeChapterId)
+    const order = dir === 1 ? store.chapters.slice(i + 1) : store.chapters.slice(0, Math.max(0, i)).reverse()
     const target = atEdge ? order.find((c) => countIn(plainText(c), query, cs, ww) > 0) : undefined
     if (!target) {
       if (dir === 1) editor.commands.findNext()
@@ -163,7 +179,7 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
       showCurrent(editor)
       return
     }
-    book.selectChapter(target.id)
+    store.selectChapter(target.id)
     whenChapterEditor(target.id, (e) =>
       setTimeout(() => {
         setActiveEditor(e)
@@ -179,6 +195,14 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
   /** Replace the current match and show the next one (find.ts selects it). */
   const replaceOne = (): void => {
     if (editor.commands.replaceCurrent(replace)) showCurrent(editor)
+  }
+
+  /**
+   * After a click on Replace or Replace all. When no match is current, the button turns off and loses the
+   * focus: the search box takes it, so the keys (Esc) stay in the bar.
+   */
+  const keepFocus = (): void => {
+    if ((findKey.getState(editor.state)?.current ?? -1) < 0) input.current?.focus()
   }
 
   /** Replace in all chapters, after the confirm. The toast has the result and an Undo. */
@@ -203,11 +227,15 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
     <AnimatePresence>
       {open && (
         <motion.div
-          className="find-bar"
+          className={clsx('find-bar', !book && 'is-note')}
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -6, transition: { duration: 0.12 } }}
           transition={{ type: 'spring', stiffness: 500, damping: 36 }}
+          // Esc closes the bar from each of its controls: a box, an option, Replace or Replace all.
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') close()
+          }}
         >
           <div className="find-row">
             <button className={clsx('find-toggle', showReplace && 'is-open')} onClick={() => setShowReplace(!showReplace)} aria-label={tf.replaceToggle} aria-expanded={showReplace}>
@@ -230,7 +258,6 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
                   e.preventDefault()
                   go(e.key === 'ArrowDown' ? 1 : -1)
                 }
-                if (e.key === 'Escape') close()
               }}
             />
             <span className="find-count" aria-live="polite">{query ? (st.count ? (st.current >= 0 ? `${st.current + 1}/${st.count}` : String(st.count)) : tf.noResults) : ''}</span>
@@ -264,18 +291,31 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
                     e.preventDefault()
                     replaceOne()
                   }
-                  if (e.key === 'Escape') close()
                 }}
               />
-              <button className="find-text-btn" disabled={st.current < 0} onClick={replaceOne}>
+              <button
+                className="find-text-btn"
+                disabled={st.current < 0}
+                onClick={() => {
+                  replaceOne()
+                  keepFocus()
+                }}
+              >
                 {tf.replace}
               </button>
-              <button className="find-text-btn" disabled={!st.count} onClick={() => editor.commands.replaceAll(replace)}>
+              <button
+                className="find-text-btn"
+                disabled={!st.count}
+                onClick={() => {
+                  editor.commands.replaceAll(replace)
+                  keepFocus()
+                }}
+              >
                 {tf.replaceAll}
               </button>
             </div>
           )}
-          {showReplace && (
+          {book && showReplace && (
             <div className="find-row find-row-all">
               <button className="find-link-btn" disabled={!query} onClick={() => setInBook(matchesInBook(query, { caseSensitive: cs, wholeWord: ww }))}>
                 {t.editor.replaceInAllChapters}
@@ -311,34 +351,36 @@ export function FindBar({ editor }: { editor: Editor }): React.JSX.Element {
         </motion.div>
       )}
     </AnimatePresence>
-    <Dialog
-      open={inBook !== null}
-      onOpenChange={(v) => !v && setInBook(null)}
-      title={t.editor.replaceInBookTitle}
-      description={inBook?.length ? t.editor.replaceInBookWhat(query, replace) : t.editor.replaceInBookNone(query)}
-      width={460}
-      footer={
-        <>
-          <Button variant="ghost" onClick={() => setInBook(null)}>
-            {t.common.cancel}
-          </Button>
-          <Button variant="primary" disabled={!inBookTotal} onClick={replaceEverywhere}>
-            {t.editor.replaceInBookButton(inBookTotal)}
-          </Button>
-        </>
-      }
-    >
-      {inBook && inBook.length > 0 && (
-        <ul className="replace-book-list">
-          {inBook.map((c) => (
-            <li key={c.chapterId}>
-              <span>{c.title}</span>
-              <span className="replace-book-n">{t.editor.replaceCount(c.count)}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Dialog>
+    {book && (
+      <Dialog
+        open={inBook !== null}
+        onOpenChange={(v) => !v && setInBook(null)}
+        title={t.editor.replaceInBookTitle}
+        description={inBook?.length ? t.editor.replaceInBookWhat(query, replace) : t.editor.replaceInBookNone(query)}
+        width={460}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setInBook(null)}>
+              {t.common.cancel}
+            </Button>
+            <Button variant="primary" disabled={!inBookTotal} onClick={replaceEverywhere}>
+              {t.editor.replaceInBookButton(inBookTotal)}
+            </Button>
+          </>
+        }
+      >
+        {inBook && inBook.length > 0 && (
+          <ul className="replace-book-list">
+            {inBook.map((c) => (
+              <li key={c.chapterId}>
+                <span>{c.title}</span>
+                <span className="replace-book-n">{t.editor.replaceCount(c.count)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Dialog>
+    )}
     </>
   )
 }

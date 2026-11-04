@@ -121,13 +121,22 @@ export function selectedText(): string {
   return textWithMap(a.editor.state.doc, from, to).text
 }
 
-/** Scroll the desk so that a position of an editor sits in the upper part of the screen. */
-export function scrollToPos(editor: Editor, pos: number, behavior: ScrollBehavior = 'smooth'): void {
-  const desk = editor.view.dom.closest('.desk') as HTMLElement | null
+/**
+ * Scroll the desk (or the page of a note in the Plan view) so that a position of an editor sits in the
+ * upper part of the screen. With `ifHidden`, a position in the middle part of the screen (not in the top or
+ * the bottom 15 %, where a bar or the edge can hide it) does not move: a smooth scroll that is in progress
+ * stops there, so the position stays on screen.
+ */
+export function scrollToPos(editor: Editor, pos: number, behavior: ScrollBehavior = 'smooth', { ifHidden = false } = {}): void {
+  const desk = editor.view.dom.closest('.desk, .plan-scroll') as HTMLElement | null
   if (!desk) return
   const p = Math.max(0, Math.min(pos, editor.state.doc.content.size))
   const coords = editor.view.coordsAtPos(p)
   const box = desk.getBoundingClientRect()
+  if (ifHidden && coords.top >= box.top + box.height * 0.15 && coords.bottom <= box.bottom - box.height * 0.15) {
+    desk.scrollTo({ top: desk.scrollTop, behavior: 'instant' })
+    return
+  }
   const target = box.top + box.height * 0.35
   desk.scrollBy({ top: coords.top - target, behavior })
 }

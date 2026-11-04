@@ -1,4 +1,5 @@
 .plan-desk {
+  position: relative;
   height: 100%;
 }
 /* The gutter of the scrollbar is always there, so the column does not move when the page gets long.

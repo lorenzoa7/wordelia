@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { markdownToPlainBlocks, newManifest } from '@shared/book'
 import type { EditorComment } from '@shared/comments'
-import { buildChatSystem } from '@shared/prompts/chat'
+import { buildChatSystem, chatHistory } from '@shared/prompts/chat'
 import { buildReadTurn } from '@shared/prompts/read'
 import { parseProposals, type Hunk } from '@shared/proposals/parse'
 import { findText } from '@shared/proposals/apply'
-import type { Chapter, Thread } from '@shared/types'
+import type { Chapter, ChatTurn, Thread } from '@shared/types'
 import { mockProvider, readReply } from './mock'
 
 const BODY = [
@@ -127,9 +127,9 @@ describe('the scripted editor\'s read', () => {
 })
 
 describe('the scripted provider', () => {
-  async function chat(system: string, content: string): Promise<string> {
+  async function chat(system: string, content: string, history: ChatTurn[] = []): Promise<string> {
     process.env['WORDELIA_MOCK_DELAY'] = '1'
-    const req = { route: { provider: 'claude-code' as const, model: 'sonnet' }, system, messages: [{ role: 'user' as const, content }], purpose: 'chat' as const }
+    const req = { route: { provider: 'claude-code' as const, model: 'sonnet' }, system, messages: [...history, { role: 'user' as const, content }], purpose: 'chat' as const }
     const result = await mockProvider('claude-code').complete(req, () => {}, new AbortController().signal)
     return result.text
   }
@@ -157,5 +157,27 @@ describe('the scripted provider', () => {
       expect(parseProposals(text).find((s) => s.kind === 'edit')).toMatchObject({ file: 'manuscript/A Tempestade.md' })
       expect(edits(text)).toEqual([{ find: second, replace: `* * *\n\n${second}`, complete: true }])
     }
+  })
+
+  it('"change the proposal": the same <find> as the change that waits, and a <replace> with the change', async () => {
+    const system = systemFor('Brazilian Portuguese')
+    const ask = 'Melhore o primeiro parágrafo.'
+    const first = await chat(system, ask)
+    const [waiting] = edits(first)
+    expect(waiting.find).not.toBe('')
+    // The history, as the app sends it: the change that waits is there in full.
+    const at = '2026-01-01T00:00:00Z'
+    const history = chatHistory([{ id: 'u1', role: 'user', content: ask, createdAt: at }, { id: 'a1', role: 'assistant', content: first, createdAt: at }], 24)
+    for (const follow of ['Mude a proposta: acrescente uma frase no fim.', 'Change the proposal: add a sentence at the end.']) {
+      const [changed] = edits(await chat(system, follow, history))
+      expect(changed.find).toBe(waiting.find)
+      expect(changed.replace).not.toBe(waiting.replace)
+      expect(changed.replace.startsWith(waiting.replace)).toBe(true)
+    }
+  })
+
+  it('"change the proposal" with no change that waits: no new proposal', async () => {
+    const text = await chat(systemFor('Brazilian Portuguese'), 'Mude a proposta.')
+    expect(edits(text)).toEqual([])
   })
 })

@@ -5,8 +5,10 @@
 //
 // - Only the current proposals show: the proposals of the replies after the last message of the
 //   author. Older ones stay on their cards; "Show in text" on such a card brings it back to the text.
-// - Two proposals for the same words: the newest shows. The card of the older one says so.
-// - A change with an empty <find> adds text at the end: it shows after the last paragraph.
+// - Two proposals for the same words: the newest shows. The card of the older one says so. When the
+//   author accepts the newer one, the older one cannot be accepted any more (`superseded`).
+// - A change with an empty <find> adds text at the end: it shows after the last paragraph. Two
+//   additions to the same text are the same words: the newest shows.
 // - A new reply takes the author to its change, but never while the author types (typing.ts): then a
 //   toast "Changes ready · Show" waits for a click.
 
@@ -19,7 +21,7 @@ import { SCENE_MARK, markdownToPlainBlocks, markdownToPlainScenes } from '@share
 import { findText } from '@shared/proposals/apply'
 import { hunkKey, parseProposals } from '@shared/proposals/parse'
 import { currentFrom } from '@shared/proposals/state'
-import type { ChatMessage, Thread } from '@shared/types'
+import type { ChatMessage, HunkState, Thread } from '@shared/types'
 import { useBook } from '@/stores/book'
 import { showText, toast, useUi } from '@/stores/ui'
 import { getT } from '@/lib/i18n'
@@ -76,11 +78,16 @@ interface InlineState {
   portraits: PortraitProposal[]
   /** The proposal that "Show in text" points at, for a moment */
   focus: string | null
-  /** An older proposal (id) whose words a newer pending proposal (id) changes too */
+  /** An older proposal (id) whose words a newer pending or accepted proposal (id) changes too */
   replaced: Record<string, string>
+  /**
+   * An older proposal (id) whose words a newer proposal changes, and the author accepted that newer
+   * one (id). The older one cannot be accepted: its text would go over the newer text.
+   */
+  superseded: Record<string, string>
 }
 
-export const useInlineProposals = create<InlineState>(() => ({ list: [], portraits: [], focus: null, replaced: {} }))
+export const useInlineProposals = create<InlineState>(() => ({ list: [], portraits: [], focus: null, replaced: {}, superseded: {} }))
 
 /** Old proposals that the author brought back to the text with "Show in text", for this session */
 const revived = new Set<string>()
@@ -164,8 +171,8 @@ function liveEdits(thread: Thread): InlineProposal[] {
       seg.hunks.forEach((h, i) => {
         const key = hunkKey(seg.index, i)
         const state = m.hunks?.[key]
-        if (!h.complete || !h.find.trim() || (state && state !== 'pending' && state !== 'accepted')) return
-        mine.push({ id: inlineProposalId(thread.id, m.id, key), threadId: thread.id, messageId: m.id, key, ...doc, file: seg.file, find: h.find, replace: h.replace })
+        if (!h.complete || (state && state !== 'pending' && state !== 'accepted')) return
+        mine.push({ id: inlineProposalId(thread.id, m.id, key), threadId: thread.id, messageId: m.id, key, ...doc, file: seg.file, find: h.find.trim() ? h.find : '', replace: h.replace })
       })
     }
     out.push(...mine.reverse())
@@ -176,37 +183,40 @@ function liveEdits(thread: Thread): InlineProposal[] {
 /**
  * The older pending proposals whose words a newer proposal of another reply (pending or accepted)
  * changes too: id → id of the newer one. The words meet in the text, or one passage has the other.
+ * Two additions at the end of the same text are the same words too: the page shows only the newest.
+ * `superseded`: the ones whose newer proposal the author accepted.
  */
-function replacedIn(thread: Thread): Record<string, string> {
+function replacedIn(thread: Thread): { replaced: Record<string, string>; superseded: Record<string, string> } {
   const all = liveEdits(thread)
-  const out: Record<string, string> = {}
+  const replaced: Record<string, string> = {}
+  const superseded: Record<string, string> = {}
   const texts = new Map<string, string>()
   const places = all.map((p) => {
     const key = `${p.kind}:${p.docId}`
     if (!texts.has(key)) texts.set(key, plainOf(p))
     const needle = markdownToPlainBlocks(p.find)
-    const m = findText(texts.get(key)!, needle)
+    const m = needle ? findText(texts.get(key)!, needle) : null
     return { doc: key, needle: needle.replace(/\s+/g, ' ').trim(), range: m && m.count === 1 ? { from: m.start, to: m.end } : null }
   })
-  const pending = (p: InlineProposal): boolean => {
-    const state = thread.messages.find((m) => m.id === p.messageId)?.hunks?.[p.key]
-    return !state || state === 'pending'
-  }
+  const stateOf = (p: InlineProposal): HunkState => thread.messages.find((m) => m.id === p.messageId)?.hunks?.[p.key] ?? 'pending'
   // `all` is the newest first: a proposal is replaced by a newer one that meets its words.
   all.forEach((p, i) => {
-    if (!pending(p)) return
+    if (stateOf(p) !== 'pending') return
     const a = places[i]
     for (let j = 0; j < i; j++) {
       const b = places[j]
-      if (b.doc !== a.doc || all[j].messageId === p.messageId) continue
+      const newer = all[j]
+      if (b.doc !== a.doc || newer.messageId === p.messageId) continue
       const meet = a.range && b.range ? b.range.from < a.range.to && a.range.from < b.range.to : false
-      if (meet || (a.needle && b.needle && (a.needle.includes(b.needle) || b.needle.includes(a.needle)))) {
-        out[p.id] = all[j].id
+      const both = !p.find && !newer.find
+      if (both || meet || (a.needle && b.needle && (a.needle.includes(b.needle) || b.needle.includes(a.needle)))) {
+        replaced[p.id] = newer.id
+        if (stateOf(newer) === 'accepted') superseded[p.id] = newer.id
         return
       }
     }
   })
-  return out
+  return { replaced, superseded }
 }
 
 /** Use the image of a portrait proposal as the portrait of its note. */
@@ -391,13 +401,15 @@ let lastThread: string | null = null
 function refresh(): void {
   const threads = useBook.getState().threads
   const thread = shownThread(threads, useChat.getState().activeThreadId)
-  const list = thread ? pendingProposals(thread) : []
+  const { replaced, superseded } = thread ? replacedIn(thread) : { replaced: {}, superseded: {} }
+  // A proposal whose newer proposal the author accepted never shows in the text (an old one that "Show in text" brought back).
+  const list = thread ? pendingProposals(thread).filter((p) => !superseded[p.id]) : []
   const portraits = thread ? pendingPortraits(thread) : []
   const sameThread = thread?.id === lastThread
   lastThread = thread?.id ?? null
   const state = useInlineProposals.getState()
-  const replaced = thread ? replacedIn(thread) : {}
   if (!sameMap(state.replaced, replaced)) useInlineProposals.setState({ replaced })
+  if (!sameMap(state.superseded, superseded)) useInlineProposals.setState({ superseded })
   if (state.portraits.map((p) => p.id).join('|') !== portraits.map((p) => p.id).join('|')) useInlineProposals.setState({ portraits })
 
   // A new reply of the thread where the author asked, and that shows in the chat.

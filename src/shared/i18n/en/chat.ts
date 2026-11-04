@@ -200,6 +200,8 @@ export const chat = {
   dismissOld: (v: number): string => `Dismiss old proposals (${v})`,
   dismissOldHint: 'Reject the proposals of the earlier replies that you did not decide.',
   replacedByNewer: 'A newer proposal changes the same text.',
+  /** The card of an older proposal after the author accepted a newer one for the same words: it has no Accept */
+  newerAccepted: 'You accepted a newer proposal for the same text.',
   /** The thread list: a new thread that has no messages yet */
   notStarted: 'No messages yet',
   threadDeleted: (title: string): string => `Moved “${title}” to the trash of the book.`,

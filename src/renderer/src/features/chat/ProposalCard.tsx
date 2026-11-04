@@ -164,6 +164,11 @@ function EditCard({ segment: raw, message, thread, streaming }: Props & { segmen
   const isPending = (i: number): boolean => segment.hunks[i].complete && (!states[keys[i]] || states[keys[i]] === 'pending')
   const pending = keys.filter((_, i) => isPending(i))
   const replaced = useInlineProposals((s) => ids.map((id) => Boolean(id && s.replaced[id])).join(','))
+  // The author accepted a newer proposal for the same words: this one would go over its text.
+  const superseded = useInlineProposals((s) => ids.map((id) => Boolean(id && s.superseded[id])).join(','))
+  const isSuperseded = (i: number): boolean => superseded.split(',')[i] === 'true'
+  const canAccept = (i: number): boolean => isPending(i) && !isSuperseded(i)
+  const acceptable = keys.filter((_, i) => canAccept(i))
   const inText = useInlineProposals((s) => ids.map((id) => s.list.some((p) => p.id === id)).join(','))
   const totals = useMemo(() => {
     let added = 0
@@ -218,7 +223,7 @@ function EditCard({ segment: raw, message, thread, streaming }: Props & { segmen
     const accepted: number[] = []
     // Apply from the last hunk to the first, so earlier text does not move.
     for (let i = segment.hunks.length - 1; i >= 0; i--) {
-      if (!isPending(i)) continue
+      if (!canAccept(i)) continue
       if (apply(i)) accepted.push(i)
     }
     setBusy(false)
@@ -235,7 +240,7 @@ function EditCard({ segment: raw, message, thread, streaming }: Props & { segmen
     const found = revealProposal(target.chapter.id, segment.hunks[i].find, ids[i])
     if (!found) toast(t.chat.passageNotFound, { kind: 'error' })
   }
-  const firstPending = segment.hunks.findIndex((_, i) => isPending(i))
+  const firstPending = segment.hunks.findIndex((_, i) => canAccept(i))
   const open = (): void => {
     if (target.kind === 'chapter') {
       if (!streaming && firstPending >= 0) reveal(firstPending)
@@ -273,9 +278,11 @@ function EditCard({ segment: raw, message, thread, streaming }: Props & { segmen
                 <button className="proposal-btn" onClick={() => reject(pending)}>
                   {segment.hunks.length > 1 ? t.common.rejectAll : t.common.reject}
                 </button>
-                <button className="proposal-btn is-accept" onClick={acceptAll} disabled={busy}>
-                  <Check size={12} weight="bold" /> {segment.hunks.length > 1 ? t.common.acceptAll : t.common.accept}
-                </button>
+                {acceptable.length > 0 && (
+                  <button className="proposal-btn is-accept" onClick={acceptAll} disabled={busy}>
+                    <Check size={12} weight="bold" /> {segment.hunks.length > 1 ? t.common.acceptAll : t.common.accept}
+                  </button>
+                )}
               </>
             )
           )}
@@ -294,10 +301,12 @@ function EditCard({ segment: raw, message, thread, streaming }: Props & { segmen
                   <WarningCircle size={12} aria-hidden /> {t.chat.changeIncomplete}
                 </p>
               )}
-              {!streaming && isPending(i) && replaced.split(',')[i] === 'true' && <p className="hunk-note">{t.chat.replacedByNewer}</p>}
+              {!streaming && isPending(i) && replaced.split(',')[i] === 'true' && (
+                <p className="hunk-note">{isSuperseded(i) ? t.chat.newerAccepted : t.chat.replacedByNewer}</p>
+              )}
               {!streaming && isPending(i) && (target.kind === 'chapter' || segment.hunks.length > 1) && (
                 <div className="hunk-foot">
-                  {target.kind === 'chapter' && (
+                  {target.kind === 'chapter' && !isSuperseded(i) && (
                     <Tooltip label={t.chat.showInTextHint}>
                       <button className="hunk-reveal" onClick={() => reveal(i)}>
                         <Crosshair size={12} /> {t.chat.showInText}
@@ -312,11 +321,13 @@ function EditCard({ segment: raw, message, thread, streaming }: Props & { segmen
                           <X size={12} />
                         </button>
                       </Tooltip>
-                      <Tooltip label={t.chat.acceptChange}>
-                        <button className="hunk-icon is-accept" onClick={() => accept(i)} aria-label={t.chat.acceptChange}>
-                          <Check size={12} weight="bold" />
-                        </button>
-                      </Tooltip>
+                      {canAccept(i) && (
+                        <Tooltip label={t.chat.acceptChange}>
+                          <button className="hunk-icon is-accept" onClick={() => accept(i)} aria-label={t.chat.acceptChange}>
+                            <Check size={12} weight="bold" />
+                          </button>
+                        </Tooltip>
+                      )}
                     </>
                   )}
                 </div>

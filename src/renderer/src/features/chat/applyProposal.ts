@@ -199,12 +199,14 @@ export function onDecision(fn: (threadId: string) => void): void {
  * Apply every pending proposal of a message, in the order of the message,
  * so an entry that the message creates exists before the message edits it.
  * Chapters get a version in the history before the first change.
+ * `skip`: keys that stay pending (a change whose newer proposal the author accepted).
  */
 export async function acceptPending(
   segments: Segment[],
-  states: Record<string, HunkState> = {}
+  states: Record<string, HunkState> = {},
+  skip: string[] = []
 ): Promise<{ states: Record<string, HunkState>; replaced: Record<string, string> }> {
-  const todo = new Set(pendingKeys(segments, states))
+  const todo = new Set(pendingKeys(segments, states).filter((k) => !skip.includes(k)))
   const out: Record<string, HunkState> = {}
   const replaced: Record<string, string> = {}
   for (const s of segments) {

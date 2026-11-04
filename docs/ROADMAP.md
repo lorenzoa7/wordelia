@@ -4,8 +4,8 @@ This file is the source of truth for progress. Update it after each task. Mark a
 
 ## Current focus
 
-> **Milestone:** Version 0.15 — the editor's read
-> **Next task:** Collect feedback on the editor's read (0.15.3).
+> **Milestone:** Version 0.16 — find in notes, safer chat proposals
+> **Next task:** Collect feedback on 0.16.0.
 > **Not verified:** Codex and the two API transports. The user has no Codex account, and no API keys are set. The scripted provider (`WORDELIA_MOCK_AI=1`) covers their UI flows.
 
 ## M0 — Foundation
@@ -378,6 +378,15 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] 0.15.1: the fixes after the live test
 - [x] 0.15.3 (the tag v0.15.2 has no release: a scenario was unstable on CI): a chat change that adds a long text shows on its pages (green text goes on to the next page); scenario `proposalpages`
 - [x] `live-read` with the real AI (Opus) on a copy of the author's book: 3 reads (all lenses, a second read, the last chapter with Continuity in progress), 16 comments, all on their passages, no repeated comment; Polish passage with the comment works. Fixes from it: the letter and the comments never name ids (a read wrote "^c75"); a chip of the letter stays on the line of its parentheses
+
+## Version 0.16 — find in notes, safer chat proposals
+
+- [x] Ctrl+F and Ctrl+H in a note of the Plan view (one find bar, scope "note"); scenario `notefind`
+- [x] An accepted chat change stays accepted when its new words change; only Undo and Redo of the last change move its state; scenario `acceptedits`
+- [x] A waiting proposal can change before the decision (full pending changes in the history; an older proposal cannot apply over a newer accepted one); scenario `proposalchange`
+- [x] Scene breaks in chat proposals (the page uses the diff of the review); scenario `scenebreak`
+- [x] No ids or file paths in the words of the chat; room around the Accept and Reject buttons in the page
+- [x] 61 scenarios, 737 unit tests
 
 ## Tests and CI
 

@@ -2,6 +2,18 @@
 
 Each version has its Windows installer in GitHub Releases. The release workflow copies the section of the version from this file to the release notes.
 
+## 0.16.0 (2026-11-04)
+
+### Plan
+- Ctrl+F finds words in the open note of the Plan view, with the count of matches, Next and Previous, and Replace in the note. Ctrl+H opens Replace. Esc puts the cursor at the match.
+
+### Chat proposals
+- An accepted change stays accepted when you or another change edits its new words later. Before, such an edit made it come back as a proposal, and Accept put its text in a second time. Only Undo (Ctrl+Z) makes it wait again.
+- You can ask the chat to change a proposal before you accept or reject it: add, remove or move words. The new proposal takes the place of the old one. When you accept the new one, the old one cannot apply any more.
+- A proposal can add a scene break ("* * *"), and the page shows it before you accept.
+- The chat never shows internal ids (for example "card ^c47") or file paths in its words. It names a card of the story line by its text.
+- The Accept and Reject buttons in the page have a little room above and below them.
+
 ## 0.15.3 (2026-11-04)
 
 - A change of the chat that adds a long text (new paragraphs at the end, or new words in a paragraph) shows on the pages that the text will have: the green text goes on to the next page, as text does. Before, it made one very tall page until you accepted it.

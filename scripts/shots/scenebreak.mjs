@@ -26,6 +26,8 @@ export default async function ({ page, shot, openBook, book }) {
       return out
     })
   const shape = (list) => list.map((b) => b.type).join('')
+  // The page draws its widgets and page gaps again after each measure: find the element and scroll in one step.
+  const show = (selector) => page.evaluate((s) => document.querySelector(s)?.scrollIntoView({ block: 'center' }), selector)
   const setView = (view) =>
     page.evaluate((v) => {
       const app = window.__wordelia.app.getState()
@@ -72,12 +74,12 @@ export default async function ({ page, shot, openBook, book }) {
   if (shown.struck) fail('the page strikes words that the proposal keeps (the italics of the paragraph)')
   if (shown.card !== '* * *') fail('the chat card does not show the scene break')
   if (shown.plus !== '+1') fail(`the card counts ${shown.plus} for one scene break`)
-  await page.locator(`${sheet} .ai-ins-scene`).scrollIntoViewIfNeeded()
+  await show(`${sheet} .ai-ins-scene`)
   await shot('shown')
   for (const [view, cls] of [['stacked', 'ai-ins-stacked'], ['new', 'ai-ins-new']]) {
     await setView(view)
     await page.waitForSelector(`${sheet} .${cls} .ai-ins-scene`, { timeout: 5000 }).catch(() => fail(`the "${view}" view shows no new scene break`))
-    await page.locator(`${sheet} .${cls}`).scrollIntoViewIfNeeded()
+    await show(`${sheet} .${cls}`)
     await shot(view)
   }
   await setView('words')
@@ -94,7 +96,7 @@ export default async function ({ page, shot, openBook, book }) {
   // The italics of the paragraph stay.
   await onDisk('the *Swallow* was missing', 'the italics of the paragraph are gone')
   await page.locator('.msg-ai').last().locator('.hunk-badge.is-accepted').waitFor({ timeout: 5000 }).catch(() => fail('the card does not say that the change was applied'))
-  await page.locator(`${sheet} .scene-break`).first().scrollIntoViewIfNeeded()
+  await show(`${sheet} .scene-break`)
   await shot('accepted')
 
   // ---- 3. An addition at the end that starts with a scene break ----
@@ -110,7 +112,7 @@ export default async function ({ page, shot, openBook, book }) {
   const appended = await page.evaluate((sel) => [...document.querySelectorAll(`${sel} .pm-prop-append > p`)].map((p) => p.textContent.replace(/Accept|Reject/g, '').trim()), sheet)
   console.log('addition at the end:', JSON.stringify(appended))
   if (appended.length !== 2 || appended[0] !== '* * *' || appended[1] !== 'The next morning, the sea was calm.') fail('the addition at the end does not show a scene break, then its paragraph')
-  await page.locator(`${sheet} .pm-prop-append`).scrollIntoViewIfNeeded()
+  await show(`${sheet} .pm-prop-append`)
   await shot('append')
   await page.locator(`${sheet} .pm-prop-append .pm-prop-btn.is-accept`).click()
   await page.waitForFunction((sel) => !document.querySelector(`${sel} .pm-prop-append`), sheet, { timeout: 5000 })

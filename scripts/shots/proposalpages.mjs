@@ -70,7 +70,9 @@ export default async function ({ page, shot, openBook }) {
   console.log('pages with the long passage:', JSON.stringify(inside))
   const gapsInWords = await page.evaluate((sel) => document.querySelectorAll(`${sel} .ai-ins-host .pm-page-gap`).length, sheet)
   if (!gapsInWords) fail('no page gap is in the new words')
-  await page.locator(`${sheet} .ai-ins-host .pm-page-gap`).first().scrollIntoViewIfNeeded()
+  // A new measure can put the gaps in the new words again at any time: find the first one and scroll in one step.
+  const showGap = () => page.evaluate((sel) => document.querySelector(`${sel} .ai-ins-host .pm-page-gap`)?.scrollIntoView({ block: 'center' }), sheet)
+  await showGap()
   await shot('inside')
   // The other views of a change: "old over new" and "new text only". The pages stay even in each one.
   for (const [view, cls] of [['stacked', 'ai-ins-stacked'], ['new', 'ai-ins-new']]) {
@@ -81,7 +83,7 @@ export default async function ({ page, shot, openBook }) {
     await page.waitForSelector(`${sheet} .${cls}`, { timeout: 5000 })
     await until(`the long passage in the "${view}" view made a page taller than the others`, () => even(before.length + 1))
     console.log(`pages in the "${view}" view:`, JSON.stringify(await pages()))
-    await page.locator(`${sheet} .ai-ins-host .pm-page-gap`).first().scrollIntoViewIfNeeded()
+    await showGap()
     await shot(`inside-${view}`)
   }
   await page.evaluate(() => {

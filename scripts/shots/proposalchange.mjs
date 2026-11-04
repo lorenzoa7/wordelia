@@ -67,6 +67,8 @@ export default async function ({ page, shot, openBook }) {
     }, i)
   const sheet = '.page[data-chapter="ch_sample01"]'
   const ADDED = 'The lamp turned above them, slow and patient.'
+  // The page draws its widgets and page gaps again after each measure: find the element and scroll in one step.
+  const show = (selector) => page.evaluate((s) => document.querySelector(s)?.scrollIntoView({ block: 'center' }), selector)
 
   await openBook()
   await page.evaluate(() => window.__wordelia.app.getState().setUi({ chatOpen: true, chatWidth: 400 }))
@@ -98,7 +100,7 @@ export default async function ({ page, shot, openBook }) {
   const before = await card(0)
   console.log('older card:', JSON.stringify(before))
   if (!before.note.includes('A newer proposal changes the same text.')) fail('the older card does not say that a newer proposal changes the same text')
-  await page.locator(`${sheet} .pm-prop`).first().scrollIntoViewIfNeeded()
+  await show(`${sheet} .pm-prop`)
   await shot('changed')
 
   // ---- 2. Accept the new one; the older one cannot go over it ----
@@ -136,7 +138,7 @@ export default async function ({ page, shot, openBook }) {
   const additions = await page.evaluate((sel) => document.querySelectorAll(`${sel} .pm-prop-append`).length, sheet)
   if (additions !== 1) fail(`the page shows ${additions} additions at the end`)
   if (!(await card(2)).note.includes('A newer proposal changes the same text.')) fail('the card of the older addition does not say that a newer one changes it')
-  await page.locator(`${sheet} .pm-prop-append`).scrollIntoViewIfNeeded()
+  await show(`${sheet} .pm-prop-append`)
   await shot('addition-changed')
   await page.locator(`${sheet} .pm-prop-append .pm-prop-btn.is-accept`).click()
   await accepted(last.id).catch(() => fail('Accept did not apply the new addition'))

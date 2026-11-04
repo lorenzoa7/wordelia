@@ -368,6 +368,8 @@
   display: inline-flex;
   gap: 4px;
   margin-left: 0.4em;
+  /* Room above and below: on a line of their own, the buttons do not touch the proposed words. */
+  margin-block: var(--s-1);
   vertical-align: 0.1em;
   text-indent: 0;
   user-select: none;

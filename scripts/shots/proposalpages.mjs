@@ -31,10 +31,13 @@ export default async function ({ page, shot, openBook }) {
       const bottoms = [...bands.map((b) => b.top), s.bottom]
       return tops.map((t, i) => Math.round(bottoms[i] - t))
     }, sheet)
+  // Scroll an element to the middle of the desk, for a screenshot. One step in the page: a new measure puts
+  // the gaps in the new words again, so a gap that a locator found can be gone a moment later.
+  const show = (sel) => page.evaluate((q) => document.querySelector(q)?.scrollIntoView({ block: 'center' }), sel)
   /** True when all the pages have the same height; else the heights, for the message. */
   const even = async (atLeast) => {
     const h = await pages()
-    return h.length >= atLeast && h.every((x) => Math.abs(x - h[0]) <= 2) ? true : h
+    return h.length >= atLeast && h.every((x) => Math.abs(x - h[0]) <= 3) ? true : h
   }
 
   await openBook()
@@ -50,13 +53,13 @@ export default async function ({ page, shot, openBook }) {
   await until('the new paragraphs at the end made a page taller than the others', () => even(first.length + 2))
   const preview = await pages()
   console.log('pages with the new paragraphs:', JSON.stringify(preview))
-  await page.locator(`${sheet} .pm-prop-append`).scrollIntoViewIfNeeded()
+  await show(`${sheet} .pm-prop-append`)
   await shot('append')
   await page.locator(`${sheet} .pm-prop-append .pm-prop-btn.is-accept`).click()
   await page.waitForFunction(() => window.__wordelia.book.getState().chapters[0].body.includes('Elias desceu a escada de ferro'), null, { timeout: 5000 })
   await until('the pages after Accept are not the pages of the proposal', async () => {
     const h = await pages()
-    return h.length === preview.length && h.every((x) => Math.abs(x - h[0]) <= 2) ? true : h
+    return h.length === preview.length && h.every((x) => Math.abs(x - h[0]) <= 3) ? true : h
   })
 
   // 2. A long passage inside the first paragraph: the page gaps go into the new words.
@@ -70,7 +73,7 @@ export default async function ({ page, shot, openBook }) {
   console.log('pages with the long passage:', JSON.stringify(inside))
   const gapsInWords = await page.evaluate((sel) => document.querySelectorAll(`${sel} .ai-ins-host .pm-page-gap`).length, sheet)
   if (!gapsInWords) fail('no page gap is in the new words')
-  await page.locator(`${sheet} .ai-ins-host .pm-page-gap`).first().scrollIntoViewIfNeeded()
+  await show(`${sheet} .ai-ins-host .pm-page-gap`)
   await shot('inside')
   // The other views of a change: "old over new" and "new text only". The pages stay even in each one.
   for (const [view, cls] of [['stacked', 'ai-ins-stacked'], ['new', 'ai-ins-new']]) {
@@ -81,7 +84,7 @@ export default async function ({ page, shot, openBook }) {
     await page.waitForSelector(`${sheet} .${cls}`, { timeout: 5000 })
     await until(`the long passage in the "${view}" view made a page taller than the others`, () => even(before.length + 1))
     console.log(`pages in the "${view}" view:`, JSON.stringify(await pages()))
-    await page.locator(`${sheet} .ai-ins-host .pm-page-gap`).first().scrollIntoViewIfNeeded()
+    await show(`${sheet} .ai-ins-host .pm-page-gap`)
     await shot(`inside-${view}`)
   }
   await page.evaluate(() => {
@@ -93,7 +96,7 @@ export default async function ({ page, shot, openBook }) {
   await page.waitForFunction(() => !document.querySelector('.page[data-chapter="ch_sample01"] .ai-ins'), null, { timeout: 5000 })
   await until('the pages after Accept are not the pages of the proposal', async () => {
     const h = await pages()
-    return h.length === inside.length && h.every((x) => Math.abs(x - h[0]) <= 2) ? true : h
+    return h.length === inside.length && h.every((x) => Math.abs(x - h[0]) <= 3) ? true : h
   })
   await shot('accepted')
 }

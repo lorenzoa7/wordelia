@@ -661,6 +661,12 @@
   background: var(--paper);
   box-shadow: var(--shadow-pop);
 }
+/* The find bar of a note (Plan view). No toolbar is above it: it sits in the margin above the page, so at
+   the top of the note it covers no control of the page. */
+.find-bar.is-note {
+  top: var(--s-2);
+  right: var(--s-6);
+}
 .find-row {
   display: flex;
   align-items: center;

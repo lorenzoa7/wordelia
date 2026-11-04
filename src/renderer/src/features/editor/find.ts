@@ -1,4 +1,4 @@
-// Find and replace inside the open chapter.
+// Find and replace inside one editor: the open chapter (Write view) or the open note (Plan view).
 
 import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey, TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
@@ -20,6 +20,30 @@ export interface FindState {
 }
 
 export const findKey = new PluginKey<FindState>('find')
+
+/** Where a find bar searches: 'book' is the chapters of the Write view, 'note' is the open note of the Plan view. */
+export type FindScope = 'book' | 'note'
+
+/**
+ * The text that the selection puts in the search box when the find bar opens (Ctrl+F, Ctrl+H): the
+ * selected text, with a space between two blocks, when it has fewer than 80 characters. Else null,
+ * and the box keeps its text.
+ */
+export function selectionQuery(state: EditorState): string | null {
+  const { from, to } = state.selection
+  const text = state.doc.textBetween(from, to, ' ')
+  return text && text.length < 80 ? text : null
+}
+
+/**
+ * True when Next (1) or Previous (-1) goes to another chapter: the current match is the last (or the
+ * first) match of the chapter, or the chapter has no match. A note has no other chapter: after its
+ * last match, Next goes back to its first match.
+ */
+export function goesToOtherChapter(scope: FindScope, current: number, count: number, dir: 1 | -1): boolean {
+  if (scope === 'note') return false
+  return !count || (dir === 1 ? current >= count - 1 : current <= 0)
+}
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -121,6 +145,18 @@ export function replaceCurrentMatch(state: EditorState, tr: Transaction, text: s
   return true
 }
 
+/** Replace all the matches in `tr`: one transaction, so one undo step. Returns false when the text has no match. */
+export function replaceAllMatches(state: EditorState, tr: Transaction, text: string): boolean {
+  const s = findKey.getState(state)
+  if (!s || !s.matches.length) return false
+  for (let i = s.matches.length - 1; i >= 0; i--) {
+    const m = s.matches[i]
+    if (text) tr.insertText(text, m.from, m.to)
+    else tr.delete(m.from, m.to)
+  }
+  return true
+}
+
 /** The find plugin: the search, its matches and the current match of one editor. */
 export function findPlugin(): Plugin<FindState> {
   return new Plugin<FindState>({
@@ -212,13 +248,7 @@ export const FindReplace = Extension.create({
         ({ state, tr, dispatch }) => {
           const s = findKey.getState(state)
           if (!s || !s.matches.length) return false
-          if (dispatch) {
-            for (let i = s.matches.length - 1; i >= 0; i--) {
-              const m = s.matches[i]
-              if (text) tr.insertText(text, m.from, m.to)
-              else tr.delete(m.from, m.to)
-            }
-          }
+          if (dispatch) replaceAllMatches(state, tr, text)
           return true
         },
       clearFind:

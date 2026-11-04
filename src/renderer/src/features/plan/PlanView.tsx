@@ -18,6 +18,8 @@ import { useUi } from '@/stores/ui'
 import { useChat } from '@/features/chat/chatStore'
 import { ImageViewer } from '@/features/chat/ChatImages'
 import { acceptPortraitProposal, rejectPortraitProposal, useInlineProposals } from '@/features/editor/inlineProposals'
+import { FindBar } from '@/features/editor/FindBar'
+import type { Editor } from '@tiptap/react'
 import { useApp } from '@/stores/app'
 import { LINE_PAGE, MAP_PAGE, MapView, PlanViewSwitch, planBack, useBackPlace } from '@/features/graph'
 import { LineView } from './line/LineView'
@@ -370,6 +372,8 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
   const [name, setName] = useState(entry.name)
   const [aliasDraft, setAliasDraft] = useState('')
   const [viewing, setViewing] = useState<string | null>(null)
+  /** The editor of the text of the note: the find bar searches it (Ctrl+F) */
+  const [textEditor, setTextEditor] = useState<Editor | null>(null)
   useEffect(() => setName(entry.name), [entry.name])
   // A portrait that the chat proposes shows in the place of the portrait, with Use and Reject.
   const proposal = useInlineProposals((s) => s.portraits.filter((p) => p.docId === entry.id).at(-1) ?? null)
@@ -440,6 +444,9 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
   }
 
   return (
+    <>
+    {/* Outside the scroll: the find bar stays at the top while the note scrolls. */}
+    {textEditor && <FindBar editor={textEditor} scope="note" />}
     <div className="plan-scroll">
       <motion.article
         className="entry-page grain"
@@ -576,6 +583,7 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
             quoteLabel={entry.name}
             inlineProposals
             placeholder={t.plan.entry.notesPlaceholder}
+            onEditor={setTextEditor}
           />
         </div>
         {mentions.length > 0 && (
@@ -602,5 +610,6 @@ function EntryEditor({ entry }: { entry: Entry }): React.JSX.Element {
         )}
       </motion.article>
     </div>
+    </>
   )
 }

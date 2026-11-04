@@ -251,4 +251,22 @@ export default async function ({ page, shot, openBook }) {
   await still('write')
   await page.keyboard.press('Escape')
   await page.waitForSelector(writeBar, { state: 'detached', timeout: 3000 }).catch(() => fail('Esc did not close the chapter find bar'))
+
+  // 9. Ctrl+F, then a word at once, with no wait: no letter is lost. (The box selected its words a moment
+  // after it showed, so the first letters typed before that went away.)
+  for (const view of ['write', 'plan']) {
+    if (view === 'plan') {
+      await page.keyboard.press('Control+2')
+      await wait(() => window.__wordelia.book.getState().view === 'plan' && document.querySelector('.entry-body .ProseMirror'), null, 'Ctrl+2 did not go back to the note')
+      await page.locator('.entry-body .ProseMirror p').first().click()
+    } else {
+      await page.locator('.page .manuscript p').first().click()
+    }
+    await page.keyboard.press('Control+f')
+    await page.keyboard.type('farol')
+    const bar = view === 'plan' ? noteBar : writeBar
+    await wait((sel) => document.querySelector(`${sel} .find-input`)?.value === 'farol', bar, `typed at once after Ctrl+F in the ${view} view, the box does not have "farol": "${await page.evaluate((sel) => document.querySelector(`${sel} .find-input`)?.value, bar)}"`, 2000)
+    await page.keyboard.press('Escape')
+    await page.waitForSelector(bar, { state: 'detached', timeout: 3000 }).catch(() => fail(`Esc did not close the find bar of the ${view} view`))
+  }
 }

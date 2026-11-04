@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEditorState, type Editor } from '@tiptap/react'
 import { ArrowDown, ArrowUp, CaretRight, X } from '@phosphor-icons/react'
@@ -50,6 +50,8 @@ export function FindBar({ editor, scope = 'book' }: { editor: Editor; scope?: Fi
   const [cs, setCs] = useState(false)
   const [ww, setWw] = useState(false)
   const input = useRef<HTMLInputElement>(null)
+  /** Ctrl+F opened the bar or put a selection in the box: select the words of the box when it shows */
+  const selectOnShow = useRef(false)
   /** "Replace in all chapters": the chapters with matches, waiting for the confirm */
   const [inBook, setInBook] = useState<ChapterMatches[] | null>(null)
   const chapters = useBook((s) => s.chapters)
@@ -77,12 +79,26 @@ export function FindBar({ editor, scope = 'book' }: { editor: Editor; scope?: Fi
         if (e.key === 'h') setShowReplace(true)
         const sel = selectionQuery(editor.state)
         if (sel) setQuery(sel)
-        setTimeout(() => input.current?.select(), 30)
+        // Select the words of the box before the next key: a key that comes first goes into the box,
+        // and a select after it would take that letter away. An open bar selects now; a new bar when it shows.
+        if (input.current) {
+          input.current.focus()
+          input.current.select()
+          if (sel) selectOnShow.current = true
+        } else selectOnShow.current = true
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [editor, setOpen, book])
+
+  // The bar shows, or the box got the words of a selection: select them, in the same task as the render.
+  useLayoutEffect(() => {
+    if (!open || !selectOnShow.current || !input.current) return
+    selectOnShow.current = false
+    input.current.focus()
+    input.current.select()
+  })
 
   useEffect(() => {
     if (open) editor.commands.setFind(query, { caseSensitive: cs, wholeWord: ww })

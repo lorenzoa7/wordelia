@@ -12,6 +12,7 @@
 
 import { useEffect } from 'react'
 import { Extension } from '@tiptap/core'
+import { isHistoryTransaction } from '@tiptap/pm/history'
 import { Plugin, PluginKey, type EditorState } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { create } from 'zustand'
@@ -329,29 +330,38 @@ function countIn(text: string, markdown: string): number {
 }
 
 /**
- * The text of a chapter changed. An accepted change whose old words are back (and its new words
- * gone) was undone: it is pending again and shows in the text. An undone change whose new words are
- * back was done again: it is accepted again.
+ * Undo or Redo changed the text of a chapter (`before` → `after`). Undo takes back the last step of
+ * the history, so only the last accepted change of the chapter can be undone: when this step took its
+ * new words away and its old words are back, it is pending again and shows in the text. Redo does the
+ * last undone step again: when this step brought the new words of the last undone change back, it is
+ * accepted again. Other changes of the new words leave the state alone: an edit of the author, another
+ * accepted change, or the Undo of a later change inside them. Else a change that keeps its old words
+ * (it adds text after them) came back as a proposal, and Accept put its text in a second time.
  */
-function checkUndo(docId: string, doc: EditorState['doc']): void {
-  const mine = [...accepted, ...undone].filter((p) => p.docId === docId && p.find)
-  if (!mine.length) return
-  const { text } = textWithMap(doc, 0, doc.content.size)
-  for (const p of mine) {
-    const thread = threadOf(p)
-    if (!thread) continue
-    const oldBack = countIn(text, p.find) === 1
-    const newThere = countIn(text, replaceText(p)) >= 1
-    if (accepted.includes(p) && oldBack && !newThere) {
-      accepted.splice(accepted.indexOf(p), 1)
-      remember(undone, p)
+function checkUndo(docId: string, before: EditorState['doc'], after: EditorState['doc']): void {
+  const last = accepted.filter((p) => p.docId === docId && p.find).at(-1)
+  const lastUndone = undone.filter((p) => p.docId === docId && p.find).at(-1)
+  if (!last && !lastUndone) return
+  const was = textWithMap(before, 0, before.content.size).text
+  const { text } = textWithMap(after, 0, after.content.size)
+  const thread = (p: InlineProposal): Thread | undefined => threadOf(p)
+  // Redo first: a Redo of a change inside the new words of an older change takes those words away too.
+  if (lastUndone && thread(lastUndone) && stateOf(lastUndone) !== 'accepted') {
+    if (countIn(was, replaceText(lastUndone)) === 0 && countIn(text, replaceText(lastUndone)) >= 1) {
+      undone.splice(undone.indexOf(lastUndone), 1)
+      remember(accepted, lastUndone)
+      setHunkStates(thread(lastUndone)!, lastUndone.messageId, { [lastUndone.key]: 'accepted' })
+      return
+    }
+  }
+  if (last && thread(last)) {
+    const newWasThere = countIn(was, replaceText(last)) >= 1
+    if (newWasThere && countIn(text, replaceText(last)) === 0 && countIn(text, last.find) === 1) {
+      accepted.splice(accepted.indexOf(last), 1)
+      remember(undone, last)
       // The change is in the text again, also when its reply is old now.
-      revived.add(p.id)
-      setHunkStates(thread, p.messageId, { [p.key]: 'pending' })
-    } else if (undone.includes(p) && !oldBack && newThere && stateOf(p) !== 'accepted') {
-      undone.splice(undone.indexOf(p), 1)
-      remember(accepted, p)
-      setHunkStates(thread, p.messageId, { [p.key]: 'accepted' })
+      revived.add(last.id)
+      setHunkStates(thread(last)!, last.messageId, { [last.key]: 'pending' })
     }
   }
 }
@@ -692,6 +702,14 @@ export const InlineProposals = Extension.create<InlineProposalsOptions>({
             return tr.docChanged ? set.map(tr.mapping, tr.doc) : set
           }
         },
+        // Undo or Redo: an accepted chat change can be undone, or done again (checkUndo).
+        appendTransaction(trs, oldState, newState) {
+          if (trs.some((tr) => tr.docChanged && isHistoryTransaction(tr))) {
+            const id = opts.docId()
+            queueMicrotask(() => checkUndo(id, oldState.doc, newState.doc))
+          }
+          return null
+        },
         props: {
           decorations: (state) => inlineProposalsKey.getState(state)
         },
@@ -700,7 +718,6 @@ export const InlineProposals = Extension.create<InlineProposalsOptions>({
           const rebuild = (): void => {
             if (view.isDestroyed) return
             const id = opts.docId()
-            checkUndo(id, view.state.doc)
             const { list, focus } = useInlineProposals.getState()
             const mine = list.filter((p) => p.docId === id)
             // Nothing to show and nothing shown: no transaction.

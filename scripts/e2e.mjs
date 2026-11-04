@@ -56,6 +56,7 @@ const SCENARIOS = [
   { args: ['storyline-edit'], areas: ['plan', 'store'], s: 14 },
   { args: ['pages', '--en'], areas: ['editor'], s: 7 },
   { args: ['proposalpages'], areas: ['editor', 'chat'], s: 15 },
+  { args: ['acceptedits'], areas: ['editor', 'chat'], s: 12 },
   { args: ['reveal'], areas: ['editor', 'chat'], s: 12 },
   { args: ['reopen'], areas: ['editor', 'store'], s: 9 },
   { args: ['pagebreak', '--en'], areas: ['editor'], s: 6 },

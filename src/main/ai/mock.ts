@@ -311,6 +311,15 @@ function reply(req: AiRequest): string {
       '</edit>'
     ].join('\n')
   }
+  // "A new scene after the first paragraph": a change that keeps the paragraph and adds one after it. "Change
+  // the new scene": a change of words inside that new paragraph, which an accepted change put there.
+  const NEW_SCENE = 'Na manhã seguinte, Marta encontrou o bote azul vazio na praia, com a corda cortada.'
+  if (chapter && firstPara && /new scene after|cena nova depois/i.test(last)) {
+    return ['Here is a new scene after the first paragraph.', '', `<edit file="${chapter[1]}">`, `<find>${firstPara.trim()}</find>`, `<replace>${firstPara.trim()}\n\n${NEW_SCENE}</replace>`, '</edit>'].join('\n')
+  }
+  if (chapter && /change the new scene|mude a cena nova/i.test(last) && chapter[2].includes(NEW_SCENE)) {
+    return ['A smaller change in the new scene.', '', `<edit file="${chapter[1]}">`, `<find>${NEW_SCENE}</find>`, `<replace>${NEW_SCENE.replace('com a corda cortada', 'e a corda cortada')}</replace>`, '</edit>'].join('\n')
+  }
   const wantsEdit = /edit|change|improve|rewrite|melhor|mude|reescrev/i.test(last)
   // "Improve the first two paragraphs": several proposals in one reply, for the bar that applies them all.
   if (chapter && wantsEdit && /\b(two|both|several|dois|duas|ambos)\b/i.test(last)) {

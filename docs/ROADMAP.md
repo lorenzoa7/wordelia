@@ -5,7 +5,7 @@ This file is the source of truth for progress. Update it after each task. Mark a
 ## Current focus
 
 > **Milestone:** Version 0.16 — find in notes, safer chat proposals
-> **Next task:** Collect feedback on 0.16.0.
+> **Next task:** Collect feedback on 0.16.1.
 > **Not verified:** Codex and the two API transports. The user has no Codex account, and no API keys are set. The scripted provider (`WORDELIA_MOCK_AI=1`) covers their UI flows.
 
 ## M0 — Foundation
@@ -386,7 +386,8 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] A waiting proposal can change before the decision (full pending changes in the history; an older proposal cannot apply over a newer accepted one); scenario `proposalchange`
 - [x] Scene breaks in chat proposals (the page uses the diff of the review); scenario `scenebreak`
 - [x] No ids or file paths in the words of the chat; room around the Accept and Reject buttons in the page
-- [x] 61 scenarios, 737 unit tests
+- [x] 0.16.1: a chapter that comes back after a change while it had no editor keeps its text (it was emptied: two schemas); a save that takes most of a chapter away keeps a version first; Ctrl+F loses no letters; scenario `farchange`
+- [x] 62 scenarios, 741 unit tests
 
 ## Tests and CI
 

@@ -2,7 +2,14 @@
 
 Each version has its Windows installer in GitHub Releases. The release workflow copies the section of the version from this file to the release notes.
 
-## 0.16.0 (2026-11-04)
+## 0.16.1 (2026-11-04)
+
+The tag v0.16.0 has no release: a scenario was unstable on CI. This version has all of 0.16.0, and these fixes.
+
+### Your text is safe
+- Important fix: a chat change that you accepted in a chapter far from the screen (for example chapter 6 while you write in chapter 7) could empty that chapter when you went back to it, and the next save wrote the empty chapter. Now the chapter comes back with all of its text. A restore of a version had the same problem in that chapter, and it is fixed too.
+- A save that takes away most of the text of a chapter now saves the text before it in the version history first, as "Before a big loss of text". Whatever the cause, you can bring the chapter back from the history.
+- Ctrl+F selects the words of the find box at once: the first letters that you type right after Ctrl+F are not lost.
 
 ### Plan
 - Ctrl+F finds words in the open note of the Plan view, with the count of matches, Next and Previous, and Replace in the note. Ctrl+H opens Replace. Esc puts the cursor at the match.

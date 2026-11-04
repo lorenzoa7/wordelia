@@ -2,7 +2,7 @@
 
 Each version has its Windows installer in GitHub Releases. The release workflow copies the section of the version from this file to the release notes.
 
-## 0.15.2 (2026-11-04)
+## 0.15.3 (2026-11-04)
 
 - A change of the chat that adds a long text (new paragraphs at the end, or new words in a paragraph) shows on the pages that the text will have: the green text goes on to the next page, as text does. Before, it made one very tall page until you accepted it.
 

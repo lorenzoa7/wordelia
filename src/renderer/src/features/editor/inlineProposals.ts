@@ -199,7 +199,8 @@ function replacedIn(thread: Thread): { replaced: Record<string, string>; superse
     return { doc: key, needle: needle.replace(/\s+/g, ' ').trim(), range: m && m.count === 1 ? { from: m.start, to: m.end } : null }
   })
   const stateOf = (p: InlineProposal): HunkState => thread.messages.find((m) => m.id === p.messageId)?.hunks?.[p.key] ?? 'pending'
-  // `all` is the newest first: a proposal is replaced by a newer one that meets its words.
+  // `all` is the newest first: a proposal is replaced by the newest one that meets its words, and
+  // superseded by any newer one that meets its words and that the author accepted.
   all.forEach((p, i) => {
     if (stateOf(p) !== 'pending') return
     const a = places[i]
@@ -209,9 +210,10 @@ function replacedIn(thread: Thread): { replaced: Record<string, string>; superse
       if (b.doc !== a.doc || newer.messageId === p.messageId) continue
       const meet = a.range && b.range ? b.range.from < a.range.to && a.range.from < b.range.to : false
       const both = !p.find && !newer.find
-      if (both || meet || (a.needle && b.needle && (a.needle.includes(b.needle) || b.needle.includes(a.needle)))) {
-        replaced[p.id] = newer.id
-        if (stateOf(newer) === 'accepted') superseded[p.id] = newer.id
+      if (!both && !meet && !(a.needle && b.needle && (a.needle.includes(b.needle) || b.needle.includes(a.needle)))) continue
+      replaced[p.id] ??= newer.id
+      if (stateOf(newer) === 'accepted') {
+        superseded[p.id] = newer.id
         return
       }
     }

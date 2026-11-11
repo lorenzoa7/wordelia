@@ -206,10 +206,15 @@
   min-width: 0;
   padding: 0 6px;
 }
+/* Side by side when their words fit, else one under the other: a narrow sidebar or a long language. */
 .sync-card-bulk {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-wrap: wrap;
   gap: 6px;
+}
+.sync-card-actions .sync-card-bulk .btn {
+  flex: 1 1 auto;
+  width: auto;
 }
 .sync-card-bulk .sync-accept-all {
   border-color: color-mix(in srgb, var(--pen) 40%, var(--rule));

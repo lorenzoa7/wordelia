@@ -73,6 +73,33 @@ export default async function ({ app, page, shot, openBook }) {
   if (!notes.includes(visitor) || !notes.includes('Elias')) fail(`the card names "${notes}"`)
   if ((await sync.getAttribute('aria-disabled')) !== 'true') fail('after the sync, the button is not off')
   await shot('result')
+  // The buttons of the card keep their words inside them: in the longest language, in the narrowest sidebar.
+  const was = await page.evaluate(() => ({ language: window.__wordelia.app.getState().settings.language, width: window.__wordelia.app.getState().settings.ui.sidebarWidth }))
+  for (const [language, width] of [['pt-BR', 200], ['es', 200], [was.language, 200]]) {
+    await page.evaluate((l) => window.__wordelia.app.getState().updateSettings({ language: l }), language)
+    await setUi({ sidebarWidth: width })
+    await page.waitForTimeout(300)
+    const bad = await page.evaluate(() => {
+      const cardBox = document.querySelector('.sync-card').getBoundingClientRect()
+      const buttons = [...document.querySelectorAll('.sync-card-actions .btn')]
+      const boxes = buttons.map((b) => b.getBoundingClientRect())
+      const out = []
+      buttons.forEach((b, i) => {
+        if (b.scrollWidth > b.clientWidth + 1) out.push(`"${b.textContent}" does not fit in its button`)
+        if (boxes[i].left < cardBox.left - 1 || boxes[i].right > cardBox.right + 1) out.push(`"${b.textContent}" goes out of the card`)
+        for (let j = 0; j < i; j++) {
+          const a = boxes[j]
+          const c = boxes[i]
+          if (a.left < c.right - 1 && c.left < a.right - 1 && a.top < c.bottom - 1 && c.top < a.bottom - 1) out.push(`"${buttons[j].textContent}" and "${b.textContent}" overlap`)
+        }
+      })
+      return out
+    })
+    if (bad.length) fail(`the card in ${language} at ${width} px: ${bad.join('; ')}`)
+  }
+  await shot('result-narrow')
+  await page.evaluate((l) => window.__wordelia.app.getState().updateSettings({ language: l }), was.language)
+  await setUi({ sidebarWidth: was.width })
 
   // 4. Review opens the sync thread in the chat, at its proposals.
   await page.locator('.sync-review').click()

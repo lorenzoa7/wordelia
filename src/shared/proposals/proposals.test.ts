@@ -90,14 +90,14 @@ describe('applyHunk', () => {
 
 describe('applyHunkAfter', () => {
   // A story line has the same id line in its two views: "^c55 ^c56" can be in "# By chapter" and in "# By order".
-  const line = '# By chapter\n## Ventania ^k8\n^c49 ^c50\n\n## Traição ^k10\n^c55 ^c56\n\n# By order\n## Noite ^k20\n^c55 ^c56\n'
+  const line = '# By chapter\n## A Tempestade ^k8\n^c49 ^c50\n\n## O Visitante ^k10\n^c55 ^c56\n\n# By order\n## Noite ^k20\n^c55 ^c56\n'
 
   it('takes the first place after the change before it when the words are in the text more than one time', () => {
-    const first = applyHunkAfter(line, '## Ventania ^k8\n^c49 ^c50', '## Ventania ^k8\n^c50', 0)
+    const first = applyHunkAfter(line, '## A Tempestade ^k8\n^c49 ^c50', '## A Tempestade ^k8\n^c50', 0)
     expect(first.ok).toBe(true)
     if (!first.ok) return
     const second = applyHunkAfter(first.text, '^c55 ^c56', '^c49 ^c55 ^c56', first.end)
-    expect(second).toMatchObject({ ok: true, text: '# By chapter\n## Ventania ^k8\n^c50\n\n## Traição ^k10\n^c49 ^c55 ^c56\n\n# By order\n## Noite ^k20\n^c55 ^c56\n' })
+    expect(second).toMatchObject({ ok: true, text: '# By chapter\n## A Tempestade ^k8\n^c50\n\n## O Visitante ^k10\n^c49 ^c55 ^c56\n\n# By order\n## Noite ^k20\n^c55 ^c56\n' })
   })
 
   it('is not clear when no change comes before it', () => {

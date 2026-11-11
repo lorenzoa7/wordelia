@@ -6,6 +6,7 @@ Each version has its Windows installer in GitHub Releases. The release workflow 
 
 - A change of the story line from the chat no longer fails when a line of card ids is in its two views ("By chapter" and "By order"): the changes of a proposal go in their order. The AI now starts such a change with the heading of its column. When a proposal still cannot apply, the bar says why.
 - The card "N changes proposed to the notes" keeps "Accept all" and "Reject all" inside their buttons: in a narrow sidebar they go one under the other.
+- A note no longer leaves the Plan view when you give it a new name and its old name again fast, or when you undo the delete of a category at once. Its file was always on the disk; the app now reads late events of its own changes right.
 
 ## 0.16.1 (2026-11-04)
 

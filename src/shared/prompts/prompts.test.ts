@@ -196,6 +196,13 @@ describe('story line in the prompts', () => {
     expect(s).toContain('The last written chapter is chapter 3, "Três"')
   })
 
+  it('a change of an id line starts with the heading of its column: the same id line can be in the two views', () => {
+    // A real proposal changed "^c55 ^c56 ^c57 ^c58", which was in "# By chapter" and in "# By order".
+    const s = withLine('c1')
+    expect(s).toMatch(/start the <find> with the heading line of its column/)
+    expect(s).toMatch(/in the order of the file/)
+  })
+
   it('says when the open chapter has no card', () => {
     expect(withLine('c3')).toContain('The open chapter "Três" (chapter 3) has no card in the story line yet.')
   })

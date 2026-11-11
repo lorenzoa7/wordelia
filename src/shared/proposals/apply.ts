@@ -98,3 +98,30 @@ export function applyHunk(
   if (m.count > 1) return { ok: false, code: 'ambiguous', reason: 'The text to change appears more than once, so the right place is not clear. Ask the AI for a longer passage.' }
   return { ok: true, text: markdown.slice(0, m.start) + replace + markdown.slice(m.end) }
 }
+
+/**
+ * Apply one change of a series that is in the order of the text: `from` is the end of the change before
+ * it in this text (0 for the first). Words that are in the text more than one time go to their first
+ * place after `from`: the changes of a story line often have an id line that is in its two views. The
+ * result has the end of the new words, for the next change.
+ */
+export function applyHunkAfter(
+  markdown: string,
+  find: string,
+  replace: string,
+  from: number
+): { ok: true; text: string; end: number } | { ok: false; reason: string; code: 'not-found' | 'ambiguous' } {
+  if (!find.trim()) {
+    const res = applyHunk(markdown, find, replace)
+    return res.ok ? { ...res, end: res.text.length } : res
+  }
+  const m = findText(markdown, find)
+  if (m && m.count === 1) return { ok: true, text: markdown.slice(0, m.start) + replace + markdown.slice(m.end), end: m.start + replace.length }
+  const later = m && from > 0 ? findText(markdown.slice(from), find) : null
+  if (later) {
+    const start = from + later.start
+    return { ok: true, text: markdown.slice(0, start) + replace + markdown.slice(from + later.end), end: start + replace.length }
+  }
+  const res = applyHunk(markdown, find, replace)
+  return res.ok ? { ...res, end: res.text.length } : res
+}

@@ -118,6 +118,7 @@ export const plan: typeof en = {
     columnMove: 'Muda de lugar',
     reviewLocked: 'Aceite ou rejeite a proposta antes de mudar a linha.',
     reviewStale: 'Esta proposta da IA não cabe mais na linha.',
+    reviewAmbiguous: 'Esta proposta da IA aponta um trecho que aparece mais de uma vez na linha. Peça para a IA propor de novo.',
     writing: 'A IA está escrevendo uma proposta para a linha…',
     showInChat: 'Mostrar no chat',
     showInLine: 'Mostrar na linha',

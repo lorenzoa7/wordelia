@@ -130,6 +130,8 @@ export const plan = {
     columnMove: 'New place',
     reviewLocked: 'Accept or reject it before you change the line.',
     reviewStale: 'This proposal of the AI does not fit the line any more.',
+    /** A change of the AI names words that are in the line more than one time: the place is not clear */
+    reviewAmbiguous: 'This AI proposal names a part of the line that is in it more than one time. Ask the AI to propose it again.',
     writing: 'The AI writes a proposal for the line…',
     showInChat: 'Show in the chat',
     showInLine: 'Show in the line',

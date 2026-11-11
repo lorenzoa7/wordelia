@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyHunk, findText } from './apply'
+import { applyHunk, applyHunkAfter, findText } from './apply'
 import { hasProposals, isFileSegment, parseProposals, proposalSummary, replyProse } from './parse'
 import { hasIncomplete, pendingKeys } from './state'
 import { diffStats, wordDiff } from '../text/diff'
@@ -85,6 +85,28 @@ describe('applyHunk', () => {
 
   it('appends when find is empty', () => {
     expect(applyHunk('Fim.\n', '', 'Novo.')).toEqual({ ok: true, text: 'Fim.\n\nNovo.\n' })
+  })
+})
+
+describe('applyHunkAfter', () => {
+  // A story line has the same id line in its two views: "^c55 ^c56" can be in "# By chapter" and in "# By order".
+  const line = '# By chapter\n## Ventania ^k8\n^c49 ^c50\n\n## Traição ^k10\n^c55 ^c56\n\n# By order\n## Noite ^k20\n^c55 ^c56\n'
+
+  it('takes the first place after the change before it when the words are in the text more than one time', () => {
+    const first = applyHunkAfter(line, '## Ventania ^k8\n^c49 ^c50', '## Ventania ^k8\n^c50', 0)
+    expect(first.ok).toBe(true)
+    if (!first.ok) return
+    const second = applyHunkAfter(first.text, '^c55 ^c56', '^c49 ^c55 ^c56', first.end)
+    expect(second).toMatchObject({ ok: true, text: '# By chapter\n## Ventania ^k8\n^c50\n\n## Traição ^k10\n^c49 ^c55 ^c56\n\n# By order\n## Noite ^k20\n^c55 ^c56\n' })
+  })
+
+  it('is not clear when no change comes before it', () => {
+    expect(applyHunkAfter(line, '^c55 ^c56', '^c49 ^c55 ^c56', 0)).toMatchObject({ ok: false, code: 'ambiguous' })
+  })
+
+  it('gives the end of the new words, for the next change', () => {
+    const r = applyHunkAfter('Um dois três.', 'dois', 'DOIS', 0)
+    expect(r).toEqual({ ok: true, text: 'Um DOIS três.', end: 'Um DOIS'.length })
   })
 })
 

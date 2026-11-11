@@ -9,7 +9,7 @@
 import { useMemo } from 'react'
 import { PLANNING_DIR, entryToFile } from '@shared/book'
 import { readFrontmatter } from '@shared/markdown/frontmatter'
-import { applyHunk } from '@shared/proposals/apply'
+import { applyHunkAfter } from '@shared/proposals/apply'
 import { hunkKey, parseProposals, type Segment } from '@shared/proposals/parse'
 import { STORY_LINE_TYPE, applyBoardChange, applyOrder, boardChanges, cascadeRejects, findStoryLine, impliedChanges, isStoryLine, linkMentions, liveChanges, parseBoard, type Board, type BoardChange } from '@shared/storyline'
 import type { ChatMessage, HunkState, Thread } from '@shared/types'
@@ -53,6 +53,8 @@ export interface LineProposal {
   base: string
   /** The proposed body; null when an edit does not fit the line any more */
   after: string | null
+  /** Why `after` is null: the words of a change are not in the line (it changed since), or they are in it more than one time */
+  failure: 'not-found' | 'ambiguous' | null
   /** The proposal was decided in part: its two lines are kept in the message */
   kept: boolean
   /** All the changes of the proposal (between `base` and `after`) */
@@ -91,6 +93,7 @@ export function messageLineProposal(thread: Thread, message: ChatMessage, body: 
   const kept = message.lineAfter !== undefined
   const base = kept ? (message.lineBefore ?? body ?? '') : (body ?? '')
   let after: string | null = kept ? message.lineAfter! : base
+  let failure: LineProposal['failure'] = null
   if (!kept) {
     for (const s of segments) {
       if (after === null) break
@@ -98,16 +101,25 @@ export function messageLineProposal(thread: Thread, message: ChatMessage, body: 
         after = readFrontmatter(s.content).body
         continue
       }
+      // The changes of an edit are in the order of the line: an id line that is in the two views goes to
+      // its first place after the change before it.
+      let from = 0
       for (let i = 0; i < s.hunks.length && after !== null; i++) {
         if (!pendingOf(s, states).includes(hunkKey(s.index, i))) continue
-        const res = applyHunk(after, s.hunks[i].find, s.hunks[i].replace)
-        after = res.ok ? res.text : null
+        const res = applyHunkAfter(after, s.hunks[i].find, s.hunks[i].replace, from)
+        if (res.ok) {
+          after = res.text
+          from = res.end
+        } else {
+          after = null
+          failure = res.code
+        }
       }
     }
   }
   const decided = Object.fromEntries(Object.entries(states).flatMap(([k, v]) => (k.startsWith(LINE) ? [[k.slice(LINE.length), v]] : [])))
   const chapters = useBook.getState().chapters
-  const p = { before: body ?? '', base, after }
+  const p = { before: body ?? '', base, after, failure }
   const next = proposedBoard(p)
   // The changes are the changes between the two kept lines: a later change of the line (a card of the
   // author, another proposal, a new chapter title) is not a change of this proposal.
@@ -250,7 +262,7 @@ export async function acceptLineProposal(p: LineProposal): Promise<void> {
   const book = useBook.getState()
   const story = findStoryLine(book.entries)
   if (p.after === null || (story ? story.body : '') !== p.before) {
-    toast(t.plan.line.reviewStale, { kind: 'error' })
+    toast(p.failure === 'ambiguous' ? t.plan.line.reviewAmbiguous : t.plan.line.reviewStale, { kind: 'error' })
     return
   }
   const snap = story ? snapshotOf(`${PLANNING_DIR}/${story.file}`) : null

@@ -610,7 +610,7 @@ function LineCard({ segment, message, thread, streaming }: Props & { segment: Li
       {p && (
         <div className="line-proposal-body">
           {p.after === null ? (
-            <p className="proposal-line-stale">{t.plan.line.reviewStale}</p>
+            <p className="proposal-line-stale">{p.failure === 'ambiguous' ? t.plan.line.reviewAmbiguous : t.plan.line.reviewStale}</p>
           ) : (
             <div className="line-proposal-actions">
               <button className="proposal-btn" onClick={() => rejectLineProposal(p)}>

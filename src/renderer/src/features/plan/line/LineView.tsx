@@ -178,7 +178,7 @@ export function LineView(): React.JSX.Element {
   } else if (proposal) {
     bar = (
       <div className="line-bar is-stale" role="status">
-        <span className="line-bar-text">{t.plan.line.reviewStale}</span>
+        <span className="line-bar-text">{proposal.failure === 'ambiguous' ? t.plan.line.reviewAmbiguous : t.plan.line.reviewStale}</span>
         <IconButton label={t.plan.line.showInChat} onClick={() => showInChat(proposal)}>
           <ChatCircleText size={15} />
         </IconButton>

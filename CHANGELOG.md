@@ -2,6 +2,11 @@
 
 Each version has its Windows installer in GitHub Releases. The release workflow copies the section of the version from this file to the release notes.
 
+## 0.16.2 (2026-11-10)
+
+- A change of the story line from the chat no longer fails when a line of card ids is in its two views ("By chapter" and "By order"): the changes of a proposal go in their order. The AI now starts such a change with the heading of its column. When a proposal still cannot apply, the bar says why.
+- The card "N changes proposed to the notes" keeps "Accept all" and "Reject all" inside their buttons: in a narrow sidebar they go one under the other.
+
 ## 0.16.1 (2026-11-04)
 
 The tag v0.16.0 has no release: a scenario was unstable on CI. This version has all of 0.16.0, and these fixes.

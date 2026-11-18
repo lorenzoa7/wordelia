@@ -6,7 +6,7 @@
 // on the same passage: it is a retry.
 
 import { serializeMarkdown } from '@shared/markdown/serialize'
-import { buildActionSystem, buildActionUser, extractRewrite, replyWithoutRewrite, tidyRewrite } from '@shared/prompts/action'
+import { buildActionSystem, buildActionUser, extractRewrite, replyWithoutRewrite, tidyRewrite, voiceOfBook } from '@shared/prompts/action'
 import { contextAround } from '@shared/prompts/context'
 import { hasChanges } from '@shared/text/diff'
 import type { AiAction, CompletionResult, DocNode, ModelChoice, ProviderId } from '@shared/types'
@@ -209,6 +209,8 @@ export async function runAction(action: AiAction, range?: { from: number; to: nu
     selection: selectionMd,
     after: ctx.after,
     chapterTitle: chapter?.title ?? '',
+    // How the book narrates, from another chapter: a draft and the text around it can use another tense.
+    voice: voiceOfBook(book.chapters, chapterId),
     note
   }
 

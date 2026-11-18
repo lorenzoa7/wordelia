@@ -391,6 +391,14 @@ The composer (`Composer.tsx`) and the edit box of a sent message use `ChatInput.
 
 An action sends: the writing rules, the action instructions, N characters before the selection, the selection, and N characters after. The AI returns `<rewrite>...</rewrite>`. The editor shows a word diff as decorations on the page. Accept replaces the range in one transaction.
 
+The tense and the point of view come from the writing rules, not from the text around the passage. A draft is often in another tense (the present tense in a book that narrates in the past tense), and the N characters around it are in that tense too. Without help, the AI keeps the tense of the context. Three parts of the prompt prevent this:
+
+- `voiceOfBook` sends the end of the nearest other chapter with text (`<book_voice>`, about 900 characters) as a sample of how the book narrates.
+- The last line of the user turn, after `<after>`, asks for the tense and the point of view of the writing rules.
+- The AI writes `<narration>past tense, third person</narration>` before `<rewrite>`. When it names the tense first, it keeps that tense. The app ignores this line (`extractRewrite`, `replyWithoutRewrite`).
+
+A live test on a draft in the present tense gave the past tense in 6 of 6 runs with the three parts. With only the rule in the system prompt, it gave the past tense in about half of the runs.
+
 #### The review of an action
 
 `runAction` (`features/actions/runAction.ts`) runs the action, and `review.ts` with `ReviewBar.tsx` shows the result.

@@ -2,6 +2,10 @@
 
 Each version has its Windows installer in GitHub Releases. The release workflow copies the section of the version from this file to the release notes.
 
+## 0.16.3 (2026-11-17)
+
+- An action (Polish, or one of your own) now writes in the tense and the point of view of your writing rules. Before, on a draft in another tense (for example the present tense in a book that narrates in the past tense), it kept the tense of the draft and of the text around it. The AI now also gets the end of another chapter as a sample of how your book narrates.
+
 ## 0.16.2 (2026-11-10)
 
 - A change of the story line from the chat no longer fails when a line of card ids is in its two views ("By chapter" and "By order"): the changes of a proposal go in their order. The AI now starts such a change with the heading of its column. When a proposal still cannot apply, the bar says why.

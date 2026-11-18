@@ -5,7 +5,7 @@ This file is the source of truth for progress. Update it after each task. Mark a
 ## Current focus
 
 > **Milestone:** Version 0.16 — find in notes, safer chat proposals
-> **Next task:** Release 0.16.3 (actions keep the tense of the writing rules). Then collect feedback.
+> **Next task:** Collect feedback on 0.16.3.
 > **Not verified:** Codex and the two API transports. The user has no Codex account, and no API keys are set. The scripted provider (`WORDELIA_MOCK_AI=1`) covers their UI flows.
 
 ## M0 — Foundation
@@ -388,7 +388,7 @@ This file is the source of truth for progress. Update it after each task. Mark a
 - [x] No ids or file paths in the words of the chat; room around the Accept and Reject buttons in the page
 - [x] 0.16.1: a chapter that comes back after a change while it had no editor keeps its text (it was emptied: two schemas); a save that takes most of a chapter away keeps a version first; Ctrl+F loses no letters; scenario `farchange`
 - [x] 0.16.2: story line proposals apply their changes in order (an id line in the two views); the notes update card fits a narrow sidebar
-- [x] Actions narrate in the tense and the point of view of the writing rules, also on a draft in another tense: a sample of another chapter (`voiceOfBook`), a last line in the user turn, and a `<narration>` line before the rewrite
+- [x] 0.16.3: actions narrate in the tense and the point of view of the writing rules, also on a draft in another tense: a sample of another chapter (`voiceOfBook`), a last line in the user turn, and a `<narration>` line before the rewrite
 - [x] 62 scenarios, 745 unit tests
 
 ## Tests and CI
